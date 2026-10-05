@@ -2,109 +2,145 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<title>예약현황 (시험용 가짜 네이버 예약관리 화면)</title>
-<!-- 사장님이 보낸 네이버 스마트플레이스 예약현황 캡처를 본뜬 시험용 페이지 (실제 저장본을 받으면 구조를 다시 맞춤)
-     - 위: ‹ 2026. 10. 5. 월 › 날짜
-     - 가운데 표: 열 = 상품(평일 무제한 / 휴일 1시간 50분 입장권 · 야간자유 입장권 · [평일] 단체 · 열쇠분실), 줄 = 시간(오후 2:00 …)
-       칸 안에 "예약가능 7" · "확정 3" · "이용완료 2"
-     - 칸을 누르면 오른쪽에 탭 "예약가능 7 | 확정 3 | 완료 2" 와 예약자 카드
-       카드: 상태(확정/완료) · 이름 · "완료 1, 취소 1" · 예약자 · 전화번호 · 예약번호 · 예약유형 · 상품 · 이용일시 · 수량 · 결제상태 · [예약취소] [이용완료]
-     - ?login=need 로그인 화면 -->
+<title>네이버 스마트플레이스 (시험용 가짜 예약관리 화면)</title>
+<!-- 사장님이 저장해 준 실제 네이버 예약관리 화면(2026-10-05) 구조를 본뜬 시험용 페이지. 클래스 이름도 실제와 같게(뒤 해시 포함).
+     ?view=list      예약 목록: "이전 26. 10. 5.월 다음", 줄마다 a.contents-user(상태·예약자·전화번호·예약번호) + a.contents-booking(이용일시·상품·수량·결제상태)
+     ?view=calendar  예약현황: "이전 2026. 10. 5. 월 다음", 머리 = 상품 이름, 줄 = 시간, 칸 = "오전 10:00" + 버튼(title 예약가능/잔여예약/확정/이용완료, 숫자)
+                     확정·이용완료 버튼 → 오른쪽 "예약정보" 패널: 탭 확정 n / 완료 n, 카드(List__contents-box) — 이름 밑 "완료 11, 취소 2", 예약자·전화번호·예약번호·상품·이용일시·수량·결제상태
+                     확정 카드의 [이용완료] → "이용완료 처리하시겠습니까?" [확인] (실제 확인 창 모양은 아직 모름)
+     ?login=need 로그인 화면 -->
 <style>
-  body { margin: 0; font-family: "Malgun Gothic", sans-serif; font-size: 13px; display: grid; grid-template-columns: 1fr 340px; }
-  .top { grid-column: 1 / -1; padding: 8px; border-bottom: 1px solid #ddd; }
-  table { border-collapse: collapse; }
-  th, td { border: 1px solid #ddd; padding: 4px; vertical-align: top; min-width: 120px; }
-  .chip { display: flex; justify-content: space-between; padding: 2px 6px; margin: 2px 0; border-radius: 4px; cursor: pointer; }
-  .avail { background: #d8eef0; } .conf { background: #2d5fd3; color: #fff; } .done { background: #eee; }
+  body { margin: 0; font-family: "Malgun Gothic", sans-serif; font-size: 13px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .bar { padding: 8px; border-bottom: 1px solid #ddd; }
+  .d-flex { display: flex; }
+  [class*="Calendar__week-cell__"] { width: 170px; border: 1px solid #eee; padding: 4px; min-height: 30px; }
+  .calendar-btn { margin: 2px; }
+  [class*="BookingListView__cell__"] { padding: 4px 8px; min-width: 60px; }
+  .wrap { display: grid; grid-template-columns: 1fr 340px; }
   aside { border-left: 1px solid #ddd; padding: 8px; }
-  .tabs a { margin-right: 8px; cursor: pointer; } .tabs a.on { font-weight: bold; text-decoration: underline; }
-  .card { border-bottom: 1px solid #ddd; padding: 8px 0; }
-  .card dl { display: grid; grid-template-columns: 80px 1fr; margin: 4px 0; }
-  .card dt { color: #888; } .card dd { margin: 0; }
-  .sub { color: #1a9a4a; font-size: 12px; }
+  [class*="List__contents-box"] { border-bottom: 1px solid #ddd; padding: 8px 0; }
+  [class*="Summary__item__"] { display: flex; gap: 8px; }
   .layer { position: fixed; top: 30%; left: 35%; background: #fff; border: 2px solid #333; padding: 16px; }
 </style>
 </head>
 <body>
 <script>
   const P = new URLSearchParams(location.search);
-  const KEY = "mockNaver";
+  const KEY = "mockNaver3";
   const DOW = ["일", "월", "화", "수", "목", "금", "토"];
-  const PRODUCTS = ["평일 무제한 / 휴일 1시간 50분 입장권", "야간자유 입장권", "[평일] 단체 입장권", "열쇠분실[미반납]"];
+  const PRODUCTS = ["평일 무제한 / 휴일 1시간 50분 입장권", "야간자유 입장권", "[평일] 단체 10시~13시 대관", "열쇠분실[미반납]결제"];
   const seed = () => ({
     "2026-10-05": [
+      { no: "1367156204", name: "송나라", phone: "010-6687-3285", time: "10:00", product: 0, qty: 1, status: "완료", done: 11, cancel: 2 },
+      { no: "1368411002", name: "엄효정", phone: "010-5358-6288", time: "10:00", product: 0, qty: 2, status: "완료", done: 11, cancel: 0 },
       { no: "1368102888", name: "백연화", phone: "010-7515-4623", time: "14:00", product: 0, qty: 1, status: "확정", done: 1, cancel: 1 },
       { no: "1368155282", name: "허정은", phone: "010-4674-0736", time: "14:00", product: 0, qty: 1, status: "확정", done: 8, cancel: 2 },
       { no: "1368177001", name: "송다온", phone: "010-2024-5489", time: "14:00", product: 0, qty: 2, status: "확정", done: 9, cancel: 0 },
-      { no: "1368100555", name: "고성현", phone: "010-9196-0199", time: "13:30", product: 0, qty: 1, status: "완료", done: 3, cancel: 0 },
+      { no: "1368188002", name: "취소손님", phone: "010-5555-6666", time: "14:00", product: 0, qty: 1, status: "취소", done: 2, cancel: 3 },
       { no: "1370988026", name: "홍길동", phone: "010-1111-2222", time: "18:00", product: 1, qty: 1, status: "확정", done: 0, cancel: 0 },
-      { no: "1370988777", name: "단체손님", phone: "010-3333-4444", time: "14:00", product: 2, qty: 1, status: "확정", done: 0, cancel: 0 },
+      { no: "1370988777", name: "단체손님", phone: "010-3333-4444", time: "10:00", product: 2, qty: 1, status: "확정", done: 0, cancel: 0 },
     ],
   });
   let db;
   try { db = JSON.parse(localStorage.getItem(KEY)) || seed(); } catch (e) { db = seed(); }
   const save = () => localStorage.setItem(KEY, JSON.stringify(db));
-  let day = P.get("day") || "2026-10-05", openCell = null, tab = "확정";
-  const hm12 = (t) => { let [h, m] = t.split(":").map(Number); return `${h < 12 ? "오전" : "오후"} ${h > 12 ? h - 12 : h}:${String(m).padStart(2, "0")}`; };
-  const label = (k) => { const d = new Date(k + "T12:00:00"); return `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}. ${DOW[d.getDay()]}`; };
+  const go = (o) => { const q = new URLSearchParams(Object.assign(Object.fromEntries(P), o)); location.href = location.pathname + "?" + q; };
+  const view = P.get("view") || "calendar";
+  const day = P.get("day") || "2026-10-05";
   const shift = (k, n) => { const d = new Date(k + "T12:00:00"); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
-  const times = []; for (let h = 10; h <= 19; h++) times.push(`${h}:00`, `${h}:30`);
+  const D = new Date(day + "T12:00:00");
+  const ampm = (t) => { let [h, m] = t.split(":").map(Number); return [h < 12 ? "오전" : "오후", `${h > 12 ? h - 12 : h}:${String(m).padStart(2, "0")}`]; };
+  const list = db[day] || [];
+  const dateNav = (txt) => `<button type="button" class="DatePeriodCalendar__btn-date__TWrZb DatePeriodCalendar__prev__lUBcO" onclick="go({day:'${shift(day, -1)}',sel:''})"><span class="sr-only">이전</span>‹</button>
+    <span class="DatePeriodCalendar__date__x1">${txt}</span>
+    <button type="button" class="DatePeriodCalendar__btn-date__TWrZb DatePeriodCalendar__next__1Ox-q" onclick="go({day:'${shift(day, 1)}',sel:''})"><span class="sr-only">다음</span>›</button>`;
 
-  function render() {
-    if (P.get("login") === "need") {
-      document.body.innerHTML = `<form style="margin:80px auto;display:grid;gap:8px;width:280px"><b>NAVER 로그인</b><input placeholder="아이디"><input type="password" placeholder="비밀번호"><button type="button">로그인</button></form>`;
-      return;
-    }
-    const list = db[day] || [];
+  if (P.get("login") === "need") {
+    document.body.innerHTML = `<form style="margin:80px auto;display:grid;gap:8px;width:280px"><b>NAVER 로그인</b><input placeholder="아이디"><input type="password" placeholder="비밀번호"><button type="button">로그인</button></form>`;
+  } else if (view === "list") {
+    const label = `${String(D.getFullYear()).slice(2)}. ${D.getMonth() + 1}. ${D.getDate()}.${DOW[D.getDay()]}`;
+    const all = list.slice().sort((a, b) => a.time.localeCompare(b.time));
+    let shownN = 3; // 실제는 50줄씩
+    const rows = all.slice(0, shownN);
+    const renderList = () => { const rows = all.slice(0, shownN);
+    document.body.innerHTML = `<div class="bar">${dateNav(label)} <span>${all.length}건</span><span>내려받기</span></div>
+      <div class="BookingListView__root__Gdv+5"><div class="BookingListView__booking-list-table__W6zDs">
+      <div class="BookingListView__list-contents__Jl5uz">${rows.map((b) => `<a href="#" class="BookingListView__contents-user__oA+jA d-flex" data-tst_click_link="${b.no}">
+        <div class="BookingListView__cell__VGAjs BookingListView__state__-xJ-b"><span class="label label-round">${b.status}</span></div>
+        <div class="BookingListView__cell__VGAjs BookingListView__name__V9wyJ" title="${b.name}"><div class="BookingListView__name-area__L4MQS"><span>${b.name}</span></div></div>
+        <div class="BookingListView__cell__VGAjs BookingListView__phone__XhSA-"><span>${b.phone}</span></div>
+        <div class="BookingListView__cell__VGAjs BookingListView__book-number__2f8Ix">${b.no}</div></a>`).join("")}</div>
+      <div class="BookingListView__booking-list-table-cell-wrap__PZCKc"><div class="BookingListView__content__-ukEo">${rows.map((b) => `<a href="#" class="BookingListView__contents-booking__A0Gzc d-flex" data-tst_click_link="${b.no}">
+        <div class="BookingListView__cell__VGAjs BookingListView__book-date__tEIDm"><span class="BookingListView__secondary-text__4Lwgy">${b.time}</span></div>
+        <div class="BookingListView__cell__VGAjs BookingListView__host__NcbHk" title="${PRODUCTS[b.product]}"><span class="BookingListView__primary-text__-kehQ">${PRODUCTS[b.product]}</span></div>
+        <div class="BookingListView__cell__VGAjs BookingListView__option__G+sun"><span class="BookingListView__primary-text__-kehQ">4인 입장권<span class="text-info">${b.qty}</span></span></div>
+        <div class="BookingListView__cell__VGAjs BookingListView__option__G+sun"><span></span></div>
+        <div class="BookingListView__cell__VGAjs BookingListView__payment-state__RsNRx"><span class="label">결제완료</span></div>
+        <div class="BookingListView__cell__VGAjs BookingListView__total-price__uOOlX">${(14000 * b.qty).toLocaleString()}원</div></a>`).join("")}</div>
+      ${rows.map((b) => `<a href="#" class="BookingListView__contents-user__oA+jA" data-tst_click_link="${b.no}"></a>`).join("")}</div>
+      </div></div><div style="height:1200px"></div><div>${shownN < all.length ? "로딩중" : ""}</div>`; };
+    renderList();
+    window.addEventListener("scroll", () => {
+      if (shownN < all.length && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 50) setTimeout(() => { shownN += 3; renderList(); }, 200);
+    });
+  } else {
+    const label = `${D.getFullYear()}. ${D.getMonth() + 1}. ${D.getDate()}. ${DOW[D.getDay()]}`;
+    const times = []; for (let h = 10; h <= 19; h++) times.push(`${String(h).padStart(2, "0")}:00`, `${String(h).padStart(2, "0")}:30`);
+    const has = (p, t) => (p === 0 && t < "18:00") || (p === 1 && t >= "18:00") || (p === 2 && t === "10:00");
+    const btn = (title, n, cls) => `<button type="button" class="btn btn-xs calendar-btn ${cls}" title="${title}" data-act="${title}"><span><span class="StatusButton__text__Mw4v+ text">${title.slice(0, 2)}</span><span class="StatusButton__text__Mw4v+ text">${title.slice(2)}</span></span><span class="number">${n}</span></button>`;
     const cell = (p, t) => {
-      // 실제처럼: 야간자유 입장권은 18:00 부터, 평일/휴일 입장권은 17:30 까지만 칸이 있음
-      if ((p === 1 && t < "18:00" && t.length === 5) || (p === 0 && t >= "18:00")) return "";
-      const bs = list.filter((b) => b.product === p && b.time === t);
+      if (!has(p, t)) return `<div class="Calendar__week-cell__ntFou Calendar__week-rest__4uV-Y"><div class="Calendar__week-cell-inner__tqaOB"></div></div>`;
+      const bs = list.filter((b) => b.product === p && b.time === t && b.status !== "취소");
       const conf = bs.filter((b) => b.status === "확정").reduce((a, b) => a + b.qty, 0);
       const done = bs.filter((b) => b.status === "완료").reduce((a, b) => a + b.qty, 0);
-      return `<div class="slotcell" data-p="${p}" data-t="${t}"><div class="time">${hm12(t)}</div>
-        <div class="chip avail" data-tab="예약가능"><span>예약가능</span><b>${10 - conf - done}</b></div>
-        ${conf ? `<div class="chip conf" data-tab="확정"><span>확정</span><b>${conf}</b></div>` : ""}
-        ${done ? `<div class="chip done" data-tab="완료"><span>이용완료</span><b>${done}</b></div>` : ""}</div>`;
+      const [ap, hm] = ampm(t);
+      return `<div class="Calendar__week-cell__ntFou" title="예약 등록"><div class="Calendar__week-cell-inner__tqaOB Calendar__clickable__lL1Wp" data-p="${p}" data-t="${t}">
+        <span class="btn btn-xs calendar-btn btn-trans"><span class="text">${ap}</span><span class="time">${hm}</span></span>
+        ${conf || done ? btn("잔여예약", 10 - conf - done, "remaining") : btn("예약가능", 10, "avail")}${conf ? btn("확정", conf, "confirmed") : ""}${done ? btn("이용완료", done, "completed") : ""}</div></div>`;
     };
+    const sel = P.get("sel") ? JSON.parse(P.get("sel")) : null; // { p, t, s: "확정"|"완료" }
     let panel = "";
-    if (openCell) {
-      const bs = list.filter((b) => b.product === openCell.p && b.time === openCell.t);
-      const c = (s) => bs.filter((b) => b.status === s).length;
-      const shown = bs.filter((b) => b.status === tab);
-      panel = `<div class="tabs"><a data-tab="예약가능">예약가능 ${10 - c("확정") - c("완료")}</a><a class="${tab === "확정" ? "on" : ""}" data-tab="확정">확정 ${c("확정")}</a><a class="${tab === "완료" ? "on" : ""}" data-tab="완료">완료 ${c("완료")}</a></div>
-        ${shown.map((b) => `<div class="card"><div><span class="badge">${b.status}</span> <strong class="name">${b.name}</strong><div class="sub">완료 ${b.done}${b.cancel ? `, 취소 ${b.cancel}` : ""}</div></div>
-          <dl><dt>예약자</dt><dd>${b.name}</dd><dt>전화번호</dt><dd>${b.phone}</dd><dt>예약번호</dt><dd>${b.no}</dd><dt>예약유형</dt><dd>일반</dd>
-          <dt>상품</dt><dd>${PRODUCTS[b.product]}</dd><dt>이용일시</dt><dd>${label(day).replace(/ (.)$/, ".($1)")} ${hm12(b.time)}</dd><dt>수량</dt><dd>4인 입장권 ${b.qty}</dd><dt>결제상태</dt><dd><span>결제완료</span></dd></dl>
-          ${b.status === "확정" ? `<button type="button" data-cancel="${b.no}">예약취소</button> <button type="button" data-complete="${b.no}">이용완료</button>` : ""}</div>`).join("")}`;
+    if (sel) {
+      const bs = list.filter((b) => b.product === sel.p && b.time === sel.t);
+      const n = (s) => bs.filter((b) => b.status === s).length;
+      const shown = bs.filter((b) => b.status === sel.s);
+      panel = `<div><b>예약정보</b> <button type="button" onclick="go({sel:''})">닫기</button></div>
+        <ul>${["확정", "완료"].map((s) => `<li class="BookingListTab__item__WvfHs ${s === sel.s ? "BookingListTab__active__rhhuS" : ""}"><a href="#" class="BookingListTab__anchor__CNbqG" data-tab="${s}">${s}${n(s)}</a></li>`).join("")}</ul>
+        ${shown.map((b) => { const [ap, hm] = ampm(b.time); return `<div class="List__contents-box__aIuHh"><div class="Summary__root__J7Cxm"><div class="Summary__profile__65ECc">
+          <a href="#" class="Summary__user-area__d8i5K" data-tst_click_link="${b.no}"><span class="Summary__user-state__-w1Zi"><span class="label label-round" data-tst_booking_status="0">${b.status}</span></span>
+          <span class="Summary__user-info__5U4rs"><span class="Summary__user-name__gnk40"><span class="Summary__name__MDiZ7">${b.name}</span></span><div class="Summary__user-state-label__uvLuO"><div><div class="text-info-sub"> 완료 ${b.done}${b.cancel ? `, 취소 ${b.cancel}` : ""}</div></div></div></span></a></div>
+          <div class="Summary__list-cont__MA7Mv">
+            <div class="Summary__item__mKdi8"><span class="Summary__item-title__Z-wa7">예약자</span><span class="Summary__item-dsc__Y4wms">${b.name}</span></div>
+            <div class="Summary__item__mKdi8"><span class="Summary__item-title__Z-wa7">전화번호</span><a href="tel:${b.phone}" class="Summary__item-dsc__Y4wms">${b.phone}</a></div>
+            <div class="Summary__item__mKdi8"><span class="Summary__item-title__Z-wa7">예약번호</span><span class="Summary__item-dsc__Y4wms"><span>${b.no}</span></span></div>
+            <div class="Summary__item__stsVC"><span class="Summary__item-title__bzqwu">상품</span><span class="Summary__item-dsc__5aGv2">${PRODUCTS[b.product]}</span></div>
+            <div class="Summary__item__stsVC"><span class="Summary__item-title__bzqwu">이용일시</span><span class="Summary__item-dsc__5aGv2">${D.getFullYear()}. ${D.getMonth() + 1}. ${D.getDate()}.(${DOW[D.getDay()]}) ${ap} ${hm}</span></div>
+            <div class="Summary__item__stsVC"><span class="Summary__item-title__bzqwu">수량</span><span class="Summary__item-dsc__5aGv2"><span>4인 입장권 <span class="text-info">${b.qty}</span><span>, </span></span></span></div>
+            <div class="Summary__item__stsVC"><span class="Summary__item-title__bzqwu">결제상태</span><span class="Summary__item-dsc__5aGv2"><span class="label">결제완료</span></span></div>
+          </div>${b.status === "확정" ? `<div class="Summary__btn-area"><button type="button" class="btn">예약취소</button><button type="button" class="btn btn-dark" data-complete="${b.no}">이용완료</button></div>` : ""}</div></div>`; }).join("")}`;
     }
-    document.body.innerHTML = `<div class="top"><button class="prev">‹</button> <span class="date">${label(day)}</span> <button class="next">›</button></div>
-      <main><table><thead><tr><th></th>${PRODUCTS.map((p) => `<th>${p}</th>`).join("")}</tr></thead>
-      <tbody>${times.map((t) => `<tr><td>${hm12(t)}</td>${PRODUCTS.map((_, p) => `<td>${cell(p, t)}</td>`).join("")}</tr>`).join("")}</tbody></table></main>
-      <aside>${panel}</aside>`;
+    document.body.innerHTML = `<div class="bar">${dateNav(label)}</div><div class="wrap"><div class="Calendar__inner-contents__px333">
+      <div class="Calendar__inner-header__y3esS"><div class="d-flex Calendar__week-row__JWB4z">${PRODUCTS.map((x) => `<div class="Calendar__week-cell__ntFou"><span class="Calendar__day-header__6caUi">${x}</span></div>`).join("")}</div></div>
+      <div class="Calendar__row-wrap__8dvIt">${times.map((t) => `<div class="d-flex Calendar__week-cell-daily-row__5WVtA">${PRODUCTS.map((_, p) => cell(p, t)).join("")}</div>`).join("")}</div>
+      </div><aside>${panel}</aside></div>`;
+    document.addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-act]");
+      if (b && (b.dataset.act === "확정" || b.dataset.act === "이용완료")) { const c = b.closest("[data-p]"); setTimeout(() => go({ sel: JSON.stringify({ p: +c.dataset.p, t: c.dataset.t, s: b.dataset.act === "확정" ? "확정" : "완료" }) }), 150); return; }
+      const tab = e.target.closest("[data-tab]");
+      if (tab) { e.preventDefault(); setTimeout(() => go({ sel: JSON.stringify(Object.assign(sel, { s: tab.dataset.tab })) }), 150); return; }
+      const c = e.target.closest("[data-complete]");
+      if (c) {
+        const box = document.createElement("div");
+        box.className = "layer";
+        box.innerHTML = `<p>이용완료 처리하시겠습니까?</p><button type="button" class="ok">확인</button> <button type="button">취소</button>`;
+        box.querySelector(".ok").onclick = () => { const x = db[day].find((y) => y.no === c.dataset.complete); x.status = "완료"; x.done += 1; save(); box.remove(); setTimeout(() => go({}), 200); };
+        box.querySelectorAll("button")[1].onclick = () => box.remove();
+        document.body.appendChild(box);
+      }
+    });
   }
-  // 예약관리 화면처럼 자리에서 바뀜 (조금 늦게)
-  const later = (fn) => setTimeout(() => { fn(); render(); }, 200);
-  document.addEventListener("click", (e) => {
-    const t = e.target;
-    if (t.closest(".prev")) return later(() => { day = shift(day, -1); openCell = null; });
-    if (t.closest(".next")) return later(() => { day = shift(day, 1); openCell = null; });
-    const chip = t.closest(".chip");
-    if (chip) { const c = chip.closest(".slotcell"); return later(() => { openCell = { p: +c.dataset.p, t: c.dataset.t }; tab = chip.dataset.tab === "완료" ? "완료" : "확정"; }); }
-    const tb = t.closest(".tabs a");
-    if (tb) return later(() => { tab = tb.dataset.tab; });
-    if (t.dataset.complete) {
-      // 이용완료 누르면 확인 창 (실제 화면에서 확인 필요)
-      const box = document.createElement("div");
-      box.className = "layer";
-      box.innerHTML = `<p>이용완료 처리하시겠습니까?</p><button type="button" class="ok">확인</button> <button type="button" class="no">취소</button>`;
-      box.querySelector(".ok").onclick = () => { box.remove(); later(() => { const b = db[day].find((x) => x.no === t.dataset.complete); b.status = "완료"; b.done += 1; save(); }); };
-      box.querySelector(".no").onclick = () => box.remove();
-      document.body.appendChild(box);
-    }
-  });
-  render();
+  window.go = go;
 </script>
 </body>
 </html>

@@ -1,91 +1,141 @@
-/* 네이버 예약관리(스마트플레이스 파트너센터) 예약현황 화면을 읽고 조작하는 코드 (네이버 페이지 안에서 실행됨)
-   지금은 사장님이 보낸 캡처를 본뜬 구조 기준 — 실제 저장본을 받으면 이 파일만 맞추면 된다.
-   - 날짜: "2026. 10. 5. 월" 글자, 앞뒤 이동 버튼 ‹ ›
-   - 표: 열 머리 = 상품 이름, 칸 = "오후 2:00" + "예약가능 n" · "확정 n" · "이용완료 n"
-   - 칸의 확정/이용완료를 누르면 오른쪽에 예약자 카드 (예약자 · 전화번호 · 예약번호 · 상품 · 이용일시 · 수량 · 결제상태 · 이름 밑 "완료 n, 취소 n")
-   - 카드의 [이용완료] → 확인 창 → 확인
-   버튼·칸은 화면 좌표가 아니라 글자로 찾는다 (창이 가려져도 동작). */
+/* 네이버 예약관리(스마트플레이스 파트너센터)를 읽고 조작하는 코드 (네이버 페이지 안에서 실행됨)
+   실제 화면(2026-10-05 저장본) 기준:
+   - 예약 목록 booking-list-view: 날짜 "이전 26. 10. 5.월 다음"
+       줄마다 a[class*=contents-user](상태·예약자·전화번호·예약번호) + a[class*=contents-booking](이용일시·상품·수량·결제상태), data-tst_click_link = 예약번호
+   - 예약현황 booking-calendar-view: 날짜 "이전 2026. 10. 5. 월 다음"
+       머리(Calendar__inner-header) = 상품 이름, 줄(Calendar__week-cell-daily-row) = 시간, 칸 = "오전"+"10:00" + 버튼(title 예약가능/잔여예약/확정/이용완료, span.number)
+       확정·이용완료 버튼 → 오른쪽 "예약정보": 탭(BookingListTab) 확정 n / 완료 n, 카드(List__contents-box): 이름 밑 "완료 11, 취소 2", Summary__item-title/dsc 쌍
+   - 클래스 이름 뒤의 해시(__VGAjs 등)는 네이버가 바꿀 수 있어 [class*="앞부분"] 으로 찾는다
+   - 이용완료 확인 창 모양은 아직 모름: window.confirm 이면 자동 확인, 화면 안 창이면 "하시겠습니까" 글자 옆 [확인] */
 
 function installNaverDriver() {
-  if (window.__naver && window.__naver.v === 1) return true;
+  if (window.__naver && window.__naver.v === 2) return true;
 
   const norm = (s) => String(s || "").replace(/\s+/g, "");
   const vis = (el) => !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== "hidden");
   const textOf = (e) => norm(e.value || e.textContent);
-  const clickables = (root = document) => [...root.querySelectorAll("button, a, [role=button], [onclick], [role=tab]")].filter(vis);
+  const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+  const clickables = (root = document) => $$("button, a, [role=button], [role=tab]", root).filter(vis);
   const press = (el) => {
     for (const type of ["mousedown", "mouseup", "click"]) el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
   };
-  const TIME = /^(오전|오후)\s*(\d{1,2}):(\d{2})$/;
-  const to24 = (t) => {
-    const m = String(t).trim().match(TIME);
+  const to24 = (s) => {
+    const m = String(s).replace(/\s+/g, "").match(/(오전|오후)?(\d{1,2}):(\d{2})/);
     if (!m) return null;
     let h = +m[2];
     if (m[1] === "오후" && h < 12) h += 12;
     if (m[1] === "오전" && h === 12) h = 0;
     return `${String(h).padStart(2, "0")}:${m[3]}`;
   };
-  const num = (re, s) => {
-    const m = String(s).match(re);
-    return m ? +m[1] : 0;
-  };
-  // 화면 위 날짜 "2026. 10. 5. 월" → "2026-10-05"
+  const txt = (el) => (el ? el.textContent.trim().replace(/\s+/g, " ") : "");
+  const cls = (root, part) => root.querySelector(`[class*="${part}"]`);
+
+  // 날짜: "이전" 버튼 옆의 날짜 글자 ("2026. 10. 5. 월" 또는 "26. 10. 5.월")
+  const prevBtn = () => clickables().find((b) => textOf(b).startsWith("이전") || (b.getAttribute("aria-label") || "").includes("이전"));
+  const nextBtn = () => clickables().find((b) => textOf(b).startsWith("다음") || (b.getAttribute("aria-label") || "").includes("다음"));
   const readDate = () => {
-    const re = /(20\d\d)\.\s*(\d{1,2})\.\s*(\d{1,2})\./;
-    const el = [...document.querySelectorAll("span, div, strong, button, h2, h3, p")].filter(vis).find((e) => e.children.length === 0 && re.test(e.textContent));
-    if (!el) return null;
-    const m = el.textContent.match(re);
-    return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+    const b = prevBtn();
+    let box = b && b.parentElement;
+    for (let i = 0; i < 3 && box; i++, box = box.parentElement) {
+      const m = box.textContent.match(/(\d{2,4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./);
+      if (m) return `${m[1].length === 2 ? "20" + m[1] : m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+    }
+    return null;
   };
-  // 예약 칸: "오후 2:00" 글자와 "예약가능" 이 함께 든 가장 작은 상자
-  const slotCells = () => {
+
+  // 예약 목록
+  const readList = () => {
+    const booking = new Map($$('a[class*="contents-booking"]').map((a) => [a.getAttribute("data-tst_click_link"), a]));
+    // 같은 줄이 고정 칸용으로 빈 복사본이 더 있음 → 내용 있는 줄만, 예약번호로 한 번씩
+    const seen = new Set();
+    return $$('a[class*="contents-user"]').filter((u) => {
+      const no = u.getAttribute("data-tst_click_link");
+      if (!u.children.length || !no || seen.has(no)) return false;
+      seen.add(no);
+      return true;
+    }).map((u) => {
+      const no = u.getAttribute("data-tst_click_link") || txt(cls(u, "book-number"));
+      const b = booking.get(no) || u;
+      const opt = cls(b, "BookingListView__option");
+      const qtyEl = opt && opt.querySelector(".text-info");
+      const host = cls(b, "BookingListView__host");
+      return {
+        no,
+        status: txt(cls(u, "BookingListView__state")),
+        name: (cls(u, "BookingListView__name") || {}).title || txt(cls(u, "BookingListView__name")),
+        phone: txt(cls(u, "BookingListView__phone")),
+        time: to24(txt(cls(b, "BookingListView__book-date"))),
+        product: (host && (host.getAttribute("title") || txt(host))) || "",
+        qty: qtyEl ? +txt(qtyEl) || 1 : 1,
+        qtyText: opt ? txt(opt) : "",
+        pay: txt(cls(b, "payment-state")),
+      };
+    });
+  };
+
+  // 예약현황 머리의 상품 이름 (맨 앞 '회차' 이름 칸은 뺌)
+  const productHeads = () => {
+    const header = cls(document, "Calendar__inner-header");
+    return header ? $$('[class*="Calendar__week-cell"]', header).filter((c) => !/week-label/.test(c.className)).map((c) => txt(c)) : [];
+  };
+  // 예약현황 칸
+  const readSlots = () => {
+    const products = productHeads();
     const out = [];
-    for (const t of [...document.querySelectorAll("div, span, strong, p, td")].filter((e) => vis(e) && e.children.length === 0 && TIME.test(e.textContent.trim()))) {
-      let box = t.parentElement;
-      while (box && box !== document.body && !/예약가능/.test(box.textContent)) box = box.parentElement;
-      if (!box || box === document.body || box.tagName === "TR" || box.tagName === "TBODY" || box.tagName === "TABLE") continue;
-      const td = box.closest("td");
-      let product = "";
-      if (td) {
-        const table = td.closest("table");
-        const head = table && table.tHead ? table.tHead.rows[0] : null;
-        if (head && head.cells[td.cellIndex]) product = head.cells[td.cellIndex].textContent.trim();
-      }
-      const txt = box.textContent;
-      out.push({ el: box, product, time: to24(t.textContent), avail: num(/예약가능\s*(\d+)/, txt), conf: num(/확정\s*(\d+)/, txt), done: num(/이용완료\s*(\d+)/, txt) });
+    for (const row of $$('[class*="Calendar__week-cell-daily-row"]')) {
+      const cells = [...row.children].filter((c) => /Calendar__week-cell/.test(c.className));
+      cells.forEach((c, i) => {
+        const tEl = c.querySelector(".time");
+        if (!tEl) return;
+        const ap = c.querySelector(".text");
+        const n = (title) => {
+          const b = c.querySelector(`button[title="${title}"]`);
+          return b ? +txt(b.querySelector(".number")) || 0 : 0;
+        };
+        out.push({ product: products[i] || "", time: to24((ap ? txt(ap) : "") + txt(tEl)), avail: n("예약가능") + n("잔여예약"), conf: n("확정"), done: n("이용완료"), apply: n("신청") });
+      });
     }
     return out;
   };
-  // 카드 안에서 "예약번호" 같은 이름 칸 옆의 값
-  const valueIn = (card, label) => {
-    const l = [...card.querySelectorAll("dt, th, span, div, em, strong")].find((e) => norm(e.textContent) === norm(label) && e.children.length === 0);
-    if (!l) return "";
-    const nx = l.nextElementSibling;
-    return nx ? nx.textContent.trim().replace(/\s+/g, " ") : "";
+  const findSlotCell = (product, time) => {
+    const products = productHeads();
+    for (const row of $$('[class*="Calendar__week-cell-daily-row"]')) {
+      const cells = [...row.children].filter((c) => /Calendar__week-cell/.test(c.className));
+      for (let i = 0; i < cells.length; i++) {
+        const c = cells[i];
+        const tEl = c.querySelector(".time");
+        if (!tEl) continue;
+        const ap = c.querySelector(".text");
+        if (to24((ap ? txt(ap) : "") + txt(tEl)) === time && (!product || products[i] === product)) return c;
+      }
+    }
+    return null;
   };
-  // 카드 하나 = 예약번호를 딱 하나 가진 가장 큰 상자 (예약현황 표·탭은 들지 않음)
-  const cards = () => {
-    const one = (e) => (e.textContent.match(/예약번호/g) || []).length === 1 && /이용일시/.test(e.textContent) && !/예약가능/.test(e.textContent);
-    const cand = [...document.querySelectorAll("div, li, article, section")].filter((e) => vis(e) && one(e));
-    return cand.filter((e) => !(e.parentElement && one(e.parentElement)));
+
+  // 예약정보 카드
+  const cards = () => $$('[class*="List__contents-box"]').filter(vis);
+  const field = (card, label) => {
+    const t = $$('[class*="Summary__item-title"]', card).find((e) => norm(e.textContent) === norm(label));
+    return t && t.nextElementSibling ? txt(t.nextElementSibling).replace(/,\s*$/, "") : "";
   };
   const readCard = (c) => {
-    const txt = c.textContent;
-    const sub = txt.match(/완료\s*(\d+)(?:\s*,\s*취소\s*(\d+))?/);
-    const badge = [...c.querySelectorAll("span, em, strong, div")].find((e) => e.children.length === 0 && /^(확정|완료|취소|노쇼|신청)$/.test(e.textContent.trim()));
-    const when = valueIn(c, "이용일시");
-    const tm = when.match(/(오전|오후)\s*\d{1,2}:\d{2}/);
+    const sub = txt(c.querySelector(".text-info-sub")).match(/완료\s*(\d+)(?:\s*,\s*취소\s*(\d+))?/);
+    const badge = c.querySelector("[data-tst_booking_status]") || cls(c, "Summary__user-state");
+    const when = field(c, "이용일시");
+    const qtyEl = (() => {
+      const t = $$('[class*="Summary__item-title"]', c).find((e) => norm(e.textContent) === "수량");
+      return t && t.nextElementSibling ? t.nextElementSibling.querySelector(".text-info") : null;
+    })();
     return {
-      no: valueIn(c, "예약번호"),
-      name: valueIn(c, "예약자"),
-      phone: valueIn(c, "전화번호"),
-      product: valueIn(c, "상품"),
+      no: field(c, "예약번호"),
+      name: field(c, "예약자") || txt(cls(c, "Summary__name")),
+      phone: field(c, "전화번호"),
+      product: field(c, "상품"),
       when,
-      time: tm ? to24(tm[0]) : null,
-      qty: num(/(\d+)\s*$/, valueIn(c, "수량")) || 1,
-      qtyText: valueIn(c, "수량"),
-      pay: valueIn(c, "결제상태"),
-      status: badge ? badge.textContent.trim() : "",
+      time: to24(when.replace(/^.*\)\s*/, "")),
+      qty: qtyEl ? +txt(qtyEl) || 1 : 1,
+      pay: field(c, "결제상태"),
+      status: txt(badge),
       doneCount: sub ? +sub[1] : 0,
       cancelCount: sub && sub[2] ? +sub[2] : 0,
       canComplete: clickables(c).some((b) => textOf(b) === "이용완료"),
@@ -96,48 +146,65 @@ function installNaverDriver() {
   window.alert = () => {};
 
   window.__naver = {
-    v: 1,
+    v: 2,
     read() {
+      const page = cls(document, "Calendar__inner-contents") ? "calendar" : $$('a[class*="contents-user"]').length || cls(document, "BookingListView__root") ? "list" : "";
+      const total = (document.body.innerText.match(/(\d+)\s*건\s*내려받기/) || [])[1];
       const date = readDate();
-      const needLogin = !date && !!document.querySelector("input[type=password]");
+      const needLogin = !page && !!document.querySelector("input[type=password]");
       return {
+        page,
         needLogin,
         date,
-        slots: slotCells().map(({ el, ...s }) => s),
+        list: page === "list" ? readList() : [],
+        slots: page === "calendar" ? readSlots() : [],
         cards: cards().map(readCard),
+        listTotal: total ? +total : null, // 예약 목록 위의 "124건"
+        loading: $$('[class*="Loading__load_area"], .spinner').some(vis),
       };
     },
-    /** 날짜 한 칸 이동: dir = -1 / 1 */
+    /** 예약 목록은 아래로 내리면 더 불러옴 → 맨 아래로 */
+    scrollMore() {
+      const rows = $$('a[class*="contents-user"]').filter((u) => u.children.length);
+      if (rows.length) rows[rows.length - 1].scrollIntoView({ block: "end" });
+      window.scrollTo(0, document.documentElement.scrollHeight);
+      window.dispatchEvent(new Event("scroll"));
+      return { ok: true };
+    },
+    go(url) {
+      location.href = url;
+      return { ok: true };
+    },
     stepDate(dir) {
-      const want = dir < 0 ? ["‹", "<", "이전"] : ["›", ">", "다음"];
-      const b = clickables().find((e) => want.includes(e.textContent.trim()) || want.some((w) => (e.getAttribute("aria-label") || "").includes(w)));
+      const b = dir < 0 ? prevBtn() : nextBtn();
       if (!b) return { ok: false, why: "네이버 화면에서 날짜 이동 버튼을 못 찾음" };
       press(b);
       return { ok: true };
     },
-    /** 칸 열기: kind = "확정" | "이용완료" */
+    /** 예약현황 칸의 버튼 누르기: kind = "확정" | "이용완료" */
     openSlot(product, time, kind) {
-      const c = slotCells().find((s) => s.time === time && (!product || s.product === product));
-      if (!c) return { ok: false, why: `네이버 화면에서 ${time} 칸을 못 찾음` };
-      const chip = [...c.el.querySelectorAll("*")].find((e) => e.children.length === 0 && e.textContent.trim() === kind);
-      press((chip && (chip.closest("[data-tab], button, a, div") || chip)) || c.el);
+      const c = findSlotCell(product, time);
+      if (!c) return { ok: false, why: `네이버 예약현황에서 ${time} 칸을 못 찾음` };
+      const b = c.querySelector(`button[title="${kind}"]`);
+      if (!b) return { ok: false, why: `${time} 칸에 '${kind}' 버튼이 없음` };
+      press(b);
       return { ok: true };
     },
-    /** 오른쪽 탭 바꾸기: "확정" | "완료" */
+    /** 예약정보 탭: "확정" | "완료" */
     openTab(kind) {
-      const t = clickables().find((e) => new RegExp(`^${kind}\\d+$`).test(textOf(e)));
+      const t = $$('[class*="BookingListTab__item"] a, [class*="BookingListTab__item"]').find((e) => new RegExp(`^${kind}\\d+$`).test(textOf(e)));
       if (!t) return { ok: false, why: `'${kind}' 탭을 못 찾음` };
       press(t);
       return { ok: true };
     },
-    /** 예약번호 카드의 [이용완료] → 확인 창의 [확인] */
+    /** 예약번호 카드의 [이용완료] → 확인 창 [확인] */
     complete(no) {
-      const card = cards().find((c) => valueIn(c, "예약번호") === String(no));
+      const card = cards().find((c) => field(c, "예약번호") === String(no));
       if (!card) return { ok: false, why: `예약번호 ${no} 카드를 못 찾음` };
       const b = clickables(card).find((e) => textOf(e) === "이용완료");
       if (!b) return { ok: false, why: "이용완료 버튼이 없음 (이미 완료됐거나 확정이 아님)" };
       b.click();
-      const ok = clickables().find((e) => ["확인", "OK", "이용완료처리"].includes(textOf(e)) && /하시겠습니까/.test((e.closest("div, section, dialog") || {}).textContent || ""));
+      const ok = clickables().find((e) => ["확인", "OK", "이용완료처리"].includes(textOf(e)) && /하시겠습니까|처리/.test((e.closest("div, section, dialog") || {}).textContent || ""));
       if (ok) ok.click();
       return { ok: true };
     },

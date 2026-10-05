@@ -8,7 +8,7 @@ const path = require("path");
 const fs = require("fs");
 const { execFile } = require("child_process");
 const { AmanoSync } = require("./amano-sync");
-const { NaverSync } = require("./naver-sync");
+const { NaverSync, naverUrls } = require("./naver-sync");
 
 const SETTINGS_FILE = () => path.join(app.getPath("userData"), "settings.json");
 const DEFAULTS = {
@@ -103,7 +103,7 @@ function openNaver() {
       naverWin.minimize();
     }
   });
-  naver = new NaverSync((code) => naverWin.webContents.executeJavaScript(code, true));
+  naver = new NaverSync((code) => naverWin.webContents.executeJavaScript(code, true), { urls: naverUrls(settings.naverUrl) });
 }
 
 function createDesk() {
@@ -185,6 +185,8 @@ ipcMain.handle("naver:setHome", () => {
   if (!naverWin) return { ok: false, why: "네이버 창이 없음" };
   settings.naverUrl = naverWin.webContents.getURL();
   saveSettings();
+  if (naver) naver.urls = naverUrls(settings.naverUrl);
+  if (!naver || !naver.urls) return { ok: false, why: "네이버 예약관리(파트너센터) 화면에서 눌러 주세요" };
   if (deskWin) deskWin.focus();
   return { ok: true, url: settings.naverUrl };
 });

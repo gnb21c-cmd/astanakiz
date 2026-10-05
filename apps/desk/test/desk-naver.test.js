@@ -23,7 +23,7 @@ test("데스크가 네이버 예약을 불러오고, 등록 완료 때 네이버
     await naverPage.goto(NAVER);
     await naverPage.evaluate(() => localStorage.clear());
     await naverPage.goto(NAVER);
-    const naver = new NaverSync((code) => naverPage.evaluate(code));
+    const naver = new NaverSync((code) => naverPage.evaluate(code), { urls: { list: NAVER + "?view=list", calendar: NAVER + "?view=calendar" } });
 
     const desk = await ctx.newPage();
     await desk.clock.install({ time: new Date("2026-10-05T13:56:00") });
@@ -39,7 +39,7 @@ test("데스크가 네이버 예약을 불러오고, 등록 완료 때 네이버
     // 오늘 14:00 칸: 네이버 확정 4 (입장권만, 단체 제외)
     await desk.waitForFunction(() => /불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 30000 });
     const slot14 = await desk.textContent('.slot[data-s="840"]');
-    assert.match(slot14, /4\s*\/\s*6/, "14:00 확정 4 / 잔여 6");
+    assert.deepStrictEqual(await desk.$$eval('.slot[data-s="840"] .c', (e) => e.map((x) => x.textContent.trim())), ["4", "6"], "14:00 확정 4 · 잔여 6");
 
     await desk.click('.slot[data-s="840"]');
     const names = await desk.$$eval(".res .name", (e) => e.map((x) => x.textContent));

@@ -93,14 +93,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .datebar button.arrow { height: 34px; border: 1px solid var(--line); background: var(--surface-2); border-radius: 8px; font-size: 16px; font-weight: 700; }
 .datebar .d { text-align: center; font-weight: 700; font-size: 14px; line-height: 1.15; }
 .datebar .d small { display: block; font-weight: 500; font-size: 11px; color: var(--muted); }
-.slot-head { display: grid; grid-template-columns: 64px minmax(0, 1fr); font-size: 11.5px; color: var(--muted); font-weight: 700; padding: 0 4px; }
-.slot-head span:last-child { text-align: right; }
-.slot { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: center; gap: 4px; width: 100%; border: 1px solid transparent; background: transparent; padding: 3px 4px; border-radius: 9px; text-align: left; }
+/* 시간 · 확정 · 잔여 세 칸 */
+.slot-head { display: grid; grid-template-columns: 70px 1fr 1fr; font-size: 12px; color: var(--muted); font-weight: 700; padding: 0 4px; text-align: center; }
+.slot { display: grid; grid-template-columns: 70px 1fr 1fr; align-items: center; gap: 4px; width: 100%; border: 1px solid transparent; background: transparent; padding: 3px 4px; border-radius: 9px; text-align: left; }
 .slot .t { border: 1.5px solid var(--line); border-radius: 8px; text-align: center; font-weight: 700; padding: 2px 0; background: var(--surface); }
-.slot .c { text-align: right; font-weight: 600; }
-.slot .c b { font-weight: 700; }
-.slot .c .full { color: var(--red); }
-.slot .c .pend { display: block; font-size: 10.5px; color: var(--accent); font-weight: 600; }
+.slot .c { text-align: center; font-weight: 700; font-size: 15px; }
+.slot .c.full { color: var(--red); }
 .slot.now .t { border-color: var(--accent); color: var(--accent); }
 .slot.on { background: var(--accent-bg); border-color: var(--accent); }
 .slot.on .t { background: var(--accent); color: #fff; border-color: var(--accent); }
@@ -282,7 +280,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         <div class="d num" id="date"></div>
         <button class="arrow" data-act="day" data-d="1" aria-label="다음날">→</button>
       </div>
-      <div class="slot-head"><span>시간</span><span>확정 / 잔여</span></div>
+      <div class="slot-head"><span>시간</span><span>확정</span><span>잔여</span></div>
       <div class="scroll" id="slots"></div>
     </section>
 
@@ -497,8 +495,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         product: (n.qtyText || "").replace(/\s*\d+\s*$/, "") || "입장권", naverProduct: n.product, pay: n.pay || "",
         cancels: n.cancelCount,
       });
-      if (!done) { b.prevDone = n.doneCount; if (b.enteredAt == null) b.status = "확정"; }
-      else { b.status = "완료"; if (b.prevDone == null) b.prevDone = Math.max(0, n.doneCount - 1); if (!b.visitNo) b.visitNo = n.doneCount; b.naverPending = false; }
+      // 네이버 카드의 '완료 n': 미입장이면 이번 방문 전까지, 이용완료면 이번 방문까지 센 수 (못 읽었으면 null)
+      if (!done) { if (n.doneCount != null) b.prevDone = n.doneCount; if (b.enteredAt == null) b.status = "확정"; }
+      else { b.status = "완료"; if (n.doneCount != null) { if (b.prevDone == null) b.prevDone = Math.max(0, n.doneCount - 1); if (!b.visitNo) b.visitNo = n.doneCount; } b.naverPending = false; }
       list.push(b);
     }
     // 네이버에서 사라진 예약(취소)은 열쇠를 받지 않았을 때만 뺌
@@ -571,11 +570,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const ns = (naverSlots[viewDay] || {})[s];
       const conf = ns ? ns.conf + ns.done : bs.reduce((a, b) => a + b.qty, 0);
       const left = ns ? Math.max(0, ns.cap - conf) : Math.max(0, RULES.slotCap - conf);
-      const pend = viewDay === TODAY ? bs.filter((b) => b.status === "확정").reduce((a, b) => a + b.qty, 0) : 0;
       const isNow = viewDay === TODAY && now >= s - RULES.earlyMinutes && now < s + 25;
       return `<button class="slot ${s === selSlot ? "on" : ""} ${isNow ? "now" : ""}" data-act="slot" data-s="${s}" aria-pressed="${s === selSlot}">
         <span class="t num">${hm(s)}</span>
-        <span class="c num"><b>${conf}</b> / <span class="${left ? "" : "full"}">${left}</span>${pend ? `<span class="pend">입장 전 ${pend}</span>` : ""}</span></button>`;
+        <span class="c num">${conf}</span><span class="c num ${left ? "" : "full"}">${left}</span></button>`;
     }).join("");
   }
 
@@ -585,6 +583,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   const stampOf = (n) => ((n - 1) % RULES.giftEvery) + 1;
   const isGift = (n) => n > 0 && n % RULES.giftEvery === 0;
   function visitText(b) {
+    if (b.status === "완료" ? !b.visitNo : b.prevDone == null) return `<span class="help">방문 횟수 확인 중</span>`;
     const c = b.cancels ? ` · 취소 ${b.cancels}` : "";
     const n = b.status === "완료" ? b.visitNo : b.prevDone + 1;
     const gift = isGift(n) ? ` <span class="gift">${RULES.giftName} 증정</span>` : "";
@@ -1006,7 +1005,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         if (!r || !r.ok) { sheet.naverErr = (r && r.why) || "네이버 응답 없음"; renderSheet(); return; }
       }
       if (btn && btn.dataset.skipNaver) b.naverPending = true; // 네이버에는 나중에 이용완료를 눌러야 함
-      Object.assign(b, { status: "완료", keys: sheet.keys.slice(), enteredAt: now, visitNo: b.prevDone + 1 });
+      Object.assign(b, { status: "완료", keys: sheet.keys.slice(), enteredAt: now, visitNo: b.prevDone == null ? null : b.prevDone + 1 });
       closeSheet();
       toast(`${b.name}님 입장 · 열쇠 ${b.keys.join(", ")}번 · 네이버 이용완료${isGift(b.visitNo) ? ` · ${b.visitNo}번째 방문, ${RULES.giftName}을 드리세요` : ""}${printForm("enter", keyVals(b))}`);
       renderAll();
