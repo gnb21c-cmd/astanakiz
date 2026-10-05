@@ -655,8 +655,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   }
 
   // ── 초과요금 미터 ────────────────────────────────
-  /* 반납 시각(예약 입장시간 + 1시간 50분)이 지나면 초 단위로 세고,
-     10분마다 5,000원 × 아직 가진 열쇠 수. POS 결제를 누른 순간 금액으로 고정 */
+  /* 초과요금 (열쇠 1개 기준, 예약 입장시간부터)
+     ~ 1:50:00 페널티 없음 · 1:50:01 부터 카운트업 시작
+     2:00:00 정각에 5,000원 · 2:10:00 정각에 10,000원 … 10분이 꽉 찰 때마다 오름
+     열쇠 수만큼 곱함. POS 결제를 누른 순간 금액으로 고정 */
   function overInfo(h) {
     const m = minutesFor(TODAY, h.slot);
     if (m == null) return { sec: 0, due: 0, units: 0 };
