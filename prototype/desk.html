@@ -48,12 +48,14 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { height: 100%; }
-body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; line-height: 1.4; padding-inline: 16px; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; line-height: 1.4; overflow: hidden; }
+/* POS 화면 1024×768 을 그대로 그리고, 창 크기에 맞춰 통째로 줄이거나 키움 (칸 배치는 절대 바뀌지 않음) */
+#stage { position: absolute; top: 0; left: 0; width: 1024px; height: 768px; transform-origin: 0 0; overflow: hidden; background: var(--bg); }
 button, input { font: inherit; color: inherit; }
 button { cursor: pointer; touch-action: manipulation; }
 button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .num { font-variant-numeric: tabular-nums; }
-.app { max-width: 1320px; margin: 0 auto; padding-block: 8px; display: grid; gap: 8px; }
+.app { height: 100%; padding: 8px 16px; display: grid; gap: 8px; grid-template-rows: auto minmax(0, 1fr); }
 
 .btn { border: 1px solid var(--line); background: var(--surface); border-radius: 9px; padding: 6px 12px; font-weight: 600; min-height: 36px; }
 .btn:hover { background: var(--surface-2); }
@@ -70,18 +72,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .top .now { font-size: 22px; font-weight: 700; }
 
 /* 세 칸 */
-.cols { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
+.cols { display: grid; gap: 8px; grid-template-columns: 190px 244px minmax(0, 1fr); height: 100%; min-height: 0; }
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 8px; display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 0; }
 .panel h2 { margin: 0; font-size: 14px; display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
 .panel h2 small { font-size: 11.5px; color: var(--muted); font-weight: 500; }
-.scroll { min-height: 0; display: grid; gap: 5px; align-content: start; }
-@media (min-width: 1000px) and (min-height: 680px) {
-  body { overflow: hidden; }
-  .app { height: 100%; grid-template-rows: auto minmax(0, 1fr); }
-  .cols { grid-template-columns: 190px 244px minmax(0, 1fr); height: 100%; min-height: 0; }
-  .panel { height: 100%; }
-  .scroll { overflow: auto; flex: 1; }
-}
+.panel { height: 100%; }
+.scroll { min-height: 0; display: grid; gap: 5px; align-content: start; overflow: auto; flex: 1; }
 
 /* 왼쪽: 날짜 · 시간표 */
 .datebar { display: grid; grid-template-columns: 28px minmax(0, 1fr) 28px; align-items: center; gap: 4px; }
@@ -161,7 +157,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .park .disc p { margin: 0; font-size: 11px; color: var(--muted); }
 
 /* 팝업 */
-.overlay { position: fixed; inset: 0; background: rgba(12, 16, 24, .5); display: grid; align-items: center; justify-items: center; z-index: 20; padding: 12px 16px; }
+.overlay { position: absolute; inset: 0; background: rgba(12, 16, 24, .5); display: grid; align-items: center; justify-items: center; z-index: 20; padding: 12px 16px; }
 .sheet { background: var(--surface); color: var(--fg); width: min(480px, 100%); max-height: 100%; overflow: auto; border-radius: 14px; padding: 16px; display: grid; gap: 10px; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
 .sheet h3 { margin: 0; font-size: 18px; display: flex; justify-content: space-between; align-items: center; }
 .sheet .x { border: 0; background: transparent; font-size: 24px; line-height: 1; padding: 2px 8px; color: var(--muted); }
@@ -190,16 +186,17 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .steps li.done { color: var(--ok); }
 
 /* 체험용 POS 화면 */
-.pos { position: fixed; inset: 0; z-index: 40; background: #2B2F36; color: #EDEFF2; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; font-family: var(--font); }
+.pos { position: absolute; inset: 0; z-index: 40; background: #2B2F36; color: #EDEFF2; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; font-family: var(--font); }
 .pos .bar { background: #C9302C; color: #fff; padding: 8px 16px; font-weight: 700; display: flex; justify-content: space-between; }
 .pos .body { display: grid; place-content: center; gap: 12px; text-align: center; padding: 16px; }
 .pos .body b { font-size: 26px; }
 .pos .foot { padding: 12px 16px; display: flex; justify-content: flex-end; gap: 8px; background: #1F2227; }
 .pos .foot button { background: #fff; color: #1F2227; border: 0; border-radius: 8px; padding: 10px 16px; font-weight: 700; }
 
-.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 14px; background: var(--ink); color: var(--on-ink); padding: 9px 16px; border-radius: 12px; font-weight: 600; z-index: 50; max-width: calc(100% - 32px); box-shadow: var(--shadow); }
+.toast { position: absolute; left: 50%; transform: translateX(-50%); bottom: 14px; background: var(--ink); color: var(--on-ink); padding: 9px 16px; border-radius: 12px; font-weight: 600; z-index: 50; max-width: calc(100% - 32px); box-shadow: var(--shadow); }
 </style>
 
+<div id="stage">
 <div class="app">
   <header class="top">
     <h1>아스타나키즈 입장 데스크</h1>
@@ -267,6 +264,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   <div class="foot"><button data-act="posDone">결제 끝 · POS 최소화</button></div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+</div>
 
 <script>
 (() => {
@@ -685,6 +683,16 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   });
   $("park-form").addEventListener("submit", (e) => { e.preventDefault(); carQ = $("car-q").value; carSel = null; renderCars(); });
 
+  // 창 크기에 맞춰 1024×768 화면을 통째로 맞춤 (가운데 정렬)
+  function fit() {
+    const st = $("stage");
+    const k = Math.min(window.innerWidth / 1024, window.innerHeight / 768);
+    st.style.transform = `scale(${k})`;
+    st.style.left = Math.max(0, (window.innerWidth - 1024 * k) / 2) + "px";
+    st.style.top = Math.max(0, (window.innerHeight - 768 * k) / 2) + "px";
+  }
+  window.addEventListener("resize", fit);
+  fit();
   renderAll();
 })();
 </script>
