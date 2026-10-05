@@ -27,7 +27,8 @@ test("데스크가 네이버 예약을 불러오고, 등록 완료 때 네이버
 
     const desk = await ctx.newPage();
     await desk.clock.install({ time: new Date("2026-10-05T13:56:00") });
-    await desk.exposeFunction("__naverLoad", (day) => naver.loadDay(day));
+    const loads = [];
+    await desk.exposeFunction("__naverLoad", (day) => (loads.push(day), naver.loadDay(day)));
     await desk.exposeFunction("__naverComplete", (b) => naver.complete(b));
     await desk.addInitScript(() => {
       window.desk = { naver: { load: (d) => window.__naverLoad(d), complete: (b) => window.__naverComplete(b) } };
@@ -57,6 +58,21 @@ test("데스크가 네이버 예약을 불러오고, 등록 완료 때 네이버
     // 네이버 화면에서도 완료로 바뀜
     const after = await naver.loadDay("2026-10-05");
     assert.strictEqual(after.bookings.find((b) => b.no === "1368155282").status, "완료");
+
+    // 자동 불러오기: 13:56에 켰으니 다음은 14:20 (팝업이 닫혀 있을 때)
+    assert.match(await desk.textContent("#refresh-at"), /다음 14:20/);
+    const n0 = loads.length;
+    await desk.clock.runFor(20 * 60 * 1000); // 14:16
+    assert.strictEqual(loads.length, n0, "14:20 전에는 안 불러옴");
+    await desk.clock.runFor(5 * 60 * 1000); // 14:21
+    await desk.waitForFunction(() => /14:2\d 불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 30000 });
+    assert.strictEqual(loads.length, n0 + 1, "14:20에 한 번만 불러옴");
+    assert.match(await desk.textContent("#refresh-at"), /다음 14:50/);
+
+    // 새로고침 버튼: 자동 시각이 아니어도 바로 불러옴
+    await desk.click("[data-act=refresh]");
+    await desk.waitForFunction((n) => !/불러오는 중/.test(document.getElementById("refresh-at").textContent), null, { timeout: 30000 });
+    assert.strictEqual(loads.length, n0 + 2);
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();
