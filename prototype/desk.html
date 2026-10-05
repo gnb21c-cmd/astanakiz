@@ -21,6 +21,9 @@
   --accent-bg: #E3EAFA;
   --naver: #0B8F47;
   --naver-bg: #E1F3E8;
+  --sky-bg: #DCEFFC;
+  --sky-line: #8CC5EE;
+  --done-bg: #E6E8EC;
   --pink: #F2A7BC;
   --pink-fg: #7A1F3A;
   --red: #D23A3A;
@@ -31,6 +34,7 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    --sky-bg: #16324A; --sky-line: #2F6A96; --done-bg: #262C35;
     --bg: #0F141C; --surface: #18202B; --surface-2: #1F2834; --fg: #E8ECF2; --muted: #9AA4B5; --faint: #4A5566; --line: #2C3645;
     --ink: #E8ECF2; --on-ink: #10151D; --accent: #82A3F2; --accent-bg: #1E2B4A; --naver: #4CC788; --naver-bg: #163126;
     --pink: #E58FA8; --pink-fg: #3A0E1B; --red: #EF6B6B; --ok: #5BCB92; --warn-bg: #43201F;
@@ -39,6 +43,7 @@
   }
 }
 :root[data-theme="dark"] {
+    --sky-bg: #16324A; --sky-line: #2F6A96; --done-bg: #262C35;
   --bg: #0F141C; --surface: #18202B; --surface-2: #1F2834; --fg: #E8ECF2; --muted: #9AA4B5; --faint: #4A5566; --line: #2C3645;
   --ink: #E8ECF2; --on-ink: #10151D; --accent: #82A3F2; --accent-bg: #1E2B4A; --naver: #4CC788; --naver-bg: #163126;
   --pink: #E58FA8; --pink-fg: #3A0E1B; --red: #EF6B6B; --ok: #5BCB92; --warn-bg: #43201F;
@@ -99,8 +104,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .slot.on:hover { background: var(--accent-bg); }
 
 /* 가운데: 예약자 명단 */
-.res { border: 1px solid var(--line); border-radius: 10px; padding: 7px 9px; display: grid; gap: 3px; background: var(--surface); }
-.res.done { background: var(--surface-2); }
+.res { border: 1px solid var(--sky-line); border-radius: 10px; padding: 7px 9px; display: grid; gap: 3px; background: var(--sky-bg); }  /* 미입장: 하늘색 */
+.res.done { background: var(--done-bg); border-color: var(--line); }  /* 입장완료(이용완료): 회색 */
+.badge.conf { background: var(--surface); }
 .res { cursor: pointer; }
 .res:hover { border-color: var(--accent); }
 .res .go { font-size: 12.5px; font-weight: 700; color: var(--accent); }
@@ -462,7 +468,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       } else if (b.keys.length) act = `<span class="kchips">${b.keys.map((k) => `<span class="kchip num">${k}</span>`).join("")}</span><span class="help num">${hm(b.enteredAt)} 입장</span>`;
       else if (b.outAt != null) act = `<span class="help num">${hm(b.enteredAt)} 입장 · ${hm(b.outAt)} 퇴장</span>`;
       return `<article class="res ${b.status === "완료" ? "done" : ""}" data-act="openRes" data-id="${b.id}" tabindex="0" role="button" aria-label="${esc(b.name)} 예약 열기">
-        <div class="head"><span class="name">${esc(b.name)}</span><span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "확정"}</span></div>
+        <div class="head"><span class="name">${esc(b.name)}</span><span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span></div>
         <dl class="kv">
           <dt>전화번호</dt><dd class="phone num">${fmtPhone(b.phone)}</dd>
           <dt>이용일시</dt><dd class="num">${when}</dd>
@@ -554,7 +560,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       el.innerHTML = `
         <h3 id="sheet-title">네이버 예약자 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
         <dl class="facts">
-          <dt>예약자</dt><dd style="font-size:18px">${esc(b.name)} <span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "확정"}</span></dd>
+          <dt>예약자</dt><dd style="font-size:18px">${esc(b.name)} <span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span></dd>
           <dt>전화번호</dt><dd class="num">${fmtPhone(b.phone)}</dd>
           <dt>이용일시</dt><dd class="num">${hm(b.slot)} ${m == null ? "· 무제한" : `~ ${hm(b.slot + m)} (1시간 50분)`}</dd>
           <dt>수량</dt><dd>${b.product} ${b.qty}</dd>
