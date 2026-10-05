@@ -159,10 +159,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .pcar .no { font-size: 18px; font-weight: 700; text-align: center; background: var(--ink); color: var(--on-ink); border-radius: 6px; padding: 2px 0; }
 .pcar .tm { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
 .pcar .tm b { color: var(--red); font-size: 14px; }
-.dbtns { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.dbtns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
 .dbtns .btn { min-height: 38px; font-size: 14px; border-color: var(--accent); color: var(--accent); padding: 2px 4px; }
-.dbtns.small { grid-template-columns: repeat(4, 1fr); }
-.dbtns.small .btn { min-height: 26px; font-size: 11.5px; }
 .dlist { display: grid; gap: 2px; font-size: 11.5px; }
 .dlist div { display: flex; justify-content: space-between; align-items: center; gap: 4px; background: var(--surface-2); border-radius: 5px; padding: 1px 4px; }
 .dlist button { border: 0; background: transparent; color: var(--red); font-size: 11px; font-weight: 700; padding: 0 2px; }
@@ -501,7 +499,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     ["117무 5514", "2026-10-05 11:26"], ["119허 4402", "2026-10-05 11:48"], ["45루 6603", "2026-10-05 12:33"], ["21보 5520", "2026-10-05 12:57"],
     ["12가 3456", "2026-10-05 13:20"], ["32우 3456", "2026-10-05 13:31"], ["208라 1172", "2026-10-04 23:12"]]
     .map(([no, at], i) => ({ id: 774300 + i * 7, no, at, discs: [] }));
-  const DISC = { big: ["3시간할인", "5시간할인"], small: ["15시간할인", "16시간할인", "17시간할인", "18시간할인"] };
+  const DISC = ["3시간할인", "5시간할인", "15시간할인"]; // 쓰는 할인유형만 (아마노 화면의 같은 이름 버튼을 누름)
   let carQ = "", carSel = null, syncMsg = "차량번호를 넣고 검색하면 아마노 화면에도 같은 값이 들어가요";
   const entryMin = (c) => (c.at.slice(0, 10) === TODAY ? 0 : -1440) + toMin(c.at.slice(11));
   const parkedText = (c) => { const m = now - entryMin(c); return `${Math.floor(m / 60)}시간 ${m % 60}분`; };
@@ -520,8 +518,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     $("pcar").innerHTML = !c ? `<div class="empty">조회 목록에서 차량을 고르면 할인유형이 나와요</div>` : `
       <div class="no num">${esc(c.no)}</div>
       <div class="tm num"><span>입차 ${c.at.slice(5, 16)}</span><b>${parkedText(c)}</b></div>
-      <div class="dbtns">${DISC.big.map(btn).join("")}</div>
-      <div class="dbtns small">${DISC.small.map(btn).join("")}</div>
+      <div class="dbtns">${DISC.map(btn).join("")}</div>
       <div class="dlist">${c.discs.length ? c.discs.map((d, i) => `<div><span class="num">${d.type} · ${hm(d.at)}</span><button data-act="discDel" data-i="${i}" aria-label="할인 삭제">삭제</button></div>`).join("") : `<span class="help">할인내역 없음</span>`}</div>`;
     $("synclog").innerHTML = `아마노: <b>${esc(syncMsg)}</b>`;
   }
