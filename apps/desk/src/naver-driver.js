@@ -6,10 +6,13 @@
        머리(Calendar__inner-header) = 상품 이름, 줄(Calendar__week-cell-daily-row) = 시간, 칸 = "오전"+"10:00" + 버튼(title 예약가능/잔여예약/확정/이용완료, span.number)
        확정·이용완료 버튼 → 오른쪽 "예약정보": 탭(BookingListTab) 확정 n / 완료 n, 카드(List__contents-box): 이름 밑 "완료 11, 취소 2", Summary__item-title/dsc 쌍
    - 클래스 이름 뒤의 해시(__VGAjs 등)는 네이버가 바꿀 수 있어 [class*="앞부분"] 으로 찾는다
+   - 칸이 좁으면 시각에 오전·오후가 빠짐 → 영업시간(10:00~19:30)으로 봄: 1:00 = 13:00 (다른 세션의 실제 수집에서 확인)
+   - 오른쪽 예약정보 목록은 스크롤되는 칸이고 내려야 카드가 더 나옴 → scrollCards 로 끝까지
+   - 칸을 누르면 표가 새로 그려짐 → 다른 칸을 누르기 전에 열린 목록을 닫음(closePanel)
    - 이용완료 확인 창 모양은 아직 모름: window.confirm 이면 자동 확인, 화면 안 창이면 "하시겠습니까" 글자 옆 [확인] */
 
 function installNaverDriver() {
-  if (window.__naver && window.__naver.v === 2) return true;
+  if (window.__naver && window.__naver.v === 3) return true;
 
   const norm = (s) => String(s || "").replace(/\s+/g, "");
   const vis = (el) => !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== "hidden");
@@ -25,6 +28,7 @@ function installNaverDriver() {
     let h = +m[2];
     if (m[1] === "오후" && h < 12) h += 12;
     if (m[1] === "오전" && h === 12) h = 0;
+    if (!m[1] && h >= 1 && h <= 9) h += 12; // 오전·오후가 없으면 영업시간으로 (1:00 = 13:00)
     return `${String(h).padStart(2, "0")}:${m[3]}`;
   };
   const txt = (el) => (el ? el.textContent.trim().replace(/\s+/g, " ") : "");
@@ -146,7 +150,7 @@ function installNaverDriver() {
   window.alert = () => {};
 
   window.__naver = {
-    v: 2,
+    v: 3,
     read() {
       const page = cls(document, "Calendar__inner-contents") ? "calendar" : $$('a[class*="contents-user"]').length || cls(document, "BookingListView__root") ? "list" : "";
       const total = (document.body.innerText.match(/(\d+)\s*건\s*내려받기/) || [])[1];
@@ -170,6 +174,29 @@ function installNaverDriver() {
       window.scrollTo(0, document.documentElement.scrollHeight);
       window.dispatchEvent(new Event("scroll"));
       return { ok: true };
+    },
+    /** 오른쪽 예약정보 목록을 아래로 — 더 내려갔으면 more: true */
+    scrollCards() {
+      const first = cards()[0];
+      let sc = null;
+      for (let el = first && first.parentElement; el && el !== document.body; el = el.parentElement) {
+        if (el.scrollHeight > el.clientHeight + 10 && /(auto|scroll)/.test(getComputedStyle(el).overflowY)) { sc = el; break; }
+      }
+      const all = cards();
+      if (all.length) all[all.length - 1].scrollIntoView({ block: "end" });
+      if (!sc) return { ok: true, more: false };
+      const before = sc.scrollTop;
+      sc.scrollTop = before + sc.clientHeight * 0.8;
+      sc.dispatchEvent(new Event("scroll"));
+      return { ok: true, more: sc.scrollTop > before };
+    },
+    /** 열린 예약정보 목록 닫기 — [닫기] 단추, 없으면 Esc */
+    closePanel() {
+      if (!cards().length) return { ok: true, had: false };
+      const b = clickables().find((e) => textOf(e) === "닫기" || /닫기/.test(e.getAttribute("aria-label") || "") || /닫기/.test(e.getAttribute("title") || ""));
+      if (b) press(b);
+      else document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      return { ok: true, had: true };
     },
     go(url) {
       location.href = url;

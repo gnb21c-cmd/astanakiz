@@ -8,6 +8,8 @@
      ?view=calendar  예약현황: "이전 2026. 10. 5. 월 다음", 머리 = 상품 이름, 줄 = 시간, 칸 = "오전 10:00" + 버튼(title 예약가능/잔여예약/확정/이용완료, 숫자)
                      확정·이용완료 버튼 → 오른쪽 "예약정보" 패널: 탭 확정 n / 완료 n, 카드(List__contents-box) — 이름 밑 "완료 11, 취소 2", 예약자·전화번호·예약번호·상품·이용일시·수량·결제상태
                      확정 카드의 [이용완료] → "이용완료 처리하시겠습니까?" [확인] (실제 확인 창 모양은 아직 모름)
+                     오른쪽 목록은 스크롤되는 칸이고, 카드는 2장씩 보이다가 아래로 내리면 더 나옴 (실제도 내려야 다 나옴)
+     &compact=1 칸이 좁을 때처럼 시각에 오전·오후가 없음 ("1:00" = 13:00)
      ?login=need 로그인 화면 -->
 <style>
   body { margin: 0; font-family: "Malgun Gothic", sans-serif; font-size: 13px; }
@@ -21,6 +23,7 @@
   aside { border-left: 1px solid #ddd; padding: 8px; }
   [class*="List__contents-box"] { border-bottom: 1px solid #ddd; padding: 8px 0; }
   [class*="Summary__item__"] { display: flex; gap: 8px; }
+  [class*="List__list-wrap"] { height: 260px; overflow-y: auto; }
   .layer { position: fixed; top: 30%; left: 35%; background: #fff; border: 2px solid #333; padding: 16px; }
 </style>
 </head>
@@ -96,7 +99,7 @@
       const done = bs.filter((b) => b.status === "완료").reduce((a, b) => a + b.qty, 0);
       const [ap, hm] = ampm(t);
       return `<div class="Calendar__week-cell__ntFou" title="예약 등록"><div class="Calendar__week-cell-inner__tqaOB Calendar__clickable__lL1Wp" data-p="${p}" data-t="${t}">
-        <span class="btn btn-xs calendar-btn btn-trans"><span class="text">${ap}</span><span class="time">${hm}</span></span>
+        <span class="btn btn-xs calendar-btn btn-trans">${P.get("compact") ? "" : `<span class="text">${ap}</span>`}<span class="time">${hm}</span></span>
         ${conf || done ? btn("잔여예약", 10 - conf - done, "remaining") : btn("예약가능", 10, "avail")}${conf ? btn("확정", conf, "confirmed") : ""}${done ? btn("이용완료", done, "completed") : ""}</div></div>`;
     };
     const sel = P.get("sel") ? JSON.parse(P.get("sel")) : null; // { p, t, s: "확정"|"완료" }
@@ -107,7 +110,7 @@
       const shown = bs.filter((b) => b.status === sel.s);
       panel = `<div><b>예약정보</b> <button type="button" onclick="go({sel:''})">닫기</button></div>
         <ul>${["확정", "완료"].map((s) => `<li class="BookingListTab__item__WvfHs ${s === sel.s ? "BookingListTab__active__rhhuS" : ""}"><a href="#" class="BookingListTab__anchor__CNbqG" data-tab="${s}">${s}${n(s)}</a></li>`).join("")}</ul>
-        ${shown.map((b) => { const [ap, hm] = ampm(b.time); return `<div class="List__contents-box__aIuHh"><div class="Summary__root__J7Cxm"><div class="Summary__profile__65ECc">
+        <div class="List__list-wrap__k2Lq9">${shown.map((b, i) => { const [ap, hm] = ampm(b.time); return `<div class="List__contents-box__aIuHh" ${i >= 2 ? "hidden" : ""}><div class="Summary__root__J7Cxm"><div class="Summary__profile__65ECc">
           <a href="#" class="Summary__user-area__d8i5K" data-tst_click_link="${b.no}"><span class="Summary__user-state__-w1Zi"><span class="label label-round" data-tst_booking_status="0">${b.status}</span></span>
           <span class="Summary__user-info__5U4rs"><span class="Summary__user-name__gnk40"><span class="Summary__name__MDiZ7">${b.name}</span></span><div class="Summary__user-state-label__uvLuO"><div><div class="text-info-sub"> 완료 ${b.done}${b.cancel ? `, 취소 ${b.cancel}` : ""}</div></div></div></span></a></div>
           <div class="Summary__list-cont__MA7Mv">
@@ -118,12 +121,17 @@
             <div class="Summary__item__stsVC"><span class="Summary__item-title__bzqwu">이용일시</span><span class="Summary__item-dsc__5aGv2">${D.getFullYear()}. ${D.getMonth() + 1}. ${D.getDate()}.(${DOW[D.getDay()]}) ${ap} ${hm}</span></div>
             <div class="Summary__item__stsVC"><span class="Summary__item-title__bzqwu">수량</span><span class="Summary__item-dsc__5aGv2"><span>4인 입장권 <span class="text-info">${b.qty}</span><span>, </span></span></span></div>
             <div class="Summary__item__stsVC"><span class="Summary__item-title__bzqwu">결제상태</span><span class="Summary__item-dsc__5aGv2"><span class="label">결제완료</span></span></div>
-          </div>${b.status === "확정" ? `<div class="Summary__btn-area"><button type="button" class="btn">예약취소</button><button type="button" class="btn btn-dark" data-complete="${b.no}">이용완료</button></div>` : ""}</div></div>`; }).join("")}`;
+          </div>${b.status === "확정" ? `<div class="Summary__btn-area"><button type="button" class="btn">예약취소</button><button type="button" class="btn btn-dark" data-complete="${b.no}">이용완료</button></div>` : ""}</div></div>`; }).join("")}</div>`;
     }
     document.body.innerHTML = `<div class="bar">${dateNav(label)}</div><div class="wrap"><div class="Calendar__inner-contents__px333">
       <div class="Calendar__inner-header__y3esS"><div class="d-flex Calendar__week-row__JWB4z">${PRODUCTS.map((x) => `<div class="Calendar__week-cell__ntFou"><span class="Calendar__day-header__6caUi">${x}</span></div>`).join("")}</div></div>
       <div class="Calendar__row-wrap__8dvIt">${times.map((t) => `<div class="d-flex Calendar__week-cell-daily-row__5WVtA">${PRODUCTS.map((_, p) => cell(p, t)).join("")}</div>`).join("")}</div>
       </div><aside>${panel}</aside></div>`;
+    // 오른쪽 목록: 아래로 내리면 카드 2장씩 더
+    const wrapEl = document.querySelector('[class*="List__list-wrap"]');
+    if (wrapEl) wrapEl.addEventListener("scroll", () => {
+      if (wrapEl.scrollTop + wrapEl.clientHeight >= wrapEl.scrollHeight - 30) setTimeout(() => [...wrapEl.querySelectorAll("[hidden]")].slice(0, 2).forEach((c) => (c.hidden = false)), 150);
+    });
     document.addEventListener("click", (e) => {
       const b = e.target.closest("button[data-act]");
       if (b && (b.dataset.act === "확정" || b.dataset.act === "이용완료")) { const c = b.closest("[data-p]"); setTimeout(() => go({ sel: JSON.stringify({ p: +c.dataset.p, t: c.dataset.t, s: b.dataset.act === "확정" ? "확정" : "완료" }) }), 150); return; }

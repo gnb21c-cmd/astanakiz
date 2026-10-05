@@ -3,7 +3,8 @@
      1) 예약 목록 화면 → 그 날짜 → 하루 예약 전부 (상태·예약자·전화번호·예약번호·이용일시·상품·수량·결제상태). 입장권만, 취소 뺌
      2) 예약현황 화면 → 그 날짜 → 시간 칸별 확정/이용완료/잔여 수량
      3) '완료 n · 취소 n'(방문 횟수)은 예약 목록에 없어서, 아직 모르는 예약이 있는 칸만 열어 카드에서 읽음 (한 번 읽으면 기억)
-   complete(b): 예약현황 → 그 날짜 → 그 칸의 [확정] → 카드의 [이용완료] → 확인 → 완료로 바뀐 것을 다시 읽어 확인
+   칸을 누르기 전에 열린 목록을 닫고, 오른쪽 목록은 끝까지 내려 가며 카드를 읽음
+   complete(b): 예약현황 → 그 날짜 → 그 칸의 [확정] → (내려 가며 찾은) 카드의 [이용완료] → 확인 → 완료로 바뀐 것을 다시 읽어 확인
    exec(code): 네이버 페이지에서 코드를 실행 (앱: webContents.executeJavaScript, 시험: page.evaluate)
    urls: { list, calendar } 예약 목록 · 예약현황 주소 */
 const { NAVER_DRIVER_SOURCE } = require("./naver-driver");
@@ -70,20 +71,20 @@ class NaverSync {
   }
   async goView(view) {
     let s = await this.read();
-    if (s.needLogin) return { ok: false, why: "네이버에 로그인해 주세요" };
+    if (s.needLogin) return { ok: false, why: "네이버에 로그인해 주세요 (로그인할 때 '로그인 상태 유지'를 꼭 체크)" };
     if (s.page === view) return { ok: true, state: s };
     if (!this.urls) return { ok: false, why: "네이버 예약관리 주소를 모름 (운영 설정 → 지금 화면을 시작 화면으로)" };
     const r = await this.act(`window.__naver.go(${JSON.stringify(this.urls[view])})`);
     if (!r.ok) return r;
     s = await this.read();
-    if (s.needLogin) return { ok: false, why: "네이버에 로그인해 주세요" };
+    if (s.needLogin) return { ok: false, why: "네이버에 로그인해 주세요 (로그인할 때 '로그인 상태 유지'를 꼭 체크)" };
     if (s.page !== view) return { ok: false, why: `네이버 ${view === "list" ? "예약 목록" : "예약현황"} 화면을 열지 못함` };
     return { ok: true, state: s };
   }
   async goDate(day) {
     for (let i = 0; i < 400; i++) {
       const s = await this.read();
-      if (s.needLogin) return { ok: false, why: "네이버에 로그인해 주세요" };
+      if (s.needLogin) return { ok: false, why: "네이버에 로그인해 주세요 (로그인할 때 '로그인 상태 유지'를 꼭 체크)" };
       if (!s.date) return { ok: false, why: "네이버 화면에서 날짜를 못 찾음" };
       if (s.date === day) return { ok: true, state: s };
       const r = await this.act(`window.__naver.stepDate(${s.date < day ? 1 : -1})`);
@@ -91,13 +92,34 @@ class NaverSync {
     }
     return { ok: false, why: "날짜를 맞추지 못함" };
   }
-  /** 그 칸을 열어 카드의 방문 횟수를 기억 */
-  async readSlotCards(product, time, kind) {
+  /** 칸의 [확정]/[이용완료] 누르기 — 앞에 열린 목록이 있으면 먼저 닫음 (칸을 누르면 표가 새로 그려짐) */
+  async openSlot(product, time, kind) {
+    const s = await this.read();
+    if (s.cards.length) await this.act("window.__naver.closePanel()");
     let r = await this.act(`window.__naver.openSlot(${JSON.stringify(product)}, ${JSON.stringify(time)}, ${JSON.stringify(kind)})`);
     if (!r.ok) return r;
     const want = kind === "확정" ? "확정" : "완료";
     if (!r.state.cards.some((c) => c.status === want)) r = await this.act(`window.__naver.openTab(${JSON.stringify(want)})`);
-    for (const c of (r.state && r.state.cards) || []) if (c.no) this.visits.set(c.no, { doneCount: c.doneCount, cancelCount: c.cancelCount, status: c.status });
+    return r;
+  }
+  /** 오른쪽 목록을 아래로 내려 카드를 더 불러옴 — 더 나온 게 없으면 false */
+  async moreCards() {
+    const n = (await this.read()).cards.length;
+    const r = await this.call("window.__naver.scrollCards()").catch(() => null);
+    for (let i = 0; i < 8; i++) {
+      await sleep(250);
+      if ((await this.read()).cards.length > n) return true;
+    }
+    return !!(r && r.more);
+  }
+  /** 그 칸을 열어 카드의 방문 횟수를 기억 (목록을 끝까지 내려 가며) */
+  async readSlotCards(product, time, kind) {
+    const r = await this.openSlot(product, time, kind);
+    if (!r.ok) return r;
+    for (let i = 0; i < 30; i++) {
+      for (const c of (await this.read()).cards) if (c.no) this.visits.set(c.no, { doneCount: c.doneCount, cancelCount: c.cancelCount, status: c.status });
+      if (!(await this.moreCards())) break;
+    }
     return { ok: true };
   }
   async loadDay(day) {
@@ -145,9 +167,11 @@ class NaverSync {
     if (!g.ok) return g;
     g = await this.goDate(b.day);
     if (!g.ok) return g;
-    let r = await this.act(`window.__naver.openSlot(${JSON.stringify(b.product || "")}, ${JSON.stringify(b.time)}, "확정")`);
+    let r = await this.openSlot(b.product || "", b.time, "확정");
     if (!r.ok) return r;
-    if (!r.state.cards.some((c) => c.no === b.no)) r = await this.act(`window.__naver.openTab("확정")`);
+    // 카드가 아래에 있으면 목록을 내려 가며 찾음
+    for (let i = 0; i < 30 && !(await this.read()).cards.some((c) => c.no === b.no); i++) if (!(await this.moreCards())) break;
+    if (!(await this.read()).cards.some((c) => c.no === b.no)) return { ok: false, why: `네이버 예약정보에서 예약번호 ${b.no} 카드를 못 찾음` };
     r = await this.act(`window.__naver.complete(${JSON.stringify(b.no)})`);
     if (!r.ok) return r;
     // 다시 확인: 확정 칸에 아직 있으면 실패

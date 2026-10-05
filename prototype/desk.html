@@ -865,7 +865,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           <div class="btns"><button class="btn btn-ink" data-act="cfgSave" ${dis}>저장</button><button class="btn" data-act="amanoShow" ${dis}>아마노 화면 보기 (로그인)</button></div>
           <div class="field"><span class="label">아마노 칸 배우기 <span class="help">자동으로 못 찾을 때만 · 누르면 아마노 화면이 앞으로 나오고, 그 칸을 한 번 클릭하면 기억</span></span>
             <div class="btns">${[["carNo", "차량번호 칸"], ["day", "입차일 칸"], ["searchBtn", "검색 버튼"]].map(([k, t]) => `<button class="btn btn-sm" data-act="learn" data-k="${k}" ${dis}>${t}${learned(k)}</button>`).join("")}</div></div>
-          <div class="field"><span class="label">네이버 예약관리 <span class="help">처음 한 번: '네이버 화면 보기'로 로그인 → 예약현황 화면까지 들어간 뒤 '지금 화면을 시작 화면으로'</span></span>
+          <div class="field"><span class="label">네이버 예약관리 <span class="help">처음 한 번: '네이버 화면 보기'로 로그인(<b>'로그인 상태 유지' 꼭 체크</b> — 안 하면 앱을 껐다 켤 때 풀림) → 예약현황 화면까지 들어간 뒤 '지금 화면을 시작 화면으로'</span></span>
             <div class="btns"><button class="btn" data-act="naverShow" ${dis}>네이버 화면 보기 (로그인)</button><button class="btn" data-act="naverHome" ${dis}>지금 화면을 시작 화면으로</button></div>
             ${c.naverUrl ? `<span class="help">시작 화면: ${esc(c.naverUrl)}</span>` : ""}</div>
           <p class="help">창은 한 화면에 겹쳐 둡니다: 맨 뒤 아마노·네이버 → 가운데 POS → 맨 앞 입장 데스크. 아마노 창이 가려져 있어도 입력·클릭이 됩니다.</p>

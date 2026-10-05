@@ -13,13 +13,13 @@ try {
 }
 const MOCK = "file://" + path.join(__dirname, "..", "mock", "naver.html");
 
-async function open(query = "") {
+async function open(query = "", extra = "") {
   const browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
   const page = await browser.newPage();
   await page.goto(MOCK + query);
   await page.evaluate(() => localStorage.clear());
   await page.goto(MOCK + query);
-  return { browser, page, sync: new NaverSync((code) => page.evaluate(code), { urls: { list: MOCK + "?view=list", calendar: MOCK + "?view=calendar" } }) };
+  return { browser, page, sync: new NaverSync((code) => page.evaluate(code), { urls: { list: MOCK + "?view=list" + extra, calendar: MOCK + "?view=calendar" + extra } }) };
 }
 
 test("하루 예약 읽기: 예약 목록 + 예약현황 카드 (입장권만, 취소 뺌, 완료 n · 취소 n)", async () => {
@@ -36,6 +36,7 @@ test("하루 예약 읽기: 예약 목록 + 예약현황 카드 (입장권만, �
       { name: "허정은", phone: "010-4674-0736", time: "14:00", qty: 1, status: "확정", done: 8, cancel: 2, pay: "결제완료" },
     );
     assert.strictEqual(by["1368177001"].qty, 2);
+    assert.strictEqual(by["1368177001"].doneCount, 9, "목록 아래(세 번째 카드)도 내려서 읽음");
     assert.strictEqual(by["1367156204"].status, "완료");
     assert.strictEqual(by["1367156204"].doneCount, 11, "이용완료 손님은 완료 n 에 이번 방문이 들어 있음");
     assert.strictEqual(by["1370988026"].time, "18:00");
@@ -78,12 +79,31 @@ test("이용완료: 카드의 [이용완료] → 확인 → 완료로 바뀜, �
   }
 });
 
+test("목록 아래쪽 카드도 내려서 이용완료 · 칸이 좁아 오전·오후가 없어도 시각을 맞게 읽음 (1:00 = 13:00)", async () => {
+  const { browser, sync } = await open("", "&compact=1");
+  try {
+    const d0 = await sync.loadDay("2026-10-05");
+    assert.ok(d0.ok, d0.why);
+    assert.ok(d0.slots.some((s) => s.time === "14:00" && s.conf === 4), "2:00 → 14:00");
+    assert.ok(d0.slots.some((s) => s.time === "19:30"), "7:30 → 19:30");
+    assert.ok(d0.slots.some((s) => s.time === "12:00") && d0.slots.some((s) => s.time === "10:00"));
+    // 송다온은 14:00 목록의 세 번째 카드 (처음엔 안 보이고 내려야 나옴)
+    const r = await sync.complete({ day: "2026-10-05", no: "1368177001", time: "14:00", product: "평일 무제한 / 휴일 1시간 50분 입장권" });
+    assert.ok(r.ok, r.why);
+    const d = await sync.loadDay("2026-10-05");
+    assert.strictEqual(d.bookings.find((x) => x.no === "1368177001").status, "완료");
+  } finally {
+    await browser.close();
+  }
+});
+
 test("로그인이 풀린 화면이면 로그인하라고 알려 줌", async () => {
   const { browser, sync } = await open("?login=need");
   try {
     const r = await sync.loadDay("2026-10-05");
     assert.strictEqual(r.ok, false);
     assert.match(r.why, /로그인/);
+    assert.match(r.why, /로그인 상태 유지/, "다시 풀리지 않게 안내");
   } finally {
     await browser.close();
   }
