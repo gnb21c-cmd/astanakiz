@@ -1,0 +1,39 @@
+# 입장 데스크 Windows 설치 파일 만들기 (GitHub 의 Windows 컴퓨터가 대신 만듦)
+# main 에 apps/desk · prototype 이 바뀌어 올라가면 저절로, 또는 Actions → 설치 파일 만들기 → Run workflow
+# 결과: Releases 의 '시험판(최신)' 에 설치 파일(.exe) — POS PC 에서 받아 더블클릭
+# 아마노 · 네이버 주소 · 아이디 · 비밀번호는 넣지 않음 (POS PC 앱 설정에서 입력)
+name: 설치 파일 만들기
+on:
+  push:
+    branches: [main]
+    paths: ["apps/desk/**", "prototype/desk.html", ".github/workflows/build-win.yml"]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 꾸러미 설치
+        working-directory: apps/desk
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: npm install --no-audit --no-fund
+      - name: 설치 파일 만들기
+        working-directory: apps/desk
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npx electron-builder --win nsis --publish never
+      - name: 시험판(최신)으로 올리기
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          f=$(ls apps/desk/dist/*.exe | head -1)
+          cp "$f" astanakiz-desk-setup.exe
+          gh release delete test-latest --yes --cleanup-tag || true
+          gh release create test-latest astanakiz-desk-setup.exe --title "시험판(최신) $(git log -1 --format=%h)" --notes "POS PC 시험용. 받아서 더블클릭 → 설치." --prerelease --target ${{ github.sha }}
