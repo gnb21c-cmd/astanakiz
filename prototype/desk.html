@@ -1,301 +1,270 @@
 <title>아스타나키즈 입장 데스크</title>
-<meta name="description" content="네이버 예약 입장, POS 현장 결제, 열쇠·주차 관리를 POS 화면 한 장(1024×768)에서 처리하는 근무자용 체험판">
+<meta name="description" content="네이버 예약 확인·이용완료, 열쇠 관리, 현장 입장(POS 결제 전환), 아마노 주차등록을 POS 화면 한 장(1024×768)에서 처리하는 근무자용 체험판">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Jua&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
 <style>
-/* 배치: POS 화면 1024×768 한 장. 위 막대(현황·시계) / 세 칸 — 네이버 예약 입장 | 현장 판매·열쇠판·POS 결제 | 연동·확인할 일.
-   각 칸 안에서만 스크롤. 1000px 보다 좁으면 한 줄씩 쌓아서 휴대폰에서도 볼 수 있게 */
+/* 배치 (사장님 스케치 기준, POS 1024×768 한 장)
+   왼쪽: 날짜 ← → · 시간별 확정/잔여 | 가운데: 고른 시간의 예약자 명단 | 오른쪽: 열쇠판 10칸×5줄 · 아래 주차등록
+   각 칸 안에서만 스크롤. 1000px 보다 좁으면 한 줄씩 쌓음 */
 :root {
-  --bg: #EEF1F5;
+  --bg: #ECEFF3;
   --surface: #FFFFFF;
-  --surface-2: #F5F7FA;
-  --fg: #172033;
-  --muted: #5B6679;
-  --line: #DCE1E9;
-  --ink: #172033;
+  --surface-2: #F4F6F9;
+  --fg: #141A26;
+  --muted: #5D6778;
+  --faint: #A9B1BE;
+  --line: #D9DEE6;
+  --ink: #141A26;
   --on-ink: #FFFFFF;
-  --sun: #F2B705;
+  --accent: #2B59C3;
+  --accent-bg: #E3EAFA;
   --naver: #0B8F47;
-  --naver-bg: #E2F3E9;
-  --walk: #0E6E7A;
-  --walk-bg: #DCF0F2;
-  --use: #2C56C9;
-  --use-bg: #E4EBFB;
-  --grace: #C4650A;
-  --grace-bg: #FCE9D5;
-  --late: #CC3333;
-  --late-bg: #FBE2E2;
+  --naver-bg: #E1F3E8;
+  --pink: #F2A7BC;
+  --pink-fg: #7A1F3A;
+  --red: #D23A3A;
   --ok: #1D7F52;
-  --shadow: 0 1px 2px rgba(23, 32, 51, .06), 0 3px 12px rgba(23, 32, 51, .05);
-  --font-ui: "IBM Plex Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
-  --font-brand: "Jua", "IBM Plex Sans KR", "Malgun Gothic", sans-serif;
+  --warn-bg: #FBE3E3;
+  --shadow: 0 1px 2px rgba(20, 26, 38, .06), 0 3px 12px rgba(20, 26, 38, .05);
+  --font: "IBM Plex Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0F141D; --surface: #18202C; --surface-2: #1F2835; --fg: #E8ECF3; --muted: #9AA5B8; --line: #2C3646;
-    --ink: #E8ECF3; --on-ink: #10151E; --sun: #F5C536;
-    --naver: #4CC788; --naver-bg: #173226; --walk: #4FBFCB; --walk-bg: #15303A;
-    --use: #7FA0F5; --use-bg: #1D2A4A; --grace: #F09A4A; --grace-bg: #3A2814; --late: #F07070; --late-bg: #451C1F;
-    --ok: #5BCB92; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 3px 12px rgba(0,0,0,.25);
+    --bg: #0F141C; --surface: #18202B; --surface-2: #1F2834; --fg: #E8ECF2; --muted: #9AA4B5; --faint: #4A5566; --line: #2C3645;
+    --ink: #E8ECF2; --on-ink: #10151D; --accent: #82A3F2; --accent-bg: #1E2B4A; --naver: #4CC788; --naver-bg: #163126;
+    --pink: #E58FA8; --pink-fg: #3A0E1B; --red: #EF6B6B; --ok: #5BCB92; --warn-bg: #43201F;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 3px 12px rgba(0,0,0,.25);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0F141D; --surface: #18202C; --surface-2: #1F2835; --fg: #E8ECF3; --muted: #9AA5B8; --line: #2C3646;
-  --ink: #E8ECF3; --on-ink: #10151E; --sun: #F5C536;
-  --naver: #4CC788; --naver-bg: #173226; --walk: #4FBFCB; --walk-bg: #15303A;
-  --use: #7FA0F5; --use-bg: #1D2A4A; --grace: #F09A4A; --grace-bg: #3A2814; --late: #F07070; --late-bg: #451C1F;
-  --ok: #5BCB92; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 3px 12px rgba(0,0,0,.25);
+  --bg: #0F141C; --surface: #18202B; --surface-2: #1F2834; --fg: #E8ECF2; --muted: #9AA4B5; --faint: #4A5566; --line: #2C3645;
+  --ink: #E8ECF2; --on-ink: #10151D; --accent: #82A3F2; --accent-bg: #1E2B4A; --naver: #4CC788; --naver-bg: #163126;
+  --pink: #E58FA8; --pink-fg: #3A0E1B; --red: #EF6B6B; --ok: #5BCB92; --warn-bg: #43201F;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 3px 12px rgba(0,0,0,.25);
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { height: 100%; }
-body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 14px; line-height: 1.45; padding-inline: 16px; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; line-height: 1.4; padding-inline: 16px; }
 button, input { font: inherit; color: inherit; }
 button { cursor: pointer; touch-action: manipulation; }
-button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px solid var(--use); outline-offset: 2px; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .num { font-variant-numeric: tabular-nums; }
-.app { max-width: 1320px; margin: 0 auto; padding-block: 10px; display: grid; gap: 10px; }
+.app { max-width: 1320px; margin: 0 auto; padding-block: 8px; display: grid; gap: 8px; }
 
-/* 위 막대 */
-.top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
-.brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.brand-mark { width: 36px; height: 36px; border-radius: 10px; background: var(--sun); display: grid; place-items: center; font-family: var(--font-brand); font-size: 20px; color: #172033; flex: none; }
-.brand h1 { margin: 0; font-family: var(--font-brand); font-weight: 400; font-size: 20px; line-height: 1.1; white-space: nowrap; }
-.brand p { margin: 1px 0 0; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
-.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; flex: 1 1 100%; min-width: 0; }
-.stat { min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 5px 10px; display: grid; }
-@media (min-width: 600px) { .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.stat .label { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
-.stat .val { font-size: 20px; font-weight: 700; line-height: 1.15; white-space: nowrap; }
-.stat .val small { font-size: 12.5px; color: var(--muted); font-weight: 500; }
-.stat.alert { border-color: var(--late); background: var(--late-bg); }
-.stat.alert .val { color: var(--late); }
-.stat.good .val { color: var(--ok); }
-.stat.zero .val { color: var(--grace); }
-.clock { display: flex; align-items: center; gap: 6px; }
-.clock .now { font-size: 24px; font-weight: 700; line-height: 1; }
-.date-btn { border: 0; background: transparent; padding: 0; color: var(--muted); font-size: 11.5px; white-space: nowrap; text-decoration: underline dotted; text-underline-offset: 3px; }
-.date-btn span { font-weight: 700; color: var(--fg); }
-.set-list { display: grid; gap: 6px; }
-.set-row { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
-.set-row .btns { flex-wrap: nowrap; align-items: center; }
-.set-row input[type=date] { min-width: 0; flex: 1 1 0; border: 1px solid var(--line); border-radius: 8px; padding: 4px 6px; background: var(--surface); font-size: 14px; }
-.day-pick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.day-pick button { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 8px; text-align: left; font-size: 12.5px; line-height: 1.35; }
-.day-pick button b { display: block; font-size: 14px; }
-.day-pick button.on { border: 2px solid var(--ink); }
-.rules { margin: 0; padding-left: 18px; font-size: 13px; display: grid; gap: 2px; }
-.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 7px 12px; font-weight: 600; min-height: 38px; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 9px; padding: 6px 12px; font-weight: 600; min-height: 36px; }
 .btn:hover { background: var(--surface-2); }
-.btn[disabled] { opacity: .45; cursor: not-allowed; }
+.btn[disabled] { opacity: .4; cursor: not-allowed; }
 .btn-ink { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
 .btn-ink:hover { background: var(--ink); opacity: .9; }
-.btn-sm { padding: 3px 9px; min-height: 30px; font-size: 12.5px; border-radius: 8px; }
+.btn-sm { padding: 2px 9px; min-height: 28px; font-size: 12.5px; border-radius: 7px; }
+
+/* 위 막대 */
+.top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.top h1 { margin: 0; font-size: 16px; font-weight: 700; white-space: nowrap; }
+.top .tag { font-size: 11.5px; color: var(--muted); }
+.top .spacer { flex: 1; }
+.top .now { font-size: 22px; font-weight: 700; }
 
 /* 세 칸 */
-.cols { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); align-items: start; }
-.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 10px; display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; }
-.panel h2 { margin: 0; font-size: 15px; display: flex; align-items: baseline; gap: 6px; justify-content: space-between; flex-wrap: wrap; }
-.panel h2 .count { font-size: 12px; color: var(--muted); font-weight: 500; }
-.scroll { min-height: 0; display: grid; gap: 6px; align-content: start; }
-.sub-h { font-size: 11.5px; font-weight: 700; color: var(--muted); letter-spacing: .06em; margin: 4px 0 0; display: flex; justify-content: space-between; }
-.empty { color: var(--muted); font-size: 13px; padding: 8px; background: var(--surface-2); border-radius: 8px; text-align: center; }
-.explain { font-size: 11.5px; color: var(--muted); margin: 0; }
-
+.cols { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 8px; display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 0; }
+.panel h2 { margin: 0; font-size: 14px; display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+.panel h2 small { font-size: 11.5px; color: var(--muted); font-weight: 500; }
+.scroll { min-height: 0; display: grid; gap: 5px; align-content: start; }
 @media (min-width: 1000px) and (min-height: 680px) {
   body { overflow: hidden; }
-  .app { height: 100%; grid-template-rows: auto minmax(0, 1fr) auto; }
-  .cols { grid-template-columns: 300px minmax(0, 1fr) 272px; height: 100%; align-items: stretch; min-height: 0; }
+  .app { height: 100%; grid-template-rows: auto minmax(0, 1fr); }
+  .cols { grid-template-columns: 190px 244px minmax(0, 1fr); height: 100%; min-height: 0; }
   .panel { height: 100%; }
-  .scroll { overflow: auto; flex: 1; padding-right: 2px; }
-  .top { flex-wrap: nowrap; }
-  .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); flex: 1 1 auto; }
-  .brand h1 { font-size: 18px; }
+  .scroll { overflow: auto; flex: 1; }
 }
 
-/* 검색 */
-.search { display: flex; align-items: center; gap: 6px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 0 10px; min-height: 40px; }
-.search input { border: 0; background: transparent; outline: none; flex: 1; min-width: 0; font-size: 15px; padding: 6px 0; }
-.search label { color: var(--muted); font-size: 12px; white-space: nowrap; }
+/* 왼쪽: 날짜 · 시간표 */
+.datebar { display: grid; grid-template-columns: 28px minmax(0, 1fr) 28px; align-items: center; gap: 4px; }
+.datebar button.arrow { height: 34px; border: 1px solid var(--line); background: var(--surface-2); border-radius: 8px; font-size: 16px; font-weight: 700; }
+.datebar .d { text-align: center; font-weight: 700; font-size: 14px; line-height: 1.15; }
+.datebar .d small { display: block; font-weight: 500; font-size: 11px; color: var(--muted); }
+.slot-head { display: grid; grid-template-columns: 64px minmax(0, 1fr); font-size: 11.5px; color: var(--muted); font-weight: 700; padding: 0 4px; }
+.slot-head span:last-child { text-align: right; }
+.slot { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: center; gap: 4px; width: 100%; border: 1px solid transparent; background: transparent; padding: 3px 4px; border-radius: 9px; text-align: left; }
+.slot .t { border: 1.5px solid var(--line); border-radius: 8px; text-align: center; font-weight: 700; padding: 2px 0; background: var(--surface); }
+.slot .c { text-align: right; font-weight: 600; }
+.slot .c b { font-weight: 700; }
+.slot .c .full { color: var(--red); }
+.slot .c .pend { display: block; font-size: 10.5px; color: var(--accent); font-weight: 600; }
+.slot.now .t { border-color: var(--accent); color: var(--accent); }
+.slot.on { background: var(--accent-bg); border-color: var(--accent); }
+.slot.on .t { background: var(--accent); color: #fff; border-color: var(--accent); }
+.slot:hover { background: var(--surface-2); }
+.slot.on:hover { background: var(--accent-bg); }
 
-/* 예약 줄 */
-.row { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 9px; background: var(--surface-2); border: 1px solid transparent; }
-.row.ready { background: var(--naver-bg); border-color: color-mix(in srgb, var(--naver) 35%, transparent); }
-.row .slot { font-weight: 700; }
-.row .who { min-width: 0; line-height: 1.3; }
-.row .who b { font-weight: 600; }
-.row .who .meta { display: block; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
-.row.done { opacity: .65; }
-.row .btn-ink { min-height: 36px; padding: 4px 14px; font-size: 14px; }
-.chip { display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 700; border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
-.chip.naver { background: var(--naver-bg); color: var(--naver); }
-.chip.walk { background: var(--walk-bg); color: var(--walk); }
-.chip.kc { background: var(--use-bg); color: var(--use); }
-.chip.kc.grace { background: var(--grace-bg); color: var(--grace); }
-.chip.kc.late { background: var(--late-bg); color: var(--late); }
-.kcs { display: inline-flex; gap: 3px; flex-wrap: wrap; }
-.chip.muted { background: var(--surface); color: var(--muted); border: 1px solid var(--line); }
-.chip.ok { background: var(--naver-bg); color: var(--ok); }
-.chip.warn { background: var(--late-bg); color: var(--late); }
-details.more { border-top: 1px dashed var(--line); padding-top: 4px; }
-details.more summary { cursor: pointer; color: var(--muted); font-size: 12.5px; font-weight: 600; padding: 4px 0; }
-details.more .rows { display: grid; gap: 6px; }
+/* 가운데: 예약자 명단 */
+.res { border: 1px solid var(--line); border-radius: 10px; padding: 7px 9px; display: grid; gap: 3px; background: var(--surface); }
+.res.done { background: var(--surface-2); }
+.res.picking { border: 2px solid var(--accent); }
+.res .head { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.res .name { font-size: 15.5px; font-weight: 700; }
+.badge { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
+.badge.conf { background: var(--accent-bg); color: var(--accent); }
+.badge.done { background: var(--naver-bg); color: var(--ok); }
+.badge.paid { background: var(--surface-2); color: var(--fg); border: 1px solid var(--line); }
+.kv { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 0 6px; font-size: 12.5px; margin: 0; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.kv dd.phone { font-size: 14px; font-weight: 700; letter-spacing: .01em; }
+.res .act { display: flex; gap: 5px; align-items: center; justify-content: space-between; margin-top: 2px; flex-wrap: wrap; }
+.kchips { display: inline-flex; gap: 3px; flex-wrap: wrap; }
+.kchip { font-size: 11.5px; font-weight: 700; border-radius: 5px; padding: 0 6px; background: var(--ink); color: var(--on-ink); }
+.empty { color: var(--muted); font-size: 13px; padding: 10px; background: var(--surface-2); border-radius: 8px; text-align: center; }
 
-/* 가운데: 현장 판매 · 열쇠판 · POS 결제 */
-.sale-btn { font-size: 17px; min-height: 50px; border-radius: 12px; width: 100%; display: flex; justify-content: center; align-items: center; gap: 10px; }
-.sale-btn small { font-size: 12.5px; font-weight: 500; opacity: .8; }
-.keys { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 5px; }
-.key { aspect-ratio: 1 / .92; max-width: 100%; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); display: grid; place-content: center; text-align: center; padding: 1px; line-height: 1.05; }
+/* 오른쪽: 열쇠판 */
+.keyhead { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+.keyhead .stat { font-size: 12.5px; color: var(--muted); }
+.keyhead .stat b { color: var(--fg); font-size: 15px; }
+.pickbar { display: flex; gap: 8px; align-items: center; justify-content: space-between; background: var(--accent-bg); border: 1.5px solid var(--accent); color: var(--fg); border-radius: 9px; padding: 5px 8px; font-size: 13px; font-weight: 600; }
+.keys { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; }
+.key { aspect-ratio: 1 / .98; max-width: 100%; border-radius: 8px; border: 1.5px solid var(--line); background: var(--surface-2); color: var(--faint); display: grid; align-content: center; justify-items: center; padding: 1px; line-height: 1.1; min-width: 0; overflow: hidden; }
 .key b { font-size: 17px; font-weight: 700; }
-.key span { font-size: 10px; display: block; margin-top: 2px; white-space: nowrap; }
-.key.free { color: var(--muted); }
-.key.free b { font-weight: 500; }
-.key.use { background: var(--use-bg); border: 1.5px solid var(--use); color: var(--use); }
-.key.grace { background: var(--grace-bg); border: 1.5px solid var(--grace); color: var(--grace); }
-.key.late { background: var(--late); border: 1.5px solid var(--late); color: #fff; }
-.key:hover { filter: brightness(.97); }
+.key span { font-size: 10.5px; font-weight: 600; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.key.in { background: var(--surface); border: 2px solid var(--ink); color: var(--ink); }
+.key.pink { background: var(--pink); border: 2px solid var(--pink); color: var(--pink-fg); }
+.key.red { background: var(--red); border: 2px solid var(--red); color: #fff; }
+.key.void { visibility: hidden; }
+.keys.picking .key.free { border: 2px dashed var(--accent); color: var(--accent); background: var(--surface); }
+.keys.picking .key.sel { background: var(--accent); border-color: var(--accent); color: #fff; }
 .legend { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 11.5px; color: var(--muted); }
-.legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: -1px; margin-right: 4px; border: 1px solid var(--line); }
-.legend .l-use { background: var(--use-bg); border-color: var(--use); }
-.legend .l-grace { background: var(--grace-bg); border-color: var(--grace); }
-.legend .l-late { background: var(--late); border-color: var(--late); }
-.pay-row { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 13px; padding: 5px 8px; border-radius: 8px; background: var(--surface-2); }
-.pay-row .meta { color: var(--muted); font-size: 11.5px; display: block; }
-.pay-row .amt { font-weight: 700; text-align: right; }
-@media (max-width: 420px) { .key b { font-size: 14px; } .key span { display: none; } .keys { gap: 3px; } }
+.legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: -1px; margin-right: 4px; border: 1.5px solid var(--line); background: var(--surface-2); }
+.legend .l-in { border-color: var(--ink); background: var(--surface); }
+.legend .l-pink { border-color: var(--pink); background: var(--pink); }
+.legend .l-red { border-color: var(--red); background: var(--red); }
 
-/* 오른쪽: 연동 · 확인할 일 */
-.links { display: grid; gap: 4px; }
-.link { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 8px; align-items: center; font-size: 12.5px; padding: 6px 8px; border-radius: 8px; background: var(--surface-2); }
-.link .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); }
-.link .dot.warn { background: var(--late); }
-.link b { font-weight: 700; }
-.link .meta { grid-column: 2; color: var(--muted); font-size: 11.5px; }
-.task { border-radius: 10px; padding: 8px 10px; display: grid; gap: 4px; background: var(--surface-2); border: 1px solid var(--line); }
-.task.late { background: var(--late-bg); border-color: color-mix(in srgb, var(--late) 40%, transparent); }
-.task.grace { background: var(--grace-bg); border-color: color-mix(in srgb, var(--grace) 40%, transparent); }
-.task .line1 { display: flex; justify-content: space-between; gap: 6px; flex-wrap: wrap; align-items: baseline; }
-.task .phone { font-weight: 600; user-select: all; }
-.task .note { font-size: 11.5px; color: var(--muted); }
-.btns { display: flex; gap: 5px; flex-wrap: wrap; }
-.when-late { color: var(--late); font-weight: 700; }
-.when-grace { color: var(--grace); font-weight: 700; }
-.mini { display: flex; align-items: center; gap: 6px; justify-content: space-between; flex-wrap: wrap; font-size: 13px; padding: 5px 8px; background: var(--surface-2); border-radius: 8px; }
-.mini .car { font-weight: 700; }
+/* 주차등록 */
+.park { border-top: 1px solid var(--line); padding-top: 6px; display: grid; gap: 6px; grid-template-columns: minmax(0, 1fr) 128px; grid-template-rows: auto minmax(0, 1fr); flex: 1; min-height: 0; }
+.park h3 { margin: 0; font-size: 14px; color: var(--red); grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; }
+.park h3 small { color: var(--muted); font-weight: 500; font-size: 11.5px; }
+.park .left { display: grid; gap: 6px; grid-template-rows: auto minmax(0, 1fr); min-height: 0; }
+.park .find { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; margin: 0; }
+.park .find input { border: 1.5px solid var(--red); border-radius: 8px; padding: 6px 10px; font-size: 16px; background: var(--surface); min-width: 0; min-height: 38px; }
+.park .find .btn { border-color: var(--red); color: var(--red); }
+.cars { border: 1.5px solid var(--red); border-radius: 8px; padding: 4px; display: grid; gap: 3px; align-content: start; overflow: auto; min-height: 84px; }
+.car { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: center; padding: 5px 8px; border-radius: 6px; border: 1px solid transparent; background: var(--surface-2); text-align: left; width: 100%; }
+.car.on { border-color: var(--red); background: var(--warn-bg); }
+.car b { font-size: 14.5px; }
+.car small { color: var(--muted); font-size: 11.5px; }
+.car .st { font-size: 11.5px; font-weight: 700; color: var(--ok); }
+.park .disc { display: grid; gap: 6px; align-content: end; }
+.park .disc .btn { min-height: 46px; border-radius: 12px; border-color: var(--pink-fg); color: var(--fg); font-size: 15px; }
+.park .disc p { margin: 0; font-size: 11px; color: var(--muted); }
 
-.foot-note { color: var(--muted); font-size: 11.5px; margin: 0; overflow-wrap: anywhere; }
-
-/* 시트 */
-.overlay { position: fixed; inset: 0; background: rgba(15, 20, 29, .5); display: grid; align-items: center; justify-items: center; z-index: 20; padding: 12px 16px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
-.sheet { background: var(--surface); color: var(--fg); width: min(560px, 100%); max-height: 100%; overflow: auto; border-radius: 16px; padding: 16px; display: grid; gap: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
-.sheet.wide { width: min(800px, 100%); }
-.sheet h3 { margin: 0; font-size: 18px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+/* 팝업 */
+.overlay { position: fixed; inset: 0; background: rgba(12, 16, 24, .5); display: grid; align-items: center; justify-items: center; z-index: 20; padding: 12px 16px; }
+.sheet { background: var(--surface); color: var(--fg); width: min(480px, 100%); max-height: 100%; overflow: auto; border-radius: 14px; padding: 16px; display: grid; gap: 10px; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+.sheet h3 { margin: 0; font-size: 18px; display: flex; justify-content: space-between; align-items: center; }
 .sheet .x { border: 0; background: transparent; font-size: 24px; line-height: 1; padding: 2px 8px; color: var(--muted); }
-.facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 14px; margin: 0; }
+.facts { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 4px 10px; margin: 0; align-items: center; }
 .facts dt { color: var(--muted); font-size: 13px; }
 .facts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
-.big-keys { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.big-key { font-size: 24px; font-weight: 700; min-width: 58px; text-align: center; padding: 6px 10px; border-radius: 12px; background: var(--use-bg); color: var(--use); border: 2px solid var(--use); }
-.pick { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 4px; }
-.pick button { aspect-ratio: 1.3; border-radius: 7px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; font-size: 13px; padding: 0; }
-.pick button.on { background: var(--use); border-color: var(--use); color: #fff; }
-.pick button[disabled] { opacity: .25; cursor: default; }
+.bigkeys { display: flex; gap: 6px; flex-wrap: wrap; }
+.bigkey { font-size: 22px; font-weight: 700; min-width: 54px; text-align: center; padding: 4px 10px; border-radius: 10px; border: 2px solid var(--ink); }
 .field { display: grid; gap: 4px; }
 .field label, .field .label { font-size: 13px; font-weight: 600; }
 .help { font-size: 11.5px; color: var(--muted); font-weight: 400; }
-.field input { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; background: var(--surface); font-size: 17px; min-height: 44px; width: 100%; }
-.split { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 700px) { .split { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); } }
-.stack { display: grid; gap: 8px; align-content: start; }
-.stepper { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; }
-.stepper .name b { display: block; }
-.stepper .name span { font-size: 12px; color: var(--muted); }
-.stepper .ctl { display: flex; align-items: center; gap: 6px; }
-.stepper .ctl button { width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); font-size: 22px; font-weight: 700; line-height: 1; }
-.stepper .ctl output { min-width: 30px; text-align: center; font-size: 20px; font-weight: 700; }
-.seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.seg button { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; min-height: 42px; font-weight: 600; }
-.seg button.on { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
-.phone-show { font-size: 22px; font-weight: 700; min-height: 46px; display: flex; align-items: center; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); letter-spacing: .02em; }
-.phone-show.placeholder { color: var(--muted); font-weight: 500; font-size: 16px; }
-.pad { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
-.pad button { min-height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); font-size: 20px; font-weight: 600; }
-.pad button.fn { font-size: 13px; background: var(--surface-2); }
-.banner { border-radius: 10px; padding: 8px 10px; font-size: 13px; }
-.banner.ok { background: var(--naver-bg); }
-.banner.warn { background: var(--late-bg); border: 1px solid color-mix(in srgb, var(--late) 40%, transparent); }
+.field input { border: 1.5px solid var(--line); border-radius: 10px; padding: 8px 12px; background: var(--surface); font-size: 22px; font-weight: 700; min-height: 48px; width: 100%; letter-spacing: .03em; }
+.field input:focus { border-color: var(--accent); }
+.fixed { display: inline-block; font-size: 17px; font-weight: 700; padding: 4px 12px; background: var(--surface-2); border-radius: 10px; }
+.stepper { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.stepper button { width: 42px; height: 42px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); font-size: 22px; font-weight: 700; line-height: 1; }
+.stepper output { min-width: 28px; text-align: center; font-size: 20px; font-weight: 700; }
+.banner { border-radius: 9px; padding: 7px 10px; font-size: 13px; background: var(--naver-bg); }
+.banner.warn { background: var(--warn-bg); }
 .banner b { font-weight: 700; }
-.total { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 14px; padding-top: 6px; border-top: 1px solid var(--line); }
-.total b { font-size: 22px; }
+.stack-btns { display: grid; gap: 6px; }
+.stack-btns .btn { min-height: 50px; font-size: 16px; border-radius: 12px; }
 .sheet-foot { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
-.sheet-foot .btn { min-height: 48px; padding: 8px 18px; font-size: 15px; }
-.pay-wait { text-align: center; display: grid; gap: 10px; padding: 12px 0; }
-.spinner { width: 40px; height: 40px; border-radius: 50%; border: 4px solid var(--line); border-top-color: var(--use); margin: 0 auto; animation: spin 1s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
-.done-msg { text-align: center; display: grid; gap: 8px; justify-items: center; }
+.sheet-foot .btn { min-height: 46px; font-size: 15px; padding: 8px 16px; }
+.steps { margin: 0; padding-left: 18px; font-size: 12.5px; color: var(--muted); display: grid; gap: 1px; }
+.steps li.done { color: var(--ok); }
 
-.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--on-ink); padding: 9px 16px; border-radius: 12px; font-weight: 600; z-index: 30; max-width: calc(100% - 32px); box-shadow: var(--shadow); }
+/* 체험용 POS 화면 */
+.pos { position: fixed; inset: 0; z-index: 40; background: #2B2F36; color: #EDEFF2; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; font-family: var(--font); }
+.pos .bar { background: #C9302C; color: #fff; padding: 8px 16px; font-weight: 700; display: flex; justify-content: space-between; }
+.pos .body { display: grid; place-content: center; gap: 12px; text-align: center; padding: 16px; }
+.pos .body b { font-size: 26px; }
+.pos .foot { padding: 12px 16px; display: flex; justify-content: flex-end; gap: 8px; background: #1F2227; }
+.pos .foot button { background: #fff; color: #1F2227; border: 0; border-radius: 8px; padding: 10px 16px; font-weight: 700; }
+
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 14px; background: var(--ink); color: var(--on-ink); padding: 9px 16px; border-radius: 12px; font-weight: 600; z-index: 50; max-width: calc(100% - 32px); box-shadow: var(--shadow); }
 </style>
 
 <div class="app">
   <header class="top">
-    <div class="brand">
-      <div class="brand-mark" aria-hidden="true">키</div>
-      <div>
-        <h1>아스타나키즈 입장 데스크</h1>
-        <p>체험판 · 예시 데이터</p>
-      </div>
-    </div>
-    <section class="stats" id="stats" aria-label="지금 현황"></section>
-    <div class="clock">
-      <div>
-        <div class="now num" id="now">13:50</div>
-        <button class="date-btn" id="day-btn" data-act="settings" aria-label="운영 설정 열기"></button>
-      </div>
-      <button class="btn btn-sm" data-act="time" data-min="5">+5분</button>
-      <button class="btn btn-sm" data-act="time" data-min="30">+30분</button>
-    </div>
+    <h1>아스타나키즈 입장 데스크</h1>
+    <span class="tag">체험판 · 예시 데이터 · 네이버·POS·아마노는 실제로 연결되지 않음</span>
+    <span class="spacer"></span>
+    <span class="now num" id="now">13:50</span>
+    <button class="btn btn-sm" data-act="time" data-min="5">+5분</button>
+    <button class="btn btn-sm" data-act="time" data-min="30">+30분</button>
+    <button class="btn btn-sm" data-act="settings">운영 설정</button>
   </header>
 
   <div class="cols">
-    <section class="panel" aria-labelledby="h-naver">
-      <h2 id="h-naver">네이버 예약 입장 <span class="count" id="naver-count"></span></h2>
-      <div class="search">
-        <label for="q">찾기</label>
-        <input id="q" type="search" placeholder="이름 또는 전화 뒷자리" autocomplete="off">
+    <section class="panel" aria-label="날짜와 시간별 예약">
+      <div class="datebar">
+        <button class="arrow" data-act="day" data-d="-1" aria-label="전날">←</button>
+        <div class="d num" id="date"></div>
+        <button class="arrow" data-act="day" data-d="1" aria-label="다음날">→</button>
       </div>
-      <div class="scroll" id="naver"></div>
+      <div class="slot-head"><span>시간</span><span>확정 / 잔여</span></div>
+      <div class="scroll" id="slots"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="h-res">
+      <h2 id="h-res"><span id="res-title">예약자</span> <small id="res-sub"></small></h2>
+      <div class="scroll" id="res"></div>
     </section>
 
     <section class="panel" aria-labelledby="h-keys">
-      <button class="btn btn-ink sale-btn" data-act="sale">현장 판매 · 입장 <small id="sale-sub"></small></button>
-      <h2 id="h-keys">열쇠판 <span class="count" id="keys-count"></span></h2>
+      <div class="keyhead">
+        <h2 id="h-keys">열쇠</h2>
+        <span class="stat num" id="key-stat"></span>
+      </div>
+      <div class="pickbar" id="pickbar" hidden></div>
       <div class="keys" id="keys"></div>
       <div class="legend">
         <span><i></i>빈 열쇠</span>
-        <span><i class="l-use"></i>이용 중 (~반납 시각 · 무제한은 입장 시각~)</span>
-        <span><i class="l-grace"></i>반납 시간(10분 안)</span>
-        <span><i class="l-late"></i>반납 지연</span>
+        <span><i class="l-in"></i>입장 ~ 1시간 50분</span>
+        <span><i class="l-pink"></i>1시간 50분 ~ 2시간</span>
+        <span><i class="l-red"></i>2시간 넘음</span>
+        <span>· 빈 열쇠를 누르면 현장입장</span>
       </div>
-      <h2>오늘 현장 결제 <span class="count num" id="pay-sum"></span></h2>
-      <div class="scroll" id="pays"></div>
-    </section>
-
-    <section class="panel" aria-labelledby="h-tasks">
-      <h2 id="h-tasks">연동 · 확인할 일</h2>
-      <div class="scroll" id="tasks"></div>
+      <div class="park">
+        <h3>주차등록 <small>아마노코리아 주차 웹 연결 (체험)</small></h3>
+        <div class="left">
+          <form class="find" id="park-form">
+            <input id="car-q" inputmode="numeric" placeholder="차번호 뒤 4자리" autocomplete="off" aria-label="차번호">
+            <button class="btn" type="submit">검색</button>
+          </form>
+          <div class="cars" id="cars" aria-label="검색된 차량"></div>
+        </div>
+        <div class="disc">
+          <p id="disc-help">차량을 고른 뒤 누르세요</p>
+          <button class="btn" data-act="discount" data-h="2시간 30분" disabled>2시간 30분</button>
+          <button class="btn" data-act="discount" data-h="5시간" disabled>5시간</button>
+        </div>
+      </div>
     </section>
   </div>
-
-  <p class="foot-note">체험판입니다. 이름·전화·차량번호는 예시이고 결제·네이버·주차는 실제로 처리되지 않습니다. 입장권 16,000원 · 입장권 1장에 열쇠 1개는 임시 값입니다. 시계 아래 날짜를 누르면 성수기 기간과 체험 날짜를 바꿀 수 있고, +5분 · +30분으로 반납 지연을 볼 수 있습니다.</p>
 </div>
 
-<div class="overlay" id="overlay" hidden>
-  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title"></div>
+<div class="overlay" id="overlay" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title"></div></div>
+<div class="pos" id="pos" hidden>
+  <div class="bar"><span>POS 프로그램 (체험 화면)</span><span class="num" id="pos-amt"></span></div>
+  <div class="body"><b>여기는 매장 POS 프로그램 자리입니다</b><span>실제로는 아침부터 켜져 있는 POS 창이 앞으로 나옵니다.<br>POS에서 결제를 마치고 POS 창을 최소화하면 입장 데스크 팝업으로 돌아옵니다.</span></div>
+  <div class="foot"><button data-act="posDone">결제 끝 · POS 최소화</button></div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
@@ -303,573 +272,418 @@ details.more .rows { display: grid; gap: 6px; }
 (() => {
   // ── 규칙 ─────────────────────────────────────────
   const RULES = {
-    keys: 45,              // 보유 열쇠 (정함)
-    baseKeys: 40,          // 기본 운영 열쇠. 나머지 5개는 유동 열쇠 — 안에 빈 좌석이 있을 때만 (정함)
-    seats: 39,             // 내부 4인석(입식·좌식) 좌석 수 (정함)
-    useMinutes: 110,       // 시간제 이용시간 1시간 50분 (정함)
-    unlimitedFrom: "18:00",// 이 시각 입장부터는 무제한 (정함)
-    earlyMinutes: 5,       // 예약 5분 전부터 입장 (지금 운영 방식)
-    keysPerTicket: 1,      // 입장권 1장에 열쇠 1개 (임시)
-    ticketPrice: 16000,    // 현장 입장권 가격 (임시 — 실제로는 POS 상품 가격)
-    graceMinutes: 10,      // 반납 시각이 지나고 이만큼은 주황으로만 표시 (임시)
-    // 성수기 기간 (운영 설정에서 바꿈, 예시 값)
+    keys: 45,               // 보유 열쇠
+    baseKeys: 40,           // 기본 운영 열쇠, 나머지 5개는 유동 (빈 좌석 보고)
+    seats: 39,              // 내부 4인석(입식·좌식)
+    useMinutes: 110,        // 1시간 50분
+    pinkUntil: 120,         // 1시간 50분 ~ 2시간 분홍, 2시간 넘으면 빨강
+    unlimitedFrom: "18:00", // 이 시각 입장부터 무제한
+    earlyMinutes: 5,        // 예약 5분 전부터 입장
+    slotCap: 10,            // 네이버 시간대별 판매 수량 (체험용 — 실제는 네이버 값)
     peaks: [{ name: "여름방학", from: "2026-07-20", to: "2026-08-23" }, { name: "겨울방학", from: "2026-12-28", to: "2027-02-28" }],
   };
-  /* 이용시간 규칙
-     - 성수기: 평일·휴일 모두 17:30 입장까지 1시간 50분, 18:00 입장부터 무제한
-     - 비수기: 평일은 항상 무제한, 휴일은 성수기와 같음 */
-  const KEYS = RULES.keys, BASE = RULES.baseKeys, GRACE = RULES.graceMinutes, EARLY = RULES.earlyMinutes, DUR = RULES.useMinutes;
-  const HOLIDAYS = ["2026-10-03", "2026-10-05", "2026-10-09", "2026-12-25", "2027-01-01"]; // 공휴일 (실제로는 달력 자료로)
-  const DAYS = [
-    { key: "2026-10-10", label: "10/10 (토)" },
-    { key: "2026-10-13", label: "10/13 (화)" },
-    { key: "2026-07-28", label: "7/28 (화)" },
-  ];
-  let day = DAYS[0];
-  const dowOf = (key) => new Date(key + "T00:00:00").getDay();
-  const isHoliday = (key) => [0, 6].includes(dowOf(key)) || HOLIDAYS.includes(key);
-  const peakOf = (key) => RULES.peaks.find((p) => p.from && p.to && p.from <= key && key <= p.to) || null;
-  const dayTimed = () => !!peakOf(day.key) || isHoliday(day.key);   // 시간제가 있는 날인지
-  /** 이 시각 입장의 이용시간(분). 무제한이면 null */
-  const minutesFor = (entryMin) => (dayTimed() && entryMin < toMinS(RULES.unlimitedFrom) ? DUR : null);
-  function dayRuleText() {
-    const peak = peakOf(day.key);
-    const kind = (peak ? `성수기(${peak.name})` : "비수기") + " " + (isHoliday(day.key) ? "휴일" : "평일");
-    return dayTimed() ? `${kind} · 17:30 입장까지 1시간 50분 · 18:00부터 무제한` : `${kind} · 하루 종일 무제한`;
-  }
+  /* 이용시간: 성수기 — 평일·휴일 모두 17:30 입장까지 1시간 50분, 18:00 입장부터 무제한
+              비수기 — 평일은 무제한, 휴일은 성수기와 같음 */
+  const HOLIDAYS = ["2026-09-24", "2026-09-25", "2026-09-26", "2026-10-03", "2026-10-05", "2026-10-09", "2026-12-25", "2027-01-01"];
+  const SLOTS = []; for (let h = 10; h <= 19; h++) SLOTS.push(h * 60, h * 60 + 30);
+  const TODAY = "2026-10-05";
 
-  function toMinS(s) { const [h, m] = s.split(":").map(Number); return h * 60 + m; }
-  const toMin = toMinS;
   const hm = (m) => String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
-  const won = (n) => n.toLocaleString("ko-KR") + "원";
+  const toMin = (s) => { const [h, m] = s.split(":").map(Number); return h * 60 + m; };
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const digits = (p) => String(p).replace(/\D/g, "");
-  const last4 = (p) => digits(p).slice(-4);
-  const fmtPhone = (p) => { const d = digits(p); return d.length === 11 ? `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}` : d.length === 10 ? `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}` : d; };
+  const fmtPhone = (p) => { const d = digits(p); if (d.length <= 3) return d; if (d.length <= 7) return `${d.slice(0, 3)}-${d.slice(3)}`; if (d.length === 10) return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`; return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`; };
+  const localKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const shiftDay = (key, n) => { const d = new Date(key + "T12:00:00"); d.setDate(d.getDate() + n); return localKey(d); };
+  const DOW = ["일", "월", "화", "수", "목", "금", "토"];
+  const dateLabel = (key) => { const d = new Date(key + "T12:00:00"); return `${String(d.getFullYear()).slice(2)}.${d.getMonth() + 1}.${d.getDate()} (${DOW[d.getDay()]})`; };
+  const isHoliday = (key) => { const w = new Date(key + "T12:00:00").getDay(); return w === 0 || w === 6 || HOLIDAYS.includes(key); };
+  const peakOf = (key) => RULES.peaks.find((p) => p.from <= key && key <= p.to) || null;
+  const timedDay = (key) => !!peakOf(key) || isHoliday(key);
+  /** 이 날 이 시각 입장의 이용시간(분). 무제한이면 null */
+  const minutesFor = (key, entry) => (timedDay(key) && entry < toMin(RULES.unlimitedFrom) ? RULES.useMinutes : null);
+  const dayKind = (key) => (peakOf(key) ? "성수기" : "비수기") + " " + (isHoliday(key) ? "휴일" : "평일") + (timedDay(key) ? " · 시간제" : " · 무제한");
 
   let now = toMin("13:50");
+  let viewDay = TODAY;
+  let selSlot = toMin("14:00");
+
+  // ── 네이버 예약 (예시) ────────────────────────────
+  // 날짜별 예약 목록. 오늘 것은 정해 두고, 다른 날은 예시로 만들어 냄
+  const NAMES = ["홍길동", "김철수", "고성현", "윤서아", "배주원", "김서윤", "박하은", "이도윤", "탁서율", "최지호", "정예린", "노윤호", "강민준", "문하윤", "백지우", "장시우", "임하준", "조아인", "한지안", "남궁민", "유채아", "구본우", "오유나", "서도현", "신채원", "권이준", "황수아", "안지후", "송다온", "류하린", "전시윤", "홍예준", "고은우", "문서진", "양지아", "손라온", "차예나", "변시후"];
   let seq = 1;
-  let posSeq = 30;
-  const visits = [];
-
-  // 반납 시각: 네이버는 예약 시간대 기준, 현장은 입장 시각 기준. 무제한이면 null
-  function setExp(v) { const m = minutesFor(v.slot); v.exp = m == null ? null : v.slot + m; }
-  // 날짜·성수기 기간이 바뀌면 반납 시각을 다시 계산 (자동 미입장도 다시 판단)
-  function recalc() { visits.forEach((v) => { if (v.status === "noshow") v.status = "wait"; setExp(v); }); }
-
-  // 네이버 예약 (예시) — keys 가 있으면 이미 입장
-  function naver(slot, name, phone, tickets, o = {}) {
+  const bookings = {}; // dateKey -> [예약]
+  function booking(day, slot, name, phone, qty, o = {}) {
     const s = toMin(slot);
-    const v = {
-      id: "v" + seq++, src: "naver", no: "N" + (240000 + seq * 37), name, phone, slot: s, tickets,
-      car: o.car || "", park: o.car ? (o.park || "ok") : null, status: "wait", keys: [], enteredAt: null, exp: null,
-      outAt: null, naverDone: null,
+    const b = {
+      id: "b" + seq++, day, slot: s, name, phone, qty, no: String(1370988026 + seq * 7313),
+      product: s >= toMin(RULES.unlimitedFrom) ? "야간자유 입장권" : "4인 입장권", pay: "결제완료",
+      status: o.done ? "완료" : "확정", keys: [], enteredAt: null, outAt: null, called: null,
     };
-    if (o.keys) { v.status = "in"; v.keys = o.keys.slice(); v.enteredAt = s - 3; v.naverDone = s - 3; }
-    if (o.out) { v.status = "out"; v.enteredAt = s - 2; v.outAt = s + 95; v.naverDone = s - 2; }
-    setExp(v);
-    visits.push(v);
-    return v;
+    (bookings[day] = bookings[day] || []).push(b);
+    return b;
   }
-  function walk(at, phone, tickets, keys, o = {}) {
-    const a = toMin(at);
-    const v = {
-      id: "v" + seq++, src: "walk", name: "현장 구매", phone, slot: a, tickets,
-      car: o.car || "", park: o.car ? (o.park || "ok") : null, status: "in", keys: keys.slice(), enteredAt: a, exp: null,
-      outAt: null, pay: o.pay || "카드", amount: tickets * RULES.ticketPrice,
-      posNo: "POS-" + String(posSeq++).padStart(4, "0"),
-    };
-    setExp(v);
-    visits.push(v);
-    return v;
-  }
-
-  naver("10:30", "배주원", "01048213390", 1);
-  naver("11:30", "김서윤", "01027384410", 1, { keys: [3], car: "38다 1172" });
-  naver("12:00", "박하은", "01093318820", 1, { out: true, car: "21보 5520" });
-  naver("12:00", "이도윤", "01055102947", 2, { keys: [7, 8], car: "152가 7781", park: "fail" });
-  naver("12:00", "탁서율", "01064420183", 1, { keys: [24] });
-  naver("12:30", "최지호", "01033829051", 1, { keys: [2] });
-  naver("12:30", "정예린", "01087120336", 1, { keys: [4] });
-  naver("12:30", "노윤호", "01022917740", 2, { keys: [15, 16], car: "61머 3020" });
-  naver("13:00", "강민준", "01076643215", 2, { keys: [5, 6] });
-  naver("13:00", "윤서아", "01090047721", 1, { keys: [9], car: "27노 8814" });
-  naver("13:00", "문하윤", "01031156628", 1, { keys: [17] });
-  naver("13:00", "백지우", "01045527719", 2, { keys: [18, 19] });
-  naver("13:00", "장시우", "01068893304", 1);
-  naver("13:30", "임하준", "01012298874", 1, { keys: [10] });
-  naver("13:30", "조아인", "01039906512", 3, { keys: [11, 12, 13], car: "119허 4402" });
-  naver("13:30", "한지안", "01058821137", 1, { keys: [14] });
-  naver("13:30", "남궁민", "01077240098", 1, { keys: [20] });
-  naver("13:30", "유채아", "01020087346", 2, { keys: [21, 22] });
-  naver("13:30", "구본우", "01094471128", 1, { keys: [23] });
-  naver("14:00", "오유나", "01063390471", 1);
-  naver("14:00", "서도현", "01017783305", 2);
-  naver("14:00", "신채원", "01082214490", 1);
-  naver("14:00", "권이준", "01049905123", 1);
-  naver("14:30", "황수아", "01036654018", 1);
-  naver("14:30", "안지후", "01071180942", 2);
-  naver("14:30", "송다온", "01025539987", 1);
-  naver("15:00", "류하린", "01088016634", 1);
-  naver("15:00", "전시윤", "01014472259", 1);
-  naver("15:00", "홍예준", "01052238841", 2);
-  naver("15:30", "고은우", "01097731106", 1);
-  naver("15:30", "문서진", "01030065512", 1);
-  naver("16:00", "양지아", "01069924478", 2);
-  naver("16:00", "손라온", "01041187730", 1);
-  walk("11:05", "01091124478", 1, [1]).status = "out";
-  visits[visits.length - 1].keys = []; visits[visits.length - 1].outAt = toMin("12:58");
-  walk("12:40", "01026659013", 2, [25, 26], { car: "45루 6603" });
-  walk("13:10", "01084430217", 1, [27], { pay: "현금" });
-  let lastImport = toMin("13:48");
-
-  // ── 계산 ─────────────────────────────────────────
-  const holderOf = (k) => visits.find((v) => v.keys.includes(k));
-  const band = (v) => (v.exp == null || now < v.exp ? "use" : now < v.exp + GRACE ? "grace" : "late");
-  const untilText = (v) => (v.exp == null ? "무제한" : `${hm(v.exp)}까지`);
-  const freeKeys = () => { const out = []; for (let k = 1; k <= KEYS; k++) if (!holderOf(k)) out.push(k); return out; };
-  const byId = (id) => visits.find((x) => x.id === id);
-
-  // 빈 열쇠 중 번호가 작은 것부터 (prefer 가 있으면 그 열쇠 먼저)
-  function pickKeys(n, prefer) {
-    const order = freeKeys();
-    if (prefer && order.includes(prefer)) { order.splice(order.indexOf(prefer), 1); order.unshift(prefer); }
-    return order.slice(0, n);
-  }
-
-  /* 현장 판매 가능 열쇠: 지금부터 1시간 50분 동안 5분마다
-     (안에 있는 손님 열쇠 + 그때 와 있을 네이버 예약 열쇠)를 빼고 남는 열쇠의 가장 작은 값.
-     예약 손님 자리를 먼저 남기므로 근무자가 "팔아도 되나"를 따로 판단하지 않습니다.
-     base = 기본 40개 안에서, all = 유동 5개까지 (유동은 빈 좌석을 보고 근무자가 씀) */
-  function projection() {
-    let worst = Infinity, worstAt = now;
-    for (let x = now; x <= now + DUR; x += 5) {
-      let used = 0;
-      for (const v of visits) {
-        if (v.status === "in") { if (v.exp == null || v.exp > x || x < now + GRACE) used += v.keys.length; }
-        else if (v.status === "wait" && v.src === "naver") { if (v.slot - EARLY <= x && (v.exp == null || x < v.exp)) used += v.tickets * RULES.keysPerTicket; }
+  const P = (i) => "010" + String(20000000 + ((i * 7919) % 79999999)).padStart(8, "0");
+  [
+    ["10:00", "홍길동", 1, 1], ["10:00", "김철수", 2, 1], ["10:00", "찟재명", 1, 1], ["10:00", "응석열", 1, 1], ["10:00", "배주원", 1, 1], ["10:00", "김서윤", 1, 1],
+    ["10:30", "박하은", 1, 1], ["10:30", "이도윤", 2, 1], ["10:30", "탁서율", 1, 1], ["10:30", "최지호", 1, 1],
+    ["11:00", "정예린", 2, 1], ["11:00", "노윤호", 2, 1], ["11:00", "강민준", 2, 1], ["11:00", "문하윤", 2, 1], ["11:00", "백지우", 2, 1],
+    ["11:30", "장시우", 1, 1], ["11:30", "임하준", 1, 1],
+    ["12:00", "조아인", 2, 1], ["12:00", "한지안", 1, 1], ["12:00", "남궁민", 1, 1],
+    ["12:30", "유채아", 1, 1], ["12:30", "구본우", 2, 1],
+    ["13:00", "오유나", 1, 1], ["13:00", "서도현", 1, 1], ["13:00", "신채원", 2, 0],
+    ["13:30", "권이준", 1, 1], ["13:30", "황수아", 2, 1], ["13:30", "안지후", 1, 0],
+    ["14:00", "송다온", 1], ["14:00", "류하린", 2], ["14:00", "전시윤", 1], ["14:00", "홍예준", 1], ["14:00", "고은우", 1],
+    ["14:30", "문서진", 1], ["14:30", "양지아", 2],
+    ["15:00", "손라온", 1], ["15:00", "차예나", 1], ["15:00", "변시후", 2],
+    ["15:30", "윤서아", 1], ["16:00", "고성현", 1], ["16:30", "김철수", 1],
+    ["18:00", "고성현", 1], ["18:30", "홍길동", 1],
+  ].forEach(([t, n, q, d], i) => booking(TODAY, t, n, P(i + 3), q, { done: !!d }));
+  // 이미 입장한 예약 [이름, 예약시간, 열쇠, 입장 시각, 퇴장 시각(아직이면 null)]
+  const T = toMin;
+  [
+    ["홍길동", "10:00", [1], "09:58", "11:52"], ["김철수", "10:00", [2, 3], "09:57", "11:40"], ["찟재명", "10:00", [4], "09:59", null],
+    ["응석열", "10:00", [5], "10:01", "11:55"], ["배주원", "10:00", [6], "10:00", "11:49"], ["김서윤", "10:00", [7], "10:02", "11:58"],
+    ["박하은", "10:30", [8], "10:27", "12:15"], ["이도윤", "10:30", [9, 10], "10:28", "12:20"], ["탁서율", "10:30", [11], "10:30", "12:18"], ["최지호", "10:30", [12], "10:29", "12:22"],
+    ["정예린", "11:00", [13, 14], "10:58", "12:47"], ["노윤호", "11:00", [15, 16], "10:57", "12:50"], ["강민준", "11:00", [17, 18], "11:01", null], ["문하윤", "11:00", [19, 20], "11:03", "12:52"], ["백지우", "11:00", [21, 22], "11:02", "12:55"],
+    ["장시우", "11:30", [1], "11:28", null], ["임하준", "11:30", [23], "11:29", "13:20"],
+    ["조아인", "12:00", [24, 25], "11:57", null], ["한지안", "12:00", [26], "11:58", null], ["남궁민", "12:00", [2], "12:01", null],
+    ["유채아", "12:30", [3], "12:28", null], ["구본우", "12:30", [27, 28], "12:29", null],
+    ["오유나", "13:00", [6], "12:58", null], ["서도현", "13:00", [7], "12:57", null],
+    ["권이준", "13:30", [8], "13:27", null], ["황수아", "13:30", [9, 10], "13:28", null],
+  ].forEach(([name, slot, keys, at, out]) => {
+    const b = bookings[TODAY].find((x) => x.name === name && x.slot === T(slot));
+    b.enteredAt = T(at);
+    if (out == null) b.keys = keys.slice(); else b.outAt = T(out);
+  });
+  // 다른 날 예시: 날짜마다 같은 결과가 나오게
+  function ensureDay(key) {
+    if (bookings[key]) return;
+    bookings[key] = [];
+    let r = [...key].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+    const rnd = () => ((r = (r * 1103515245 + 12345) >>> 0) / 4294967296);
+    const busy = isHoliday(key) ? 0.8 : 0.4;
+    for (const s of SLOTS) {
+      let left = RULES.slotCap;
+      while (left > 0 && rnd() < busy * (s >= 18 * 60 ? 0.4 : 1)) {
+        const q = rnd() < 0.25 ? 2 : 1; if (q > left) break; left -= q;
+        booking(key, hm(s), NAMES[Math.floor(rnd() * NAMES.length)], P(Math.floor(rnd() * 99999)), q, { done: key < TODAY });
       }
-      if (KEYS - used < worst) { worst = KEYS - used; worstAt = x; }
+    }
+  }
+
+  // 현장입장자
+  let posSeq = 31;
+  const walkins = [];
+  function walkin(phone, keys, at) {
+    const w = { id: "w" + seq++, name: "현장입장자", phone, keys: keys.slice(), enteredAt: at, slot: at, posNo: "POS-" + String(posSeq++).padStart(4, "0"), outAt: null, called: null, walk: true };
+    walkins.push(w);
+    return w;
+  }
+  walkin("01026659013", [29], T("12:40"));
+  walkin("01084430217", [30, 31], T("13:12"));
+
+  // ── 열쇠 계산 ─────────────────────────────────────
+  const holders = () => bookings[TODAY].concat(walkins).filter((x) => x.keys.length);
+  const holderOf = (k) => holders().find((x) => x.keys.includes(k));
+  const freeKeys = () => { const out = []; for (let k = 1; k <= RULES.keys; k++) if (!holderOf(k)) out.push(k); return out; };
+  /* 열쇠 색: 예약한 입장시간(현장은 입장 시각)부터
+     ~ 1시간 50분 검정 · 1시간 50분 ~ 2시간 분홍 · 2시간 넘으면 빨강. 무제한 손님은 계속 검정 */
+  function keyColor(h) {
+    if (minutesFor(TODAY, h.slot) == null) return "in";
+    const used = now - h.slot;
+    return used < RULES.useMinutes ? "in" : used < RULES.pinkUntil ? "pink" : "red";
+  }
+  /* 현장 판매 가능 열쇠: 지금부터 1시간 50분 동안 5분마다
+     (안에 있는 손님 열쇠 + 그때 와 있을 네이버 예약 열쇠)를 뺀 값의 가장 작은 값.
+     base = 기본 40개 안, all = 유동 5개까지 */
+  function projection() {
+    let worst = Infinity;
+    for (let x = now; x <= now + RULES.useMinutes; x += 5) {
+      let used = 0;
+      for (const h of holders()) { const m = minutesFor(TODAY, h.slot); if (m == null || h.slot + m > x || x < now + 10) used += h.keys.length; }
+      for (const b of bookings[TODAY]) {
+        if (b.status !== "확정") continue;
+        const m = minutesFor(TODAY, b.slot);
+        if (b.slot - RULES.earlyMinutes <= x && (m == null || x < b.slot + m)) used += b.qty;
+      }
+      worst = Math.min(worst, RULES.keys - used);
     }
     const free = freeKeys().length;
-    const all = Math.max(0, Math.min(worst, free));
-    const base = Math.max(0, Math.min(worst - (KEYS - BASE), free));
-    return { base, all, flex: all - base, worstAt };
-  }
-  const ticketsFor = (keys) => Math.floor(keys / RULES.keysPerTicket);
-
-  // 시간이 지나면: 이용시간이 끝나도록 안 온 예약은 자동 미입장 (무제한 예약은 그대로 둠)
-  function settle() {
-    for (const v of visits) if (v.status === "wait" && v.exp != null && now >= v.exp) v.status = "noshow";
-  }
-
-  // 주차 웹 자동 입력 (체험: 1.5초 뒤 등록됨)
-  function parkSubmit(v) {
-    v.park = "wait";
-    setTimeout(() => { v.park = "ok"; renderAll(); toast(`${v.car} 주차 등록됨`); }, 1500);
+    return { base: Math.max(0, Math.min(worst - (RULES.keys - RULES.baseKeys), free)), all: Math.max(0, Math.min(worst, free)) };
   }
 
   // ── 그리기 ───────────────────────────────────────
   const $ = (id) => document.getElementById(id);
-  let query = "";
+  let pick = null; // 네이버 예약자 열쇠 고르기 { id, need, keys: [] }
+  const findB = (id) => bookings[TODAY].find((b) => b.id === id);
 
-  function renderStats() {
-    const inUse = KEYS - freeKeys().length;
-    const pj = projection();
-    const avail = ticketsFor(pj.base), flex = ticketsFor(pj.all) - avail;
-    const late = visits.filter((v) => v.status === "in" && band(v) !== "use").length;
-    const waiting = visits.filter((v) => v.status === "wait" && v.slot - EARLY <= now).length;
-    $("stats").innerHTML = `
-      <div class="stat"><span class="label">사용 중 열쇠</span><span class="val num">${inUse}<small> / ${KEYS}</small></span></div>
-      <div class="stat ${avail > 0 ? "good" : "zero"}"><span class="label">현장 판매 가능</span><span class="val num">${avail}<small>장${flex ? ` +유동 ${flex}` : ""}</small></span></div>
-      <div class="stat"><span class="label">입장 기다림</span><span class="val num">${waiting}<small>팀</small></span></div>
-      <div class="stat ${late ? "alert" : ""}"><span class="label">반납 지연</span><span class="val num">${late}<small>건</small></span></div>`;
-    $("sale-sub").textContent = avail > 0 ? `지금 ${avail}장까지` : flex > 0 ? `유동 열쇠 ${flex}개 남음` : "지금은 예약 손님 자리로 꽉 참";
-    $("day-btn").innerHTML = `${day.label} <span class="num">${dayTimed() ? "시간제" : "무제한"}</span>`;
+  function renderSlots() {
+    ensureDay(viewDay);
+    $("date").innerHTML = `${dateLabel(viewDay)}<small>${dayKind(viewDay)}</small>`;
+    const list = bookings[viewDay];
+    $("slots").innerHTML = SLOTS.map((s) => {
+      const bs = list.filter((b) => b.slot === s);
+      const conf = bs.reduce((a, b) => a + b.qty, 0);
+      const left = Math.max(0, RULES.slotCap - conf);
+      const pend = viewDay === TODAY ? bs.filter((b) => b.status === "확정").reduce((a, b) => a + b.qty, 0) : 0;
+      const isNow = viewDay === TODAY && now >= s - RULES.earlyMinutes && now < s + 25;
+      return `<button class="slot ${s === selSlot ? "on" : ""} ${isNow ? "now" : ""}" data-act="slot" data-s="${s}" aria-pressed="${s === selSlot}">
+        <span class="t num">${hm(s)}</span>
+        <span class="c num"><b>${conf}</b> / <span class="${left ? "" : "full"}">${left}</span>${pend ? `<span class="pend">입장 전 ${pend}</span>` : ""}</span></button>`;
+    }).join("");
   }
 
-  function keyChips(v) {
-    const b = v.status === "in" ? band(v) : "use";
-    return `<span class="kcs">${v.keys.map((k) => `<span class="chip kc ${b === "use" ? "" : b}">${k}</span>`).join("")}</span>`;
-  }
-
-  function naverRow(v) {
-    const ready = v.status === "wait" && v.slot - EARLY <= now;
-    let right;
-    if (v.status === "wait") right = ready
-      ? `<button class="btn btn-ink" data-act="checkin" data-id="${v.id}">입장</button>`
-      : `<span class="chip muted num">${hm(v.slot - EARLY)}~</span>`;
-    else if (v.status === "in") right = keyChips(v);
-    else if (v.status === "out") right = `<span class="chip muted num">퇴장 ${hm(v.outAt)}</span>`;
-    else right = `<span class="chip muted">안 옴</span>`;
-    let meta = `${last4(v.phone)} · 입장권 ${v.tickets}장`;
-    if (v.status === "in") meta += ` · ${untilText(v)}`;
-    if (v.status === "wait" && now > v.slot + 10) meta += ` · <span class="when-grace">${now - v.slot}분 늦음</span>`;
-    return `<div class="row ${ready ? "ready" : ""} ${v.status === "out" || v.status === "noshow" ? "done" : ""}">
-      <span class="slot num">${hm(v.slot)}</span>
-      <span class="who"><b>${esc(v.name)}</b><span class="meta num">${meta}</span></span>
-      <span>${right}</span>
-    </div>`;
-  }
-
-  function renderNaver() {
-    const q = query.trim();
-    const qd = digits(q);
-    const match = (v) => v.src === "naver" && (!q || v.name.includes(q) || (qd && digits(v.phone).includes(qd)));
-    const list = visits.filter(match).sort((a, b) => a.slot - b.slot);
-    const ready = list.filter((v) => v.status === "wait" && v.slot - EARLY <= now);
-    const later = list.filter((v) => v.status === "wait" && v.slot - EARLY > now);
-    const inside = list.filter((v) => v.status === "in");
-    const done = list.filter((v) => v.status === "out" || v.status === "noshow");
-    $("naver-count").textContent = `오늘 ${visits.filter((v) => v.src === "naver").length}건`;
-    let html = `<p class="sub-h"><span>지금 입장</span><span class="num">${ready.length}팀</span></p>`;
-    html += ready.length ? ready.map(naverRow).join("") : `<div class="empty">${q ? "찾는 예약이 없어요" : "지금 입장할 예약이 없어요"}</div>`;
-    if (later.length) html += `<p class="sub-h"><span>곧 도착</span><span class="num">${later.length}팀</span></p>${later.map(naverRow).join("")}`;
-    if (inside.length || done.length) {
-      html += `<details class="more" ${q ? "open" : ""}><summary>입장한 예약 ${inside.length}팀 · 끝난 예약 ${done.length}팀</summary><div class="rows">${inside.concat(done).map(naverRow).join("")}</div></details>`;
-    }
-    $("naver").innerHTML = html;
+  function renderRes() {
+    const list = bookings[viewDay].filter((b) => b.slot === selSlot).sort((a, b) => (a.status === "확정" ? 0 : 1) - (b.status === "확정" ? 0 : 1));
+    const q = list.reduce((a, b) => a + b.qty, 0);
+    $("res-title").textContent = `${hm(selSlot)} 예약자`;
+    $("res-sub").textContent = `${list.length}명 · 수량 ${q}`;
+    const isToday = viewDay === TODAY;
+    $("res").innerHTML = list.length ? list.map((b) => {
+      const d = new Date(b.day + "T12:00:00");
+      const when = `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}.(${DOW[d.getDay()]}) ${hm(b.slot)}`;
+      let act = "";
+      if (b.status === "확정") {
+        if (!isToday) act = `<span class="help">이용일에 입장 처리</span>`;
+        else if (now < b.slot - RULES.earlyMinutes) act = `<span class="help num">${hm(b.slot - RULES.earlyMinutes)}부터 입장</span>`;
+        else act = pick && pick.id === b.id
+          ? `<span class="help">오른쪽에서 빈 열쇠를 누르세요</span><button class="btn btn-sm" data-act="pickCancel">취소</button>`
+          : `<button class="btn btn-ink btn-sm" data-act="enter" data-id="${b.id}">입장 · 열쇠 고르기</button>`;
+      } else if (b.keys.length) act = `<span class="kchips">${b.keys.map((k) => `<span class="kchip num">${k}</span>`).join("")}</span><span class="help num">${hm(b.enteredAt)} 입장</span>`;
+      else if (b.outAt != null) act = `<span class="help num">${hm(b.enteredAt)} 입장 · ${hm(b.outAt)} 퇴장</span>`;
+      return `<article class="res ${b.status === "완료" ? "done" : ""} ${pick && pick.id === b.id ? "picking" : ""}">
+        <div class="head"><span class="name">${esc(b.name)}</span><span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "확정"}</span></div>
+        <dl class="kv">
+          <dt>전화번호</dt><dd class="phone num">${fmtPhone(b.phone)}</dd>
+          <dt>이용일시</dt><dd class="num">${when}</dd>
+          <dt>수량</dt><dd>${b.product} ${b.qty}</dd>
+          <dt>결제상태</dt><dd><span class="badge paid">${b.pay}</span></dd>
+        </dl>
+        <div class="act">${act}</div>
+      </article>`;
+    }).join("") : `<div class="empty">이 시간 예약이 없어요</div>`;
   }
 
   function renderKeys() {
+    const { base, all } = projection();
+    $("key-stat").innerHTML = `사용 <b>${RULES.keys - freeKeys().length}</b>/${RULES.keys} · 현장 가능 <b>${base}</b>${all > base ? ` +유동 ${all - base}` : ""}`;
     let html = "";
-    for (let k = 1; k <= KEYS; k++) {
-      const v = holderOf(k);
-      if (!v) { html += `<button class="key free" data-act="key" data-k="${k}" aria-label="${k}번 빈 열쇠"><b class="num">${k}</b><span>&nbsp;</span></button>`; continue; }
-      const b = band(v);
-      const label = b === "late" ? `+${now - v.exp}분` : b === "grace" ? "반납" : v.exp == null ? `${hm(v.enteredAt)}~` : `~${hm(v.exp)}`;
-      html += `<button class="key ${b}" data-act="key" data-k="${k}" aria-label="${k}번 ${esc(v.name)} ${label}"><b class="num">${k}</b><span class="num">${label}</span></button>`;
+    for (let k = 1; k <= 50; k++) {
+      if (k > RULES.keys) { html += `<span class="key void" aria-hidden="true"></span>`; continue; }
+      const h = holderOf(k);
+      if (!h) { html += `<button class="key free ${pick && pick.keys.includes(k) ? "sel" : ""}" data-act="key" data-k="${k}" aria-label="${k}번 빈 열쇠"><b class="num">${k}</b><span>&nbsp;</span></button>`; continue; }
+      html += `<button class="key ${keyColor(h)}" data-act="key" data-k="${k}" aria-label="${k}번 ${esc(h.name)}"><b class="num">${k}</b><span>${esc(h.walk ? "현장" : h.name)}</span></button>`;
     }
     $("keys").innerHTML = html;
-    $("keys-count").textContent = `빈 열쇠 ${freeKeys().length}개`;
+    $("keys").classList.toggle("picking", !!pick);
+    if (pick) {
+      const b = findB(pick.id);
+      $("pickbar").hidden = false;
+      $("pickbar").innerHTML = `<span>${esc(b.name)}님 · 빈 열쇠 <b class="num">${pick.need}</b>개를 눌러 주세요 (${pick.keys.length}/${pick.need})</span><button class="btn btn-sm" data-act="pickCancel">취소</button>`;
+    } else $("pickbar").hidden = true;
   }
 
-  function renderPays() {
-    const list = visits.filter((v) => v.src === "walk").sort((a, b) => b.enteredAt - a.enteredAt);
-    const sum = list.reduce((a, v) => a + v.amount, 0);
-    $("pay-sum").textContent = `${list.length}건 · ${won(sum)}`;
-    $("pays").innerHTML = list.length ? list.map((v) => `<div class="pay-row">
-        <span class="num">${hm(v.enteredAt)}</span>
-        <span>입장권 ${v.tickets}장 · ${v.status === "in" ? keyChips(v) : `<span class="chip muted">퇴장</span>`}
-          <span class="meta num">${v.pay} · ${v.posNo} · ${last4(v.phone)}</span></span>
-        <span class="amt num">${won(v.amount)}</span>
-      </div>`).join("") : `<div class="empty">아직 현장 결제가 없어요</div>`;
+  // ── 주차 (아마노 웹 연계 체험) ─────────────────────
+  // 체험용 입차 차량 (실제로는 아마노 주차 웹에서 검색)
+  const LOT = [["152가 7781", "09:52"], ["38다 1172", "10:05"], ["61머 3020", "10:41"], ["27노 8814", "11:02"], ["119허 4402", "11:48"], ["45루 6603", "12:33"], ["21보 5520", "12:57"], ["12가 3456", "13:20"], ["32우 3456", "13:31"], ["208라 1172", "13:44"]]
+    .map(([no, at]) => ({ no, at, disc: null }));
+  let carQ = "", carSel = null;
+  function renderCars() {
+    const q = digits(carQ);
+    const list = q ? LOT.filter((c) => digits(c.no).includes(q)) : [];
+    $("cars").innerHTML = !q ? `<div class="empty">차번호를 넣고 검색하세요 (예: 3456, 1172)</div>`
+      : list.length ? list.map((c) => `<button class="car ${carSel === c.no ? "on" : ""}" data-act="car" data-no="${esc(c.no)}" aria-pressed="${carSel === c.no}">
+          <span><b class="num">${esc(c.no)}</b> <small class="num">입차 ${c.at}</small></span>
+          <span class="st">${c.disc ? c.disc + " 등록됨" : ""}</span></button>`).join("")
+      : `<div class="empty">검색된 차량이 없어요</div>`;
+    const sel = LOT.find((c) => c.no === carSel);
+    document.querySelectorAll("[data-act=discount]").forEach((b) => (b.disabled = !sel));
+    $("disc-help").textContent = sel ? `${sel.no} 할인` : "차량을 고른 뒤 누르세요";
   }
 
-  function renderTasks() {
-    const late = visits.filter((v) => v.status === "in" && band(v) !== "use").sort((a, b) => a.exp - b.exp);
-    const parks = visits.filter((v) => v.car && v.status !== "noshow" && v.status !== "wait");
-    const parkFail = parks.filter((v) => v.park === "fail").length;
-    let html = `<div class="links">
-      <div class="link"><span class="dot"></span><b>네이버 예약</b><span class="meta num">${hm(lastImport)} 자동으로 불러옴 · 입장하면 이용완료도 자동 표시</span></div>
-      <div class="link"><span class="dot"></span><b>POS 결제</b><span class="meta">현장 판매 금액을 POS 단말기로 보내고 승인 결과를 받아옴</span></div>
-      <div class="link"><span class="dot ${parkFail ? "warn" : ""}"></span><b>주차 웹</b><span class="meta">${parkFail ? `${parkFail}대 입력 실패 · 아래에서 다시 시도` : "입장할 때 받은 차량번호를 자동 입력"}</span></div>
-      <button class="btn btn-sm" data-act="newBooking">네이버 새 예약 들어오는 모습 보기</button>
-    </div>`;
+  function renderAll() { $("now").textContent = hm(now); renderSlots(); renderRes(); renderKeys(); renderCars(); }
 
-    html += `<p class="sub-h"><span>반납 지연</span><span class="num">${late.length}건</span></p>`;
-    html += late.length ? late.map((v) => {
-      const b = band(v);
-      return `<div class="task ${b}">
-        <div class="line1"><b>${esc(v.name)} <span class="chip ${v.src}">${v.src === "naver" ? "네이버" : "현장"}</span></b><span>${keyChips(v)}</span></div>
-        <div class="line1"><span class="${b === "late" ? "when-late" : "when-grace"} num">${hm(v.exp)} 반납 · ${now - v.exp}분 지남</span><span class="phone num">${fmtPhone(v.phone)}</span></div>
-        <div class="note">${v.called != null ? `<span class="num">${hm(v.called)}</span> 연락함` : "전화로 반납을 안내해 주세요"}</div>
-        <div class="btns"><button class="btn btn-sm" data-act="returnAll" data-id="${v.id}">반납 받음${v.keys.length > 1 ? ` (${v.keys.length}개)` : ""}</button><button class="btn btn-sm" data-act="called" data-id="${v.id}">연락함</button></div>
-      </div>`;
-    }).join("") : `<div class="empty">늦은 열쇠가 없어요</div>`;
-
-    html += `<p class="sub-h"><span>주차 등록</span><span class="num">${parks.length}대</span></p>`;
-    html += parks.length ? parks.slice().sort((a, b) => (a.park === "fail" ? -1 : 0) - (b.park === "fail" ? -1 : 0) || b.enteredAt - a.enteredAt).map((v) => {
-      const st = v.park === "ok" ? `<span class="chip ok">등록됨</span>` : v.park === "wait" ? `<span class="chip muted">입력 중…</span>`
-        : `<button class="btn btn-sm" data-act="parkRetry" data-id="${v.id}">다시 시도</button>`;
-      return `<div class="mini"><span><span class="car num">${esc(v.car)}</span> · ${esc(v.name)}${v.park === "fail" ? ` <span class="chip warn">실패</span>` : ""}</span>${st}</div>`;
-    }).join("") : `<div class="empty">등록할 차량이 없어요</div>`;
-    $("tasks").innerHTML = html;
-  }
-
-  function renderAll() { settle(); $("now").textContent = hm(now); renderStats(); renderNaver(); renderKeys(); renderPays(); renderTasks(); if (sheet.mode === "key") renderSheet(); }
-
-  // ── 시트 ─────────────────────────────────────────
+  // ── 팝업 ─────────────────────────────────────────
   const sheet = { mode: null };
-  function openSheet(s) {
-    for (const k of Object.keys(sheet)) delete sheet[k];
-    Object.assign(sheet, s);
-    $("overlay").hidden = false;
-    renderSheet();
-    setTimeout(() => { const f = $("sheet").querySelector("[data-autofocus]"); if (f) f.focus(); }, 30);
-  }
-  function closeSheet() { clearTimeout(sheet.timer); sheet.mode = null; $("overlay").hidden = true; }
+  function openSheet(s) { for (const k of Object.keys(sheet)) delete sheet[k]; Object.assign(sheet, s); $("overlay").hidden = false; renderSheet(); focusFirst(); }
+  function focusFirst() { setTimeout(() => { const f = $("sheet").querySelector("[data-autofocus]"); if (f) f.focus(); }, 30); }
+  function closeSheet() { sheet.mode = null; $("overlay").hidden = true; }
 
-  function pickGrid(selected) {
-    const free = new Set(freeKeys());
-    let html = "";
-    for (let k = 1; k <= KEYS; k++) {
-      const on = selected.includes(k);
-      html += `<button type="button" class="${on ? "on" : ""} num" data-act="pickKey" data-k="${k}" ${!free.has(k) ? "disabled" : ""} aria-pressed="${on}">${k}</button>`;
-    }
-    return `<div class="pick">${html}</div>`;
+  function walkState() {
+    const { base, all } = projection();
+    const need = sheet.keys.length;
+    const over = need > all, flex = !over && need > base;
+    return { base, all, need, over, flex, phoneOk: digits(sheet.phone).length >= 10 };
   }
-
-  const saleKeys = () => sheet.tickets * RULES.keysPerTicket;
-  const saleAmount = () => sheet.tickets * RULES.ticketPrice;
 
   function renderSheet() {
     const el = $("sheet");
-    el.classList.toggle("wide", sheet.mode === "sale" && sheet.stage === "form");
-    if (sheet.mode === "checkin") {
-      const v = byId(sheet.id);
-      const ok = sheet.keys.length === v.tickets * RULES.keysPerTicket;
+    if (sheet.mode === "enter") {
+      const b = findB(sheet.id);
+      const m = minutesFor(TODAY, b.slot);
       el.innerHTML = `
         <h3 id="sheet-title">네이버 예약 입장 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
         <dl class="facts">
-          <dt>예약</dt><dd class="num">${hm(v.slot)} · ${esc(v.name)} · 입장권 ${v.tickets}장 <span class="chip naver">네이버에서 불러옴</span></dd>
-          <dt>전화</dt><dd class="num">${fmtPhone(v.phone)}</dd>
-          <dt>이용</dt><dd class="num">${v.exp == null ? `${hm(v.slot)}부터 무제한` : `${hm(v.slot)} ~ ${hm(v.exp)} (1시간 50분)`}</dd>
-          <dt>예약번호</dt><dd class="num">${v.no}</dd>
+          <dt>예약자</dt><dd>${esc(b.name)}</dd>
+          <dt>전화번호</dt><dd class="num">${fmtPhone(b.phone)}</dd>
+          <dt>이용일시</dt><dd class="num">${hm(b.slot)} ${m == null ? "· 무제한" : `~ ${hm(b.slot + m)} (1시간 50분)`}</dd>
+          <dt>수량</dt><dd>${b.product} ${b.qty}</dd>
+          <dt>결제상태</dt><dd>${b.pay}</dd>
+          <dt>열쇠</dt><dd><div class="bigkeys">${sheet.keys.map((k) => `<span class="bigkey num">${k}</span>`).join("")}</div></dd>
         </dl>
-        <div class="field">
-          <span class="label">드릴 열쇠 <span class="help">빈 열쇠 중 번호가 작은 것으로 자동으로 골랐어요</span></span>
-          <div class="big-keys">${sheet.keys.map((k) => `<span class="big-key num">${k}</span>`).join("")}
-            <button class="btn btn-sm" data-act="togglePick">${sheet.picking ? "다 골랐어요" : "다른 열쇠로"}</button></div>
-          ${sheet.picking ? pickGrid(sheet.keys) + `<span class="help">${v.tickets * RULES.keysPerTicket}개를 골라 주세요 (지금 ${sheet.keys.length}개)</span>` : ""}
-        </div>
-        <div class="field">
-          <label for="car">차량번호 <span class="help">적으면 주차 웹에 자동 입력 · 차가 없으면 비워 두세요</span></label>
-          <input id="car" value="${esc(sheet.car)}" placeholder="예: 12가 3456" autocomplete="off">
-        </div>
-        <p class="explain">입장 처리를 누르면 열쇠 배정, 네이버 이용완료 표시, 주차 등록이 한 번에 됩니다.</p>
-        <div class="sheet-foot">
-          <button class="btn" data-act="close">취소</button>
-          <button class="btn btn-ink" data-act="doCheckin" ${ok ? "" : "disabled"} data-autofocus>입장 처리 · 열쇠 ${sheet.keys.join(", ")}번</button>
+        <div class="sheet-foot"><button class="btn" data-act="close">다시 고르기</button><button class="btn btn-ink" data-act="doEnter" data-autofocus>입장 · 네이버 이용완료</button></div>`;
+      return;
+    }
+    if (sheet.mode === "walk") {
+      const st = walkState();
+      const m = minutesFor(TODAY, now);
+      el.innerHTML = `
+        <h3 id="sheet-title">현장입장 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
+        <div class="banner ${st.over || st.flex ? "warn" : ""}">${st.over ? `지금은 열쇠 <b class="num">${st.all}</b>개까지만 내줄 수 있어요. 예약 손님이 오실 자리라서 팔지 않습니다.`
+          : st.flex ? `기본 열쇠 ${RULES.baseKeys}개를 넘어 <b>유동 열쇠</b>를 씁니다. 안에 빈 좌석이 있는지 보고 판매하세요.`
+          : `현장 판매 가능 <b class="num">${st.base}</b>개 · 예약 손님 자리를 먼저 남겨 두고 계산했어요`}</div>
+        <dl class="facts">
+          <dt>고객명</dt><dd><span class="fixed">현장입장자</span></dd>
+          <dt>열쇠</dt><dd><div class="bigkeys">${sheet.keys.map((k) => `<span class="bigkey num">${k}</span>`).join("")}</div></dd>
+          <dt>수량</dt><dd><div class="stepper"><button data-act="qty" data-d="-1" aria-label="수량 줄이기">−</button><output class="num">${st.need}</output><button data-act="qty" data-d="1" aria-label="수량 늘리기">+</button><span class="help">수량만큼 열쇠를 이어서 드려요</span></div></dd>
+          <dt>이용</dt><dd class="num">${hm(now)} ${m == null ? "· 무제한" : `~ ${hm(now + m)} (1시간 50분)`}</dd>
+        </dl>
+        <div class="field"><label for="w-phone">전화번호 <span class="help">USB 키패드로 누르세요 · 반납이 늦을 때 연락용</span></label>
+          <input id="w-phone" inputmode="numeric" autocomplete="off" value="${esc(fmtPhone(sheet.phone))}" placeholder="010-0000-0000" data-autofocus></div>
+        ${st.flex ? `<button class="btn ${sheet.flexOk ? "btn-ink" : ""}" data-act="flexOk" aria-pressed="${!!sheet.flexOk}">${sheet.flexOk ? "빈 좌석 확인함" : "빈 좌석 확인했어요"}</button>` : ""}
+        <ol class="steps"><li class="${sheet.paid ? "done" : ""}">결제하기 → POS 화면에서 결제 → POS를 최소화하면 이 팝업으로 돌아옴${sheet.paid ? " ✓" : ""}</li><li>결제 완료 → 열쇠판에 등록</li></ol>
+        <div class="stack-btns">
+          <button class="btn" data-act="pay" ${st.over || (st.flex && !sheet.flexOk) ? "disabled" : ""}>결제하기 (POS 화면으로)</button>
+          <button class="btn btn-ink" id="w-done" data-act="walkDone" ${st.over || !st.phoneOk || (st.flex && !sheet.flexOk) ? "disabled" : ""}>결제 완료 · 열쇠 등록</button>
         </div>`;
       return;
     }
-    if (sheet.mode === "sale") {
-      if (sheet.stage === "paying") {
-        const card = sheet.pay === "카드";
-        el.innerHTML = `
-          <h3 id="sheet-title">${card ? "POS 카드 결제 중" : "POS에 " + sheet.pay + " 결제 기록"}</h3>
-          <div class="pay-wait">
-            ${card ? `<div class="spinner" aria-hidden="true"></div><div>POS 단말기로 <b class="num">${won(saleAmount())}</b>을 보냈어요.<br>손님 카드를 단말기에 꽂아 주세요.</div>`
-              : `<div><b class="num">${won(saleAmount())}</b>을 ${sheet.pay === "현금" ? "현금으로" : "계좌이체로"} 받았는지 확인해 주세요.<br>확인하면 POS에 매출로 기록됩니다.</div>`}
-          </div>
-          <div class="sheet-foot">
-            <button class="btn" data-act="saleBack">돌아가기</button>
-            <button class="btn btn-ink" data-act="salePaid" data-autofocus>${card ? "승인됨 (체험)" : "받았어요"}</button>
-          </div>`;
-        return;
-      }
-      if (sheet.stage === "done") {
-        const r = sheet.result;
-        el.innerHTML = `
-          <h3 id="sheet-title">입장 완료 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
-          <div class="done-msg">
-            <div>이 열쇠를 드리세요</div>
-            <div class="big-keys">${r.keys.map((k) => `<span class="big-key num">${k}</span>`).join("")}</div>
-            <div class="num">${r.exp == null ? "무제한 이용" : `${hm(r.exp)}까지 이용`} · ${won(r.amount)} ${r.pay} · ${r.posNo}</div>
-            ${r.car ? `<div class="explain">차량 ${esc(r.car)}는 주차 웹에 자동 입력합니다.</div>` : ""}
-          </div>
-          <div class="sheet-foot"><button class="btn btn-ink" data-act="close" data-autofocus>닫기</button></div>`;
-        return;
-      }
-      const { base, all, worstAt } = projection();
-      const need = saleKeys();
-      const over = need > all;               // 유동 열쇠까지 써도 모자람 → 판매 안 함
-      const useFlex = !over && need > base;  // 기본 40개를 넘어 유동 열쇠를 씀 → 빈 좌석 확인
-      const avail = all;
-      const phoneOk = digits(sheet.phone).length >= 10;
-      const pad = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "지우기", "0", "←"]
-        .map((d) => `<button type="button" class="${d.length > 1 ? "fn" : ""} num" data-act="padKey" data-d="${d}">${d}</button>`).join("");
+    if (sheet.mode === "key") {
+      const h = holderOf(sheet.k);
+      const c = keyColor(h);
+      const m = minutesFor(TODAY, h.slot);
+      const used = now - h.slot;
       el.innerHTML = `
-        <h3 id="sheet-title">현장 판매 · 입장 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
-        <div class="banner ${base > 0 ? "ok" : "warn"}">지금 팔 수 있는 입장권 <b class="num">${ticketsFor(base)}장</b>${all > base ? ` · 빈 좌석이 있으면 유동 열쇠로 <b class="num">${ticketsFor(all) - ticketsFor(base)}장</b> 더` : ""} · 예약 손님 열쇠를 먼저 남겨 두고 계산했어요 (<span class="num">${hm(worstAt)}</span>쯤 가장 빠듯)</div>
-        <div class="split">
-          <div class="stack">
-            <div class="stepper"><div class="name"><b>입장권</b><span class="num">${won(RULES.ticketPrice)} · 열쇠 ${RULES.keysPerTicket}개 · 상품은 POS에서 불러올 예정</span></div>
-              <div class="ctl"><button data-act="step" data-f="tickets" data-d="-1" aria-label="입장권 줄이기">−</button><output class="num">${sheet.tickets}</output><button data-act="step" data-f="tickets" data-d="1" aria-label="입장권 늘리기">+</button></div></div>
-            ${over ? `<div class="banner warn">열쇠 <b class="num">${need}개</b>가 필요한데 지금은 <b class="num">${avail}개</b>까지만 내줄 수 있어요. 예약 손님이 오실 자리라서 팔지 않습니다.</div>` : ""}
-            ${useFlex ? `<div class="banner warn">기본 열쇠 ${BASE}개를 넘어 <b>유동 열쇠</b>를 씁니다. 안에 빈 좌석이 있는지 보고 판매하세요.
-              <div class="seg" style="grid-template-columns:1fr;margin-top:6px"><button type="button" class="${sheet.flexOk ? "on" : ""}" data-act="flexOk" aria-pressed="${!!sheet.flexOk}">${sheet.flexOk ? "빈 좌석 확인함" : "빈 좌석 확인했어요"}</button></div></div>` : ""}
-            <div class="field"><span class="label">결제 방법 <span class="help">어느 것이든 POS 매출로 남아요</span></span>
-              <div class="seg">${["카드", "현금", "계좌이체"].map((p) => `<button type="button" class="${sheet.pay === p ? "on" : ""}" data-act="pay" data-p="${p}" aria-pressed="${sheet.pay === p}">${p}</button>`).join("")}</div></div>
-            <div class="field">
-              <label for="car">차량번호 <span class="help">적으면 주차 웹에 자동 입력</span></label>
-              <input id="car" value="${esc(sheet.car)}" placeholder="예: 12가 3456" autocomplete="off">
-            </div>
-          </div>
-          <div class="stack">
-            <div class="field"><span class="label">전화번호 <span class="help">반납이 늦을 때 연락할 번호 · 손님이 직접 눌러도 돼요</span></span>
-              <div class="phone-show num ${sheet.phone ? "" : "placeholder"}" id="phoneShow">${sheet.phone ? fmtPhone(sheet.phone) : "010 0000 0000"}</div></div>
-            <div class="pad">${pad}</div>
-          </div>
-        </div>
-        <div class="total"><span class="num">열쇠 ${need}개 · ${minutesFor(now) == null ? `${hm(now)}부터 무제한` : `${hm(now)} ~ ${hm(now + DUR)}`}</span><b class="num">${won(saleAmount())}</b></div>
+        <h3 id="sheet-title">${sheet.k}번 열쇠 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
+        <dl class="facts">
+          <dt>${h.walk ? "고객명" : "예약자"}</dt><dd>${esc(h.name)}${h.walk ? ` · ${h.posNo}` : ""}</dd>
+          <dt>전화번호</dt><dd class="num" style="font-size:18px;user-select:all">${fmtPhone(h.phone)}</dd>
+          <dt>입장</dt><dd class="num">${hm(h.enteredAt)}${h.walk ? "" : ` (예약 ${hm(h.slot)})`}</dd>
+          <dt>이용</dt><dd class="num" style="color:${c === "red" ? "var(--red)" : "inherit"}">${m == null ? "무제한" : `${Math.floor(used / 60)}시간 ${used % 60}분째 · ${hm(h.slot + m)} 반납`}</dd>
+          <dt>열쇠</dt><dd><div class="bigkeys">${h.keys.map((k) => `<span class="bigkey num">${k}</span>`).join("")}</div></dd>
+          ${h.called != null ? `<dt>연락</dt><dd class="num">${hm(h.called)} 연락함</dd>` : ""}
+        </dl>
         <div class="sheet-foot">
-          <button class="btn" data-act="close">취소</button>
-          <button class="btn btn-ink" id="saleGo" data-act="saleGo" ${over || !phoneOk || (useFlex && !sheet.flexOk) ? "disabled" : ""}>${sheet.pay === "카드" ? "POS 단말기로 결제" : "결제 받기"} · ${won(saleAmount())}</button>
+          ${c !== "in" ? `<button class="btn" data-act="called">연락함</button>` : ""}
+          ${h.keys.length > 1 ? `<button class="btn" data-act="returnOne">${sheet.k}번만 반납</button>` : ""}
+          <button class="btn btn-ink" data-act="returnAll" data-autofocus>반납 · 퇴장${h.keys.length > 1 ? ` (${h.keys.length}개)` : ""}</button>
         </div>`;
       return;
     }
     if (sheet.mode === "settings") {
+      const dateIn = (id, v) => `<input type="date" id="${id}" value="${v}" style="font-size:14px;min-height:36px;width:auto;letter-spacing:0;font-weight:500;padding:4px 8px">`;
       el.innerHTML = `
         <h3 id="sheet-title">운영 설정 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
         <div class="field"><span class="label">성수기 기간 <span class="help">이 기간은 평일·휴일 모두 시간제</span></span>
-          <div class="set-list">${RULES.peaks.map((p, i) => `<div class="set-row"><b>${esc(p.name)}</b>
-            <span class="btns"><input type="date" id="peak-from-${i}" value="${p.from}" aria-label="${esc(p.name)} 시작"> ~ <input type="date" id="peak-to-${i}" value="${p.to}" aria-label="${esc(p.name)} 끝"></span></div>`).join("")}</div></div>
-        <div class="field"><span class="label">이용시간 규칙</span>
-          <ul class="rules">
-            <li>성수기: 평일·휴일 모두 17:30 입장까지 1시간 50분, 18:00 입장부터 무제한</li>
-            <li>비수기 평일: 하루 종일 무제한</li>
-            <li>비수기 휴일(토·일·공휴일): 성수기와 같음</li>
-            <li>열쇠 ${KEYS}개 = 기본 ${BASE}개 + 유동 ${KEYS - BASE}개 · 좌석 ${RULES.seats}석(4인석)</li>
-          </ul></div>
-        <div class="field"><span class="label">체험 날짜 <span class="help">날짜를 바꾸면 반납 시각이 다시 계산돼요</span></span>
-          <div class="day-pick">${DAYS.map((d) => { const prev = day; day = d; const t = dayRuleText(); day = prev;
-            return `<button type="button" class="${d === day ? "on" : ""}" data-act="pickDay" data-key="${d.key}" aria-pressed="${d === day}"><b>${d.label}</b>${t}</button>`; }).join("")}</div></div>
-        <p class="explain num" id="today-rule">오늘: ${dayRuleText()}</p>
+          ${RULES.peaks.map((p, i) => `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><b style="width:70px">${esc(p.name)}</b>${dateIn("pf-" + i, p.from)} ~ ${dateIn("pt-" + i, p.to)}</div>`).join("")}</div>
+        <ul class="steps" style="list-style:disc">
+          <li>성수기: 평일·휴일 모두 17:30 입장까지 1시간 50분, 18:00 입장부터 무제한</li>
+          <li>비수기: 평일은 무제한, 휴일(토·일·공휴일)은 성수기와 같음</li>
+          <li>열쇠 ${RULES.keys}개 = 기본 ${RULES.baseKeys}개 + 유동 ${RULES.keys - RULES.baseKeys}개 · 좌석 ${RULES.seats}석</li>
+          <li>열쇠 색: 예약 입장시간부터 1시간 50분까지 검정 → 2시간까지 분홍 → 그 뒤 빨강</li>
+        </ul>
         <div class="sheet-foot"><button class="btn btn-ink" data-act="close" data-autofocus>닫기</button></div>`;
-      return;
-    }
-    if (sheet.mode === "key") {
-      const k = sheet.k;
-      const v = holderOf(k);
-      if (!v) {
-        el.innerHTML = `
-          <h3 id="sheet-title">${k}번 열쇠 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
-          <div class="empty">비어 있는 열쇠예요</div>
-          <div class="sheet-foot"><button class="btn" data-act="close">닫기</button><button class="btn btn-ink" data-act="sale" data-prefer="${k}" data-autofocus>이 열쇠로 현장 판매</button></div>`;
-        return;
-      }
-      const b = band(v);
-      const state = v.exp == null ? "이용 중 · 무제한" : b === "use" ? `이용 중 · ${hm(v.exp)} 반납 (${v.exp - now}분 남음)` : `${hm(v.exp)} 반납 · <span class="${b === "late" ? "when-late" : "when-grace"}">${now - v.exp}분 지남</span>`;
-      el.innerHTML = `
-        <h3 id="sheet-title">${k}번 열쇠 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
-        <dl class="facts">
-          <dt>손님</dt><dd>${esc(v.name)} <span class="chip ${v.src}">${v.src === "naver" ? "네이버 예약" : "현장 구매"}</span></dd>
-          <dt>전화</dt><dd class="num" style="user-select:all">${fmtPhone(v.phone)}</dd>
-          <dt>입장</dt><dd class="num">${hm(v.enteredAt)}${v.src === "naver" ? ` (예약 ${hm(v.slot)})` : ` · ${v.posNo}`}</dd>
-          <dt>상태</dt><dd class="num">${state}</dd>
-          <dt>받은 열쇠</dt><dd>${keyChips(v)}</dd>
-          ${v.car ? `<dt>차량</dt><dd class="num">${esc(v.car)} · ${v.park === "ok" ? "주차 등록됨" : v.park === "wait" ? "주차 입력 중" : "주차 입력 실패"}</dd>` : ""}
-          ${v.called != null ? `<dt>연락</dt><dd class="num">${hm(v.called)} 연락함</dd>` : ""}
-        </dl>
-        <div class="sheet-foot">
-          ${b !== "use" ? `<button class="btn" data-act="called" data-id="${v.id}">연락함</button>` : ""}
-          ${v.keys.length > 1 ? `<button class="btn" data-act="returnOne" data-k="${k}">${k}번만 반납</button>` : ""}
-          <button class="btn btn-ink" data-act="returnAll" data-id="${v.id}" data-autofocus>반납 받음${v.keys.length > 1 ? ` (${v.keys.length}개 모두)` : ""}</button>
-        </div>`;
     }
   }
 
   // ── 동작 ─────────────────────────────────────────
   let toastTimer;
   function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 2600); }
-
-  function returnKeys(v, ks) {
-    v.keys = v.keys.filter((k) => !ks.includes(k));
-    if (!v.keys.length) { v.status = "out"; v.outAt = now; }
-    toast(`${ks.join(", ")}번 반납${v.status === "out" ? ` · ${v.src === "walk" ? "현장 손님" : v.name + "님"} 퇴장` : ""}`);
+  function nextFree(from, exclude) {
+    const free = freeKeys().filter((k) => !exclude.includes(k));
+    return free.filter((k) => k >= from).concat(free.filter((k) => k < from))[0];
   }
-
-  function updateSaleGo() {
-    const go = $("saleGo");
-    const pj = projection();
-    if (go) go.disabled = saleKeys() > pj.all || digits(sheet.phone).length < 10 || (saleKeys() > pj.base && !sheet.flexOk);
+  function returnKeys(h, ks) {
+    h.keys = h.keys.filter((k) => !ks.includes(k));
+    if (!h.keys.length) h.outAt = now;
+    toast(`${ks.join(", ")}번 반납${h.keys.length ? "" : ` · ${h.walk ? "현장입장자" : h.name + "님"} 퇴장`}`);
+  }
+  function updateWalkButtons() {
+    const done = $("w-done"); if (!done) return;
+    const st = walkState();
+    done.disabled = st.over || !st.phoneOk || (st.flex && !sheet.flexOk);
   }
 
   const acts = {
     time(btn) { now += Number(btn.dataset.min); renderAll(); },
-    sale(btn) {
-      openSheet({ mode: "sale", stage: "form", tickets: 1, phone: "", car: "", pay: "카드", prefer: btn.dataset.prefer ? Number(btn.dataset.prefer) : null });
-    },
-    checkin(btn) {
-      const v = byId(btn.dataset.id);
-      openSheet({ mode: "checkin", id: v.id, keys: pickKeys(v.tickets * RULES.keysPerTicket), car: v.car, picking: false });
-    },
-    togglePick() { sheet.picking = !sheet.picking; renderSheet(); },
-    pickKey(btn) {
+    day(btn) { viewDay = shiftDay(viewDay, Number(btn.dataset.d)); pick = null; renderAll(); },
+    slot(btn) { selSlot = Number(btn.dataset.s); renderAll(); },
+    enter(btn) { const b = findB(btn.dataset.id); pick = { id: b.id, need: b.qty, keys: [] }; renderAll(); },
+    pickCancel() { pick = null; renderAll(); },
+    key(btn) {
       const k = Number(btn.dataset.k);
-      const v = byId(sheet.id);
-      if (sheet.keys.includes(k)) sheet.keys = sheet.keys.filter((x) => x !== k);
-      else if (sheet.keys.length < v.tickets * RULES.keysPerTicket) sheet.keys.push(k);
-      else { sheet.keys.shift(); sheet.keys.push(k); }
-      renderSheet();
+      const h = holderOf(k);
+      if (h) { if (pick) { toast("빈 열쇠를 눌러 주세요"); return; } openSheet({ mode: "key", k }); return; }
+      if (pick) {
+        if (pick.keys.includes(k)) pick.keys = pick.keys.filter((x) => x !== k); else pick.keys.push(k);
+        renderKeys();
+        if (pick.keys.length >= pick.need) openSheet({ mode: "enter", id: pick.id, keys: pick.keys.slice() });
+        return;
+      }
+      openSheet({ mode: "walk", keys: [k], phone: "", paid: false, flexOk: false });
     },
-    doCheckin() {
-      const v = byId(sheet.id);
-      if (sheet.keys.some((k) => holderOf(k))) { toast("그 사이 다른 손님이 쓴 열쇠가 있어요. 다시 골라 주세요."); sheet.keys = pickKeys(v.tickets * RULES.keysPerTicket); renderSheet(); return; }
-      Object.assign(v, { status: "in", keys: sheet.keys.slice(), enteredAt: now, naverDone: now, car: sheet.car.trim() });
-      if (v.car) parkSubmit(v); else v.park = null;
-      closeSheet();
-      toast(`${v.name}님 입장 · 열쇠 ${v.keys.join(", ")}번 · 네이버 이용완료 표시함`);
+    doEnter() {
+      const b = findB(sheet.id);
+      if (sheet.keys.some((k) => holderOf(k))) { toast("그 사이 다른 손님이 쓴 열쇠가 있어요. 다시 골라 주세요."); pick.keys = []; closeSheet(); renderAll(); return; }
+      Object.assign(b, { status: "완료", keys: sheet.keys.slice(), enteredAt: now });
+      pick = null; closeSheet();
+      toast(`${b.name}님 입장 · 열쇠 ${b.keys.join(", ")}번 · 네이버 이용완료 처리함`);
       renderAll();
     },
-    step(btn) {
-      const f = btn.dataset.f, d = Number(btn.dataset.d);
-      sheet[f] = Math.max(1, Math.min(10, sheet[f] + d));
-      renderSheet();
+    qty(btn) {
+      const d = Number(btn.dataset.d);
+      if (d < 0 && sheet.keys.length > 1) sheet.keys.pop();
+      if (d > 0) { const add = nextFree(sheet.keys[sheet.keys.length - 1] + 1, sheet.keys); if (add) sheet.keys.push(add); else toast("빈 열쇠가 없어요"); }
+      renderSheet(); $("w-phone").focus();
     },
-    padKey(btn) {
-      const d = btn.dataset.d;
-      if (d === "지우기") sheet.phone = "";
-      else if (d === "←") sheet.phone = sheet.phone.slice(0, -1);
-      else if (sheet.phone.length < 11) sheet.phone += d;
-      const show = $("phoneShow");
-      show.textContent = sheet.phone ? fmtPhone(sheet.phone) : "010 0000 0000";
-      show.classList.toggle("placeholder", !sheet.phone);
-      updateSaleGo();
-    },
-    pay(btn) { sheet.pay = btn.dataset.p; renderSheet(); },
-    saleGo() {
-      sheet.stage = "paying"; renderSheet();
-      if (sheet.pay === "카드") { clearTimeout(sheet.timer); sheet.timer = setTimeout(() => { if (sheet.mode === "sale" && sheet.stage === "paying") acts.salePaid(); }, 2500); }
-    },
-    saleBack() { clearTimeout(sheet.timer); sheet.stage = "form"; renderSheet(); },
-    salePaid() {
-      clearTimeout(sheet.timer);
-      const need = saleKeys();
-      if (need > projection().all) { sheet.stage = "form"; renderSheet(); toast("그 사이 자리가 줄었어요. 다시 확인해 주세요."); return; }
-      const keys = pickKeys(need, sheet.prefer);
-      const v = walk(hm(now), digits(sheet.phone), sheet.tickets, keys, { car: sheet.car.trim(), pay: sheet.pay });
-      if (v.car) parkSubmit(v);
-      sheet.stage = "done";
-      sheet.result = { keys, exp: v.exp, amount: v.amount, pay: sheet.pay, phone: v.phone, posNo: v.posNo, car: v.car };
-      renderAll();
-      renderSheet();
-    },
-    key(btn) { openSheet({ mode: "key", k: Number(btn.dataset.k) }); },
-    returnAll(btn) { const v = byId(btn.dataset.id); returnKeys(v, v.keys.slice()); if (sheet.mode === "key") closeSheet(); renderAll(); },
-    returnOne(btn) { const k = Number(btn.dataset.k); returnKeys(holderOf(k), [k]); closeSheet(); renderAll(); },
-    called(btn) { const v = byId(btn.dataset.id); v.called = now; toast(`${v.src === "walk" ? "현장 손님" : v.name + "님"} 연락함으로 표시했어요`); renderAll(); },
     flexOk() { sheet.flexOk = !sheet.flexOk; renderSheet(); },
-    settings() { openSheet({ mode: "settings" }); },
-    pickDay(btn) { day = DAYS.find((d) => d.key === btn.dataset.key); recalc(); renderAll(); renderSheet(); },
-    parkRetry(btn) { const v = byId(btn.dataset.id); parkSubmit(v); renderAll(); },
-    newBooking() {
-      const names = ["차예나", "변시후", "엄다인", "주하람", "편우진", "석보미"];
-      const slot = Math.ceil((now + 40) / 30) * 30;
-      if (slot > toMin("19:30")) { toast("오늘 예약 시간이 끝났어요"); return; }
-      const name = names[seq % names.length];
-      naver(hm(slot), name, "010" + String(10000000 + ((seq * 7919) % 89999999)), 1 + (seq % 2));
-      lastImport = now;
-      toast(`네이버 새 예약 자동으로 들어옴 · ${hm(slot)} ${name}님`);
-      renderAll();
+    pay() { sheet.paid = true; $("pos-amt").textContent = `현장입장 ${sheet.keys.length}장`; $("pos").hidden = false; },
+    posDone() { $("pos").hidden = true; renderSheet(); const p = $("w-phone"); if (p) p.focus(); },
+    walkDone() {
+      if (sheet.keys.some((k) => holderOf(k))) { toast("그 사이 다른 손님이 쓴 열쇠가 있어요"); closeSheet(); renderAll(); return; }
+      const w = walkin(digits(sheet.phone), sheet.keys, now);
+      closeSheet(); toast(`현장입장자 · 열쇠 ${w.keys.join(", ")}번 등록`); renderAll();
     },
-    close() { closeSheet(); },
+    returnAll() { const h = holderOf(sheet.k); returnKeys(h, h.keys.slice()); closeSheet(); renderAll(); },
+    returnOne() { const h = holderOf(sheet.k); returnKeys(h, [sheet.k]); closeSheet(); renderAll(); },
+    called() { const h = holderOf(sheet.k); h.called = now; toast("연락함으로 표시했어요"); renderSheet(); },
+    settings() { openSheet({ mode: "settings" }); },
+    car(btn) { carSel = carSel === btn.dataset.no ? null : btn.dataset.no; renderCars(); },
+    discount(btn) {
+      const c = LOT.find((x) => x.no === carSel); if (!c) return;
+      c.disc = btn.dataset.h; toast(`${c.no} ${c.disc} 할인 등록됨 (체험)`); renderCars();
+    },
+    close() { closeSheet(); if (pick && pick.keys.length >= pick.need) { pick.keys = []; renderKeys(); } },
   };
 
   document.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-act]");
     if (btn && !btn.disabled && acts[btn.dataset.act]) { acts[btn.dataset.act](btn); return; }
-    if (e.target === $("overlay") && sheet.stage !== "paying") closeSheet();
+    if (e.target === $("overlay")) acts.close();
   });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sheet.mode && sheet.stage !== "paying") closeSheet(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || !$("pos").hidden) return;
+    if (sheet.mode) acts.close(); else if (pick) acts.pickCancel();
+  });
   document.addEventListener("input", (e) => {
-    if (e.target.id === "q") { query = e.target.value; renderNaver(); return; }
-    if (sheet.mode && e.target.id === "car") sheet.car = e.target.value;
-    const m = /^peak-(from|to)-(\d+)$/.exec(e.target.id);
-    if (m && e.target.value) { RULES.peaks[+m[2]][m[1]] = e.target.value; recalc(); renderAll(); $("today-rule").textContent = "오늘: " + dayRuleText(); }
+    const t = e.target;
+    if (t.id === "w-phone") { sheet.phone = digits(t.value).slice(0, 11); t.value = fmtPhone(sheet.phone); updateWalkButtons(); }
+    if (t.id === "car-q") carQ = t.value;
+    const m = /^p(f|t)-(\d+)$/.exec(t.id);
+    if (m && t.value) { RULES.peaks[+m[2]][m[1] === "f" ? "from" : "to"] = t.value; renderAll(); }
   });
+  $("park-form").addEventListener("submit", (e) => { e.preventDefault(); carQ = $("car-q").value; carSel = null; renderCars(); });
 
   renderAll();
 })();
