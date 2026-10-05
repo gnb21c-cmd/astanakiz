@@ -1,0 +1,24 @@
+{
+  "name": "astanakiz-desk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "아스타나키즈 입장 데스크 (POS PC 설치용)",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.js",
+    "dist:win": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.0",
+    "playwright": "1.56.1"
+  },
+  "build": {
+    "appId": "kr.astanakiz.desk",
+    "productName": "아스타나키즈 입장 데스크",
+    "files": ["src/**/*"],
+    "extraResources": [{ "from": "../../prototype/desk.html", "to": "desk.html" }],
+    "win": { "target": "nsis" }
+  }
+}

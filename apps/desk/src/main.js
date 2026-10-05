@@ -1,0 +1,167 @@
+/* 아스타나키즈 입장 데스크 — POS PC에 설치하는 Windows 프로그램
+   모니터는 한 대. 창은 겹쳐 둔다:  맨 뒤 아마노 웹 창 → 가운데 POS 프로그램 → 맨 앞 데스크 화면
+   - 아마노 창은 이 프로그램이 열어 두고, 가려진 채로 칸에 입력하고 버튼을 누른다 (화면 좌표가 아니라 페이지 안의 글자로 찾으므로 가려져도 됨)
+   - 로그인이 풀렸을 때만 "아마노 화면 보기"로 앞으로 꺼내 근무자가 로그인한다
+   - POS "결제하기"는 이미 켜진 POS 창을 앞으로 띄우기만 한다 */
+const { app, BrowserWindow, ipcMain, safeStorage } = require("electron");
+const path = require("path");
+const fs = require("fs");
+const { execFile } = require("child_process");
+const { AmanoSync } = require("./amano-sync");
+
+const SETTINGS_FILE = () => path.join(app.getPath("userData"), "settings.json");
+const DEFAULTS = {
+  amanoUrl: "", // 아마노 로그인 주소 (예: http://아마노주소/login). 저장소에 적지 않고 운영 설정에서 넣음
+  amanoPage: "/discount/registration", // 로그인 뒤 자동으로 옮겨 갈 할인등록 화면
+  amanoSelectors: {}, // 배우기로 기억한 칸 (carNo · day · searchBtn)
+  posTitle: "", // POS 프로그램 창 제목 (앞으로 띄울 때 씀)
+  amanoId: "", // 아마노 아이디
+  amanoPwEnc: "", // 아마노 비밀번호: Windows 암호화로 이 PC 계정만 풀 수 있게 저장 (저장소·설치파일에 넣지 않음)
+};
+let settings = { ...DEFAULTS };
+let deskWin = null;
+let amanoWin = null;
+let amano = null;
+
+function loadSettings() {
+  try {
+    settings = { ...DEFAULTS, ...JSON.parse(fs.readFileSync(SETTINGS_FILE(), "utf8")) };
+  } catch (e) {
+    settings = { ...DEFAULTS };
+  }
+}
+function saveSettings() {
+  fs.mkdirSync(path.dirname(SETTINGS_FILE()), { recursive: true });
+  fs.writeFileSync(SETTINGS_FILE(), JSON.stringify(settings, null, 2));
+}
+
+const DESK_HTML = () =>
+  app.isPackaged ? path.join(process.resourcesPath, "desk.html") : path.join(__dirname, "..", "..", "..", "prototype", "desk.html");
+
+function openAmano() {
+  if (amanoWin && !amanoWin.isDestroyed()) amanoWin.destroy();
+  // 맨 뒤 창: 보이기는 하지만 포커스를 가져가지 않는다
+  amanoWin = new BrowserWindow({ width: 1024, height: 768, show: false, title: "아마노 주차 (입장 데스크가 조작 중)", webPreferences: { backgroundThrottling: false } });
+  amanoWin.setMenuBarVisibility(false);
+  if (settings.amanoUrl) amanoWin.loadURL(settings.amanoUrl);
+  else amanoWin.loadURL("data:text/html;charset=utf-8," + encodeURIComponent("<p style='font:16px sans-serif;padding:24px'>운영 설정 → 아마노 탭에서 아마노 할인등록 주소를 넣어 주세요.</p>"));
+  // 로그인하면 할인등록 화면으로 자동 이동 (근무자는 아침에 아이디·비밀번호만 넣으면 됨)
+  amanoWin.webContents.on("did-finish-load", async () => {
+    if (!settings.amanoUrl) return;
+    try {
+      const target = new URL(settings.amanoPage, settings.amanoUrl).href;
+      const here = amanoWin.webContents.getURL();
+      const hasPassword = await amanoWin.webContents.executeJavaScript("!!document.querySelector('input[type=password]')");
+      // 로그인이 풀렸으면 저장된 아이디·비밀번호로 자동 로그인 (한 번만 시도, 실패하면 근무자에게 맡김)
+      if (hasPassword && settings.amanoId && settings.amanoPwEnc && !amanoWin.__triedLogin) {
+        amanoWin.__triedLogin = true;
+        const pw = safeStorage.decryptString(Buffer.from(settings.amanoPwEnc, "base64"));
+        await amano.login(settings.amanoId, pw);
+        return;
+      }
+      if (!hasPassword) amanoWin.__triedLogin = false;
+      if (!hasPassword && !here.startsWith(target)) amanoWin.loadURL(target);
+      else if (!hasPassword && deskWin) deskWin.focus(); // 할인등록 화면 준비됨 → 데스크를 앞으로
+    } catch (e) {
+      /* 주소가 잘못됨 등: 화면에 그대로 둠 */
+    }
+  });
+  amanoWin.once("ready-to-show", () => {
+    amanoWin.showInactive();
+    if (deskWin) deskWin.focus(); // 데스크가 늘 맨 앞
+  });
+  amanoWin.on("close", (e) => {
+    // 근무자가 아마노 창을 닫아도 꺼지지 않고 뒤로만 숨김
+    if (!app.isQuitting) {
+      e.preventDefault();
+      amanoWin.minimize();
+    }
+  });
+  amano = new AmanoSync((code) => amanoWin.webContents.executeJavaScript(code, true), { selectors: settings.amanoSelectors });
+}
+
+function createDesk() {
+  deskWin = new BrowserWindow({
+    width: 1024,
+    height: 768,
+    title: "아스타나키즈 입장 데스크",
+    webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true },
+  });
+  deskWin.setMenuBarVisibility(false);
+  deskWin.loadFile(DESK_HTML());
+  deskWin.maximize();
+}
+
+/** POS 프로그램 창을 앞으로 (Windows). 창 제목 일부로 찾는다 */
+function showPos() {
+  return new Promise((resolve) => {
+    if (process.platform !== "win32" || !settings.posTitle) return resolve({ ok: false, why: "운영 설정에 POS 창 제목을 넣어 주세요" });
+    const ps = `(New-Object -ComObject WScript.Shell).AppActivate('${settings.posTitle.replace(/'/g, "''")}')`;
+    execFile("powershell.exe", ["-NoProfile", "-Command", ps], (err, out) =>
+      resolve(err || String(out).trim() === "False" ? { ok: false, why: "POS 창을 찾지 못함" } : { ok: true }),
+    );
+  });
+}
+
+// 데스크 화면 ↔ 이 프로그램
+const wrap = (fn) => async (_e, ...args) => {
+  try {
+    if (!amano) return { ok: false, why: "아마노 창이 아직 열리지 않음" };
+    return await fn(...args);
+  } catch (e) {
+    return { ok: false, why: String(e.message || e) };
+  }
+};
+ipcMain.handle("amano:search", wrap((a) => amano.search(a.day, a.no)));
+ipcMain.handle("amano:select", wrap((id) => amano.select(id)));
+ipcMain.handle("amano:discount", wrap((type) => amano.discount(type)));
+ipcMain.handle("amano:remove", wrap((i) => amano.remove(i)));
+ipcMain.handle("amano:read", wrap(async () => ({ ok: true, state: await amano.read() })));
+ipcMain.handle("amano:show", () => {
+  if (amanoWin) {
+    amanoWin.show();
+    amanoWin.focus();
+  }
+  return { ok: true };
+});
+// 배우기: 아마노 창을 앞으로 꺼내고, 근무자가 누른 칸을 key(carNo · day · searchBtn)로 기억
+ipcMain.handle("amano:learn", wrap(async (key) => {
+  amanoWin.show();
+  amanoWin.focus();
+  const sel = await amano.learn();
+  settings.amanoSelectors = { ...settings.amanoSelectors, [key]: sel };
+  saveSettings();
+  amano.selectors = settings.amanoSelectors;
+  deskWin.focus();
+  return { ok: true, selector: sel };
+}));
+// 화면에는 비밀번호를 돌려주지 않음 (저장돼 있는지만)
+ipcMain.handle("config:get", () => {
+  const { amanoPwEnc, ...rest } = settings;
+  return { ...rest, hasAmanoPw: !!amanoPwEnc };
+});
+ipcMain.handle("config:set", (_e, patch) => {
+  const urlChanged = patch.amanoUrl !== undefined && patch.amanoUrl !== settings.amanoUrl;
+  patch = { ...patch };
+  if (patch.amanoPw) {
+    if (!safeStorage.isEncryptionAvailable()) return { ok: false, why: "이 PC에서 비밀번호 암호화를 쓸 수 없음" };
+    settings.amanoPwEnc = safeStorage.encryptString(patch.amanoPw).toString("base64");
+  }
+  delete patch.amanoPw;
+  delete patch.amanoPwEnc;
+  settings = { ...settings, ...patch };
+  saveSettings();
+  if (urlChanged) openAmano();
+  return { ok: true };
+});
+ipcMain.handle("pos:show", () => showPos());
+
+app.whenReady().then(() => {
+  loadSettings();
+  openAmano(); // 맨 뒤 아마노
+  createDesk(); // 맨 앞 데스크 (POS 는 원래대로 따로 켜져 있음)
+});
+app.on("before-quit", () => {
+  app.isQuitting = true;
+});
+app.on("window-all-closed", () => app.quit());

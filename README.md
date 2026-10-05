@@ -10,4 +10,6 @@
 |---|---|
 | `docs/OPERATION.md` | 지금 운영 방식, 불편한 점, 쓰는 사람, 새로 정할 규칙 |
 | `docs/INTEGRATION.md` | 화면 구성, 네이버·POS·주차 연동 방법, 받아야 할 자료 |
-| `prototype/desk.html` | 설치 없이 보는 체험판 (예시 데이터) |
+| `prototype/desk.html` | 입장 데스크 화면 (체험판으로도 열리고, 앱 안에서는 실제 아마노·POS와 연결) |
+| `apps/desk` | POS PC에 설치하는 Windows 프로그램 (아마노 동기화 · POS 창 전환) |
+| `docs/AMANO.md` | 아마노 주차등록 동기화 |

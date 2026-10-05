@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>할인등록 (시험용 가짜 아마노 화면)</title>
+<!-- 사장님이 보내 준 아마노 할인등록 화면 캡처를 본뜬 시험용 페이지.
+     실제 아마노처럼 검색·차량 선택·할인·삭제를 하면 페이지가 새로 열린다(옛날 방식 웹). 자료는 localStorage 에 저장 -->
+<style>
+  body { margin: 0; font-family: "Malgun Gothic", sans-serif; font-size: 12px; background: #2b2f3a; color: #222; }
+  .wrap { display: grid; grid-template-columns: 370px 440px; gap: 8px; padding: 8px; }
+  .box { background: #fff; border-radius: 6px; overflow: hidden; }
+  .box h2 { margin: 0; background: #12a5e0; color: #fff; font-size: 15px; text-align: center; padding: 8px; }
+  .note { background: #3a3f4f; color: #fff; margin: 8px; padding: 6px; border-radius: 4px; text-align: center; }
+  .note b { color: #ff0; }
+  form { padding: 8px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  table { border-collapse: collapse; width: 100%; }
+  th { background: #3a3f4f; color: #fff; padding: 6px; font-weight: normal; }
+  td { border-bottom: 1px solid #ddd; padding: 6px; text-align: center; }
+  tr.sel td { background: #bfe3ff; }
+  .cnt { background: #777; color: #fff; padding: 0 4px; border-radius: 3px; font-size: 11px; }
+  .info th { width: 90px; background: #f0f0f0; color: #555; text-align: center; }
+  .info td { text-align: right; }
+  .bigno { background: #2f3542; color: #fff; font-size: 22px; padding: 4px 10px; border-radius: 4px; display: inline-block; }
+  .red { color: #e00; font-size: 16px; font-weight: bold; }
+  .dbtn { background: #12a5e0; color: #fff; border: 0; border-radius: 3px; padding: 6px 12px; margin: 2px; cursor: pointer; }
+  .login { background: #fff; width: 300px; margin: 80px auto; padding: 20px; border-radius: 6px; display: grid; gap: 8px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  const NOW = new Date("2026-10-05T18:15:27");
+  const P = new URLSearchParams(location.search);
+  const KEY = "mockAmano";
+  const seed = () => ({
+    cars: [
+      { id: "774362", no: "117무5514", at: "2026-10-05 14:26:27" },
+      { id: "774370", no: "12가3456", at: "2026-10-05 13:20:05" },
+      { id: "774371", no: "32우3456", at: "2026-10-05 13:31:44" },
+      { id: "774301", no: "208라1172", at: "2026-10-04 23:12:09" },
+      { id: "774355", no: "38다1172", at: "2026-10-05 10:05:51" },
+    ],
+    disc: { "774362": [{ type: "3시간할인", by: "alphavision(관리자)", at: "2026-10-05 18:16:12" }, { type: "3시간할인", by: "alphavision(관리자)", at: "2026-10-05 14:40:21" }] },
+  });
+  let db;
+  try { db = JSON.parse(localStorage.getItem(KEY)) || seed(); } catch (e) { db = seed(); }
+  const save = () => localStorage.setItem(KEY, JSON.stringify(db));
+  const go = (o) => { const q = new URLSearchParams(Object.assign(Object.fromEntries(P), o)); location.href = location.pathname + "?" + q; };
+  const root = document.getElementById("root");
+
+  if (P.get("login") === "need") {
+    root.innerHTML = `<form class="login" id="lf"><b>로그인</b><input id="uid" placeholder="아이디"><input id="upw" type="password" placeholder="비밀번호"><button>로그인</button><span id="lerr" style="color:red"></span></form>`;
+    document.getElementById("lf").onsubmit = (e) => {
+      e.preventDefault();
+      // 시험용 계정: test / 1234
+      if (document.getElementById("uid").value === "test" && document.getElementById("upw").value === "1234") go({ login: "" });
+      else document.getElementById("lerr").textContent = "아이디 또는 비밀번호가 틀립니다";
+    };
+  } else {
+    const day = P.get("day") || "2026-10-04", no = P.get("no") || "", sel = P.get("sel") || "";
+    const list = no ? db.cars.filter((c) => c.no.includes(no) && c.at.slice(0, 10) >= day) : [];
+    const car = db.cars.find((c) => c.id === sel);
+    const ds = car ? db.disc[car.id] || [] : [];
+    const parked = car ? (() => { const m = Math.floor((NOW - new Date(car.at.replace(" ", "T"))) / 60000); return `${Math.floor(m / 60)}시간 ${m % 60}분`; })() : "";
+    root.innerHTML = `<div class="wrap">
+      <div>
+        <div class="box"><h2>차량번호 조회</h2>
+          <div class="note"><b>새벽시간</b> 검색편의를 위해 <b>입차일</b> 은 <b>전일</b> 부터 차량을 검색합니다</div>
+          <form id="f"><span>입차일</span><input id="sDay" name="day" value="${day}" size="10"><span>차량번호</span><input id="sNo" name="no" value="${no}" size="8"><input type="button" value="검색" id="btnSearch"></form>
+          <table><thead><tr><th>입차ID</th><th>차량번호</th><th>입차시간</th></tr></thead>
+          <tbody>${list.map((c) => `<tr class="${c.id === sel ? "sel" : ""}" style="cursor:pointer" onclick="go({sel:'${c.id}'})"><td>${c.id}</td><td>${c.no} ${(db.disc[c.id] || []).length ? `<span class="cnt">${db.disc[c.id].length}건</span>` : ""}</td><td>${c.at}</td></tr>`).join("")}</tbody></table>
+        </div>
+        <div class="box" style="margin-top:8px"><h2>할인내역</h2>
+          <table><thead><tr><th>할인값</th><th>등록자</th><th>등록시간</th><th>삭제</th></tr></thead>
+          <tbody>${ds.map((d, i) => `<tr><td>${d.type}</td><td>${d.by}</td><td>${d.at}</td><td><button onclick="del(${i})">삭제</button></td></tr>`).join("")}</tbody></table>
+        </div>
+      </div>
+      <div class="box"><h2>할인정보 등록</h2>
+        <table class="info">
+          <tr><th>차량번호</th><td>${car ? `<span class="bigno">${car.no}</span>` : ""}</td></tr>
+          <tr><th>입차장비</th><td>${car ? "정문입구LPR" : ""}</td></tr>
+          <tr><th>입차시간</th><td>${car ? car.at : ""}</td></tr>
+          <tr><th>주차시간</th><td class="red">${parked}</td></tr>
+          <tr><th>할인유형</th><td>${car ? ["3시간할인", "5시간할인", "15시간할인", "16시간할인", "17시간할인", "18시간할인"].map((t) => `<button class="dbtn" onclick="disc('${t}')">${t}</button>`).join("") : ""}</td></tr>
+          <tr><th>비 고</th><td><textarea></textarea></td></tr>
+        </table>
+      </div>
+    </div>`;
+    document.getElementById("btnSearch").onclick = () => go({ day: document.getElementById("sDay").value, no: document.getElementById("sNo").value, sel: "" });
+    window.disc = (t) => { if (!confirm(`${t}을(를) 등록하시겠습니까?`)) return; (db.disc[sel] = db.disc[sel] || []).unshift({ type: t, by: "astana(근무자)", at: "2026-10-05 18:20:00" }); save(); setTimeout(() => go({}), 300); };
+    window.del = (i) => { if (!confirm("삭제하시겠습니까?")) return; db.disc[sel].splice(i, 1); save(); setTimeout(() => go({}), 300); };
+  }
+  window.go = go;
+</script>
+</body>
+</html>

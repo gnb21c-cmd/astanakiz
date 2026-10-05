@@ -124,6 +124,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
 .tabs button { border: 0; background: transparent; padding: 6px 12px; font-weight: 700; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .tabs button.on { color: var(--fg); border-bottom-color: var(--ink); }
+.cfg { font-size: 15px !important; font-weight: 500 !important; min-height: 38px !important; letter-spacing: 0 !important; }
 .date-in { font-size: 14px; min-height: 36px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 .prn { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 14px; }
 .plist { display: grid; gap: 4px; }
@@ -193,7 +194,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .legend .l-pink { border-color: var(--pink); background: var(--pink); }
 .legend .l-red { border-color: var(--red); background: var(--red); }
 
-/* 주차등록: 아마노 화면(3번 모니터)과 같은 항목 */
+/* 주차등록: 뒤에 열어 둔 아마노 화면과 같은 항목 */
 .park { border-top: 1px solid var(--line); padding-top: 6px; display: grid; gap: 5px; grid-template-rows: auto auto minmax(0, 1fr) auto; flex: 1; min-height: 0; }
 .park h3 { margin: 0; font-size: 14px; color: var(--red); display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .park h3 small { color: var(--muted); font-weight: 500; font-size: 11.5px; }
@@ -307,7 +308,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         <span>· 빈 열쇠를 누르면 현장입장</span>
       </div>
       <div class="park">
-        <h3>주차등록 <small><i></i>아마노 화면(3번 모니터)과 동기화 · 체험</small></h3>
+        <h3>주차등록 <small><i></i>뒤에 열린 아마노 화면과 동기화</small></h3>
         <form class="find" id="park-form">
           <label for="car-day">입차일</label>
           <input id="car-day" type="date" value="2026-10-04" aria-label="입차일 (전날부터 검색)">
@@ -563,35 +564,68 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     $("keys").innerHTML = html;
   }
 
-  // ── 주차 (아마노 화면 동기화 체험) ─────────────────
-  /* 실제: 데스크에서 입력·누른 것을 3번 모니터의 아마노 웹 화면에 똑같이 넣고 누름 (입차일 → 차량번호 → 검색 → 차량 선택 → 할인유형)
-     그리고 아마노 화면의 결과(조회 목록·주차시간·할인내역)를 읽어 와 여기 보여 줌. 아래 LOT 은 체험용 입차 차량 */
-  const LOT = [["152가 7781", "2026-10-05 09:52"], ["38다 1172", "2026-10-05 10:05"], ["61머 3020", "2026-10-05 10:41"], ["27노 8814", "2026-10-05 11:02"],
-    ["117무 5514", "2026-10-05 11:26"], ["119허 4402", "2026-10-05 11:48"], ["45루 6603", "2026-10-05 12:33"], ["21보 5520", "2026-10-05 12:57"],
-    ["12가 3456", "2026-10-05 13:20"], ["32우 3456", "2026-10-05 13:31"], ["208라 1172", "2026-10-04 23:12"]]
-    .map(([no, at], i) => ({ id: 774300 + i * 7, no, at, discs: [] }));
+  // ── 주차 (아마노 화면 동기화) ───────────────────
+  /* 데스크에서 입력·누른 것을 뒤에 열어 둔 아마노 할인등록 화면에 똑같이 넣고 누르고, 결과를 읽어 와 보여 줌.
+     설치한 앱 안에서는 window.desk.amano(실제 아마노), 체험판에서는 아래 demoAmano(예시 자료)가 같은 모양으로 답함 */
   const DISC = ["3시간할인", "5시간할인", "15시간할인"]; // 쓰는 할인유형만 (아마노 화면의 같은 이름 버튼을 누름)
-  let carQ = "", carSel = null, syncMsg = "차량번호를 넣고 검색하면 아마노 화면에도 같은 값이 들어가요";
-  const entryMin = (c) => (c.at.slice(0, 10) === TODAY ? 0 : -1440) + toMin(c.at.slice(11));
-  const parkedText = (c) => { const m = now - entryMin(c); return `${Math.floor(m / 60)}시간 ${m % 60}분`; };
+  const REAL = !!(window.desk && window.desk.amano);
+  const demoAmano = (() => {
+    const LOT = [["152가7781", "2026-10-05 09:52:10"], ["38다1172", "2026-10-05 10:05:51"], ["61머3020", "2026-10-05 10:41:03"], ["27노8814", "2026-10-05 11:02:44"],
+      ["117무5514", "2026-10-05 11:26:27"], ["119허4402", "2026-10-05 11:48:15"], ["45루6603", "2026-10-05 12:33:09"], ["21보5520", "2026-10-05 12:57:31"],
+      ["12가3456", "2026-10-05 13:20:05"], ["32우3456", "2026-10-05 13:31:44"], ["208라1172", "2026-10-04 23:12:09"]]
+      .map(([no, at], i) => ({ id: String(774300 + i * 7), no, at }));
+    const discs = {};
+    let rows = [], sel = null;
+    const parked = (c) => { const m = now - ((c.at.slice(0, 10) === TODAY ? 0 : -1440) + toMin(c.at.slice(11, 16))); return `${Math.floor(m / 60)}시간 ${m % 60}분`; };
+    const state = () => {
+      const c = LOT.find((x) => x.id === sel);
+      return {
+        needLogin: false,
+        rows: rows.map((x) => ({ id: x.id, no: x.no, count: (discs[x.id] || []).length, at: x.at })),
+        detail: c ? { no: c.no, at: c.at, parked: parked(c) } : { no: "", at: "", parked: "" },
+        history: c ? (discs[c.id] || []).slice() : [],
+        types: c ? ["3시간할인", "5시간할인", "15시간할인", "16시간할인", "17시간할인", "18시간할인"] : [],
+      };
+    };
+    const ok = (extra = {}) => Promise.resolve(Object.assign({ ok: true, state: state() }, extra));
+    return {
+      search(day, no) { rows = LOT.filter((c) => c.no.includes(no) && c.at.slice(0, 10) >= day); sel = null; return ok(); },
+      select(id) { sel = id; return ok(); },
+      discount(t) { (discs[sel] = discs[sel] || []).unshift({ type: t, by: "astana(근무자)", at: `${TODAY} ${hm(now)}:00` }); return ok({ dialog: `${t}을(를) 등록하시겠습니까?` }); },
+      remove(i) { (discs[sel] || []).splice(i, 1); return ok({ dialog: "삭제하시겠습니까?" }); },
+    };
+  })();
+  const amanoApi = REAL ? window.desk.amano : demoAmano;
+  const park = { state: null, sel: null, busy: false, err: false, msg: "차량번호를 넣고 검색하면 아마노 화면에도 같은 값이 들어가요" };
+  async function parkRun(msg, fn) {
+    if (park.busy) return;
+    park.busy = true; park.err = false; park.msg = msg + " …"; renderCars();
+    let r;
+    try { r = await fn(); } catch (e) { r = { ok: false, why: String(e && e.message || e) }; }
+    park.busy = false;
+    if (r && r.state) park.state = r.state;
+    park.err = !r || !r.ok;
+    park.msg = r && r.ok ? `${msg} → 완료${r.dialog ? ` (확인 창 '${r.dialog}' 자동 확인)` : ""}` : (r && r.why) || "아마노 화면이 응답하지 않음";
+    renderCars();
+  }
   function renderCars() {
-    const q = digits(carQ), from = $("car-day").value;
-    const list = q ? LOT.filter((c) => digits(c.no).includes(q) && c.at.slice(0, 10) >= from) : [];
-    $("cars").innerHTML = !q ? `<div class="empty">입차일은 새벽 손님 때문에 전날부터 찾아요</div>`
-      : list.length ? list.map((c) => `<button class="car ${carSel === c.id ? "on" : ""}" data-act="car" data-id="${c.id}" aria-pressed="${carSel === c.id}">
-          <span><b class="num">${esc(c.no)}</b>${c.discs.length ? `<span class="cnt num">${c.discs.length}건</span>` : ""}</span>
-          <small class="num">${c.at.slice(5, 16)} 입차</small>
-          <small class="num">입차ID ${c.id}</small>
-          <span class="st">${c.discs.length ? c.discs[c.discs.length - 1].type + " 등록" : ""}</span></button>`).join("")
+    const st = park.state;
+    const dis = park.busy ? "disabled" : "";
+    $("cars").innerHTML = !st ? `<div class="empty">입차일은 새벽 손님 때문에 전날부터 찾아요</div>`
+      : st.needLogin ? `<div class="empty">아마노 로그인이 풀렸어요${REAL ? `<br><button class="btn btn-sm" data-act="amanoShow">아마노 화면 보기</button>` : ""}</div>`
+      : st.rows.length ? st.rows.map((c) => `<button class="car ${park.sel === c.id ? "on" : ""}" data-act="car" data-id="${esc(c.id)}" aria-pressed="${park.sel === c.id}" ${dis}>
+          <span><b class="num">${esc(c.no)}</b>${c.count ? `<span class="cnt num">${c.count}건</span>` : ""}</span>
+          <small class="num">${esc(c.at.slice(5, 16))} 입차</small>
+          <small class="num">입차ID ${esc(c.id)}</small><span></span></button>`).join("")
       : `<div class="empty">검색된 차량이 없어요</div>`;
-    const c = LOT.find((x) => x.id === carSel);
-    const btn = (t) => `<button class="btn" data-act="discount" data-h="${t}">${t.replace("할인", "")}</button>`;
-    $("pcar").innerHTML = !c ? `<div class="empty">조회 목록에서 차량을 고르면 할인유형이 나와요</div>` : `
-      <div class="no num">${esc(c.no)}</div>
-      <div class="tm num"><span>입차 ${c.at.slice(5, 16)}</span><b>${parkedText(c)}</b></div>
+    const d = st && park.sel && st.detail && st.detail.no ? st : null;
+    const btn = (t) => `<button class="btn" data-act="discount" data-h="${t}" ${park.busy || (d.types.length && !d.types.includes(t)) ? "disabled" : ""}>${t.replace("할인", "")}</button>`;
+    $("pcar").innerHTML = !d ? `<div class="empty">조회 목록에서 차량을 고르면 할인유형이 나와요</div>` : `
+      <div class="no num">${esc(d.detail.no)}</div>
+      <div class="tm num"><span>입차 ${esc(d.detail.at.slice(5, 16))}</span><b>${esc(d.detail.parked)}</b></div>
       <div class="dbtns">${DISC.map(btn).join("")}</div>
-      <div class="dlist">${c.discs.length ? c.discs.map((d, i) => `<div><span class="num">${d.type} · ${hm(d.at)}</span><button data-act="discDel" data-i="${i}" aria-label="할인 삭제">삭제</button></div>`).join("") : `<span class="help">할인내역 없음</span>`}</div>`;
-    $("synclog").innerHTML = `아마노: <b>${esc(syncMsg)}</b>`;
+      <div class="dlist">${d.history.length ? d.history.map((h, i) => `<div><span class="num">${esc(h.type)} · ${esc(String(h.at).slice(11, 16))}</span><button data-act="discDel" data-i="${i}" aria-label="할인 삭제" ${dis}>삭제</button></div>`).join("") : `<span class="help">할인내역 없음</span>`}</div>`;
+    $("synclog").innerHTML = `아마노${REAL ? "" : "(체험)"}: <b style="color:${park.err ? "var(--red)" : "inherit"}">${esc(park.msg)}</b>`;
   }
 
   function renderAll() { $("now").textContent = hm(now); $("refresh-at").textContent = `${hm(lastRefresh)} 불러옴`; renderSlots(); renderRes(); renderKeys(); renderCars(); }
@@ -696,7 +730,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     }
     if (sheet.mode === "settings") {
       const tab = sheet.tab || "rules";
-      const tabs = `<div class="tabs" role="tablist">${[["rules", "운영 규칙"], ["printer", "프린터"]].map(([k, t]) => `<button role="tab" class="${tab === k ? "on" : ""}" aria-selected="${tab === k}" data-act="setTab" data-t="${k}">${t}</button>`).join("")}</div>`;
+      const tabs = `<div class="tabs" role="tablist">${[["rules", "운영 규칙"], ["printer", "프린터"], ["link", "아마노 · POS"]].map(([k, t]) => `<button role="tab" class="${tab === k ? "on" : ""}" aria-selected="${tab === k}" data-act="setTab" data-t="${k}">${t}</button>`).join("")}</div>`;
       if (tab === "rules") {
         const dateIn = (id, v) => `<input type="date" id="${id}" value="${v}" class="date-in">`;
         el.innerHTML = `
@@ -711,6 +745,27 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
             <li>초과요금: 1:50:01부터 카운트, 2:00:00 정각 5,000원 · 10분이 꽉 찰 때마다 5,000원 × 열쇠 수</li>
           </ul>
           <div class="sheet-foot"><button class="btn btn-ink" data-act="close" data-autofocus>닫기</button></div>`;
+        return;
+      }
+      if (tab === "link") {
+        const c = CFG || {};
+        const dis = REAL ? "" : "disabled";
+        const learned = (k) => (c.amanoSelectors && c.amanoSelectors[k] ? " ✓" : "");
+        el.innerHTML = `
+          <h3 id="sheet-title">운영 설정 <button class="x" data-act="close" aria-label="닫기">×</button></h3>${tabs}
+          ${REAL ? "" : `<div class="banner warn">체험판에서는 저장되지 않아요. POS PC에 설치한 앱에서 설정합니다.</div>`}
+          <div class="field"><label for="cfg-url">아마노 로그인 주소 <span class="help">예: http://아마노주소/login · 로그인하면 할인등록 화면으로 자동 이동</span></label>
+            <input id="cfg-url" class="cfg" value="${esc(c.amanoUrl || "")}" placeholder="http://.../login" ${dis}></div>
+          <div class="field"><label for="cfg-id">아마노 아이디 · 비밀번호 <span class="help">이 PC에만 암호화해 저장 · 로그인이 풀리면 자동으로 다시 로그인</span></label>
+            <div class="btns" style="flex-wrap:nowrap"><input id="cfg-id" class="cfg" value="${esc(c.amanoId || "")}" placeholder="아이디" autocomplete="off" ${dis}>
+            <input id="cfg-pw" class="cfg" type="password" placeholder="${c.hasAmanoPw ? "저장됨 (바꿀 때만 입력)" : "비밀번호"}" autocomplete="new-password" ${dis}></div></div>
+          <div class="field"><label for="cfg-pos">POS 프로그램 창 제목 <span class="help">"결제하기"를 누르면 이 창을 앞으로 띄움 (일부만 써도 됨)</span></label>
+            <input id="cfg-pos" class="cfg" value="${esc(c.posTitle || "")}" placeholder="예: OKPOS" ${dis}></div>
+          <div class="btns"><button class="btn btn-ink" data-act="cfgSave" ${dis}>저장</button><button class="btn" data-act="amanoShow" ${dis}>아마노 화면 보기 (로그인)</button></div>
+          <div class="field"><span class="label">아마노 칸 배우기 <span class="help">자동으로 못 찾을 때만 · 누르면 아마노 화면이 앞으로 나오고, 그 칸을 한 번 클릭하면 기억</span></span>
+            <div class="btns">${[["carNo", "차량번호 칸"], ["day", "입차일 칸"], ["searchBtn", "검색 버튼"]].map(([k, t]) => `<button class="btn btn-sm" data-act="learn" data-k="${k}" ${dis}>${t}${learned(k)}</button>`).join("")}</div></div>
+          <p class="help">창은 한 화면에 겹쳐 둡니다: 맨 뒤 아마노 → 가운데 POS → 맨 앞 입장 데스크. 아마노 창이 가려져 있어도 입력·클릭이 됩니다.</p>
+          <div class="sheet-foot"><button class="btn btn-ink" data-act="close">닫기</button></div>`;
         return;
       }
       const f = PRINT.forms[PRINT.cur];
@@ -805,6 +860,19 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (sheet.mode === "key" && $("pos").hidden) { const h = holderById(sheet.hid); const mt = $("meter"); if (h && mt) { const before = !!overInfo(h).due; mt.innerHTML = meterHtml(h); if (sec === 0 || (!!overInfo(h).due !== before)) renderSheet(); } }
   }, 1000);
 
+  // POS 화면으로: 앱에서는 켜져 있는 POS 창을 앞으로 띄우고, 데스크 창이 다시 앞에 오면 결제 끝으로 봄
+  let posAway = false;
+  let CFG = null; // 설치한 앱의 설정 (아마노 주소 · POS 창 제목 · 배운 칸)
+  async function goPos() {
+    if (window.desk && window.desk.pos) {
+      const r = await window.desk.pos.show();
+      if (r && r.ok) { posAway = true; return; }
+      toast((r && r.why) || "POS 창을 찾지 못함");
+    }
+    $("pos").hidden = false; // 체험판: 가짜 POS 화면
+  }
+  window.addEventListener("focus", () => { if (posAway) { posAway = false; acts.posDone(); } });
+
   // ── 동작 ─────────────────────────────────────────
   let toastTimer;
   function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 2600); }
@@ -860,11 +928,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       renderSheet(); $("w-phone").focus();
     },
     flexOk() { sheet.flexOk = !sheet.flexOk; renderSheet(); },
-    pay() { sheet.paid = true; $("pos-amt").textContent = `현장입장 ${sheet.keys.length}장`; $("pos").hidden = false; },
+    pay() { sheet.paid = true; $("pos-amt").textContent = `현장입장 ${sheet.keys.length}장`; goPos(); },
     payOver() {
       const h = holderById(sheet.hid); const o = overInfo(h); if (!o.due) return;
       sheet.pending = { amount: o.due, sec: o.sec, at: now }; // 누르기 직전 금액으로 고정
-      $("pos-amt").textContent = `초과요금 ${won(o.due)} (열쇠 ${h.keys.join(", ")}번)`; $("pos").hidden = false;
+      $("pos-amt").textContent = `초과요금 ${won(o.due)} (열쇠 ${h.keys.join(", ")}번)`; goPos();
     },
     posDone() {
       $("pos").hidden = true;
@@ -882,26 +950,36 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       if (h.keys.length) renderSheet(); else closeSheet();
     },
     settings() { openSheet({ mode: "settings", tab: "rules" }); },
-    setTab(btn) { sheet.tab = btn.dataset.t; renderSheet(); },
+    async setTab(btn) {
+      sheet.tab = btn.dataset.t;
+      if (sheet.tab === "link" && REAL) CFG = await window.desk.config.get();
+      renderSheet();
+    },
+    async cfgSave() {
+      const patch = { amanoUrl: $("cfg-url").value.trim(), posTitle: $("cfg-pos").value.trim(), amanoId: $("cfg-id").value.trim() };
+      if ($("cfg-pw").value) patch.amanoPw = $("cfg-pw").value;
+      const r = await window.desk.config.set(patch);
+      if (r && r.ok === false) { toast(r.why); return; }
+      CFG = await window.desk.config.get(); toast("저장했어요"); renderSheet();
+    },
+    async learn(btn) {
+      toast("아마노 화면에서 그 칸을 한 번 클릭하세요");
+      const r = await window.desk.amano.learn(btn.dataset.k);
+      CFG = await window.desk.config.get();
+      toast(r && r.ok ? "기억했어요" : (r && r.why) || "기억하지 못했어요"); renderSheet();
+    },
     findPrinters() { PRINT.found = true; if (!PRINT.sel) PRINT.sel = PRINT.list[0]; toast(`프린터 ${PRINT.list.length}대 찾음 (체험)`); renderSheet(); },
     pickPrinter(btn) { PRINT.sel = btn.dataset.n; renderSheet(); },
     testPrint() { toast(`${PRINT.sel}로 테스트 출력 보냄 (체험)`); },
     pickForm(btn) { PRINT.cur = btn.dataset.k; renderSheet(); },
     car(btn) {
-      carSel = Number(btn.dataset.id);
-      const c = LOT.find((x) => x.id === carSel);
-      syncMsg = `조회 목록에서 ${c.no} 누름 → 주차시간 ${parkedText(c)} 읽음`; renderCars();
+      park.sel = btn.dataset.id;
+      const c = park.state.rows.find((x) => x.id === park.sel);
+      parkRun(`${c.no} 선택`, () => amanoApi.select(park.sel));
     },
-    discount(btn) {
-      const c = LOT.find((x) => x.id === carSel); if (!c) return;
-      c.discs.push({ type: btn.dataset.h, at: now });
-      syncMsg = `${c.no} · '${btn.dataset.h}' 버튼 누름 → 할인내역 ${c.discs.length}건 확인`;
-      toast(`${c.no} ${btn.dataset.h} 등록 (체험)`); renderCars();
-    },
-    discDel(btn) {
-      const c = LOT.find((x) => x.id === carSel); const d = c.discs.splice(Number(btn.dataset.i), 1)[0];
-      syncMsg = `${c.no} · 할인내역 '${d.type}' 삭제 누름`; renderCars();
-    },
+    discount(btn) { parkRun(`'${btn.dataset.h}' 누름`, () => amanoApi.discount(btn.dataset.h)); },
+    discDel(btn) { parkRun("할인내역 삭제", () => amanoApi.remove(Number(btn.dataset.i))); },
+    amanoShow() { if (REAL) window.desk.amano.show(); },
     close() { closeSheet(); },
   };
 
@@ -919,16 +997,16 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (t.id === "form-text") { PRINT.forms[PRINT.cur].text = t.value; $("paper").innerHTML = paperHtml(t.value, SAMPLE); }
     if (t.id === "form-auto") PRINT.forms[PRINT.cur].auto = t.checked;
     if (t.id === "w-phone") { sheet.phone = digits(t.value).slice(0, 11); t.value = fmtPhone(sheet.phone); updateWalkButtons(); }
-    if (t.id === "car-q") carQ = t.value;
     const m = /^p(f|t)-(\d+)$/.exec(t.id);
     if (m && t.value) { RULES.peaks[+m[2]][m[1] === "f" ? "from" : "to"] = t.value; renderAll(); }
   });
   $("park-form").addEventListener("submit", (e) => {
-    e.preventDefault(); carQ = $("car-q").value; carSel = null;
-    syncMsg = `입차일 ${$("car-day").value} · 차량번호 ${digits(carQ)} 입력 → 검색 누름`;
-    renderCars();
+    e.preventDefault();
+    const day = $("car-day").value, no = digits($("car-q").value);
+    if (!no) { toast("차량번호를 넣어 주세요"); return; }
+    park.sel = null;
+    parkRun(`입차일 ${day} · 차량번호 ${no} 검색`, () => amanoApi.search(day, no));
   });
-  $("car-day").addEventListener("change", () => renderCars());
 
   // 창 크기에 맞춰 1024×768 화면을 통째로 맞춤 (가운데 정렬)
   function fit() {
