@@ -1161,7 +1161,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   if (APP) {
     document.querySelectorAll("[data-act=time]").forEach((b) => (b.hidden = true));
     document.querySelector(".top .tag").textContent = "네이버 · 아마노 · POS 연결";
-    if (window.desk.config) window.desk.config.get().then((c) => { if (c && c.build) document.querySelector(".top .tag").textContent = `네이버 · 아마노 · POS 연결 · 버전 ${c.build}`; }).catch(() => {});
+    if (window.desk.config) window.desk.config.get().then((c) => { if (c && c.build) document.querySelector(".top .tag").textContent = `네이버 · 아마노 · POS 연결 ver.${c.build}`; }).catch(() => {});
   }
   fit();
   renderAll();

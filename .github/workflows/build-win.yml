@@ -1,6 +1,8 @@
 # 입장 데스크 Windows 설치 파일 만들기 (GitHub 의 Windows 컴퓨터가 대신 만듦)
 # main 에 apps/desk · prototype 이 바뀌어 올라가면 저절로, 또는 Actions → 설치 파일 만들기 → Run workflow
 # 결과: Releases 의 '시험판(최신)' 에 설치 파일(.exe) — POS PC 에서 받아 더블클릭
+# 버전: ver.0.X — X 는 설치 파일을 만들 때마다 1씩 늘어남 (이 작업의 실행 번호 − 4, 첫 번호 ver.0.1)
+#   화면 맨 위 "네이버 · 아마노 · POS 연결 ver.0.X" 로 새 설치본인지 확인
 # 아마노 · 네이버 주소 · 아이디 · 비밀번호는 넣지 않음 (POS PC 앱 설정에서 입력)
 name: 설치 파일 만들기
 on:
@@ -23,9 +25,14 @@ jobs:
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
         run: npm install --no-audit --no-fund
-      - name: 버전 적기
+      - name: 버전 적기 (ver.0.X)
+        id: ver
         shell: bash
-        run: echo "{\"build\":\"$(git log -1 --format=%h)\"}" > apps/desk/src/build.json
+        run: |
+          x=$(( ${{ github.run_number }} - 4 ))
+          echo "x=$x" >> "$GITHUB_OUTPUT"
+          echo "{\"build\":\"0.$x\",\"sha\":\"$(git log -1 --format=%h)\"}" > apps/desk/src/build.json
+          cd apps/desk && npm pkg set version=0.$x.0
       - name: 설치 파일 만들기
         working-directory: apps/desk
         env:
@@ -39,4 +46,4 @@ jobs:
           f=$(ls apps/desk/dist/*.exe | head -1)
           cp "$f" astanakiz-desk-setup.exe
           gh release delete test-latest --yes --cleanup-tag || true
-          gh release create test-latest astanakiz-desk-setup.exe --title "시험판(최신) $(git log -1 --format=%h)" --notes "POS PC 시험용. 받아서 더블클릭 → 설치." --prerelease --target ${{ github.sha }}
+          gh release create test-latest astanakiz-desk-setup.exe --title "시험판(최신) ver.0.${{ steps.ver.outputs.x }} ($(git log -1 --format=%h))" --notes "POS PC 시험용. 받아서 더블클릭 → 설치." --prerelease --target ${{ github.sha }}

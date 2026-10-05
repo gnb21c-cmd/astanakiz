@@ -31,8 +31,9 @@ const queues = {};
 // 시간 제한: 페이지가 옮겨 가는 중에는 화면 안 실행이 응답 없이 멈출 수 있음 → 끝없이 기다리지 않게
 // 설치 파일 버전 (GitHub 가 만들 때 커밋 번호를 넣음) — 화면 위에 보여 새 설치본인지 확인
 let BUILD = "개발";
+let SHA = "";
 try {
-  BUILD = require("./build.json").build;
+  ({ build: BUILD, sha: SHA = "" } = require("./build.json"));
 } catch (e) {
   /* 직접 실행(npm start) */
 }
@@ -213,7 +214,7 @@ ipcMain.handle("naver:dump", async () => {
     const wc = naverWin.webContents;
     const frames = (wc.mainFrame ? wc.mainFrame.framesInSubtree : []).map((f) => f.url);
     const html = await timed(wc.executeJavaScript("document.documentElement.outerHTML", true), 8000, "네이버 화면이 응답하지 않음");
-    const head = `<!-- 주소: ${wc.getURL()}\n액자: ${frames.join(" | ")}\n버전: ${BUILD} -->\n`;
+    const head = `<!-- 주소: ${wc.getURL()}\n액자: ${frames.join(" | ")}\n버전: ver.${BUILD} ${SHA} -->\n`;
     fs.writeFileSync(path.join(dir, `naver-${stamp}.html`), head + html);
     const img = await naverWin.webContents.capturePage();
     fs.writeFileSync(path.join(dir, `naver-${stamp}.png`), img.toPNG());
