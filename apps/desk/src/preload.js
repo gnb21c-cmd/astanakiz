@@ -21,6 +21,10 @@ contextBridge.exposeInMainWorld("desk", {
     onStep: (cb) => ipcRenderer.on("naver:step", (_e, msg) => cb(msg)),
   },
   pos: { show: () => ipcRenderer.invoke("pos:show") },
+  print: {
+    list: () => ipcRenderer.invoke("print:list"),
+    html: (job) => ipcRenderer.invoke("print:html", job),
+  },
   config: {
     get: () => ipcRenderer.invoke("config:get"),
     set: (patch) => ipcRenderer.invoke("config:set", patch),

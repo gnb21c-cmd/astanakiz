@@ -255,6 +255,41 @@ ipcMain.handle("config:set", (_e, patch) => {
 });
 ipcMain.handle("pos:show", () => showPos());
 
+// ── 영수증 프린터 (80mm 감열지) ──
+// Windows 에 설치된 프린터 목록 (POS 프린터도 Windows 에 드라이버가 깔려 있어야 보임 — '설정 → 프린터 및 스캐너' 에 있는 것)
+ipcMain.handle("print:list", async () => {
+  try {
+    const list = await deskWin.webContents.getPrintersAsync();
+    return { ok: true, list: list.map((p) => ({ name: p.name, display: p.displayName || p.name, isDefault: !!p.isDefault, status: p.status, desc: p.description || "" })) };
+  } catch (e) {
+    return { ok: false, why: String(e.message || e) };
+  }
+});
+// 영수증 HTML 을 그 프린터로 출력. silent=false 면 Windows 인쇄 창을 띄움 (드라이버 확인용)
+ipcMain.handle("print:html", async (_e, { html, deviceName, silent = true, widthMm = 80 }) => {
+  let w = null;
+  try {
+    const file = path.join(app.getPath("temp"), "astanakiz-receipt.html");
+    fs.writeFileSync(file, html, "utf8");
+    w = new BrowserWindow({ show: false, width: Math.round((widthMm / 25.4) * 96), height: 1200, webPreferences: { backgroundThrottling: false } });
+    await w.loadFile(file);
+    const hpx = await w.webContents.executeJavaScript("Math.ceil(document.documentElement.scrollHeight)");
+    // 감열지는 길이가 정해져 있지 않음 → 내용 높이만큼 (+여백 10mm)
+    const heightMicrons = Math.max(50000, Math.ceil((hpx / 96) * 25400) + 10000);
+    const res = await new Promise((resolve) =>
+      w.webContents.print(
+        { silent, deviceName: deviceName || undefined, printBackground: true, margins: { marginType: "none" }, pageSize: { width: widthMm * 1000, height: heightMicrons } },
+        (ok, why) => resolve(ok ? { ok: true } : { ok: false, why: why || "출력 실패" }),
+      ),
+    );
+    return res;
+  } catch (e) {
+    return { ok: false, why: String(e.message || e) };
+  } finally {
+    if (w && !w.isDestroyed()) setTimeout(() => w.destroy(), 1000);
+  }
+});
+
 // 한 번만 켜지게: 이미 켜져 있으면 새로 띄우지 않고 켜진 데스크를 앞으로
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) app.quit();

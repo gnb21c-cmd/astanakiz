@@ -1001,13 +1001,15 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         <div class="prn">
           <div class="stack">
             <div class="field"><span class="label">연결된 프린터 <span class="help">POS PC에 연결된 프린터를 찾아 고르세요 · 80mm 감열지</span></span>
-              <div class="plist">${PRINT.found ? PRINT.list.map((n) => `<button class="${PRINT.sel === n ? "on" : ""}" data-act="pickPrinter" data-n="${esc(n)}" aria-pressed="${PRINT.sel === n}">${esc(n)}${PRINT.sel === n ? " · 사용 중" : ""}</button>`).join("") : `<span class="help">아직 찾지 않았어요</span>`}</div>
-              <div class="btns"><button class="btn btn-sm" data-act="findPrinters">프린터 찾기</button><button class="btn btn-sm" data-act="testPrint" ${PRINT.sel ? "" : "disabled"}>테스트 출력</button></div></div>
+              <div class="plist">${PRINT.found ? (PRINT.list.length ? PRINT.list.map((p) => `<button class="${PRINT.sel === p.name ? "on" : ""}" data-act="pickPrinter" data-n="${esc(p.name)}" aria-pressed="${PRINT.sel === p.name}">${esc(p.name)}${p.isDefault ? " (기본)" : ""}${PRINT.sel === p.name ? " · 사용 중" : ""}</button>`).join("") : `<span class="help" style="color:var(--red)">Windows에 설치된 프린터가 없어요 — POS 프린터 드라이버가 Windows '설정 → 프린터 및 스캐너'에 있어야 해요</span>`) : PRINT.sel ? `<span class="help">사용 중: <b>${esc(PRINT.sel)}</b> (다시 찾으려면 '프린터 찾기')</span>` : `<span class="help">아직 찾지 않았어요</span>`}</div>
+              <div class="btns"><button class="btn btn-sm" data-act="findPrinters">프린터 찾기</button><button class="btn btn-sm" data-act="testPrint" ${PRINT.sel && !PRINT.busy ? "" : "disabled"}>테스트 출력</button><button class="btn btn-sm" data-act="testPrintDlg" ${PRINT.sel && !PRINT.busy && APP ? "" : "disabled"}>인쇄 창으로 출력</button></div>
+              ${PRINT.msg ? `<span class="help">${esc(PRINT.msg)}</span>` : ""}
+              <span class="help">안 나오면 '인쇄 창으로 출력'으로 Windows 인쇄 창에서 프린터 · 용지를 직접 골라 보세요</span></div>
             <div class="field"><span class="label">출력 양식</span>
-              <div class="seg2">${Object.entries(PRINT.forms).map(([k, x]) => `<button class="${PRINT.cur === k ? "on" : ""}" data-act="pickForm" data-k="${k}" aria-pressed="${PRINT.cur === k}">${x.name}</button>`).join("")}</div>
+              <div class="help">입장권 (네이버 · 현장) · 초과요금은 POS에서 결제하고 POS 영수증을 드려요 · <button class="btn btn-sm" data-act="resetForm">기본 양식으로</button></div>
               <label class="chk"><input type="checkbox" id="form-auto" ${f.auto ? "checked" : ""}> ${f.when}에 자동 출력</label>
               <textarea id="form-text" spellcheck="false" aria-label="양식 내용">${esc(f.text)}</textarea>
-              <span class="help">넣을 수 있는 값: ${PRINT_KEYS.map((k) => `{${k}}`).join(" ")}<br>줄 앞에 <b>#</b> 크게 가운데 · <b>^</b> 가운데 · <b>---</b> 구분선</span></div>
+              <span class="help">넣을 수 있는 값: ${PRINT_KEYS.map((k) => `{${k}}`).join(" ")}<br>줄 앞에 <b>#</b> 크게 가운데 · <b>^</b> 가운데 · <b>---</b> 구분선 · <b>[네이버]</b> 네이버 예약만 · <b>[현장]</b> 현장입장만 · <b>[사은권]</b> 사은권 회차만</span></div>
           </div>
           <div class="field"><span class="label">미리보기 <span class="help">80mm 폭 (예시 값)</span></span><div class="paper" id="paper">${paperHtml(f.text, SAMPLE)}</div></div>
         </div>
@@ -1016,39 +1018,105 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   }
 
   // ── 영수증 프린터 (80mm 감열지) ─────────────────────
-  /* 실제 앱: POS PC 의 프린터 목록을 읽어 고른 프린터로 조용히 출력 (창 안 띄움).
-     체험판: 목록과 출력은 흉내만 내고, 양식과 미리보기는 그대로 동작 */
-  const PRINT_KEYS = ["매장", "날짜", "시각", "고객", "전화뒤4", "열쇠", "수량", "입장", "반납", "방문회차", "사은권", "초과시간", "금액"];
-  const SAMPLE = { 매장: "아스타나키즈", 날짜: "2026-10-05", 시각: "13:55", 고객: "송다온", 전화뒤4: "5489", 열쇠: "5, 13", 수량: "2", 입장: "14:00", 반납: "15:50", 방문회차: "10", 사은권: "2만원 사은권 증정!", 초과시간: "0:12:30", 금액: "10,000원" };
+  /* 실제 앱: Windows 에 설치된 프린터 목록을 읽어 고른 프린터로 조용히 출력 (창 안 띄움).
+     POS 영수증 프린터도 Windows '프린터 및 스캐너'에 드라이버가 깔려 있어야 목록에 나옴.
+     체험판: 목록과 출력은 흉내만 내고, 양식과 미리보기는 그대로 동작
+     양식 문법: 줄 앞 # 크게 가운데 · ^ 가운데 · --- 구분선 · [네이버] 네이버 예약만 · [현장] 현장입장만 · [사은권] 사은권 받는 회차만 */
+  const PRINT_KEYS = ["구분", "고객", "전화뒤4", "열쇠", "입장시간", "퇴장시간", "누계", "기준회", "사은권", "날짜", "시각"];
+  const SAMPLE = { 구분: "네이버", 고객: "송*온", 전화뒤4: "5489", 열쇠: "3, 13", 입장시간: "오후 2시 00분", 퇴장시간: "오후 3시 50분", 누계: "10", 기준회: "10", 사은권: "2만원 사은권", 날짜: "2026-10-05", 시각: "13:55", _네이버: true, _현장: false, _사은권: true };
+  const ENTER_FORM = [
+    "# 아스타나키즈 {구분} 입장권",
+    "---",
+    "고객명    {고객} ({전화뒤4})",
+    "열쇠      {열쇠}번",
+    "입장시간  {입장시간}",
+    "퇴장시간  {퇴장시간}",
+    "---",
+    "[네이버]# {고객}님 네이버 ID 이용완료 누계는",
+    "[네이버]# 이번 완료까지 {누계}회 입니다",
+    "[사은권]# ★ {사은권} 증정 ★",
+    "[네이버]^이용완료 실적 기준입니다.",
+    "[네이버]^실적 {기준회}회 마다 {사은권}을 드려요",
+    "[네이버]---",
+    "^이용수칙",
+    "1. 외부음식은 분유/이유식/보리차 만 허용됩니다.",
+    "2. 지연퇴장은 5000원/10분 페널티 발생합니다.",
+    "3. 신발장 미보관, 분실은 책임지지 않습니다.",
+    "4. 1명 이상의 보호자 반드시 동반 입장해주세요.",
+    "---",
+    "^{날짜} {시각}",
+  ].join("\n");
   const PRINT = {
-    found: false, sel: null, cur: "enter",
-    list: ["POS-80C (USB001)", "EPSON TM-T82 Receipt", "Microsoft Print to PDF"],
-    forms: {
-      enter: { name: "입장표", when: "등록 완료", auto: true, text: "# {매장}\n^입장표\n---\n고객   {고객} ({전화뒤4})\n열쇠   {열쇠}번\n입장   {입장}\n반납   {반납}까지\n---\n# ★ {방문회차}번째 방문 ★\n# {사은권}\n^10회 방문마다 2만원 사은권을 드려요\n---\n^열쇠를 잃어버리지 마세요\n^{날짜} {시각}" },
-      over: { name: "초과요금 영수증", when: "초과요금 결제", auto: false, text: "# {매장}\n^초과요금\n---\n고객   {고객}\n열쇠   {열쇠}번\n반납   {반납}\n초과   {초과시간}\n---\n# {금액}\n^{날짜} {시각}" },
-    },
+    found: false, sel: null, cur: "enter", busy: false, msg: "",
+    list: APP ? [] : [{ name: "POS-80C (USB001)", isDefault: false }, { name: "EPSON TM-T82 Receipt", isDefault: false }, { name: "Microsoft Print to PDF", isDefault: true }],
+    forms: { enter: { name: "입장권", when: "등록 완료", auto: true, text: ENTER_FORM } },
   };
-  function paperHtml(text, v) {
+  // 설치한 앱: 고른 프린터 · 양식은 이 PC 설정에 저장 (껐다 켜도 그대로)
+  if (APP && window.desk.config) window.desk.config.get().then((c) => {
+    if (c && c.printer) PRINT.sel = c.printer;
+    if (c && c.printForm) Object.assign(PRINT.forms.enter, c.printForm);
+  }).catch(() => {});
+  const savePrint = () => { if (APP && window.desk.config) window.desk.config.set({ printer: PRINT.sel, printForm: { text: PRINT.forms.enter.text, auto: PRINT.forms.enter.auto } }); };
+  // 영수증 프린터처럼 보이는 이름 (처음 찾을 때 자동으로 고름)
+  const RECEIPT_RE = /pos|receipt|영수증|감열|thermal|80|srp|bixolon|빅솔론|sewoo|세우|lk-|tm-|epson|rongta|xprinter|hwasung|화성|hmk|star|citizen|okpos/i;
+
+  function paperLines(text, v) {
     const fill = (line) => esc(line).replace(/\{([^}]+)\}/g, (m, k) => (k in v ? esc(v[k]) : m));
-    // 값이 비어 있는 칸이 든 줄은 통째로 뺌 (예: 현장입장자는 방문회차가 없음)
-    const blank = (l) => [...l.matchAll(/\{([^}]+)\}/g)].some(([, k]) => k in v && v[k] === "");
-    return text.split("\n").filter((l) => !blank(l)).map((l) => {
-      if (l.trim() === "---") return `<div class="pl hr"></div>`;
-      if (l.startsWith("# ")) return `<div class="pl big">${fill(l.slice(2))}</div>`;
-      if (l.startsWith("^")) return `<div class="pl ctr">${fill(l.slice(1))}</div>`;
-      return `<div class="pl">${fill(l) || "&nbsp;"}</div>`;
-    }).join("");
+    const out = [];
+    for (let l of text.split("\n")) {
+      // [네이버] · [현장] · [사은권] 조건 (여러 개 붙여도 됨)
+      let skip = false;
+      l = l.replace(/^(\[(네이버|현장|사은권)\])+/, (m) => { for (const [, k] of m.matchAll(/\[(네이버|현장|사은권)\]/g)) if (!v["_" + k]) skip = true; return ""; });
+      if (skip) continue;
+      // 값이 비어 있는 칸이 든 줄은 뺌
+      if ([...l.matchAll(/\{([^}]+)\}/g)].some(([, k]) => k in v && v[k] === "")) continue;
+      if (l.trim() === "---") out.push(`<div class="pl hr"></div>`);
+      else if (l.startsWith("# ")) out.push(`<div class="pl big">${fill(l.slice(2))}</div>`);
+      else if (l.startsWith("^")) out.push(`<div class="pl ctr">${fill(l.slice(1))}</div>`);
+      else out.push(`<div class="pl">${fill(l) || "&nbsp;"}</div>`);
+    }
+    return out.join("");
   }
-  /** 양식대로 출력 (체험: 알림만). auto 가 꺼져 있으면 출력하지 않음 */
+  const paperHtml = paperLines;
+  /** 프린터로 보낼 문서 (80mm, 인쇄 가능 폭 약 72mm, 맑은 고딕) */
+  function receiptDoc(text, v) {
+    return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>
+      @page { size: 80mm auto; margin: 0; }
+      html, body { margin: 0; padding: 0; background: #fff; color: #000; }
+      body { width: 72mm; padding: 2mm 4mm 6mm; box-sizing: content-box; font-family: "GulimChe", "굴림체", "D2Coding", monospace; font-size: 10.5pt; line-height: 1.35; }
+      .pl { white-space: pre-wrap; overflow-wrap: anywhere; }
+      .ctr { text-align: center; }
+      .big { text-align: center; font-family: "Malgun Gothic", "맑은 고딕", sans-serif; font-size: 14pt; font-weight: 700; }
+      .hr { border-top: 1px dashed #000; margin: 2mm 0; }
+    </style></head><body>${paperLines(text, v)}</body></html>`;
+  }
+  /** 양식대로 출력. 돌려주는 글은 알림에 붙임. 출력 결과는 따로 알림 */
   function printForm(kind, v) {
     const f = PRINT.forms[kind];
-    if (!f.auto) return "";
-    if (!PRINT.sel) return " · 프린터를 아직 고르지 않아 출력 못 함";
-    return ` · ${f.name} 출력 (${PRINT.sel.split(" ")[0]})`;
+    if (!f || !f.auto) return "";
+    if (!PRINT.sel) return " · 프린터를 아직 고르지 않아 출력 못 함 (운영 설정 → 프린터)";
+    if (!APP || !window.desk.print) return ` · ${f.name} 출력 (${PRINT.sel.split(" ")[0]}, 체험)`;
+    window.desk.print.html({ html: receiptDoc(f.text, v), deviceName: PRINT.sel }).then((r) => {
+      if (!r || !r.ok) toast(`${f.name} 출력 실패: ${(r && r.why) || "응답 없음"} — 운영 설정 → 프린터에서 확인`);
+    });
+    return ` · ${f.name} 출력`;
   }
-  const keyVals = (h, extra = {}) => {
-    const m = useOf(h);
-    return Object.assign({ 매장: "아스타나키즈", 날짜: TODAY, 시각: hm(now), 고객: h.name, 전화뒤4: digits(h.phone).slice(-4), 열쇠: h.keys.join(", "), 수량: String(h.keys.length), 입장: hm(h.enteredAt), 반납: m == null ? "무제한" : hm(h.slot + m), 방문회차: h.visitNo ? String(stampOf(h.visitNo)) : "", 사은권: h.visitNo && isGift(h.visitNo) ? `${RULES.giftName} 증정!` : "", 초과시간: "", 금액: "" }, extra);
+  /** 고객 이름 가리기: 송다온 → 송*온, 홍길 → 홍*, 남궁민수 → 남**수 */
+  const maskName = (n) => { const a = [...String(n || "")]; return a.length <= 1 ? a.join("") : a.length === 2 ? a[0] + "*" : a[0] + "*".repeat(a.length - 2) + a[a.length - 1]; };
+  /** 오후 2시 00분 */
+  const krTime = (m) => { const h = Math.floor(m / 60) % 24, mm = m % 60; return `${h < 12 ? "오전" : "오후"} ${h % 12 === 0 ? 12 : h % 12}시 ${String(mm).padStart(2, "0")}분`; };
+  const keyVals = (h) => {
+    // 퇴장시간: 열쇠마다 다르면(연속예약) "오후 5시 50분 (13번 오후 3시 50분)"
+    const ends = h.keys.map((k) => ({ k, m: useOf(h, k) }));
+    const main = ends.some((e) => e.m == null) ? null : Math.max(...ends.map((e) => e.m));
+    const extra = main == null ? [] : ends.filter((e) => e.m !== main);
+    const out = main == null ? "시간제한 없음" : krTime(h.slot + main) + (extra.length ? ` (${extra.map((e) => `${e.k}번 ${krTime(h.slot + e.m)}`).join(", ")})` : "");
+    const naver = !h.walk;
+    return {
+      구분: naver ? "네이버" : "현장", 고객: h.walk ? "현장입장" : maskName(h.name), 전화뒤4: digits(h.phone).slice(-4), 열쇠: h.keys.join(", "),
+      입장시간: krTime(h.enteredAt), 퇴장시간: out, 누계: h.visitNo ? String(h.visitNo) : "", 기준회: String(RULES.giftEvery), 사은권: RULES.giftName,
+      날짜: TODAY, 시각: hm(now), _네이버: naver && !!h.visitNo, _현장: !naver, _사은권: naver && !!h.visitNo && isGift(h.visitNo),
+    };
   };
 
   // ── 초과요금 미터 ────────────────────────────────
@@ -1206,7 +1274,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     },
     posDone() {
       $("pos").hidden = true;
-      if (sheet.mode === "key" && sheet.pending) { const h = holderById(sheet.hid); if (h) h.overPaid = sheet.pending; sheet.pending = null; toast(`초과요금 ${won(h.overPaid.amount)} 결제됨${printForm("over", keyVals(h, { 초과시간: clock(h.overPaid.sec), 금액: won(h.overPaid.amount) }))}`); }
+      if (sheet.mode === "key" && sheet.pending) { const h = holderById(sheet.hid); if (h) h.overPaid = sheet.pending; sheet.pending = null; toast(`초과요금 ${won(h.overPaid.amount)} 결제됨 (영수증은 POS에서)`); }
       renderSheet(); const p = $("w-phone"); if (p) p.focus();
     },
     walkDone() {
@@ -1238,10 +1306,31 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       CFG = await window.desk.config.get();
       toast(r && r.ok ? "기억했어요" : (r && r.why) || "기억하지 못했어요"); renderSheet();
     },
-    findPrinters() { PRINT.found = true; if (!PRINT.sel) PRINT.sel = PRINT.list[0]; toast(`프린터 ${PRINT.list.length}대 찾음 (체험)`); renderSheet(); },
-    pickPrinter(btn) { PRINT.sel = btn.dataset.n; renderSheet(); },
-    testPrint() { toast(`${PRINT.sel}로 테스트 출력 보냄 (체험)`); },
-    pickForm(btn) { PRINT.cur = btn.dataset.k; renderSheet(); },
+    async findPrinters() {
+      if (APP && window.desk.print) {
+        const r = await window.desk.print.list();
+        if (!r || !r.ok) { PRINT.msg = `프린터 목록을 못 읽음: ${(r && r.why) || ""}`; renderSheet(); return; }
+        PRINT.list = r.list;
+      }
+      PRINT.found = true;
+      if (!PRINT.sel || !PRINT.list.some((p) => p.name === PRINT.sel)) {
+        const guess = PRINT.list.find((p) => RECEIPT_RE.test(p.name) && !/pdf|xps|fax|onenote/i.test(p.name));
+        PRINT.sel = guess ? guess.name : null;
+      }
+      PRINT.msg = `프린터 ${PRINT.list.length}대 찾음${PRINT.sel ? ` · ${PRINT.sel} 고름` : " · 영수증 프린터를 직접 골라 주세요"}${APP ? "" : " (체험)"}`;
+      savePrint(); renderSheet();
+    },
+    pickPrinter(btn) { PRINT.sel = btn.dataset.n; PRINT.msg = ""; savePrint(); renderSheet(); },
+    async testPrint(btn) {
+      if (!APP || !window.desk.print) { toast(`${PRINT.sel}로 테스트 출력 보냄 (체험)`); return; }
+      PRINT.busy = true; PRINT.msg = "출력 보내는 중…"; renderSheet();
+      const r = await window.desk.print.html({ html: receiptDoc(PRINT.forms.enter.text, SAMPLE), deviceName: PRINT.sel, silent: !(btn && btn.dataset.act === "testPrintDlg") });
+      PRINT.busy = false;
+      PRINT.msg = r && r.ok ? `${PRINT.sel}로 보냈어요 — 종이가 나왔는지 확인해 주세요` : `출력 실패: ${(r && r.why) || "응답 없음"}`;
+      renderSheet();
+    },
+    testPrintDlg(btn) { return acts.testPrint(btn); },
+    resetForm() { PRINT.forms.enter.text = ENTER_FORM; savePrint(); renderSheet(); },
     car(btn) {
       park.sel = btn.dataset.id;
       const c = park.state.rows.find((x) => x.id === park.sel);
@@ -1277,8 +1366,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   });
   document.addEventListener("input", (e) => {
     const t = e.target;
-    if (t.id === "form-text") { PRINT.forms[PRINT.cur].text = t.value; $("paper").innerHTML = paperHtml(t.value, SAMPLE); }
-    if (t.id === "form-auto") PRINT.forms[PRINT.cur].auto = t.checked;
+    if (t.id === "form-text") { PRINT.forms[PRINT.cur].text = t.value; $("paper").innerHTML = paperHtml(t.value, SAMPLE); savePrint(); }
+    if (t.id === "form-auto") { PRINT.forms[PRINT.cur].auto = t.checked; savePrint(); }
     if (t.id === "w-phone") { sheet.phone = digits(t.value).slice(0, 11); t.value = fmtPhone(sheet.phone); updateWalkButtons(); }
     const m = /^p(f|t)-(\d+)$/.exec(t.id);
     if (m && t.value) { RULES.peaks[+m[2]][m[1] === "f" ? "from" : "to"] = t.value; renderAll(); }
