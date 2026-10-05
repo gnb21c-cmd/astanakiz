@@ -158,6 +158,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .btn-red:hover { background: var(--red); opacity: .9; }
 .res .head { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
 .res .name { font-size: 15.5px; font-weight: 700; }
+.visits { font-size: 12px; color: var(--ok); font-weight: 600; margin-top: -2px; }
+.visits b { color: var(--fg); }
+.visits.big { font-size: 14px; margin: 0; }
 .badge { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
 .badge.conf { background: var(--accent-bg); color: var(--accent); }
 .badge.done { background: var(--naver-bg); color: var(--ok); }
@@ -383,7 +386,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       id: "b" + seq++, day, slot: s, name, phone, qty, no: String(1370988026 + seq * 7313),
       product: s >= toMin(RULES.unlimitedFrom) ? "야간자유 입장권" : "4인 입장권", pay: "결제완료",
       status: o.done ? "완료" : "확정", keys: [], enteredAt: null, outAt: null,
+      // 네이버 예약자 이름 밑 "완료 n · 취소 n" (미입장일 때 읽은 값 = 이번 방문 전까지 완료 횟수)
+      prevDone: o.prevDone ?? (seq * 7) % 13, cancels: (seq * 3) % 4 === 0 ? 1 : 0, visitNo: null,
     };
+    if (b.status === "완료") b.visitNo = b.prevDone + 1;
     (bookings[day] = bookings[day] || []).push(b);
     return b;
   }
@@ -497,6 +503,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     }).join("");
   }
 
+  /** 네이버 '완료 n'에서 이번 방문 회차: 미입장이면 완료 n → 이번 n+1번째, 이용완료면 n+1번째 방문 */
+  function visitText(b) {
+    const c = b.cancels ? ` · 취소 ${b.cancels}` : "";
+    return b.status === "완료" ? `<b>${b.visitNo}번째 방문</b>` : `완료 ${b.prevDone}${c} → 이번 <b>${b.prevDone + 1}번째 방문</b>`;
+  }
   function renderRes() {
     const list = bookings[viewDay].filter((b) => b.slot === selSlot).sort((a, b) => (a.status === "확정" ? 0 : 1) - (b.status === "확정" ? 0 : 1));
     const q = list.reduce((a, b) => a + b.qty, 0);
@@ -515,6 +526,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       else if (b.outAt != null) act = `<span class="help num">${hm(b.enteredAt)} 입장 · ${hm(b.outAt)} 퇴장</span>`;
       return `<article class="res ${b.status === "완료" ? "done" : ""}" data-act="openRes" data-id="${b.id}" tabindex="0" role="button" aria-label="${esc(b.name)} 예약 열기">
         <div class="head"><span class="name">${esc(b.name)}</span><span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span></div>
+        <div class="visits num">${visitText(b)}</div>
         <dl class="kv">
           <dt>전화번호</dt><dd class="phone num">${fmtPhone(b.phone)}</dd>
           <dt>이용일시</dt><dd class="num">${when}</dd>
@@ -609,6 +621,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         <h3 id="sheet-title">네이버 예약자 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
         <dl class="facts">
           <dt>예약자</dt><dd style="font-size:18px">${esc(b.name)} <span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span></dd>
+          <dt>방문</dt><dd class="num visits big">${visitText(b)}</dd>
           <dt>전화번호</dt><dd class="num">${fmtPhone(b.phone)}</dd>
           <dt>이용일시</dt><dd class="num">${hm(b.slot)} ${m == null ? "· 무제한" : `~ ${hm(b.slot + m)} (1시간 50분)`}</dd>
           <dt>수량</dt><dd>${b.product} ${b.qty}</dd>
@@ -711,19 +724,21 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   // ── 영수증 프린터 (80mm 감열지) ─────────────────────
   /* 실제 앱: POS PC 의 프린터 목록을 읽어 고른 프린터로 조용히 출력 (창 안 띄움).
      체험판: 목록과 출력은 흉내만 내고, 양식과 미리보기는 그대로 동작 */
-  const PRINT_KEYS = ["매장", "날짜", "시각", "고객", "전화뒤4", "열쇠", "수량", "입장", "반납", "초과시간", "금액"];
-  const SAMPLE = { 매장: "아스타나키즈", 날짜: "2026-10-05", 시각: "13:55", 고객: "송다온", 전화뒤4: "5489", 열쇠: "5, 13", 수량: "2", 입장: "14:00", 반납: "15:50", 초과시간: "0:12:30", 금액: "10,000원" };
+  const PRINT_KEYS = ["매장", "날짜", "시각", "고객", "전화뒤4", "열쇠", "수량", "입장", "반납", "방문회차", "이전완료", "초과시간", "금액"];
+  const SAMPLE = { 매장: "아스타나키즈", 날짜: "2026-10-05", 시각: "13:55", 고객: "송다온", 전화뒤4: "5489", 열쇠: "5, 13", 수량: "2", 입장: "14:00", 반납: "15:50", 방문회차: "8", 이전완료: "7", 초과시간: "0:12:30", 금액: "10,000원" };
   const PRINT = {
     found: false, sel: null, cur: "enter",
     list: ["POS-80C (USB001)", "EPSON TM-T82 Receipt", "Microsoft Print to PDF"],
     forms: {
-      enter: { name: "입장표", when: "등록 완료", auto: true, text: "# {매장}\n^입장표\n---\n고객   {고객} ({전화뒤4})\n열쇠   {열쇠}번\n입장   {입장}\n반납   {반납}까지\n---\n^열쇠를 잃어버리지 마세요\n^{날짜} {시각}" },
+      enter: { name: "입장표", when: "등록 완료", auto: true, text: "# {매장}\n^입장표\n---\n고객   {고객} ({전화뒤4})\n열쇠   {열쇠}번\n입장   {입장}\n반납   {반납}까지\n---\n# ★ {방문회차}번째 방문 ★\n^마일리지 획득! (누적 {방문회차}회)\n---\n^열쇠를 잃어버리지 마세요\n^{날짜} {시각}" },
       over: { name: "초과요금 영수증", when: "초과요금 결제", auto: false, text: "# {매장}\n^초과요금\n---\n고객   {고객}\n열쇠   {열쇠}번\n반납   {반납}\n초과   {초과시간}\n---\n# {금액}\n^{날짜} {시각}" },
     },
   };
   function paperHtml(text, v) {
     const fill = (line) => esc(line).replace(/\{([^}]+)\}/g, (m, k) => (k in v ? esc(v[k]) : m));
-    return text.split("\n").map((l) => {
+    // 값이 비어 있는 칸이 든 줄은 통째로 뺌 (예: 현장입장자는 방문회차가 없음)
+    const blank = (l) => [...l.matchAll(/\{([^}]+)\}/g)].some(([, k]) => k in v && v[k] === "");
+    return text.split("\n").filter((l) => !blank(l)).map((l) => {
       if (l.trim() === "---") return `<div class="pl hr"></div>`;
       if (l.startsWith("# ")) return `<div class="pl big">${fill(l.slice(2))}</div>`;
       if (l.startsWith("^")) return `<div class="pl ctr">${fill(l.slice(1))}</div>`;
@@ -739,7 +754,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   }
   const keyVals = (h, extra = {}) => {
     const m = minutesFor(TODAY, h.slot);
-    return Object.assign({ 매장: "아스타나키즈", 날짜: TODAY, 시각: hm(now), 고객: h.name, 전화뒤4: digits(h.phone).slice(-4), 열쇠: h.keys.join(", "), 수량: String(h.keys.length), 입장: hm(h.enteredAt), 반납: m == null ? "무제한" : hm(h.slot + m), 초과시간: "", 금액: "" }, extra);
+    return Object.assign({ 매장: "아스타나키즈", 날짜: TODAY, 시각: hm(now), 고객: h.name, 전화뒤4: digits(h.phone).slice(-4), 열쇠: h.keys.join(", "), 수량: String(h.keys.length), 입장: hm(h.enteredAt), 반납: m == null ? "무제한" : hm(h.slot + m), 방문회차: h.visitNo ? String(h.visitNo) : "", 이전완료: h.walk ? "" : String(h.prevDone), 초과시간: "", 금액: "" }, extra);
   };
 
   // ── 초과요금 미터 ────────────────────────────────
@@ -821,7 +836,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const b = findB(sheet.id);
       if (sheet.keys.length !== b.qty) return;
       if (sheet.keys.some((k) => holderOf(k))) { toast("그 사이 다른 손님이 쓴 열쇠가 있어요. 다시 골라 주세요."); sheet.keys = []; renderSheet(); return; }
-      Object.assign(b, { status: "완료", keys: sheet.keys.slice(), enteredAt: now });
+      Object.assign(b, { status: "완료", keys: sheet.keys.slice(), enteredAt: now, visitNo: b.prevDone + 1 });
       closeSheet();
       toast(`${b.name}님 입장 · 열쇠 ${b.keys.join(", ")}번 · 네이버 이용완료${printForm("enter", keyVals(b))}`);
       renderAll();
