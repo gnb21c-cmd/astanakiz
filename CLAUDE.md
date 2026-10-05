@@ -19,6 +19,7 @@
 - 데스크 앱 실행: `cd apps/desk && npm install && npm start` · Windows 설치파일: `npm run dist:win`
 
 ## 문서
+- 최종 설치본 직전 할 일(직원용 메뉴얼 PDF 포함): `docs/RELEASE.md`
 - 운영 방식: `docs/OPERATION.md`
 - 화면·연동 계획: `docs/INTEGRATION.md`
 - 체험판: `prototype/desk.html` → https://claude.ai/artifact/XkfdV6BDaG7AEMzRqNzSZH (같은 파일을 다시 게시하면 같은 주소로 갱신)
