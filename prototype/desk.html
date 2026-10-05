@@ -483,15 +483,17 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   // ── 네이버 불러오기 (설치한 앱) ─────────────────────
   const naverSlots = {}; // 날짜 → 시각(분) → { cap, conf, done } (입장권 상품 합계)
   let naverBusy = false;
-  let naverErr = ""; // 마지막 불러오기가 실패한 까닭 (다음에 성공할 때까지 버튼에 보임)
+  let naverErr = "";
+  let naverStep = ""; // 네이버에서 지금 하는 단계 (불러오는 동안 버튼에 보임)
+  if (APP && window.desk.naver.onStep) window.desk.naver.onStep((m) => { naverStep = m; if (naverBusy) $("refresh-at").textContent = refreshText(); }); // 마지막 불러오기가 실패한 까닭 (다음에 성공할 때까지 버튼에 보임)
   async function loadNaver(day, loud) {
     if (!APP) return;
     if (naverBusy) { if (loud) toast("네이버 예약을 불러오는 중이에요 — 잠시만요"); return; }
-    naverBusy = true; renderAll();
+    naverBusy = true; naverStep = ""; renderAll();
     const r = await window.desk.naver.load(day).catch((e) => ({ ok: false, why: String(e) }));
     naverBusy = false;
     if (!r || !r.ok) { naverErr = (r && r.why) || "응답 없음"; toast(`네이버: ${naverErr}`); renderAll(); return; }
-    naverErr = "";
+    naverErr = r.warn || "";
     applyNaver(day, r);
     if (day === TODAY) restoreState();
     lastRefresh = now;
@@ -716,7 +718,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   }
 
   function refreshText() {
-    if (naverBusy) return "네이버 불러오는 중…";
+    if (naverBusy) return `네이버: ${naverStep || "불러오는 중…"}`;
     if (naverErr) return `⚠ ${naverErr}`;
     const nx = autoNext(now);
     return [lastRefresh == null ? "" : `${hm(lastRefresh)} 불러옴`, nx == null ? "" : `다음 ${hm(nx)}`].filter(Boolean).join(" · ");
@@ -870,7 +872,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           <div class="field"><span class="label">아마노 칸 배우기 <span class="help">자동으로 못 찾을 때만 · 누르면 아마노 화면이 앞으로 나오고, 그 칸을 한 번 클릭하면 기억</span></span>
             <div class="btns">${[["carNo", "차량번호 칸"], ["day", "입차일 칸"], ["searchBtn", "검색 버튼"]].map(([k, t]) => `<button class="btn btn-sm" data-act="learn" data-k="${k}" ${dis}>${t}${learned(k)}</button>`).join("")}</div></div>
           <div class="field"><span class="label">네이버 예약관리 <span class="help">처음 한 번: '네이버 화면 보기'로 로그인(<b>'로그인 상태 유지' 꼭 체크</b> — 안 하면 앱을 껐다 켤 때 풀림) → 예약현황 화면까지 들어간 뒤 '지금 화면을 시작 화면으로'</span></span>
-            <div class="btns"><button class="btn" data-act="naverShow" ${dis}>네이버 화면 보기 (로그인)</button><button class="btn" data-act="naverHome" ${dis}>지금 화면을 시작 화면으로</button></div>
+            <div class="btns"><button class="btn" data-act="naverShow" ${dis}>네이버 화면 보기 (로그인)</button><button class="btn" data-act="naverHome" ${dis}>지금 화면을 시작 화면으로</button><button class="btn" data-act="naverDump" ${dis}>네이버 화면 저장 (문제 확인용)</button></div>
             ${c.naverUrl ? `<span class="help">시작 화면: ${esc(c.naverUrl)}</span>` : ""}</div>
           <p class="help">창은 한 화면에 겹쳐 둡니다: 맨 뒤 아마노·네이버 → 가운데 POS → 맨 앞 입장 데스크. 아마노 창이 가려져 있어도 입력·클릭이 됩니다.</p>
           <div class="sheet-foot"><button class="btn btn-ink" data-act="close">닫기</button></div>`;
@@ -1107,6 +1109,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     discDel(btn) { parkRun("할인내역 삭제", () => amanoApi.remove(Number(btn.dataset.i))); },
     amanoShow() { if (REAL) window.desk.amano.show(); },
     naverShow() { if (APP) window.desk.naver.show(); },
+    // 문제 확인용: 지금 네이버 창 화면을 바탕화면 '아스타나키즈-진단' 폴더에 저장
+    async naverDump() {
+      if (!APP || !window.desk.naver.dump) return;
+      const r = await window.desk.naver.dump();
+      toast(r && r.ok ? "바탕화면 '아스타나키즈-진단' 폴더에 저장했어요" : `저장 못 함: ${(r && r.why) || ""}`);
+    },
     async naverHome() {
       const r = await window.desk.naver.setHome();
       CFG = await window.desk.config.get();
@@ -1153,6 +1161,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   if (APP) {
     document.querySelectorAll("[data-act=time]").forEach((b) => (b.hidden = true));
     document.querySelector(".top .tag").textContent = "네이버 · 아마노 · POS 연결";
+    if (window.desk.config) window.desk.config.get().then((c) => { if (c && c.build) document.querySelector(".top .tag").textContent = `네이버 · 아마노 · POS 연결 · 버전 ${c.build}`; }).catch(() => {});
   }
   fit();
   renderAll();

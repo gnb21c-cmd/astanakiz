@@ -9,6 +9,7 @@
                      확정·이용완료 버튼 → 오른쪽 "예약정보" 패널: 탭 확정 n / 완료 n, 카드(List__contents-box) — 이름 밑 "완료 11, 취소 2", 예약자·전화번호·예약번호·상품·이용일시·수량·결제상태
                      확정 카드의 [이용완료] → "이용완료 처리하시겠습니까?" [확인] (실제 확인 창 모양은 아직 모름)
                      오른쪽 목록은 스크롤되는 칸이고, 카드는 2장씩 보이다가 아래로 내리면 더 나옴 (실제도 내려야 다 나옴)
+     &nocards=1 칸을 눌러도 카드가 안 나옴 (못 읽는 경우)
      &range=1 날짜가 기간으로 보임 (일간이 아닐 때)
      &compact=1 칸이 좁을 때처럼 시각에 오전·오후가 없음 ("1:00" = 13:00)
      ?login=need 로그인 화면 -->
@@ -108,7 +109,7 @@
     if (sel) {
       const bs = list.filter((b) => b.product === sel.p && b.time === sel.t);
       const n = (s) => bs.filter((b) => b.status === s).length;
-      const shown = bs.filter((b) => b.status === sel.s);
+      const shown = P.get("nocards") ? [] : bs.filter((b) => b.status === sel.s);
       panel = `<div><b>예약정보</b> <button type="button" onclick="go({sel:''})">닫기</button></div>
         <ul>${["확정", "완료"].map((s) => `<li class="BookingListTab__item__WvfHs ${s === sel.s ? "BookingListTab__active__rhhuS" : ""}"><a href="#" class="BookingListTab__anchor__CNbqG" data-tab="${s}">${s}${n(s)}</a></li>`).join("")}</ul>
         <div class="List__list-wrap__k2Lq9">${shown.map((b, i) => { const [ap, hm] = ampm(b.time); return `<div class="List__contents-box__aIuHh" ${i >= 2 ? "hidden" : ""}><div class="Summary__root__J7Cxm"><div class="Summary__profile__65ECc">

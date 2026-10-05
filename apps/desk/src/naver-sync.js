@@ -27,6 +27,7 @@ class NaverSync {
     this.urls = opts.urls || null;
     this.timeout = opts.timeout || 10000;
     this.isTicket = opts.isTicket || isKidsTicket;
+    this.onStep = opts.onStep || (() => {}); // 진행 단계를 데스크에 알림 (현장에서 어디서 막히는지 보려고)
     this.days = new Map(); // 날짜 → Map("상품|시각|확정/이용완료" → { count, cards }) — 칸 숫자가 그대로면 다시 안 엶
   }
   call(expr) {
@@ -69,8 +70,16 @@ class NaverSync {
     }
     return { ok: false, why: "네이버 화면이 응답하지 않음" };
   }
+  step(msg) {
+    try {
+      this.onStep(msg);
+    } catch (e) {
+      /* 알림 실패는 무시 */
+    }
+  }
   async goView(view) {
     let s = await this.read();
+    this.step(`네이버 ${view === "list" ? "예약 목록" : "예약현황"} 화면 확인 (지금: ${s.page === "calendar" ? "예약현황" : s.page === "list" ? "예약자관리" : s.needLogin ? "로그인 화면" : "다른 화면"})`);
     if (s.needLogin) return { ok: false, why: "네이버에 로그인해 주세요 (로그인할 때 '로그인 상태 유지'를 꼭 체크)" };
     if (s.page === view) return { ok: true, state: s };
     if (!this.urls) return { ok: false, why: "네이버 예약관리 주소를 모름 (운영 설정 → 지금 화면을 시작 화면으로)" };
@@ -91,6 +100,7 @@ class NaverSync {
       if (s.dateRange) return { ok: false, why: "네이버 예약현황이 '일간'이 아님 — 네이버 화면에서 '일간'으로 바꿔 주세요" };
       if (s.date === day) return { ok: true, state: s };
       const dir = s.date < day ? 1 : -1;
+      this.step(`네이버 날짜 맞추는 중: ${s.date.slice(5)} → ${day.slice(5)}`);
       // 넘었다 돌아왔다를 되풀이하면 (한 번에 하루씩 움직이지 않는 화면) 멈춤
       if (lastDir && dir !== lastDir && ++flips >= 2) return { ok: false, why: "네이버 날짜가 하루씩 움직이지 않음 — 예약현황을 '일간'으로 바꿔 주세요" };
       lastDir = dir;
@@ -121,13 +131,17 @@ class NaverSync {
   }
   /** 그 칸을 열어 카드를 모두 읽음 (목록을 끝까지 내려 가며) */
   async readSlotCards(product, time, kind) {
+    this.step(`${time} ${kind} 칸 여는 중`);
     const r = await this.openSlot(product, time, kind);
     if (!r.ok) return r;
+    // 오른쪽 예약정보가 늦게 뜰 수 있음 → 카드가 나올 때까지 최대 6초
+    for (let i = 0; i < 24 && !(await this.read()).cards.length; i++) await sleep(250);
     const got = new Map();
     for (let i = 0; i < 30; i++) {
       for (const c of (await this.read()).cards) if (c.no) got.set(c.no, c);
       if (!(await this.moreCards())) break;
     }
+    this.step(`${time} ${kind}: 카드 ${got.size}장`);
     return { ok: true, cards: [...got.values()] };
   }
   async loadDay(day) {
@@ -139,7 +153,9 @@ class NaverSync {
     if (!this.days.has(day)) this.days.set(day, new Map());
     const cache = this.days.get(day);
     const live = new Set();
+    const warn = [];
     let opened = false;
+    this.step(`예약현황 ${day.slice(5)} · 입장권 칸 ${slots.length}개`);
     for (const s of slots) {
       for (const [kind, n] of [["확정", s.conf], ["이용완료", s.done]]) {
         const key = `${s.product}|${s.time}|${kind}`;
@@ -150,6 +166,10 @@ class NaverSync {
         const r = await this.readSlotCards(s.product, s.time, kind);
         if (!r.ok) return r;
         opened = true;
+        if (!r.cards.length) {
+          warn.push(`${s.time} ${kind}`);
+          continue; // 못 읽은 칸은 기억하지 않음 (다음에 다시)
+        }
         cache.set(key, { count: n, time: s.time, product: s.product, status: kind === "확정" ? "확정" : "완료", cards: r.cards });
       }
     }
@@ -163,7 +183,7 @@ class NaverSync {
         seen.add(x.no);
         bookings.push({ no: x.no, status: c.status, name: x.name, phone: x.phone, time: c.time, product: c.product, qty: x.qty, qtyText: x.qtyText, pay: x.pay, doneCount: x.doneCount, cancelCount: x.cancelCount });
       }
-    return { ok: true, day, slots: slots.map((s) => ({ time: s.time, product: s.product, cap: s.avail + s.conf + s.done + s.apply, conf: s.conf + s.apply, done: s.done })), bookings };
+    return { ok: true, day, warn: warn.length ? `카드를 못 읽은 칸: ${warn.join(", ")}` : "", slots: slots.map((s) => ({ time: s.time, product: s.product, cap: s.avail + s.conf + s.done + s.apply, conf: s.conf + s.apply, done: s.done })), bookings };
   }
   /** 이용완료 처리하고 실제로 완료로 바뀌었는지 확인 */
   async complete(b) {

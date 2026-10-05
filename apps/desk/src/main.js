@@ -3,7 +3,7 @@
    - 아마노 창은 이 프로그램이 열어 두고, 가려진 채로 칸에 입력하고 버튼을 누른다 (화면 좌표가 아니라 페이지 안의 글자로 찾으므로 가려져도 됨)
    - 로그인이 풀렸을 때만 "아마노 화면 보기"로 앞으로 꺼내 근무자가 로그인한다
    - POS "결제하기"는 이미 켜진 POS 창을 앞으로 띄우기만 한다 */
-const { app, BrowserWindow, ipcMain, safeStorage } = require("electron");
+const { app, BrowserWindow, ipcMain, safeStorage, shell } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const { execFile } = require("child_process");
@@ -29,6 +29,13 @@ let naver = null;
 // 같은 창을 두 동작이 동시에 만지지 않게 차례로 실행
 const queues = {};
 // 시간 제한: 페이지가 옮겨 가는 중에는 화면 안 실행이 응답 없이 멈출 수 있음 → 끝없이 기다리지 않게
+// 설치 파일 버전 (GitHub 가 만들 때 커밋 번호를 넣음) — 화면 위에 보여 새 설치본인지 확인
+let BUILD = "개발";
+try {
+  BUILD = require("./build.json").build;
+} catch (e) {
+  /* 직접 실행(npm start) */
+}
 const timed = (p, ms, why) => {
   let t;
   return Promise.race([p, new Promise((_, rej) => (t = setTimeout(() => rej(new Error(why)), ms)))]).finally(() => clearTimeout(t));
@@ -108,7 +115,10 @@ function openNaver() {
       if (deskWin) deskWin.focus(); // 닫지 않고 데스크 뒤로 (계속 읽어야 해서)
     }
   });
-  naver = new NaverSync((code) => timed(naverWin.webContents.executeJavaScript(code, true), 8000, "네이버 화면이 응답하지 않음"), { urls: naverUrls(settings.naverUrl) });
+  naver = new NaverSync((code) => timed(naverWin.webContents.executeJavaScript(code, true), 8000, "네이버 화면이 응답하지 않음"), {
+    urls: naverUrls(settings.naverUrl),
+    onStep: (msg) => deskWin && !deskWin.isDestroyed() && deskWin.webContents.send("naver:step", msg),
+  });
 }
 
 function createDesk() {
@@ -191,6 +201,28 @@ ipcMain.handle("naver:show", () => {
   }
   return { ok: true };
 });
+// 진단: 지금 네이버 창의 화면(HTML)과 사진을 바탕화면 '아스타나키즈-진단' 폴더에 저장 → 개발자에게 보내 화면 구조를 맞춤
+// (예약자 이름 · 전화번호가 들어 있으니 개발 확인용으로만)
+ipcMain.handle("naver:dump", async () => {
+  try {
+    if (!naverWin) return { ok: false, why: "네이버 창이 없음" };
+    const dir = path.join(app.getPath("desktop"), "아스타나키즈-진단");
+    fs.mkdirSync(dir, { recursive: true });
+    const d = new Date();
+    const stamp = `${d.getMonth() + 1}${String(d.getDate()).padStart(2, "0")}-${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}${String(d.getSeconds()).padStart(2, "0")}`;
+    const wc = naverWin.webContents;
+    const frames = (wc.mainFrame ? wc.mainFrame.framesInSubtree : []).map((f) => f.url);
+    const html = await timed(wc.executeJavaScript("document.documentElement.outerHTML", true), 8000, "네이버 화면이 응답하지 않음");
+    const head = `<!-- 주소: ${wc.getURL()}\n액자: ${frames.join(" | ")}\n버전: ${BUILD} -->\n`;
+    fs.writeFileSync(path.join(dir, `naver-${stamp}.html`), head + html);
+    const img = await naverWin.webContents.capturePage();
+    fs.writeFileSync(path.join(dir, `naver-${stamp}.png`), img.toPNG());
+    shell.showItemInFolder(path.join(dir, `naver-${stamp}.html`));
+    return { ok: true, dir };
+  } catch (e) {
+    return { ok: false, why: String(e.message || e) };
+  }
+});
 // 근무자가 네이버에서 예약현황 화면까지 들어간 뒤 누르면, 그 주소를 시작 화면으로 기억
 ipcMain.handle("naver:setHome", () => {
   if (!naverWin) return { ok: false, why: "네이버 창이 없음" };
@@ -204,7 +236,7 @@ ipcMain.handle("naver:setHome", () => {
 
 ipcMain.handle("config:get", () => {
   const { amanoPwEnc, ...rest } = settings;
-  return { ...rest, hasAmanoPw: !!amanoPwEnc };
+  return { ...rest, hasAmanoPw: !!amanoPwEnc, build: BUILD };
 });
 ipcMain.handle("config:set", (_e, patch) => {
   const urlChanged = patch.amanoUrl !== undefined && patch.amanoUrl !== settings.amanoUrl;

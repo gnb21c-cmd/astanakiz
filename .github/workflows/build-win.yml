@@ -23,6 +23,9 @@ jobs:
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
         run: npm install --no-audit --no-fund
+      - name: 버전 적기
+        shell: bash
+        run: echo "{\"build\":\"$(git log -1 --format=%h)\"}" > apps/desk/src/build.json
       - name: 설치 파일 만들기
         working-directory: apps/desk
         env:

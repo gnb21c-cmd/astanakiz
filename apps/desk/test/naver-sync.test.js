@@ -108,6 +108,21 @@ test("예약현황이 '일간'이 아니라 기간으로 보이면 날짜를 왔
   }
 });
 
+test("칸을 눌러도 카드가 안 나오면 못 읽은 칸을 알려 주고, 진행 단계를 알림", async () => {
+  const { browser, page } = await open("?view=calendar&nocards=1");
+  try {
+    const steps = [];
+    const sync = new NaverSync((code) => page.evaluate(code), { urls: { list: MOCK + "?view=list&nocards=1", calendar: MOCK + "?view=calendar&nocards=1" }, timeout: 3000, onStep: (m) => steps.push(m) });
+    const r = await sync.loadDay("2026-10-05");
+    assert.ok(r.ok, r.why);
+    assert.match(r.warn, /14:00 확정/);
+    assert.ok(steps.some((m) => /14:00 확정 칸 여는 중/.test(m)), steps.join(" / "));
+    assert.ok(steps.some((m) => /카드 0장/.test(m)));
+  } finally {
+    await browser.close();
+  }
+});
+
 test("로그인이 풀린 화면이면 로그인하라고 알려 줌", async () => {
   const { browser, sync } = await open("?login=need");
   try {
