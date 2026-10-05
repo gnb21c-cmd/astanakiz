@@ -44,7 +44,7 @@ test("데스크가 네이버 예약을 불러오고, 등록 완료 때 네이버
 
     await desk.click('.slot[data-s="840"]');
     const names = await desk.$$eval(".res .name", (e) => e.map((x) => x.textContent));
-    assert.deepStrictEqual(names.sort(), ["백연화", "송다온", "허정은"].sort());
+    assert.deepStrictEqual(names, ["백연화", "송다온", "허정은"], "이름 가나다순");
     assert.match(await desk.textContent('.res:has-text("허정은")'), /완료 8 · 취소 2 → 이번 9번째 방문/);
 
     // 허정은 입장: 열쇠 1개 고르고 등록 완료 → 네이버 이용완료
@@ -54,6 +54,7 @@ test("데스크가 네이버 예약을 불러오고, 등록 완료 때 네이버
     await desk.waitForFunction(() => document.getElementById("overlay").hidden, null, { timeout: 30000 });
     assert.match(await desk.textContent('.res:has-text("허정은")'), /이용완료/);
     assert.match(await desk.textContent('.res:has-text("허정은")'), /9번째 방문/);
+    assert.deepStrictEqual(await desk.$$eval(".res .name", (e) => e.map((x) => x.textContent)), ["백연화", "송다온", "허정은"], "입장해도 순서 그대로");
 
     // 네이버 화면에서도 완료로 바뀜
     const after = await naver.loadDay("2026-10-05");

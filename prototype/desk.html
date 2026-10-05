@@ -605,7 +605,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     return (b.status === "완료" ? `<b>${n}번째 방문</b>` : `완료 ${b.prevDone}${c} → 이번 <b>${n}번째 방문</b>`) + gift;
   }
   function renderRes() {
-    const list = bookings[viewDay].filter((b) => b.slot === selSlot).sort((a, b) => (a.status === "확정" ? 0 : 1) - (b.status === "확정" ? 0 : 1));
+    // 이름 가나다순 (네이버 목록 순서와 상관없이 · 입장해도 자리 그대로, 색으로만 미입장/입장완료 구분)
+    const list = bookings[viewDay].filter((b) => b.slot === selSlot).sort((a, b) => a.name.localeCompare(b.name, "ko") || String(a.no || a.id).localeCompare(String(b.no || b.id)));
     const q = list.reduce((a, b) => a + b.qty, 0);
     $("res-title").textContent = `${hm(selSlot)} 예약자`;
     $("res-sub").textContent = `${list.length}명 · 수량 ${q}`;
