@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld("desk", {
   print: {
     list: () => ipcRenderer.invoke("print:list"),
     html: (job) => ipcRenderer.invoke("print:html", job),
+    cut: (name) => ipcRenderer.invoke("print:cut", name),
   },
   config: {
     get: () => ipcRenderer.invoke("config:get"),

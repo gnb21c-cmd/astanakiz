@@ -265,8 +265,49 @@ ipcMain.handle("print:list", async () => {
     return { ok: false, why: String(e.message || e) };
   }
 });
+// 영수증 프린터에 날 바이트(ESC/POS)를 보냄 — Windows 인쇄 대기열에 RAW 로 (드라이버가 그대로 프린터에 넘김)
+// PowerShell 이 winspool.drv 를 불러 씀 (따로 설치할 것 없음)
+const RAW_PS = `
+$code = @"
+using System; using System.Runtime.InteropServices;
+public class RawPrn {
+  [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)] public class DOCINFO { public string pDocName; public string pOutputFile; public string pDataType; }
+  [DllImport("winspool.drv", CharSet=CharSet.Unicode, SetLastError=true)] public static extern bool OpenPrinter(string n, out IntPtr h, IntPtr d);
+  [DllImport("winspool.drv", SetLastError=true)] public static extern bool ClosePrinter(IntPtr h);
+  [DllImport("winspool.drv", CharSet=CharSet.Unicode, SetLastError=true)] public static extern int StartDocPrinter(IntPtr h, int l, DOCINFO di);
+  [DllImport("winspool.drv", SetLastError=true)] public static extern bool EndDocPrinter(IntPtr h);
+  [DllImport("winspool.drv", SetLastError=true)] public static extern bool StartPagePrinter(IntPtr h);
+  [DllImport("winspool.drv", SetLastError=true)] public static extern bool EndPagePrinter(IntPtr h);
+  [DllImport("winspool.drv", SetLastError=true)] public static extern bool WritePrinter(IntPtr h, byte[] b, int c, out int w);
+  public static string Send(string name, byte[] data) {
+    IntPtr h; if (!OpenPrinter(name, out h, IntPtr.Zero)) return "프린터를 열 수 없음";
+    var di = new DOCINFO(); di.pDocName = "astanakiz cut"; di.pDataType = "RAW";
+    if (StartDocPrinter(h, 1, di) == 0) { ClosePrinter(h); return "인쇄 작업을 만들 수 없음"; }
+    StartPagePrinter(h); int w; bool ok = WritePrinter(h, data, data.Length, out w);
+    EndPagePrinter(h); EndDocPrinter(h); ClosePrinter(h);
+    return ok ? "ok" : "보내기 실패";
+  }
+}
+"@
+Add-Type -TypeDefinition $code
+[Console]::Out.Write([RawPrn]::Send($env:ASTANA_PRN, [Convert]::FromBase64String($env:ASTANA_DATA)))
+`;
+function rawSend(printer, bytes) {
+  return new Promise((resolve) => {
+    if (process.platform !== "win32") return resolve({ ok: false, why: "Windows 에서만 됨" });
+    const enc = Buffer.from(RAW_PS, "utf16le").toString("base64");
+    execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", enc], { env: { ...process.env, ASTANA_PRN: printer, ASTANA_DATA: Buffer.from(bytes).toString("base64") }, timeout: 20000 }, (err, out) => {
+      const r = String(out || "").trim();
+      resolve(r === "ok" ? { ok: true } : { ok: false, why: r || (err && err.message) || "자르기 명령 실패" });
+    });
+  });
+}
+// 종이 자르기: 3줄 올리고(ESC d 3) 부분 자르기(GS V 1) — 대부분의 80mm 영수증 프린터(ESC/POS)
+const CUT = [0x1b, 0x64, 0x03, 0x1d, 0x56, 0x01];
+ipcMain.handle("print:cut", (_e, deviceName) => rawSend(deviceName, CUT));
+
 // 영수증 HTML 을 그 프린터로 출력. silent=false 면 Windows 인쇄 창을 띄움 (드라이버 확인용)
-ipcMain.handle("print:html", async (_e, { html, deviceName, silent = true, widthMm = 80 }) => {
+ipcMain.handle("print:html", async (_e, { html, deviceName, silent = true, widthMm = 80, cut = true }) => {
   let w = null;
   try {
     const file = path.join(app.getPath("temp"), "astanakiz-receipt.html");
@@ -282,6 +323,11 @@ ipcMain.handle("print:html", async (_e, { html, deviceName, silent = true, width
         (ok, why) => resolve(ok ? { ok: true } : { ok: false, why: why || "출력 실패" }),
       ),
     );
+    // 출력이 끝나면 종이 자르기 (인쇄 대기열에서 출력 다음 차례로 들어감)
+    if (res.ok && cut && deviceName) {
+      const c = await rawSend(deviceName, CUT);
+      if (!c.ok) return { ok: true, cutWhy: c.why };
+    }
     return res;
   } catch (e) {
     return { ok: false, why: String(e.message || e) };

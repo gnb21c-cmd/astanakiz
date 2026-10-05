@@ -14,7 +14,11 @@
 4. 설치본 만들기: `cd apps/desk && npm run dist:win`
 5. POS PC에 설치 → 운영 설정(아마노 주소 · 아이디 · 비밀번호 · POS 창 제목 · 프린터) → 차량 한 대로 실제 시험
 
-## 시험판 버전 (현장 시험 중)
+## 버전 (ver.1.0 완성 10/6)
+- 직원용 메뉴얼 PDF: `docs/manual/staff-manual.pdf` (원본 `manual.html`, 사진은 체험판으로 찍음) — 설치 파일과 함께 Releases 에 올라감
+- 정식 **ver.1.0** 부터 ver.1.X (설치 파일을 만들 때마다 +1). 받는 주소: Releases '최신'(test-latest) · 버전별 기록 v1.X
+
+## 시험판 버전 (현장 시험 때)
 - main 에 데스크 코드가 올라가면 GitHub 가 설치 파일을 만들어 Releases **시험판(최신)** 에 올린다 (`.github/workflows/build-win.yml`)
 - 버전은 **ver.0.X**, 설치 파일을 만들 때마다 X 가 1씩 늘어난다 (첫 번호 ver.0.1). 화면 맨 위 "네이버 · 아마노 · POS 연결 ver.0.X" 로 새 설치본인지 확인 (사용자 지시)
 - 현장 시험이 끝나면 정식 **Ver. 1.0**

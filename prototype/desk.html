@@ -101,8 +101,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .slot-sum .lb { font-size: 12.5px; border: 1.5px solid var(--line); border-radius: 8px; padding: 1px 0; }
 .slot-sum .dn { color: var(--muted); }
 .slot .c { text-align: center; font-weight: 700; font-size: 15px; }
-.slot .c.full { color: var(--red); }
+.slot .c.full, .slot-sum .full { color: var(--red); }
 .slot .c.dn { color: var(--muted); }
+.slot .c.cf, .slot-sum .cf { color: var(--accent); }
+.slot .c.lf, .slot-sum .lf { color: var(--fg); }
 .slot.now .t { border-color: var(--accent); color: var(--accent); }
 .slot.on { background: var(--accent-bg); border-color: var(--accent); }
 .slot.on .t { background: var(--accent); color: #fff; border-color: var(--accent); }
@@ -127,7 +129,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .tabs button { border: 0; background: transparent; padding: 6px 12px; font-weight: 700; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .tabs button.on { color: var(--fg); border-bottom-color: var(--ink); }
 .cfg { font-size: 15px !important; font-weight: 500 !important; min-height: 38px !important; letter-spacing: 0 !important; }
-.date-in { font-size: 14px; min-height: 36px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.date-in { font-size: 14px !important; min-height: 34px; width: 150px !important; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.peakrow { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; }
 .prn { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 14px; }
 .plist { display: grid; gap: 4px; }
 .plist button { text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 10px; font-weight: 600; }
@@ -360,7 +363,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     // 네이버 예약 자동 불러오기: 09:50부터 매시 20분 · 50분 (마지막 입장 19:30 전 19:20까지)
     //   그 사이에 들어온 예약(예: 09:58에 10:00 예약)은 근무자가 [새로고침]으로 바로 불러옴
     naverAuto: { from: "09:50", until: "19:20", at: [20, 50] },
-    peaks: [{ name: "여름방학", from: "2026-07-20", to: "2026-08-23" }, { name: "겨울방학", from: "2026-12-28", to: "2027-02-28" }],
+    peaks: [{ from: "2026-07-20", to: "2026-08-23" }, { from: "2026-12-28", to: "2027-02-28" }], // 성수기 기간 (운영 설정에서 고치고 더함)
   };
   /* 이용시간: 성수기 — 평일·휴일 모두 17:30 입장까지 1시간 50분, 18:00 입장부터 무제한
               비수기 — 평일은 무제한, 휴일은 성수기와 같음 */
@@ -695,9 +698,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const isNow = viewDay === TODAY && now >= s - RULES.earlyMinutes && now < s + 25;
       return `<button class="slot ${s === selSlot ? "on" : ""} ${isNow ? "now" : ""}" data-act="slot" data-s="${s}" aria-pressed="${s === selSlot}">
         <span class="t num">${hm(s)}</span>
-        <span class="c num dn">${done}</span><span class="c num">${conf}</span><span class="c num ${left ? "" : "full"}" title="기준 ${cap}">${left}</span></button>`;
+        <span class="c num dn">${done}</span><span class="c num ${conf ? "cf" : "lf"}">${conf}</span><span class="c num ${left ? "lf" : "full"}" title="기준 ${cap}">${left}</span></button>`;
     }).join("");
-    $("slot-sum").innerHTML = `<span class="lb">${viewDay === TODAY ? "오늘 합" : "이날 합"}</span><span class="dn">${tot.done}</span><span>${tot.conf}</span><span>${tot.left}</span>`;
+    $("slot-sum").innerHTML = `<span class="lb">${viewDay === TODAY ? "오늘 합" : "이날 합"}</span><span class="dn">${tot.done}</span><span class="${tot.conf ? "cf" : "lf"}">${tot.conf}</span><span class="${tot.left ? "lf" : "full"}">${tot.left}</span>`;
   }
 
   /** 네이버 '완료 n'에서 이번 방문 회차: 미입장이면 완료 n → 이번 n+1번째, 이용완료면 n+1번째 방문 */
@@ -958,8 +961,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         const dateIn = (id, v) => `<input type="date" id="${id}" value="${v}" class="date-in">`;
         el.innerHTML = `
           <h3 id="sheet-title">운영 설정 <button class="x" data-act="close" aria-label="닫기">×</button></h3>${tabs}
-          <div class="field"><span class="label">성수기 기간 <span class="help">이 기간은 평일·휴일 모두 시간제</span></span>
-            ${RULES.peaks.map((p, i) => `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><b style="width:70px">${esc(p.name)}</b>${dateIn("pf-" + i, p.from)} ~ ${dateIn("pt-" + i, p.to)}</div>`).join("")}</div>
+          <div class="field"><span class="label">성수기 기간 <span class="help">이 기간은 평일·휴일 모두 시간제 · 기간 밖 평일은 무제한</span></span>
+            ${RULES.peaks.map((p, i) => `<div class="peakrow">${dateIn("pf-" + i, p.from)} <span>~</span> ${dateIn("pt-" + i, p.to)}${RULES.peaks.length > 1 ? `<button class="btn btn-sm" data-act="delPeak" data-i="${i}" aria-label="이 기간 지우기">×</button>` : ""}</div>`).join("")}
+            <div><button class="btn btn-sm" data-act="addPeak">+ 기간 추가</button></div></div>
           <ul class="steps" style="list-style:disc">
             <li>성수기: 평일·휴일 모두 17:30 입장까지 1시간 50분, 18:00 입장부터 무제한</li>
             <li>비수기: 평일은 무제한, 휴일(토·일·공휴일)은 성수기와 같음</li>
@@ -1003,6 +1007,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
             <div class="field"><span class="label">연결된 프린터 <span class="help">POS PC에 연결된 프린터를 찾아 고르세요 · 80mm 감열지</span></span>
               <div class="plist">${PRINT.found ? (PRINT.list.length ? PRINT.list.map((p) => `<button class="${PRINT.sel === p.name ? "on" : ""}" data-act="pickPrinter" data-n="${esc(p.name)}" aria-pressed="${PRINT.sel === p.name}">${esc(p.name)}${p.isDefault ? " (기본)" : ""}${PRINT.sel === p.name ? " · 사용 중" : ""}</button>`).join("") : `<span class="help" style="color:var(--red)">Windows에 설치된 프린터가 없어요 — POS 프린터 드라이버가 Windows '설정 → 프린터 및 스캐너'에 있어야 해요</span>`) : PRINT.sel ? `<span class="help">사용 중: <b>${esc(PRINT.sel)}</b> (다시 찾으려면 '프린터 찾기')</span>` : `<span class="help">아직 찾지 않았어요</span>`}</div>
               <div class="btns"><button class="btn btn-sm" data-act="findPrinters">프린터 찾기</button><button class="btn btn-sm" data-act="testPrint" ${PRINT.sel && !PRINT.busy ? "" : "disabled"}>테스트 출력</button><button class="btn btn-sm" data-act="testPrintDlg" ${PRINT.sel && !PRINT.busy && APP ? "" : "disabled"}>인쇄 창으로 출력</button></div>
+              <label class="chk"><input type="checkbox" id="print-cut" ${PRINT.cut ? "checked" : ""}> 출력 끝나면 종이 자르기 <span class="help">(프린터 설정에서 이미 자르면 끄세요 — 두 번 잘림)</span></label>
               ${PRINT.msg ? `<span class="help">${esc(PRINT.msg)}</span>` : ""}
               <span class="help">안 나오면 '인쇄 창으로 출력'으로 Windows 인쇄 창에서 프린터 · 용지를 직접 골라 보세요</span></div>
             <div class="field"><span class="label">출력 양식</span>
@@ -1052,7 +1057,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     "^{날짜} {시각}",
   ].join("\n");
   const PRINT = {
-    found: false, sel: null, cur: "enter", busy: false, msg: "",
+    found: false, sel: null, cur: "enter", busy: false, msg: "", cut: true, // cut: 출력 끝나면 종이 자르기 (ESC/POS)
     list: APP ? [] : [{ name: "POS-80C (USB001)", isDefault: false }, { name: "EPSON TM-T82 Receipt", isDefault: false }, { name: "Microsoft Print to PDF", isDefault: true }],
     forms: { enter: { name: "입장권", when: "등록 완료", auto: true, text: ENTER_FORM } },
   };
@@ -1060,8 +1065,17 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   if (APP && window.desk.config) window.desk.config.get().then((c) => {
     if (c && c.printer) PRINT.sel = c.printer;
     if (c && c.printForm) Object.assign(PRINT.forms.enter, c.printForm);
+    if (c && c.printCut === false) PRINT.cut = false;
   }).catch(() => {});
-  const savePrint = () => { if (APP && window.desk.config) window.desk.config.set({ printer: PRINT.sel, printForm: { text: PRINT.forms.enter.text, auto: PRINT.forms.enter.auto } }); };
+  // 성수기 기간: 설치한 앱은 이 PC 설정에, 체험판은 이 브라우저에 저장
+  function savePeaks() {
+    const v = RULES.peaks.map(({ from, to }) => ({ from, to }));
+    if (APP && window.desk.config) window.desk.config.set({ peaks: v });
+    else try { localStorage.setItem("astanakiz-peaks", JSON.stringify(v)); } catch (e) { /* 저장 못 해도 동작 */ }
+  }
+  if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c && Array.isArray(c.peaks) && c.peaks.length) { RULES.peaks = c.peaks; renderAll(); } }).catch(() => {});
+  else try { const v = JSON.parse(localStorage.getItem("astanakiz-peaks")); if (Array.isArray(v) && v.length) RULES.peaks = v; } catch (e) { /* 없음 */ }
+  const savePrint = () => { if (APP && window.desk.config) window.desk.config.set({ printer: PRINT.sel, printCut: PRINT.cut, printForm: { text: PRINT.forms.enter.text, auto: PRINT.forms.enter.auto } }); };
   // 영수증 프린터처럼 보이는 이름 (처음 찾을 때 자동으로 고름)
   const RECEIPT_RE = /pos|receipt|영수증|감열|thermal|80|srp|bixolon|빅솔론|sewoo|세우|lk-|tm-|epson|rongta|xprinter|hwasung|화성|hmk|star|citizen|okpos/i;
 
@@ -1101,8 +1115,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (!f || !f.auto) return "";
     if (!PRINT.sel) return " · 프린터를 아직 고르지 않아 출력 못 함 (운영 설정 → 프린터)";
     if (!APP || !window.desk.print) return ` · ${f.name} 출력 (${PRINT.sel.split(" ")[0]}, 체험)`;
-    window.desk.print.html({ html: receiptDoc(f.text, v), deviceName: PRINT.sel }).then((r) => {
+    window.desk.print.html({ html: receiptDoc(f.text, v), deviceName: PRINT.sel, cut: PRINT.cut }).then((r) => {
       if (!r || !r.ok) toast(`${f.name} 출력 실패: ${(r && r.why) || "응답 없음"} — 운영 설정 → 프린터에서 확인`);
+      else if (r.cutWhy) toast(`출력은 됐지만 자르기 명령 실패: ${r.cutWhy}`);
     });
     return ` · ${f.name} 출력`;
   }
@@ -1325,13 +1340,16 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       PRINT.msg = `프린터 ${PRINT.list.length}대 찾음${PRINT.sel ? ` · ${PRINT.sel} 고름` : " · 영수증 프린터를 직접 골라 주세요"}${APP ? "" : " (체험)"}`;
       savePrint(); renderSheet();
     },
+    addPeak() { const last = RULES.peaks[RULES.peaks.length - 1]; RULES.peaks.push({ from: last ? last.to : TODAY, to: last ? last.to : TODAY }); savePeaks(); renderSheet(); },
+    delPeak(btn) { RULES.peaks.splice(Number(btn.dataset.i), 1); savePeaks(); renderSheet(); renderAll(); },
     pickPrinter(btn) { PRINT.sel = btn.dataset.n; PRINT.msg = ""; savePrint(); renderSheet(); },
     async testPrint(btn) {
       if (!APP || !window.desk.print) { toast(`${PRINT.sel}로 테스트 출력 보냄 (체험)`); return; }
       PRINT.busy = true; PRINT.msg = "출력 보내는 중…"; renderSheet();
-      const r = await window.desk.print.html({ html: receiptDoc(PRINT.forms.enter.text, SAMPLE), deviceName: PRINT.sel, silent: !(btn && btn.dataset.act === "testPrintDlg") });
+      const dlg = !!(btn && btn.dataset.act === "testPrintDlg");
+      const r = await window.desk.print.html({ html: receiptDoc(PRINT.forms.enter.text, SAMPLE), deviceName: PRINT.sel, silent: !dlg, cut: PRINT.cut && !dlg });
       PRINT.busy = false;
-      PRINT.msg = r && r.ok ? `${PRINT.sel}로 보냈어요 — 종이가 나왔는지 확인해 주세요` : `출력 실패: ${(r && r.why) || "응답 없음"}`;
+      PRINT.msg = r && r.ok ? `${PRINT.sel}로 보냈어요 — 종이가 나오고 ${PRINT.cut && !dlg ? "잘렸는지" : "나왔는지"} 확인해 주세요${r.cutWhy ? ` (자르기 실패: ${r.cutWhy})` : ""}` : `출력 실패: ${(r && r.why) || "응답 없음"}`;
       renderSheet();
     },
     testPrintDlg(btn) { return acts.testPrint(btn); },
@@ -1373,9 +1391,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     const t = e.target;
     if (t.id === "form-text") { PRINT.forms[PRINT.cur].text = t.value; $("paper").innerHTML = paperHtml(t.value, SAMPLE); savePrint(); }
     if (t.id === "form-auto") { PRINT.forms[PRINT.cur].auto = t.checked; savePrint(); }
+    if (t.id === "print-cut") { PRINT.cut = t.checked; savePrint(); }
     if (t.id === "w-phone") { sheet.phone = digits(t.value).slice(0, 11); t.value = fmtPhone(sheet.phone); updateWalkButtons(); }
     const m = /^p(f|t)-(\d+)$/.exec(t.id);
-    if (m && t.value) { RULES.peaks[+m[2]][m[1] === "f" ? "from" : "to"] = t.value; renderAll(); }
+    if (m && t.value) { RULES.peaks[+m[2]][m[1] === "f" ? "from" : "to"] = t.value; savePeaks(); renderAll(); }
   });
   $("park-form").addEventListener("submit", (e) => {
     e.preventDefault();
@@ -1394,7 +1413,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     st.style.top = Math.max(0, (window.innerHeight - 768 * k) / 2) + "px";
   }
   window.addEventListener("resize", fit);
+  // 주차 입차일: 기본 전날 (새벽 손님 때문)
+  $("car-day").value = shiftDay(TODAY, -1);
   if (APP) {
+    // 자정이 지나 날짜가 바뀌면 새 날로 다시 열기 (열쇠·입장 기록은 날짜별로 저장돼 있음). 팝업을 쓰는 중이면 닫은 뒤
+    setInterval(() => { if (localKey(new Date()) !== TODAY && !sheet.mode) location.reload(); }, 30 * 1000);
     document.querySelectorAll("[data-act=time]").forEach((b) => (b.hidden = true));
     document.querySelector(".top .tag").textContent = "네이버 · 아마노 · POS 연결";
     if (window.desk.config) window.desk.config.get().then((c) => { if (c && c.build) document.querySelector(".top .tag").textContent = `네이버 · 아마노 · POS 연결 ver.${c.build}`; }).catch(() => {});
