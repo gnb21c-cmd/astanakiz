@@ -9,6 +9,7 @@
                      확정·이용완료 버튼 → 오른쪽 "예약정보" 패널: 탭 확정 n / 완료 n, 카드(List__contents-box) — 이름 밑 "완료 11, 취소 2", 예약자·전화번호·예약번호·상품·이용일시·수량·결제상태
                      확정 카드의 [이용완료] → "이용완료 처리하시겠습니까?" [확인] (실제 확인 창 모양은 아직 모름)
                      오른쪽 목록은 스크롤되는 칸이고, 카드는 2장씩 보이다가 아래로 내리면 더 나옴 (실제도 내려야 다 나옴)
+     &range=1 날짜가 기간으로 보임 (일간이 아닐 때)
      &compact=1 칸이 좁을 때처럼 시각에 오전·오후가 없음 ("1:00" = 13:00)
      ?login=need 로그인 화면 -->
 <style>
@@ -88,7 +89,7 @@
       if (shownN < all.length && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 50) setTimeout(() => { shownN += 3; renderList(); }, 200);
     });
   } else {
-    const label = `${D.getFullYear()}. ${D.getMonth() + 1}. ${D.getDate()}. ${DOW[D.getDay()]}`;
+    const label = `${D.getFullYear()}. ${D.getMonth() + 1}. ${D.getDate()}. ${DOW[D.getDay()]}` + (P.get("range") ? " ~ 2026. 11. 4. 수" : "");
     const times = []; for (let h = 10; h <= 19; h++) times.push(`${String(h).padStart(2, "0")}:00`, `${String(h).padStart(2, "0")}:30`);
     const has = (p, t) => (p === 0 && t < "18:00") || (p === 1 && t >= "18:00") || (p === 2 && t === "10:00");
     const btn = (title, n, cls) => `<button type="button" class="btn btn-xs calendar-btn ${cls}" title="${title}" data-act="${title}"><span><span class="StatusButton__text__Mw4v+ text">${title.slice(0, 2)}</span><span class="StatusButton__text__Mw4v+ text">${title.slice(2)}</span></span><span class="number">${n}</span></button>`;

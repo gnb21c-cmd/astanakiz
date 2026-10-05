@@ -12,7 +12,7 @@
    - 이용완료 확인 창 모양은 아직 모름: window.confirm 이면 자동 확인, 화면 안 창이면 "하시겠습니까" 글자 옆 [확인] */
 
 function installNaverDriver() {
-  if (window.__naver && window.__naver.v === 3) return true;
+  if (window.__naver && window.__naver.v === 4) return true;
 
   const norm = (s) => String(s || "").replace(/\s+/g, "");
   const vis = (el) => !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== "hidden");
@@ -45,6 +45,14 @@ function installNaverDriver() {
       if (m) return `${m[1].length === 2 ? "20" + m[1] : m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
     }
     return null;
+  };
+
+  // 날짜 칸이 하루가 아니라 기간(한달 · 주간)인지 — "~" 가 있으면 기간
+  const dateIsRange = () => {
+    const b = prevBtn();
+    let box = b && b.parentElement;
+    for (let i = 0; i < 3 && box; i++, box = box.parentElement) if (/(\d{1,2})\.\s*(\d{1,2})\./.test(box.textContent)) return /~/.test(box.textContent);
+    return false;
   };
 
   // 예약 목록
@@ -138,6 +146,7 @@ function installNaverDriver() {
       when,
       time: to24(when.replace(/^.*\)\s*/, "")),
       qty: qtyEl ? +txt(qtyEl) || 1 : 1,
+      qtyText: field(c, "수량"),
       pay: field(c, "결제상태"),
       status: txt(badge),
       doneCount: sub ? +sub[1] : 0,
@@ -150,7 +159,7 @@ function installNaverDriver() {
   window.alert = () => {};
 
   window.__naver = {
-    v: 3,
+    v: 4,
     read() {
       const page = cls(document, "Calendar__inner-contents") ? "calendar" : $$('a[class*="contents-user"]').length || cls(document, "BookingListView__root") ? "list" : "";
       const total = (document.body.innerText.match(/(\d+)\s*건\s*내려받기/) || [])[1];
@@ -160,6 +169,7 @@ function installNaverDriver() {
         page,
         needLogin,
         date,
+        dateRange: dateIsRange(),
         list: page === "list" ? readList() : [],
         slots: page === "calendar" ? readSlots() : [],
         cards: cards().map(readCard),

@@ -173,16 +173,16 @@ ipcMain.handle("amano:learn", wrap(async (key) => {
 }));
 // 화면에는 비밀번호를 돌려주지 않음 (저장돼 있는지만)
 // 네이버
-const nwrap = (fn) => async (_e, ...args) => {
+const nwrap = (fn, limit = 120000) => async (_e, ...args) => {
   try {
     if (!naver) return { ok: false, why: "네이버 창이 아직 열리지 않음" };
-    // 한 번에 하나씩, 2분 넘으면 포기 (다음 요청이 줄에 막히지 않게)
-    return await serial("naver", () => timed(Promise.resolve().then(() => fn(...args)), 120000, "네이버 응답이 2분 넘게 없음 — '네이버 화면 보기'로 확인해 주세요"));
+    // 한 번에 하나씩, 시간이 넘으면 포기 (다음 요청이 줄에 막히지 않게)
+    return await serial("naver", () => timed(Promise.resolve().then(() => fn(...args)), limit, `네이버 응답이 ${limit / 60000}분 넘게 없음 — '네이버 화면 보기'로 확인해 주세요`));
   } catch (e) {
     return { ok: false, why: String(e.message || e) };
   }
 };
-ipcMain.handle("naver:load", nwrap((day) => naver.loadDay(day)));
+ipcMain.handle("naver:load", nwrap((day) => naver.loadDay(day), 300000)); // 처음엔 칸을 다 열어 오래 걸릴 수 있음
 ipcMain.handle("naver:complete", nwrap((b) => naver.complete(b)));
 ipcMain.handle("naver:show", () => {
   if (naverWin) {

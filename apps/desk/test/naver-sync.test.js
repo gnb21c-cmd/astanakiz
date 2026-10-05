@@ -80,7 +80,7 @@ test("이용완료: 카드의 [이용완료] → 확인 → 완료로 바뀜, �
 });
 
 test("목록 아래쪽 카드도 내려서 이용완료 · 칸이 좁아 오전·오후가 없어도 시각을 맞게 읽음 (1:00 = 13:00)", async () => {
-  const { browser, sync } = await open("", "&compact=1");
+  const { browser, sync } = await open("?view=calendar&compact=1", "&compact=1");
   try {
     const d0 = await sync.loadDay("2026-10-05");
     assert.ok(d0.ok, d0.why);
@@ -92,6 +92,17 @@ test("목록 아래쪽 카드도 내려서 이용완료 · 칸이 좁아 오전�
     assert.ok(r.ok, r.why);
     const d = await sync.loadDay("2026-10-05");
     assert.strictEqual(d.bookings.find((x) => x.no === "1368177001").status, "완료");
+  } finally {
+    await browser.close();
+  }
+});
+
+test("예약현황이 '일간'이 아니라 기간으로 보이면 날짜를 왔다갔다 하지 않고 바로 알려 줌", async () => {
+  const { browser, sync } = await open("?view=calendar&range=1", "&range=1");
+  try {
+    const r = await sync.loadDay("2026-10-05");
+    assert.strictEqual(r.ok, false);
+    assert.match(r.why, /일간/);
   } finally {
     await browser.close();
   }
