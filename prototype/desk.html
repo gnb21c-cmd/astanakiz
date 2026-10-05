@@ -346,7 +346,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     overUnitMin: 10,        // 초과요금: 반납 시각이 지나고 10분마다
     overFee: 5000,          //           열쇠 1개당 5,000원 (열쇠 수만큼 곱함)
     unlimitedFrom: "18:00", // 이 시각 입장부터 무제한
-    earlyMinutes: 5,        // 예약 5분 전부터 입장
+    earlyMinutes: 5,        // 손님 안내 기준: 예약 5분 전 입장 — 막지는 않음. 예약 당일이면 근무자 판단으로 더 일찍도 입장 (네이버도 일찍 이용완료 가능)
     slotCap: 10,            // 네이버 시간대별 판매 수량 (체험용 — 실제는 네이버 값)
     // 네이버 예약 자동 불러오기: 09:50부터 매시 20분 · 50분 (마지막 입장 19:30 전 19:20까지)
     //   그 사이에 들어온 예약(예: 09:58에 10:00 예약)은 근무자가 [새로고침]으로 바로 불러옴
@@ -626,8 +626,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       let act = "";
       if (b.status === "확정") {
         if (!isToday) act = `<span class="help">이용일에 입장 처리</span>`;
-        else if (now < b.slot - RULES.earlyMinutes) act = `<span class="help num">${hm(b.slot - RULES.earlyMinutes)}부터 입장</span>`;
-        else act = `<span class="go">눌러서 입장 · 열쇠 지급 ›</span>`;
+        else act = `<span class="go">눌러서 입장 · 열쇠 지급 ›</span>${now < b.slot - RULES.earlyMinutes ? `<span class="help num">안내 ${hm(b.slot - RULES.earlyMinutes)} · 일찍 입장 가능</span>` : ""}`;
       } else if (b.keys.length) act = `<span class="kchips">${b.keys.map((k) => `<span class="kchip num">${k}</span>`).join("")}</span><span class="help num">${hm(b.enteredAt)} 입장</span>`;
       else if (b.outAt != null) act = `<span class="help num">${hm(b.enteredAt)} 입장 · ${hm(b.outAt)} 퇴장</span>`;
       return `<article class="res ${b.status === "완료" ? "done" : ""}" data-act="openRes" data-id="${b.id}" tabindex="0" role="button" aria-label="${esc(b.name)} 예약 열기">
@@ -760,7 +759,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (sheet.mode === "enter") {
       const b = findB(sheet.id);
       const m = minutesFor(b.day, b.slot);
-      const canEnter = b.status === "확정" && b.day === TODAY && now >= b.slot - RULES.earlyMinutes;
+      // 예약 당일이면 언제든 입장 (5분 전은 손님 안내 기준일 뿐, 근무자가 현장 상황을 보고 더 일찍 들여보낼 수 있음)
+      const canEnter = b.status === "확정" && b.day === TODAY;
+      const early = canEnter && now < b.slot - RULES.earlyMinutes;
       let pickHtml = "";
       if (b.status === "확정") {
         let btns = "";
@@ -771,7 +772,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         pickHtml = `<div class="field"><span class="label">지급할 열쇠 <span class="help num">예약 수량 ${b.qty}개만큼 누르세요 · ${sheet.keys.length}/${b.qty} · 흐린 번호는 이미 지급됨</span></span><div class="kpick">${btns}</div></div>`;
       }
       const note = b.status !== "확정" ? "" : b.day !== TODAY ? `<div class="banner warn">이용일(${b.day.slice(5).replace("-", "/")})에 입장 처리할 수 있어요</div>`
-        : !canEnter ? `<div class="banner warn">${hm(b.slot - RULES.earlyMinutes)}부터 입장할 수 있어요</div>` : "";
+        : early ? `<div class="banner">예약 ${hm(b.slot)}보다 일찍 입장 — 근무자 판단으로 가능해요 (손님 안내 기준은 ${hm(b.slot - RULES.earlyMinutes)})</div>` : "";
       el.innerHTML = `
         <h3 id="sheet-title">네이버 예약자 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
         <dl class="facts">

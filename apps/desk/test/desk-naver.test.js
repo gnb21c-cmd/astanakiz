@@ -47,6 +47,14 @@ test("데스크가 네이버 예약을 불러오고, 등록 완료 때 네이버
     assert.deepStrictEqual(names, ["백연화", "송다온", "허정은"], "이름 가나다순");
     assert.match(await desk.textContent('.res:has-text("허정은")'), /완료 8 · 취소 2 → 이번 9번째 방문/);
 
+    // 일찍 입장: 13:56 에 18:00 예약도 열쇠를 고를 수 있음 (5분 전은 손님 안내 기준일 뿐)
+    await desk.click('.slot[data-s="1080"]');
+    await desk.click('.res:has-text("홍길동")');
+    assert.match(await desk.textContent("#sheet"), /일찍 입장 — 근무자 판단으로 가능/);
+    assert.ok(await desk.$eval(".kpick button:not([disabled])", (b) => !!b), "열쇠 고를 수 있음");
+    await desk.click("[data-act=close] >> nth=0");
+    await desk.click('.slot[data-s="840"]');
+
     // 허정은 입장: 열쇠 1개 고르고 등록 완료 → 네이버 이용완료
     await desk.click('.res:has-text("허정은")');
     await desk.click(".kpick button:not([disabled]) >> nth=0");
