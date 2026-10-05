@@ -116,6 +116,20 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .kpick button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .kpick button[disabled] { border-color: var(--line); background: var(--surface-2); color: var(--faint); opacity: .45; cursor: default; font-weight: 500; }
 .sheet.wide { width: min(620px, 100%); }
+.sheet.keysheet { width: min(560px, 100%); }  /* 열쇠 10개(5개 × 2줄)가 들어가는 크기 */
+.rbtns { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.rbtns .btn { min-height: 44px; font-size: 15px; }
+.rall { min-height: 48px; font-size: 16px; width: 100%; }
+.meter { border: 2px solid var(--red); background: var(--warn-bg); border-radius: 12px; padding: 10px 12px; display: grid; gap: 2px; text-align: center; }
+.meter .mt { font-size: 12.5px; font-weight: 700; color: var(--red); }
+.meter .tick { font-size: 30px; font-weight: 700; color: var(--red); letter-spacing: .02em; line-height: 1.1; }
+.meter .amt { font-size: 26px; font-weight: 700; }
+.meter .calc { font-size: 11.5px; color: var(--muted); }
+.meter .btn { margin-top: 6px; min-height: 48px; font-size: 16px; }
+.meter.paid { border-color: var(--ok); background: var(--naver-bg); }
+.meter.paid .mt { color: var(--ok); }
+.btn-red { background: var(--red); border-color: var(--red); color: #fff; }
+.btn-red:hover { background: var(--red); opacity: .9; }
 .res .head { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
 .res .name { font-size: 15.5px; font-weight: 700; }
 .badge { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
@@ -295,6 +309,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     seats: 39,              // 내부 4인석(입식·좌식)
     useMinutes: 110,        // 1시간 50분
     pinkUntil: 120,         // 1시간 50분 ~ 2시간 분홍, 2시간 넘으면 빨강
+    overUnitMin: 10,        // 초과요금: 반납 시각이 지나고 10분마다
+    overFee: 5000,          //           열쇠 1개당 5,000원 (열쇠 수만큼 곱함)
     unlimitedFrom: "18:00", // 이 시각 입장부터 무제한
     earlyMinutes: 5,        // 예약 5분 전부터 입장
     slotCap: 10,            // 네이버 시간대별 판매 수량 (체험용 — 실제는 네이버 값)
@@ -336,7 +352,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     const b = {
       id: "b" + seq++, day, slot: s, name, phone, qty, no: String(1370988026 + seq * 7313),
       product: s >= toMin(RULES.unlimitedFrom) ? "야간자유 입장권" : "4인 입장권", pay: "결제완료",
-      status: o.done ? "완료" : "확정", keys: [], enteredAt: null, outAt: null, called: null,
+      status: o.done ? "완료" : "확정", keys: [], enteredAt: null, outAt: null,
     };
     (bookings[day] = bookings[day] || []).push(b);
     return b;
@@ -394,7 +410,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   let posSeq = 31;
   const walkins = [];
   function walkin(phone, keys, at) {
-    const w = { id: "w" + seq++, name: "현장입장자", phone, keys: keys.slice(), enteredAt: at, slot: at, posNo: "POS-" + String(posSeq++).padStart(4, "0"), outAt: null, called: null, walk: true };
+    const w = { id: "w" + seq++, name: "현장입장자", phone, keys: keys.slice(), enteredAt: at, slot: at, posNo: "POS-" + String(posSeq++).padStart(4, "0"), outAt: null, walk: true };
     walkins.push(w);
     return w;
   }
@@ -542,6 +558,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   function renderSheet() {
     const el = $("sheet");
     el.classList.toggle("wide", sheet.mode === "enter");
+    el.classList.toggle("keysheet", sheet.mode === "key");
     if (sheet.mode === "enter") {
       const b = findB(sheet.id);
       const m = minutesFor(b.day, b.slot);
@@ -587,7 +604,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           <dt>수량</dt><dd><div class="stepper"><button data-act="qty" data-d="-1" aria-label="수량 줄이기">−</button><output class="num">${st.need}</output><button data-act="qty" data-d="1" aria-label="수량 늘리기">+</button><span class="help">수량만큼 열쇠를 이어서 드려요</span></div></dd>
           <dt>이용</dt><dd class="num">${hm(now)} ${m == null ? "· 무제한" : `~ ${hm(now + m)} (1시간 50분)`}</dd>
         </dl>
-        <div class="field"><label for="w-phone">전화번호 <span class="help">USB 키패드로 누르세요 · 반납이 늦을 때 연락용</span></label>
+        <div class="field"><label for="w-phone">전화번호 <span class="help">USB 키패드로 누르세요</span></label>
           <input id="w-phone" inputmode="numeric" autocomplete="off" value="${esc(fmtPhone(sheet.phone))}" placeholder="010-0000-0000" data-autofocus></div>
         ${st.flex ? `<button class="btn ${sheet.flexOk ? "btn-ink" : ""}" data-act="flexOk" aria-pressed="${!!sheet.flexOk}">${sheet.flexOk ? "빈 좌석 확인함" : "빈 좌석 확인했어요"}</button>` : ""}
         <ol class="steps"><li class="${sheet.paid ? "done" : ""}">결제하기 → POS 화면에서 결제 → POS를 최소화하면 이 팝업으로 돌아옴${sheet.paid ? " ✓" : ""}</li><li>결제 완료 → 열쇠판에 등록</li></ol>
@@ -598,24 +615,26 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       return;
     }
     if (sheet.mode === "key") {
-      const h = holderOf(sheet.k);
-      const c = keyColor(h);
+      const h = holderById(sheet.hid);
+      if (!h) { closeSheet(); return; }
       const m = minutesFor(TODAY, h.slot);
       const used = now - h.slot;
+      const over = overInfo(h);
+      const many = h.keys.length > 1;
+      const lock = over.due > 0 && !h.overPaid; // 초과요금이 있으면 결제 뒤에 반납
       el.innerHTML = `
-        <h3 id="sheet-title">${sheet.k}번 열쇠 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
+        <h3 id="sheet-title">${h.keys.join(", ")}번 열쇠 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
         <dl class="facts">
           <dt>${h.walk ? "고객명" : "예약자"}</dt><dd>${esc(h.name)}${h.walk ? ` · ${h.posNo}` : ""}</dd>
-          <dt>전화번호</dt><dd class="num" style="font-size:18px;user-select:all">${fmtPhone(h.phone)}</dd>
+          <dt>전화번호</dt><dd class="num">${fmtPhone(h.phone)}</dd>
           <dt>입장</dt><dd class="num">${hm(h.enteredAt)}${h.walk ? "" : ` (예약 ${hm(h.slot)})`}</dd>
-          <dt>이용</dt><dd class="num" style="color:${c === "red" ? "var(--red)" : "inherit"}">${m == null ? "무제한" : `${Math.floor(used / 60)}시간 ${used % 60}분째 · ${hm(h.slot + m)} 반납`}</dd>
-          <dt>열쇠</dt><dd><div class="bigkeys">${h.keys.map((k) => `<span class="bigkey num">${k}</span>`).join("")}</div></dd>
-          ${h.called != null ? `<dt>연락</dt><dd class="num">${hm(h.called)} 연락함</dd>` : ""}
+          <dt>이용</dt><dd class="num">${m == null ? "무제한" : `${Math.floor(used / 60)}시간 ${used % 60}분째 · ${hm(h.slot + m)} 반납`}</dd>
+          <dt>열쇠</dt><dd class="num">${h.keys.length}개</dd>
         </dl>
-        <div class="sheet-foot">
-          ${c !== "in" ? `<button class="btn" data-act="called">연락함</button>` : ""}
-          ${h.keys.length > 1 ? `<button class="btn" data-act="returnOne">${sheet.k}번만 반납</button>` : ""}
-          <button class="btn btn-ink" data-act="returnAll" data-autofocus>반납 · 퇴장${h.keys.length > 1 ? ` (${h.keys.length}개)` : ""}</button>
+        <div id="meter">${meterHtml(h)}</div>
+        <div class="field"><span class="label">반납 ${lock ? `<span class="help">초과요금을 결제한 뒤 반납하세요</span>` : ""}</span>
+          ${many ? `<div class="rbtns">${h.keys.map((k) => `<button class="btn" data-act="returnKey" data-k="${k}" ${lock ? "disabled" : ""}>${k}번만</button>`).join("")}</div>` : ""}
+          <button class="btn btn-ink rall" data-act="returnAll" ${lock ? "disabled" : ""}>${many ? `모두 반납 (${h.keys.length}개)` : `${h.keys[0]}번 반납 · 퇴장`}</button>
         </div>`;
       return;
     }
@@ -634,6 +653,40 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         <div class="sheet-foot"><button class="btn btn-ink" data-act="close" data-autofocus>닫기</button></div>`;
     }
   }
+
+  // ── 초과요금 미터 ────────────────────────────────
+  /* 반납 시각(예약 입장시간 + 1시간 50분)이 지나면 초 단위로 세고,
+     10분마다 5,000원 × 아직 가진 열쇠 수. POS 결제를 누른 순간 금액으로 고정 */
+  function overInfo(h) {
+    const m = minutesFor(TODAY, h.slot);
+    if (m == null) return { sec: 0, due: 0, units: 0 };
+    const secOver = (now * 60 + sec) - (h.slot + m) * 60;
+    if (secOver <= 0) return { sec: 0, due: 0, units: 0 };
+    const units = Math.floor(secOver / (RULES.overUnitMin * 60));
+    return { sec: secOver, units, due: units * RULES.overFee * h.keys.length };
+  }
+  const won = (n) => n.toLocaleString("ko-KR") + "원";
+  const clock = (t) => `${Math.floor(t / 3600)}:${String(Math.floor(t / 60) % 60).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+  function meterHtml(h) {
+    if (h.overPaid) return `<div class="meter paid"><div class="mt">초과요금 결제 완료</div><div class="amt num">${won(h.overPaid.amount)}</div><div class="calc num">초과 ${clock(h.overPaid.sec)} 기준 · ${hm(h.overPaid.at)} POS 결제</div></div>`;
+    const o = overInfo(h);
+    if (o.sec <= 0) return "";
+    const nextIn = RULES.overUnitMin * 60 - (o.sec % (RULES.overUnitMin * 60));
+    return `<div class="meter">
+      <div class="mt">반납 시간 지남 · 초과 경과</div>
+      <div class="tick num">${clock(o.sec)}</div>
+      <div class="amt num">${won(o.due)}</div>
+      <div class="calc num">${won(RULES.overFee)} × ${o.units}(10분) × 열쇠 ${h.keys.length}개 · 다음 +${won(RULES.overFee * h.keys.length)}까지 ${Math.floor(nextIn / 60)}:${String(nextIn % 60).padStart(2, "0")}</div>
+      <button class="btn btn-red" data-act="payOver" ${o.due ? "" : "disabled"}>POS로 결제 · ${won(o.due)}</button>
+    </div>`;
+  }
+  const holderById = (id) => bookings[TODAY].concat(walkins).find((x) => x.id === id && x.keys.length);
+  let sec = 0; // 체험 시계의 초
+  setInterval(() => {
+    sec++;
+    if (sec >= 60) { sec = 0; now++; renderAll(); }
+    if (sheet.mode === "key" && $("pos").hidden) { const h = holderById(sheet.hid); const mt = $("meter"); if (h && mt) { const before = !!overInfo(h).due; mt.innerHTML = meterHtml(h); if (sec === 0 || (!!overInfo(h).due !== before)) renderSheet(); } }
+  }, 1000);
 
   // ── 동작 ─────────────────────────────────────────
   let toastTimer;
@@ -654,7 +707,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   }
 
   const acts = {
-    time(btn) { now += Number(btn.dataset.min); renderAll(); },
+    time(btn) { now += Number(btn.dataset.min); renderAll(); if (sheet.mode === "key") renderSheet(); },
     day(btn) { viewDay = shiftDay(viewDay, Number(btn.dataset.d)); renderAll(); },
     slot(btn) { selSlot = Number(btn.dataset.s); renderAll(); },
     openRes(el) { openSheet({ mode: "enter", id: el.dataset.id, keys: [] }); },
@@ -669,7 +722,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     key(btn) {
       const k = Number(btn.dataset.k);
       const h = holderOf(k);
-      if (h) { openSheet({ mode: "key", k }); return; }
+      if (h) { openSheet({ mode: "key", hid: h.id }); return; }
       openSheet({ mode: "walk", keys: [k], phone: "", paid: false, flexOk: false });
     },
     doEnter() {
@@ -689,15 +742,26 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     },
     flexOk() { sheet.flexOk = !sheet.flexOk; renderSheet(); },
     pay() { sheet.paid = true; $("pos-amt").textContent = `현장입장 ${sheet.keys.length}장`; $("pos").hidden = false; },
-    posDone() { $("pos").hidden = true; renderSheet(); const p = $("w-phone"); if (p) p.focus(); },
+    payOver() {
+      const h = holderById(sheet.hid); const o = overInfo(h); if (!o.due) return;
+      sheet.pending = { amount: o.due, sec: o.sec, at: now }; // 누르기 직전 금액으로 고정
+      $("pos-amt").textContent = `초과요금 ${won(o.due)} (열쇠 ${h.keys.join(", ")}번)`; $("pos").hidden = false;
+    },
+    posDone() {
+      $("pos").hidden = true;
+      if (sheet.mode === "key" && sheet.pending) { const h = holderById(sheet.hid); if (h) h.overPaid = sheet.pending; sheet.pending = null; toast(`초과요금 ${won(h.overPaid.amount)} 결제됨 · 이제 반납 처리하세요`); }
+      renderSheet(); const p = $("w-phone"); if (p) p.focus();
+    },
     walkDone() {
       if (sheet.keys.some((k) => holderOf(k))) { toast("그 사이 다른 손님이 쓴 열쇠가 있어요"); closeSheet(); renderAll(); return; }
       const w = walkin(digits(sheet.phone), sheet.keys, now);
       closeSheet(); toast(`현장입장자 · 열쇠 ${w.keys.join(", ")}번 등록`); renderAll();
     },
-    returnAll() { const h = holderOf(sheet.k); returnKeys(h, h.keys.slice()); closeSheet(); renderAll(); },
-    returnOne() { const h = holderOf(sheet.k); returnKeys(h, [sheet.k]); closeSheet(); renderAll(); },
-    called() { const h = holderOf(sheet.k); h.called = now; toast("연락함으로 표시했어요"); renderSheet(); },
+    returnAll() { const h = holderById(sheet.hid); returnKeys(h, h.keys.slice()); closeSheet(); renderAll(); },
+    returnKey(btn) {
+      const h = holderById(sheet.hid); returnKeys(h, [Number(btn.dataset.k)]); renderAll();
+      if (h.keys.length) renderSheet(); else closeSheet();
+    },
     settings() { openSheet({ mode: "settings" }); },
     car(btn) {
       carSel = Number(btn.dataset.id);
