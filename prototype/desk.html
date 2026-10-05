@@ -96,7 +96,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 /* 시간 · 확정 · 잔여 세 칸 */
 .slot-head { display: grid; grid-template-columns: 62px repeat(3, minmax(0, 1fr)); gap: 2px; font-size: 12px; color: var(--muted); font-weight: 700; padding: 0 4px; text-align: center; }
 .slot { display: grid; grid-template-columns: 62px repeat(3, minmax(0, 1fr)); align-items: center; gap: 2px; width: 100%; border: 1px solid transparent; background: transparent; padding: 3px 4px; border-radius: 9px; text-align: left; }
-.slot .t { border: 1.5px solid var(--line); border-radius: 8px; text-align: center; font-weight: 700; padding: 2px 0; background: var(--surface); }
+.slot .t { border: 1.5px solid transparent; border-radius: 8px; text-align: center; font-weight: 800; padding: 2px 0; background: transparent; }
+.slot-sum { display: grid; grid-template-columns: 62px repeat(3, minmax(0, 1fr)); gap: 2px; padding: 4px 4px 5px; margin: 2px 4px 2px; border-bottom: 3px double var(--line); text-align: center; font-weight: 800; font-size: 15px; }
+.slot-sum .lb { font-size: 12.5px; border: 1.5px solid var(--line); border-radius: 8px; padding: 1px 0; }
+.slot-sum .dn { color: var(--muted); }
 .slot .c { text-align: center; font-weight: 700; font-size: 15px; }
 .slot .c.full { color: var(--red); }
 .slot .c.dn { color: var(--muted); }
@@ -161,6 +164,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .visits { font-size: 12px; color: var(--ok); font-weight: 600; margin-top: -2px; }
 .visits b { color: var(--fg); }
 .visits.big { font-size: 14px; margin: 0; }
+.chain { font-size: 12.5px; font-weight: 800; color: #b45309; background: #fef3c7; border-radius: 6px; padding: 1px 6px; justify-self: start; }
+.chain.sub { color: var(--muted); background: var(--surface-2); font-weight: 700; }
+.npend { font-size: 11.5px; color: var(--red); font-weight: 700; }
 .gift { display: inline-block; font-size: 11px; font-weight: 700; color: #fff; background: var(--red); border-radius: 5px; padding: 0 6px; margin-left: 2px; }
 .badge { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
 .badge.conf { background: var(--accent-bg); color: var(--accent); }
@@ -281,6 +287,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         <div class="d num" id="date"></div>
         <button class="arrow" data-act="day" data-d="1" aria-label="다음날">→</button>
       </div>
+      <div class="slot-sum num" id="slot-sum" aria-label="하루 합계"></div>
       <div class="slot-head"><span>시간</span><span>완료</span><span>확정</span><span>잔여</span></div>
       <div class="scroll" id="slots"></div>
     </section>
@@ -431,6 +438,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     ["15:30", "윤서아", 1], ["16:00", "고성현", 1], ["16:30", "김철수", 1],
     ["18:00", "고성현", 1], ["18:30", "홍길동", 1],
   ].forEach(([t, n, q, d], i) => booking(TODAY, t, n, P(i + 3), q, { done: !!d }));
+  // 예시: 연속예약 (같은 사람이 14:30 · 16:30 두 타임)
+  booking(TODAY, "14:30", "나연속", "01055501234", 1, { prevDone: 3 });
+  booking(TODAY, "16:30", "나연속", "01055501234", 1, { prevDone: 3 });
   // 이미 입장한 예약 [이름, 예약시간, 열쇠, 입장 시각, 퇴장 시각(아직이면 null)]
   [
     ["홍길동", "10:00", [1], "09:58", "11:52"], ["김철수", "10:00", [2, 3], "09:57", "11:40"], ["찟재명", "10:00", [4], "09:59", null],
@@ -529,13 +539,27 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     for (const b of old.values()) if (!list.includes(b) && b.keys.length) list.push(b);
     bookings[day] = list;
   }
+  // 네이버에 아직 이용완료를 못 누른 예약(연속예약의 뒤 예약 · '네이버 없이 등록')을 차례로 처리, 실패하면 2분마다 다시
+  let flushing = false;
+  async function naverFlush() {
+    if (!APP || flushing) return;
+    flushing = true;
+    try {
+      for (const x of (bookings[TODAY] || []).filter((y) => y.naverPending && y.no && y.status === "완료")) {
+        const r = await window.desk.naver.complete({ day: x.day, no: x.no, time: hm(x.slot), product: x.naverProduct || "" }).catch(() => null);
+        if (r && r.ok) { x.naverPending = false; renderAll(); }
+      }
+    } finally { flushing = false; }
+  }
+  if (APP) setInterval(naverFlush, 2 * 60 * 1000);
+
   // 오늘의 열쇠·입장 기록은 이 PC에 저장 (앱을 껐다 켜도 열쇠판 유지)
   const STATE_KEY = "astanakiz-desk-" + TODAY;
   function saveState() {
     if (!APP) return;
     try {
       localStorage.setItem(STATE_KEY, JSON.stringify({
-        b: (bookings[TODAY] || []).filter((b) => b.enteredAt != null).map((b) => ({ no: b.no, keys: b.keys, enteredAt: b.enteredAt, outAt: b.outAt, visitNo: b.visitNo, overPaid: b.overPaid, naverPending: b.naverPending, status: b.status })),
+        b: (bookings[TODAY] || []).filter((b) => b.enteredAt != null).map((b) => ({ no: b.no, keys: b.keys, enteredAt: b.enteredAt, outAt: b.outAt, visitNo: b.visitNo, overPaid: b.overPaid, naverPending: b.naverPending, status: b.status, useMin: b.useMin, chainHead: b.chainHead })),
         w: walkins, seq, posSeq,
       }));
     } catch (e) { /* 저장 못 해도 화면은 동작 */ }
@@ -552,6 +576,32 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (!walkins.length) walkins.push(...(st.w || []));
   }
 
+  // ── 연속예약 ─────────────────────────────────────
+  /* 같은 사람(이름 + 전화번호)이 2시간 간격으로 이어서 예약하면(10:00 · 12:00 …) 퇴장 없이 이어서 쓰는 예약.
+     첫 예약에 "★n타임 연속예약", 첫 예약에서 입장하면 나머지 예약도 함께 이용완료(네이버는 뒤에서 차례로),
+     열쇠 이용시간은 n타임 × 2시간 − 10분 (1타임 1:50 · 2타임 3:50 · 3타임 5:50), 무제한 시간이 끼면 무제한 */
+  const CHAIN_GAP = [100, 150]; // 다음 예약까지 간격(분): 2시간 근처
+  function chainOf(b) {
+    if (!b || !b.phone) return [b];
+    const same = (bookings[b.day] || []).filter((x) => x.name === b.name && digits(x.phone) === digits(b.phone)).sort((x, y) => x.slot - y.slot);
+    // b 가 들어 있는 이어진 묶음
+    let group = [];
+    for (const x of same) {
+      const last = group[group.length - 1];
+      if (last && x.slot - last.slot >= CHAIN_GAP[0] && x.slot - last.slot <= CHAIN_GAP[1]) group.push(x);
+      else { if (group.includes(b)) break; group = [x]; }
+    }
+    return group.includes(b) ? group : [b];
+  }
+  /** 묶음 전체 이용시간(분). 무제한이 끼면 null */
+  function chainMinutes(chain) {
+    if (chain.some((x) => minutesFor(x.day, x.slot) == null)) return null;
+    return chain.length * (RULES.useMinutes + 10) - 10;
+  }
+  /** 열쇠를 가진 손님의 이용시간(분, 예약 시간부터). 연속예약이면 입장 때 정해 둔 값, 무제한이면 null */
+  const dur = (m) => `${Math.floor(m / 60)}시간${m % 60 ? ` ${m % 60}분` : ""}`;
+  const useOf = (h) => (h.useMin !== undefined ? h.useMin : minutesFor(TODAY, h.slot));
+
   // ── 열쇠 계산 ─────────────────────────────────────
   const holders = () => bookings[TODAY].concat(walkins).filter((x) => x.keys.length);
   const holderOf = (k) => holders().find((x) => x.keys.includes(k));
@@ -559,9 +609,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   /* 열쇠 색: 예약한 입장시간(현장은 입장 시각)부터
      ~ 1시간 50분 검정 · 1시간 50분 ~ 2시간 분홍 · 2시간 넘으면 빨강. 무제한 손님은 계속 검정 */
   function keyColor(h) {
-    if (minutesFor(TODAY, h.slot) == null) return "in";
+    const m = useOf(h);
+    if (m == null) return "in";
     const used = now - h.slot;
-    return used < RULES.useMinutes ? "in" : used < RULES.pinkUntil ? "pink" : "red";
+    return used < m ? "in" : used < m + (RULES.pinkUntil - RULES.useMinutes) ? "pink" : "red";
   }
   /* 현장 판매 가능 열쇠: 지금부터 1시간 50분 동안 5분마다
      (안에 있는 손님 열쇠 + 그때 와 있을 네이버 예약 열쇠)를 뺀 값의 가장 작은 값.
@@ -570,7 +621,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     let worst = Infinity;
     for (let x = now; x <= now + RULES.useMinutes; x += 5) {
       let used = 0;
-      for (const h of holders()) { const m = minutesFor(TODAY, h.slot); if (m == null || h.slot + m > x || x < now + 10) used += h.keys.length; }
+      for (const h of holders()) { const m = useOf(h); if (m == null || h.slot + m > x || x < now + 10) used += h.keys.length; }
       for (const b of bookings[TODAY]) {
         if (b.status !== "확정") continue;
         const m = minutesFor(TODAY, b.slot);
@@ -590,6 +641,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     ensureDay(viewDay);
     $("date").innerHTML = `${dateLabel(viewDay)}<small>${dayKind(viewDay)}</small>`;
     const list = bookings[viewDay];
+    const tot = { done: 0, conf: 0, left: 0 };
     $("slots").innerHTML = SLOTS.map((s) => {
       const bs = list.filter((b) => b.slot === s);
       const ns = (naverSlots[viewDay] || {})[s];
@@ -599,11 +651,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const conf = ns ? ns.conf : sum("확정");
       const cap = ns ? ns.cap : RULES.slotCap;
       const left = Math.max(0, cap - conf - done);
+      tot.done += done; tot.conf += conf; tot.left += left;
       const isNow = viewDay === TODAY && now >= s - RULES.earlyMinutes && now < s + 25;
       return `<button class="slot ${s === selSlot ? "on" : ""} ${isNow ? "now" : ""}" data-act="slot" data-s="${s}" aria-pressed="${s === selSlot}">
         <span class="t num">${hm(s)}</span>
         <span class="c num dn">${done}</span><span class="c num">${conf}</span><span class="c num ${left ? "" : "full"}" title="기준 ${cap}">${left}</span></button>`;
     }).join("");
+    $("slot-sum").innerHTML = `<span class="lb">${viewDay === TODAY ? "오늘 합" : "이날 합"}</span><span class="dn">${tot.done}</span><span>${tot.conf}</span><span>${tot.left}</span>`;
   }
 
   /** 네이버 '완료 n'에서 이번 방문 회차: 미입장이면 완료 n → 이번 n+1번째, 이용완료면 n+1번째 방문 */
@@ -612,6 +666,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   const stampOf = (n) => ((n - 1) % RULES.giftEvery) + 1;
   const isGift = (n) => n > 0 && n % RULES.giftEvery === 0;
   function visitText(b) {
+    if (b.chainHead) return `<span class="help">연속예약 — 첫 예약과 같은 방문</span>`;
     if (b.status === "완료" ? !b.visitNo : b.prevDone == null) return `<span class="help">방문 횟수 확인 중</span>`;
     const c = b.cancels ? ` · 취소 ${b.cancels}` : "";
     const n = b.status === "완료" ? b.visitNo : b.prevDone + 1;
@@ -629,14 +684,19 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const d = new Date(b.day + "T12:00:00");
       const when = `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}.(${DOW[d.getDay()]}) ${hm(b.slot)}`;
       let act = "";
-      if (b.status === "확정") {
+      const ch = chainOf(b), ci = ch.indexOf(b);
+      const chainTag = ch.length < 2 ? "" : ci === 0 ? `<div class="chain">★${ch.length}타임 연속예약 <span class="num">${ch.map((x) => hm(x.slot)).join(" · ")}</span></div>` : `<div class="chain sub num">연속예약 ${ci + 1}/${ch.length} · 첫 예약 ${hm(ch[0].slot)}</div>`;
+      if (b.status === "확정" && ci > 0) act = `<span class="help num">첫 예약(${hm(ch[0].slot)})에서 함께 입장 처리</span>`;
+      else if (b.status === "확정") {
         if (!isToday) act = `<span class="help">이용일에 입장 처리</span>`;
         else act = `<span class="go">눌러서 입장 · 열쇠 지급 ›</span>${now < b.slot - RULES.earlyMinutes ? `<span class="help num">안내 ${hm(b.slot - RULES.earlyMinutes)} · 일찍 입장 가능</span>` : ""}`;
       } else if (b.keys.length) act = `<span class="kchips">${b.keys.map((k) => `<span class="kchip num">${k}</span>`).join("")}</span><span class="help num">${hm(b.enteredAt)} 입장</span>`;
       else if (b.outAt != null) act = `<span class="help num">${hm(b.enteredAt)} 입장 · ${hm(b.outAt)} 퇴장</span>`;
+      else if (b.chainHead) act = `<span class="help num">연속예약 — ${hm(b.enteredAt)} 첫 예약으로 입장</span>`;
+      if (b.naverPending) act += `<span class="npend">네이버 이용완료 대기 (자동으로 다시 시도)</span>`;
       return `<article class="res ${b.status === "완료" ? "done" : ""}" data-act="openRes" data-id="${b.id}" tabindex="0" role="button" aria-label="${esc(b.name)} 예약 열기">
         <div class="head"><span class="name">${esc(b.name)}</span><span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span></div>
-        <div class="visits num">${visitText(b)}</div>
+        ${chainTag}<div class="visits num">${visitText(b)}</div>
         <dl class="kv">
           <dt>전화번호</dt><dd class="phone num">${fmtPhone(b.phone)}</dd>
           <dt>이용일시</dt><dd class="num">${when}</dd>
@@ -763,9 +823,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     el.classList.toggle("setsheet", sheet.mode === "settings");
     if (sheet.mode === "enter") {
       const b = findB(sheet.id);
-      const m = minutesFor(b.day, b.slot);
+      const ch = chainOf(b), ci = ch.indexOf(b);
+      const m = ch.length > 1 ? chainMinutes(ch) : minutesFor(b.day, b.slot);
       // 예약 당일이면 언제든 입장 (5분 전은 손님 안내 기준일 뿐, 근무자가 현장 상황을 보고 더 일찍 들여보낼 수 있음)
-      const canEnter = b.status === "확정" && b.day === TODAY;
+      // 연속예약의 두 번째부터는 첫 예약에서 함께 처리
+      const canEnter = b.status === "확정" && b.day === TODAY && ci <= 0;
       const early = canEnter && now < b.slot - RULES.earlyMinutes;
       let pickHtml = "";
       if (b.status === "확정") {
@@ -776,15 +838,17 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         }
         pickHtml = `<div class="field"><span class="label">지급할 열쇠 <span class="help num">예약 수량 ${b.qty}개만큼 누르세요 · ${sheet.keys.length}/${b.qty} · 흐린 번호는 이미 지급됨</span></span><div class="kpick">${btns}</div></div>`;
       }
-      const note = b.status !== "확정" ? "" : b.day !== TODAY ? `<div class="banner warn">이용일(${b.day.slice(5).replace("-", "/")})에 입장 처리할 수 있어요</div>`
-        : early ? `<div class="banner">예약 ${hm(b.slot)}보다 일찍 입장 — 근무자 판단으로 가능해요 (손님 안내 기준은 ${hm(b.slot - RULES.earlyMinutes)}). ${m == null ? "" : `이용시간은 예약 시간부터라 일찍 온 만큼 더 놀 수 있어요 (반납 ${hm(b.slot + m)})`}</div>` : "";
+      const chainNote = ch.length < 2 ? "" : ci > 0 ? `<div class="banner warn">연속예약 ${ci + 1}/${ch.length} — 첫 예약(${hm(ch[0].slot)}) 카드에서 입장 처리하면 이 예약도 함께 이용완료돼요</div>`
+        : `<div class="banner"><b>★${ch.length}타임 연속예약</b> (${ch.map((x) => hm(x.slot)).join(" · ")}) — 입장하면 ${ch.length}건 모두 이용완료, 열쇠 이용시간 ${m == null ? "무제한" : `${dur(m)} (반납 ${hm(b.slot + m)})`}</div>`;
+      const note = chainNote + (b.status !== "확정" ? "" : b.day !== TODAY ? `<div class="banner warn">이용일(${b.day.slice(5).replace("-", "/")})에 입장 처리할 수 있어요</div>`
+        : early ? `<div class="banner">예약 ${hm(b.slot)}보다 일찍 입장 — 근무자 판단으로 가능해요 (손님 안내 기준은 ${hm(b.slot - RULES.earlyMinutes)}). ${m == null ? "" : `이용시간은 예약 시간부터라 일찍 온 만큼 더 놀 수 있어요 (반납 ${hm(b.slot + m)})`}</div>` : "");
       el.innerHTML = `
         <h3 id="sheet-title">네이버 예약자 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
         <dl class="facts">
           <dt>예약자</dt><dd style="font-size:18px">${esc(b.name)} <span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span></dd>
           <dt>방문</dt><dd class="num visits big">${visitText(b)}</dd>
           <dt>전화번호</dt><dd class="num">${fmtPhone(b.phone)}</dd>
-          <dt>이용일시</dt><dd class="num">${hm(b.slot)} ${m == null ? "· 무제한" : `~ ${hm(b.slot + m)} (1시간 50분)`}</dd>
+          <dt>이용일시</dt><dd class="num">${hm(b.slot)} ${m == null ? "· 무제한" : `~ ${hm(b.slot + m)} (${dur(m)})`}</dd>
           <dt>수량</dt><dd>${b.product} ${b.qty}</dd>
           <dt>결제상태</dt><dd>${b.pay}</dd>
           ${b.status === "완료" ? `<dt>열쇠</dt><dd>${b.keys.length ? `<div class="bigkeys">${b.keys.map((k) => `<span class="bigkey num">${k}</span>`).join("")}</div>` : b.outAt != null ? `<span class="num">${b.enteredAt != null ? hm(b.enteredAt) + " 입장 · " : ""}${hm(b.outAt)} 퇴장 (반납함)</span>` : "-"}</dd>` : ""}
@@ -823,7 +887,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (sheet.mode === "key") {
       const h = holderById(sheet.hid);
       if (!h) { closeSheet(); return; }
-      const m = minutesFor(TODAY, h.slot);
+      const m = useOf(h);
       const used = now - h.slot;
       const over = overInfo(h);
       const many = h.keys.length > 1;
@@ -940,7 +1004,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     return ` · ${f.name} 출력 (${PRINT.sel.split(" ")[0]})`;
   }
   const keyVals = (h, extra = {}) => {
-    const m = minutesFor(TODAY, h.slot);
+    const m = useOf(h);
     return Object.assign({ 매장: "아스타나키즈", 날짜: TODAY, 시각: hm(now), 고객: h.name, 전화뒤4: digits(h.phone).slice(-4), 열쇠: h.keys.join(", "), 수량: String(h.keys.length), 입장: hm(h.enteredAt), 반납: m == null ? "무제한" : hm(h.slot + m), 방문회차: h.visitNo ? String(stampOf(h.visitNo)) : "", 사은권: h.visitNo && isGift(h.visitNo) ? `${RULES.giftName} 증정!` : "", 초과시간: "", 금액: "" }, extra);
   };
 
@@ -950,7 +1014,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
      2:00:00 정각에 5,000원 · 2:10:00 정각에 10,000원 … 10분이 꽉 찰 때마다 오름
      열쇠 수만큼 곱함. POS 결제를 누른 순간 금액으로 고정 */
   function overInfo(h) {
-    const m = minutesFor(TODAY, h.slot);
+    const m = useOf(h);
     if (m == null) return { sec: 0, due: 0, units: 0 };
     const secOver = (now * 60 + sec) - (h.slot + m) * 60;
     if (secOver <= 0) return { sec: 0, due: 0, units: 0 };
@@ -1054,9 +1118,20 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         if (!r || !r.ok) { sheet.naverErr = (r && r.why) || "네이버 응답 없음"; renderSheet(); return; }
       }
       if (btn && btn.dataset.skipNaver) b.naverPending = true; // 네이버에는 나중에 이용완료를 눌러야 함
+      const ch = chainOf(b);
       Object.assign(b, { status: "완료", keys: sheet.keys.slice(), enteredAt: now, visitNo: b.prevDone == null ? null : b.prevDone + 1 });
-      const nsl = (naverSlots[b.day] || {})[b.slot]; // 다음 불러오기 전까지 칸 숫자도 확정 → 완료
-      if (nsl) { nsl.conf = Math.max(0, nsl.conf - b.qty); nsl.done += b.qty; }
+      const moveSlot = (x) => { const nsl = (naverSlots[x.day] || {})[x.slot]; if (nsl) { nsl.conf = Math.max(0, nsl.conf - x.qty); nsl.done += x.qty; } }; // 다음 불러오기 전까지 칸 숫자도 확정 → 완료
+      moveSlot(b);
+      if (ch.length > 1 && ch[0] === b) {
+        // 연속예약: 열쇠 이용시간을 묶음 전체로, 나머지 예약도 이용완료 (네이버는 뒤에서 차례로 · 실패하면 자동으로 다시)
+        b.useMin = chainMinutes(ch);
+        for (const x of ch.slice(1)) {
+          if (x.status !== "확정") continue;
+          Object.assign(x, { status: "완료", enteredAt: now, chainHead: b.id, naverPending: APP });
+          moveSlot(x);
+        }
+        setTimeout(naverFlush, 0);
+      }
       closeSheet();
       toast(`${b.name}님 입장 · 열쇠 ${b.keys.join(", ")}번 · 네이버 이용완료${isGift(b.visitNo) ? ` · ${b.visitNo}번째 방문, ${RULES.giftName}을 드리세요` : ""}${printForm("enter", keyVals(b))}`);
       renderAll();
