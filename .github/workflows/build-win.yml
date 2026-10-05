@@ -47,7 +47,7 @@ jobs:
           f=$(ls apps/desk/dist/*.exe | head -1)
           cp "$f" astanakiz-desk-setup.exe
           files="astanakiz-desk-setup.exe"
-          [ -f docs/manual/staff-manual.pdf ] && cp docs/manual/staff-manual.pdf "아스타나키즈-입장데스크-직원메뉴얼.pdf" && files="$files 아스타나키즈-입장데스크-직원메뉴얼.pdf"
+          [ -f docs/manual/staff-manual.pdf ] && cp docs/manual/staff-manual.pdf astanakiz-staff-manual.pdf && files="$files astanakiz-staff-manual.pdf"
           notes="POS PC 설치용 — 받아서 더블클릭 → 설치. 직원 메뉴얼 PDF 같이 있음. 커밋 $(git log -1 --format=%h)"
           # 받는 주소가 늘 같은 '최신'
           gh release delete test-latest --yes --cleanup-tag || true
