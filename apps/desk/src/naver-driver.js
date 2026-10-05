@@ -9,10 +9,13 @@
    - 칸이 좁으면 시각에 오전·오후가 빠짐 → 영업시간(10:00~19:30)으로 봄: 1:00 = 13:00 (다른 세션의 실제 수집에서 확인)
    - 오른쪽 예약정보 목록은 스크롤되는 칸이고 내려야 카드가 더 나옴 → scrollCards 로 끝까지
    - 칸을 누르면 표가 새로 그려짐 → 다른 칸을 누르기 전에 열린 목록을 닫음(closePanel)
+   - 예약이 1건인 칸의 [확정]을 누르면 목록(탭 · 카드) 대신 오른쪽에 '예약 상세정보'가 바로 뜸 (현장 화면 10/6)
+       상태 동그라미(확정) · 이름 · 처음 온 손님은 '완료 n' 대신 '신규예약' · 예약자/전화번호/예약번호/상품/이용일시/수량 · [예약취소] [이용완료] · 오른쪽 위 X
+       → 상세정보도 카드 한 장으로 읽고, 칸의 이름표는 글자로 찾음
    - 이용완료 확인 창 모양은 아직 모름: window.confirm 이면 자동 확인, 화면 안 창이면 "하시겠습니까" 글자 옆 [확인] */
 
 function installNaverDriver() {
-  if (window.__naver && window.__naver.v === 4) return true;
+  if (window.__naver && window.__naver.v === 5) return true;
 
   const norm = (s) => String(s || "").replace(/\s+/g, "");
   const vis = (el) => !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== "hidden");
@@ -124,15 +127,47 @@ function installNaverDriver() {
     return null;
   };
 
-  // 예약정보 카드
-  const cards = () => $$('[class*="List__contents-box"]').filter(vis);
+  // 예약 상세정보 (예약이 1건인 칸을 누르면 목록 대신 바로 뜸): '예약 상세정보' 글자에서 위로 올라가 예약번호 · 이용일시를 품은 칸
+  const leafs = (root) => [...root.querySelectorAll("*")].filter((e) => !e.children.length && vis(e));
+  const detailPanel = () => {
+    const t = leafs(document).find((e) => norm(e.textContent) === "예약상세정보");
+    for (let p = t && t.parentElement; p && p !== document.body; p = p.parentElement) {
+      const x = norm(p.textContent);
+      if (x.includes("예약번호") && x.includes("이용일시")) return p;
+    }
+    return null;
+  };
+  // 예약정보 카드: 목록 카드들, 없으면 상세정보 한 장
+  const cards = () => {
+    const list = $$('[class*="List__contents-box"]').filter(vis);
+    if (list.length) return list;
+    const d = detailPanel();
+    return d ? [d] : [];
+  };
+  // 이름표(예약자 · 전화번호 …) 옆 값: 목록 카드의 Summary__item-title, 없으면 글자가 딱 그 이름표인 칸의 다음 칸
   const field = (card, label) => {
     const t = $$('[class*="Summary__item-title"]', card).find((e) => norm(e.textContent) === norm(label));
-    return t && t.nextElementSibling ? txt(t.nextElementSibling).replace(/,\s*$/, "") : "";
+    if (t && t.nextElementSibling) return txt(t.nextElementSibling).replace(/,\s*$/, "");
+    const l = [...card.querySelectorAll("*")].find((e) => vis(e) && norm(e.textContent) === norm(label) && ![...e.children].some((c) => norm(c.textContent) === norm(label)));
+    if (!l) return "";
+    const v = l.nextElementSibling || (l.parentElement && l.parentElement.nextElementSibling);
+    return v ? txt(v).replace(/,\s*$/, "") : "";
+  };
+  // 방문 횟수: "완료 11, 취소 2" · 처음 온 손님은 "신규예약" → 0 · 못 찾으면 null (데스크에 '확인 중')
+  const visitsOf = (c) => {
+    const m = txt(c.querySelector(".text-info-sub")).match(/완료\s*(\d+)(?:\s*,\s*취소\s*(\d+))?/);
+    if (m) return [+m[1], m[2] ? +m[2] : 0];
+    for (const e of leafs(c)) {
+      if (e.closest("button")) continue;
+      const k = txt(e).match(/^완료\s*(\d+)(?:\s*[,·]\s*취소\s*(\d+))?/);
+      if (k) return [+k[1], k[2] ? +k[2] : 0];
+      if (/^신규예약/.test(norm(e.textContent))) return [0, 0];
+    }
+    return [null, 0];
   };
   const readCard = (c) => {
-    const sub = txt(c.querySelector(".text-info-sub")).match(/완료\s*(\d+)(?:\s*,\s*취소\s*(\d+))?/);
-    const badge = c.querySelector("[data-tst_booking_status]") || cls(c, "Summary__user-state");
+    const [doneCount, cancelCount] = visitsOf(c);
+    const badge = c.querySelector("[data-tst_booking_status]") || cls(c, "Summary__user-state") || leafs(c).find((e) => !e.closest("button, a") && /^(확정|완료|이용완료|취소|신청|노쇼)$/.test(norm(e.textContent)));
     const when = field(c, "이용일시");
     const qtyEl = (() => {
       const t = $$('[class*="Summary__item-title"]', c).find((e) => norm(e.textContent) === "수량");
@@ -145,12 +180,12 @@ function installNaverDriver() {
       product: field(c, "상품"),
       when,
       time: to24(when.replace(/^.*\)\s*/, "")),
-      qty: qtyEl ? +txt(qtyEl) || 1 : 1,
+      qty: qtyEl ? +txt(qtyEl) || 1 : +(field(c, "수량").match(/(\d+)\s*,?\s*$/) || [0, 1])[1] || 1,
       qtyText: field(c, "수량"),
       pay: field(c, "결제상태"),
       status: txt(badge),
-      doneCount: sub ? +sub[1] : 0,
-      cancelCount: sub && sub[2] ? +sub[2] : 0,
+      doneCount,
+      cancelCount,
       canComplete: clickables(c).some((b) => textOf(b) === "이용완료"),
     };
   };
@@ -159,7 +194,7 @@ function installNaverDriver() {
   window.alert = () => {};
 
   window.__naver = {
-    v: 4,
+    v: 5,
     read() {
       const page = cls(document, "Calendar__inner-contents") ? "calendar" : $$('a[class*="contents-user"]').length || cls(document, "BookingListView__root") ? "list" : "";
       const total = (document.body.innerText.match(/(\d+)\s*건\s*내려받기/) || [])[1];
@@ -203,7 +238,8 @@ function installNaverDriver() {
     /** 열린 예약정보 목록 닫기 — [닫기] 단추, 없으면 Esc */
     closePanel() {
       if (!cards().length) return { ok: true, had: false };
-      const b = clickables().find((e) => textOf(e) === "닫기" || /닫기/.test(e.getAttribute("aria-label") || "") || /닫기/.test(e.getAttribute("title") || ""));
+      const b = clickables().find((e) => textOf(e) === "닫기" || /닫기/.test(e.getAttribute("aria-label") || "") || /닫기/.test(e.getAttribute("title") || "")) ||
+        clickables(detailPanel() || document).find((e) => /close/i.test(e.className && e.className.baseVal != null ? e.className.baseVal : e.className || ""));
       if (b) press(b);
       else document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
       return { ok: true, had: true };
@@ -240,10 +276,20 @@ function installNaverDriver() {
       if (!card) return { ok: false, why: `예약번호 ${no} 카드를 못 찾음` };
       const b = clickables(card).find((e) => textOf(e) === "이용완료");
       if (!b) return { ok: false, why: "이용완료 버튼이 없음 (이미 완료됐거나 확정이 아님)" };
-      b.click();
-      const ok = clickables().find((e) => ["확인", "OK", "이용완료처리"].includes(textOf(e)) && /하시겠습니까|처리/.test((e.closest("div, section, dialog") || {}).textContent || ""));
-      if (ok) ok.click();
+      press(b);
+      window.__naver.confirm();
       return { ok: true };
+    },
+    /** 확인 창이 떠 있으면 [확인] — "…하시겠습니까?" 가 든 칸의 확인 · OK · 이용완료 단추 */
+    confirm() {
+      const ok = clickables().find((e) => {
+        if (!["확인", "OK", "이용완료처리", "예"].includes(textOf(e))) return false;
+        for (let p = e.parentElement, i = 0; p && i < 5; p = p.parentElement, i++) if (/하시겠습니까|처리하|완료하/.test(p.textContent)) return true;
+        return false;
+      });
+      if (!ok) return { ok: true, clicked: false };
+      press(ok);
+      return { ok: true, clicked: true };
     },
   };
   return true;

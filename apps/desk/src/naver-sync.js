@@ -116,7 +116,11 @@ class NaverSync {
     let r = await this.act(`window.__naver.openSlot(${JSON.stringify(product)}, ${JSON.stringify(time)}, ${JSON.stringify(kind)})`);
     if (!r.ok) return r;
     const want = kind === "확정" ? "확정" : "완료";
-    if (!r.state.cards.some((c) => c.status === want)) r = await this.act(`window.__naver.openTab(${JSON.stringify(want)})`);
+    // 목록이면 그 탭으로 (예약이 1건이면 탭 없이 상세정보가 바로 뜸 → 탭을 못 찾아도 그대로)
+    if (!r.state.cards.some((c) => c.status === want || (want === "완료" && c.status === "이용완료"))) {
+      const t = await this.act(`window.__naver.openTab(${JSON.stringify(want)})`);
+      if (t.ok) r = t;
+    }
     return r;
   }
   /** 오른쪽 목록을 아래로 내려 카드를 더 불러옴 — 더 나온 게 없으면 false */
@@ -198,9 +202,20 @@ class NaverSync {
     if (!(await this.read()).cards.some((c) => c.no === b.no)) return { ok: false, why: `네이버 예약정보에서 예약번호 ${b.no} 카드를 못 찾음` };
     r = await this.act(`window.__naver.complete(${JSON.stringify(b.no)})`);
     if (!r.ok) return r;
+    // 확인 창이 늦게 뜰 수 있음 → 3초 동안 보이면 [확인]
+    for (let i = 0; i < 12; i++) {
+      const c = await this.call("window.__naver.confirm()").catch(() => null);
+      if (c && c.clicked) {
+        this.step("이용완료 확인 창 [확인]");
+        await this.act("({ ok: true })");
+        break;
+      }
+      await sleep(250);
+    }
     // 다시 확인: 확정 칸에 아직 있으면 실패
     const s = await this.read();
-    const stillCard = s.cards.find((c) => c.no === b.no && c.status === "확정");
+    // 상태 동그라미(확정)는 그림일 수 있어 글자 대신 [이용완료] 단추가 아직 있는지로 봄
+    const stillCard = s.cards.find((c) => c.no === b.no && (c.canComplete || c.status === "확정"));
     const cell = s.slots.find((x) => x.time === b.time && (!b.product || x.product === b.product));
     if (stillCard) return { ok: false, why: "네이버에서 이용완료로 바뀌지 않음" };
     // 기억한 칸은 다음 불러오기 때 숫자가 바뀌어 다시 읽힘

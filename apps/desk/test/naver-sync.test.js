@@ -40,6 +40,9 @@ test("하루 예약 읽기: 예약 목록 + 예약현황 카드 (입장권만, �
     assert.strictEqual(by["1367156204"].status, "완료");
     assert.strictEqual(by["1367156204"].doneCount, 11, "이용완료 손님은 완료 n 에 이번 방문이 들어 있음");
     assert.strictEqual(by["1370988026"].time, "18:00");
+    assert.strictEqual(by["1370988026"].doneCount, 0, "1건인 칸은 상세정보가 바로 뜸 · 처음 온 손님은 '신규예약' → 0");
+    assert.strictEqual(by["1370988026"].name, "홍길동");
+    assert.strictEqual(by["1370988026"].phone, "010-1111-2222");
     const s14 = r.slots.find((s) => s.time === "14:00" && /1시간 50분/.test(s.product));
     assert.deepStrictEqual({ cap: s14.cap, conf: s14.conf }, { cap: 10, conf: 4 });
     assert.ok(!r.slots.some((s) => /단체/.test(s.product)), "단체 칸 뺌");
@@ -118,6 +121,20 @@ test("칸을 눌러도 카드가 안 나오면 못 읽은 칸을 알려 주고, 
     assert.match(r.warn, /14:00 확정/);
     assert.ok(steps.some((m) => /14:00 확정 칸 여는 중/.test(m)), steps.join(" / "));
     assert.ok(steps.some((m) => /카드 0장/.test(m)));
+  } finally {
+    await browser.close();
+  }
+});
+
+test("예약이 1건인 칸: 상세정보의 [이용완료] → 확인 → 완료 (탭이 없어도)", async () => {
+  const { browser, sync } = await open();
+  try {
+    const r = await sync.complete({ day: "2026-10-05", no: "1370988026", time: "18:00", product: "야간자유 입장권" });
+    assert.ok(r.ok, r.why);
+    const d = await sync.loadDay("2026-10-05");
+    const b = d.bookings.find((x) => x.no === "1370988026");
+    assert.strictEqual(b.status, "완료");
+    assert.strictEqual(b.doneCount, 1);
   } finally {
     await browser.close();
   }
