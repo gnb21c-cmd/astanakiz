@@ -138,23 +138,36 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .legend .l-pink { border-color: var(--pink); background: var(--pink); }
 .legend .l-red { border-color: var(--red); background: var(--red); }
 
-/* 주차등록 */
-.park { border-top: 1px solid var(--line); padding-top: 6px; display: grid; gap: 6px; grid-template-columns: minmax(0, 1fr) 128px; grid-template-rows: auto minmax(0, 1fr); flex: 1; min-height: 0; }
-.park h3 { margin: 0; font-size: 14px; color: var(--red); grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; }
+/* 주차등록: 아마노 화면(3번 모니터)과 같은 항목 */
+.park { border-top: 1px solid var(--line); padding-top: 6px; display: grid; gap: 5px; grid-template-rows: auto auto minmax(0, 1fr) auto; flex: 1; min-height: 0; }
+.park h3 { margin: 0; font-size: 14px; color: var(--red); display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .park h3 small { color: var(--muted); font-weight: 500; font-size: 11.5px; }
-.park .left { display: grid; gap: 6px; grid-template-rows: auto minmax(0, 1fr); min-height: 0; }
-.park .find { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; margin: 0; }
-.park .find input { border: 1.5px solid var(--red); border-radius: 8px; padding: 6px 10px; font-size: 16px; background: var(--surface); min-width: 0; min-height: 38px; }
-.park .find .btn { border-color: var(--red); color: var(--red); }
-.cars { border: 1.5px solid var(--red); border-radius: 8px; padding: 4px; display: grid; gap: 3px; align-content: start; overflow: auto; min-height: 84px; }
-.car { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: center; padding: 5px 8px; border-radius: 6px; border: 1px solid transparent; background: var(--surface-2); text-align: left; width: 100%; }
+.park h3 small i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); margin-right: 4px; font-style: normal; }
+.park .find { display: grid; grid-template-columns: auto 128px minmax(0, 1fr) auto; gap: 6px; margin: 0; align-items: center; }
+.park .find label { font-size: 12px; color: var(--muted); font-weight: 600; }
+.park .find input { border: 1.5px solid var(--red); border-radius: 8px; padding: 4px 8px; font-size: 15px; background: var(--surface); min-width: 0; min-height: 34px; }
+.park .find .btn { border-color: var(--red); color: var(--red); min-height: 34px; }
+.park .body { display: grid; grid-template-columns: minmax(0, 1fr) 236px; gap: 6px; min-height: 0; }
+.cars { border: 1.5px solid var(--red); border-radius: 8px; padding: 4px; display: grid; gap: 3px; align-content: start; overflow: auto; min-height: 0; }
+.car { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 6px; align-items: center; padding: 4px 8px; border-radius: 6px; border: 1px solid transparent; background: var(--surface-2); text-align: left; width: 100%; }
 .car.on { border-color: var(--red); background: var(--warn-bg); }
-.car b { font-size: 14.5px; }
-.car small { color: var(--muted); font-size: 11.5px; }
-.car .st { font-size: 11.5px; font-weight: 700; color: var(--ok); }
-.park .disc { display: grid; gap: 6px; align-content: end; }
-.park .disc .btn { min-height: 46px; border-radius: 12px; border-color: var(--pink-fg); color: var(--fg); font-size: 15px; }
-.park .disc p { margin: 0; font-size: 11px; color: var(--muted); }
+.car b { font-size: 14px; }
+.car small { color: var(--muted); font-size: 11px; }
+.car .st { font-size: 11px; font-weight: 700; color: var(--ok); text-align: right; }
+.cnt { font-size: 10.5px; font-weight: 700; background: var(--muted); color: var(--surface); border-radius: 4px; padding: 0 4px; margin-left: 2px; }
+.pcar { border: 1.5px solid var(--red); border-radius: 8px; padding: 6px; display: grid; gap: 4px; align-content: start; overflow: auto; min-height: 0; }
+.pcar .no { font-size: 18px; font-weight: 700; text-align: center; background: var(--ink); color: var(--on-ink); border-radius: 6px; padding: 2px 0; }
+.pcar .tm { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+.pcar .tm b { color: var(--red); font-size: 14px; }
+.dbtns { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.dbtns .btn { min-height: 38px; font-size: 14px; border-color: var(--accent); color: var(--accent); padding: 2px 4px; }
+.dbtns.small { grid-template-columns: repeat(4, 1fr); }
+.dbtns.small .btn { min-height: 26px; font-size: 11.5px; }
+.dlist { display: grid; gap: 2px; font-size: 11.5px; }
+.dlist div { display: flex; justify-content: space-between; align-items: center; gap: 4px; background: var(--surface-2); border-radius: 5px; padding: 1px 4px; }
+.dlist button { border: 0; background: transparent; color: var(--red); font-size: 11px; font-weight: 700; padding: 0 2px; }
+.synclog { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.synclog b { color: var(--fg); font-weight: 600; }
 
 /* 팝업 */
 .overlay { position: absolute; inset: 0; background: rgba(12, 16, 24, .5); display: grid; align-items: center; justify-items: center; z-index: 20; padding: 12px 16px; }
@@ -239,19 +252,18 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         <span>· 빈 열쇠를 누르면 현장입장</span>
       </div>
       <div class="park">
-        <h3>주차등록 <small>아마노코리아 주차 웹 연결 (체험)</small></h3>
-        <div class="left">
-          <form class="find" id="park-form">
-            <input id="car-q" inputmode="numeric" placeholder="차번호 뒤 4자리" autocomplete="off" aria-label="차번호">
-            <button class="btn" type="submit">검색</button>
-          </form>
-          <div class="cars" id="cars" aria-label="검색된 차량"></div>
+        <h3>주차등록 <small><i></i>아마노 화면(3번 모니터)과 동기화 · 체험</small></h3>
+        <form class="find" id="park-form">
+          <label for="car-day">입차일</label>
+          <input id="car-day" type="date" value="2026-10-04" aria-label="입차일 (전날부터 검색)">
+          <input id="car-q" inputmode="numeric" placeholder="차량번호 (예: 5514)" autocomplete="off" aria-label="차량번호">
+          <button class="btn" type="submit">검색</button>
+        </form>
+        <div class="body">
+          <div class="cars" id="cars" aria-label="차량번호 조회 결과"></div>
+          <div class="pcar" id="pcar" aria-label="할인정보 등록"></div>
         </div>
-        <div class="disc">
-          <p id="disc-help">차량을 고른 뒤 누르세요</p>
-          <button class="btn" data-act="discount" data-h="2시간 30분" disabled>2시간 30분</button>
-          <button class="btn" data-act="discount" data-h="5시간" disabled>5시간</button>
-        </div>
+        <div class="synclog" id="synclog"></div>
       </div>
     </section>
   </div>
@@ -482,22 +494,36 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     } else $("pickbar").hidden = true;
   }
 
-  // ── 주차 (아마노 웹 연계 체험) ─────────────────────
-  // 체험용 입차 차량 (실제로는 아마노 주차 웹에서 검색)
-  const LOT = [["152가 7781", "09:52"], ["38다 1172", "10:05"], ["61머 3020", "10:41"], ["27노 8814", "11:02"], ["119허 4402", "11:48"], ["45루 6603", "12:33"], ["21보 5520", "12:57"], ["12가 3456", "13:20"], ["32우 3456", "13:31"], ["208라 1172", "13:44"]]
-    .map(([no, at]) => ({ no, at, disc: null }));
-  let carQ = "", carSel = null;
+  // ── 주차 (아마노 화면 동기화 체험) ─────────────────
+  /* 실제: 데스크에서 입력·누른 것을 3번 모니터의 아마노 웹 화면에 똑같이 넣고 누름 (입차일 → 차량번호 → 검색 → 차량 선택 → 할인유형)
+     그리고 아마노 화면의 결과(조회 목록·주차시간·할인내역)를 읽어 와 여기 보여 줌. 아래 LOT 은 체험용 입차 차량 */
+  const LOT = [["152가 7781", "2026-10-05 09:52"], ["38다 1172", "2026-10-05 10:05"], ["61머 3020", "2026-10-05 10:41"], ["27노 8814", "2026-10-05 11:02"],
+    ["117무 5514", "2026-10-05 11:26"], ["119허 4402", "2026-10-05 11:48"], ["45루 6603", "2026-10-05 12:33"], ["21보 5520", "2026-10-05 12:57"],
+    ["12가 3456", "2026-10-05 13:20"], ["32우 3456", "2026-10-05 13:31"], ["208라 1172", "2026-10-04 23:12"]]
+    .map(([no, at], i) => ({ id: 774300 + i * 7, no, at, discs: [] }));
+  const DISC = { big: ["3시간할인", "5시간할인"], small: ["15시간할인", "16시간할인", "17시간할인", "18시간할인"] };
+  let carQ = "", carSel = null, syncMsg = "차량번호를 넣고 검색하면 아마노 화면에도 같은 값이 들어가요";
+  const entryMin = (c) => (c.at.slice(0, 10) === TODAY ? 0 : -1440) + toMin(c.at.slice(11));
+  const parkedText = (c) => { const m = now - entryMin(c); return `${Math.floor(m / 60)}시간 ${m % 60}분`; };
   function renderCars() {
-    const q = digits(carQ);
-    const list = q ? LOT.filter((c) => digits(c.no).includes(q)) : [];
-    $("cars").innerHTML = !q ? `<div class="empty">차번호를 넣고 검색하세요 (예: 3456, 1172)</div>`
-      : list.length ? list.map((c) => `<button class="car ${carSel === c.no ? "on" : ""}" data-act="car" data-no="${esc(c.no)}" aria-pressed="${carSel === c.no}">
-          <span><b class="num">${esc(c.no)}</b> <small class="num">입차 ${c.at}</small></span>
-          <span class="st">${c.disc ? c.disc + " 등록됨" : ""}</span></button>`).join("")
+    const q = digits(carQ), from = $("car-day").value;
+    const list = q ? LOT.filter((c) => digits(c.no).includes(q) && c.at.slice(0, 10) >= from) : [];
+    $("cars").innerHTML = !q ? `<div class="empty">입차일은 새벽 손님 때문에 전날부터 찾아요</div>`
+      : list.length ? list.map((c) => `<button class="car ${carSel === c.id ? "on" : ""}" data-act="car" data-id="${c.id}" aria-pressed="${carSel === c.id}">
+          <span><b class="num">${esc(c.no)}</b>${c.discs.length ? `<span class="cnt num">${c.discs.length}건</span>` : ""}</span>
+          <small class="num">${c.at.slice(5, 16)} 입차</small>
+          <small class="num">입차ID ${c.id}</small>
+          <span class="st">${c.discs.length ? c.discs[c.discs.length - 1].type + " 등록" : ""}</span></button>`).join("")
       : `<div class="empty">검색된 차량이 없어요</div>`;
-    const sel = LOT.find((c) => c.no === carSel);
-    document.querySelectorAll("[data-act=discount]").forEach((b) => (b.disabled = !sel));
-    $("disc-help").textContent = sel ? `${sel.no} 할인` : "차량을 고른 뒤 누르세요";
+    const c = LOT.find((x) => x.id === carSel);
+    const btn = (t) => `<button class="btn" data-act="discount" data-h="${t}">${t.replace("할인", "")}</button>`;
+    $("pcar").innerHTML = !c ? `<div class="empty">조회 목록에서 차량을 고르면 할인유형이 나와요</div>` : `
+      <div class="no num">${esc(c.no)}</div>
+      <div class="tm num"><span>입차 ${c.at.slice(5, 16)}</span><b>${parkedText(c)}</b></div>
+      <div class="dbtns">${DISC.big.map(btn).join("")}</div>
+      <div class="dbtns small">${DISC.small.map(btn).join("")}</div>
+      <div class="dlist">${c.discs.length ? c.discs.map((d, i) => `<div><span class="num">${d.type} · ${hm(d.at)}</span><button data-act="discDel" data-i="${i}" aria-label="할인 삭제">삭제</button></div>`).join("") : `<span class="help">할인내역 없음</span>`}</div>`;
+    $("synclog").innerHTML = `아마노: <b>${esc(syncMsg)}</b>`;
   }
 
   function renderAll() { $("now").textContent = hm(now); renderSlots(); renderRes(); renderKeys(); renderCars(); }
@@ -657,10 +683,20 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     returnOne() { const h = holderOf(sheet.k); returnKeys(h, [sheet.k]); closeSheet(); renderAll(); },
     called() { const h = holderOf(sheet.k); h.called = now; toast("연락함으로 표시했어요"); renderSheet(); },
     settings() { openSheet({ mode: "settings" }); },
-    car(btn) { carSel = carSel === btn.dataset.no ? null : btn.dataset.no; renderCars(); },
+    car(btn) {
+      carSel = Number(btn.dataset.id);
+      const c = LOT.find((x) => x.id === carSel);
+      syncMsg = `조회 목록에서 ${c.no} 누름 → 주차시간 ${parkedText(c)} 읽음`; renderCars();
+    },
     discount(btn) {
-      const c = LOT.find((x) => x.no === carSel); if (!c) return;
-      c.disc = btn.dataset.h; toast(`${c.no} ${c.disc} 할인 등록됨 (체험)`); renderCars();
+      const c = LOT.find((x) => x.id === carSel); if (!c) return;
+      c.discs.push({ type: btn.dataset.h, at: now });
+      syncMsg = `${c.no} · '${btn.dataset.h}' 버튼 누름 → 할인내역 ${c.discs.length}건 확인`;
+      toast(`${c.no} ${btn.dataset.h} 등록 (체험)`); renderCars();
+    },
+    discDel(btn) {
+      const c = LOT.find((x) => x.id === carSel); const d = c.discs.splice(Number(btn.dataset.i), 1)[0];
+      syncMsg = `${c.no} · 할인내역 '${d.type}' 삭제 누름`; renderCars();
     },
     close() { closeSheet(); if (pick && pick.keys.length >= pick.need) { pick.keys = []; renderKeys(); } },
   };
@@ -681,7 +717,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     const m = /^p(f|t)-(\d+)$/.exec(t.id);
     if (m && t.value) { RULES.peaks[+m[2]][m[1] === "f" ? "from" : "to"] = t.value; renderAll(); }
   });
-  $("park-form").addEventListener("submit", (e) => { e.preventDefault(); carQ = $("car-q").value; carSel = null; renderCars(); });
+  $("park-form").addEventListener("submit", (e) => {
+    e.preventDefault(); carQ = $("car-q").value; carSel = null;
+    syncMsg = `입차일 ${$("car-day").value} · 차량번호 ${digits(carQ)} 입력 → 검색 누름`;
+    renderCars();
+  });
+  $("car-day").addEventListener("change", () => renderCars());
 
   // 창 크기에 맞춰 1024×768 화면을 통째로 맞춤 (가운데 정렬)
   function fit() {
