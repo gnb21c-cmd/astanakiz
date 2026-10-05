@@ -101,7 +101,15 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 /* 가운데: 예약자 명단 */
 .res { border: 1px solid var(--line); border-radius: 10px; padding: 7px 9px; display: grid; gap: 3px; background: var(--surface); }
 .res.done { background: var(--surface-2); }
-.res.picking { border: 2px solid var(--accent); }
+.res { cursor: pointer; }
+.res:hover { border-color: var(--accent); }
+.res .go { font-size: 12.5px; font-weight: 700; color: var(--accent); }
+/* 예약자 팝업의 열쇠 고르기: 15칸 × 3줄 */
+.kpick { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); gap: 4px; }
+.kpick button { aspect-ratio: 1; border-radius: 7px; border: 1.5px solid var(--ink); background: var(--surface); color: var(--ink); font-size: 15px; font-weight: 700; padding: 0; }
+.kpick button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.kpick button[disabled] { border-color: var(--line); background: var(--surface-2); color: var(--faint); opacity: .45; cursor: default; font-weight: 500; }
+.sheet.wide { width: min(620px, 100%); }
 .res .head { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
 .res .name { font-size: 15.5px; font-weight: 700; }
 .badge { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
@@ -121,7 +129,6 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .keyhead { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
 .keyhead .stat { font-size: 12.5px; color: var(--muted); }
 .keyhead .stat b { color: var(--fg); font-size: 15px; }
-.pickbar { display: flex; gap: 8px; align-items: center; justify-content: space-between; background: var(--accent-bg); border: 1.5px solid var(--accent); color: var(--fg); border-radius: 9px; padding: 5px 8px; font-size: 13px; font-weight: 600; }
 .keys { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; }
 .key { aspect-ratio: 1 / .98; max-width: 100%; border-radius: 8px; border: 1.5px solid var(--line); background: var(--surface-2); color: var(--faint); display: grid; align-content: center; justify-items: center; padding: 1px; line-height: 1.1; min-width: 0; overflow: hidden; }
 .key b { font-size: 17px; font-weight: 700; }
@@ -130,8 +137,6 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .key.pink { background: var(--pink); border: 2px solid var(--pink); color: var(--pink-fg); }
 .key.red { background: var(--red); border: 2px solid var(--red); color: #fff; }
 .key.void { visibility: hidden; }
-.keys.picking .key.free { border: 2px dashed var(--accent); color: var(--accent); background: var(--surface); }
-.keys.picking .key.sel { background: var(--accent); border-color: var(--accent); color: #fff; }
 .legend { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 11.5px; color: var(--muted); }
 .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: -1px; margin-right: 4px; border: 1.5px solid var(--line); background: var(--surface-2); }
 .legend .l-in { border-color: var(--ink); background: var(--surface); }
@@ -240,7 +245,6 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         <h2 id="h-keys">열쇠</h2>
         <span class="stat num" id="key-stat"></span>
       </div>
-      <div class="pickbar" id="pickbar" hidden></div>
       <div class="keys" id="keys"></div>
       <div class="legend">
         <span><i></i>빈 열쇠</span>
@@ -423,8 +427,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 
   // ── 그리기 ───────────────────────────────────────
   const $ = (id) => document.getElementById(id);
-  let pick = null; // 네이버 예약자 열쇠 고르기 { id, need, keys: [] }
-  const findB = (id) => bookings[TODAY].find((b) => b.id === id);
+  const findB = (id) => Object.values(bookings).flat().find((b) => b.id === id);
 
   function renderSlots() {
     ensureDay(viewDay);
@@ -455,12 +458,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       if (b.status === "확정") {
         if (!isToday) act = `<span class="help">이용일에 입장 처리</span>`;
         else if (now < b.slot - RULES.earlyMinutes) act = `<span class="help num">${hm(b.slot - RULES.earlyMinutes)}부터 입장</span>`;
-        else act = pick && pick.id === b.id
-          ? `<span class="help">오른쪽에서 빈 열쇠를 누르세요</span><button class="btn btn-sm" data-act="pickCancel">취소</button>`
-          : `<button class="btn btn-ink btn-sm" data-act="enter" data-id="${b.id}">입장 · 열쇠 고르기</button>`;
+        else act = `<span class="go">눌러서 입장 · 열쇠 지급 ›</span>`;
       } else if (b.keys.length) act = `<span class="kchips">${b.keys.map((k) => `<span class="kchip num">${k}</span>`).join("")}</span><span class="help num">${hm(b.enteredAt)} 입장</span>`;
       else if (b.outAt != null) act = `<span class="help num">${hm(b.enteredAt)} 입장 · ${hm(b.outAt)} 퇴장</span>`;
-      return `<article class="res ${b.status === "완료" ? "done" : ""} ${pick && pick.id === b.id ? "picking" : ""}">
+      return `<article class="res ${b.status === "완료" ? "done" : ""}" data-act="openRes" data-id="${b.id}" tabindex="0" role="button" aria-label="${esc(b.name)} 예약 열기">
         <div class="head"><span class="name">${esc(b.name)}</span><span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "확정"}</span></div>
         <dl class="kv">
           <dt>전화번호</dt><dd class="phone num">${fmtPhone(b.phone)}</dd>
@@ -480,16 +481,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     for (let k = 1; k <= 50; k++) {
       if (k > RULES.keys) { html += `<span class="key void" aria-hidden="true"></span>`; continue; }
       const h = holderOf(k);
-      if (!h) { html += `<button class="key free ${pick && pick.keys.includes(k) ? "sel" : ""}" data-act="key" data-k="${k}" aria-label="${k}번 빈 열쇠"><b class="num">${k}</b><span>&nbsp;</span></button>`; continue; }
+      if (!h) { html += `<button class="key free" data-act="key" data-k="${k}" aria-label="${k}번 빈 열쇠"><b class="num">${k}</b><span>&nbsp;</span></button>`; continue; }
       html += `<button class="key ${keyColor(h)}" data-act="key" data-k="${k}" aria-label="${k}번 ${esc(h.name)}"><b class="num">${k}</b><span>${esc(h.walk ? "현장" : h.name)}</span></button>`;
     }
     $("keys").innerHTML = html;
-    $("keys").classList.toggle("picking", !!pick);
-    if (pick) {
-      const b = findB(pick.id);
-      $("pickbar").hidden = false;
-      $("pickbar").innerHTML = `<span>${esc(b.name)}님 · 빈 열쇠 <b class="num">${pick.need}</b>개를 눌러 주세요 (${pick.keys.length}/${pick.need})</span><button class="btn btn-sm" data-act="pickCancel">취소</button>`;
-    } else $("pickbar").hidden = true;
   }
 
   // ── 주차 (아마노 화면 동기화 체험) ─────────────────
@@ -540,20 +535,36 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 
   function renderSheet() {
     const el = $("sheet");
+    el.classList.toggle("wide", sheet.mode === "enter");
     if (sheet.mode === "enter") {
       const b = findB(sheet.id);
-      const m = minutesFor(TODAY, b.slot);
+      const m = minutesFor(b.day, b.slot);
+      const canEnter = b.status === "확정" && b.day === TODAY && now >= b.slot - RULES.earlyMinutes;
+      let pickHtml = "";
+      if (b.status === "확정") {
+        let btns = "";
+        for (let k = 1; k <= RULES.keys; k++) {
+          const used = !!holderOf(k), on = sheet.keys.includes(k);
+          btns += `<button type="button" class="num ${on ? "on" : ""}" data-act="pickKey" data-k="${k}" ${used || !canEnter ? "disabled" : ""} aria-pressed="${on}" aria-label="${k}번${used ? " 지급됨" : ""}">${k}</button>`;
+        }
+        pickHtml = `<div class="field"><span class="label">지급할 열쇠 <span class="help num">예약 수량 ${b.qty}개만큼 누르세요 · ${sheet.keys.length}/${b.qty} · 흐린 번호는 이미 지급됨</span></span><div class="kpick">${btns}</div></div>`;
+      }
+      const note = b.status !== "확정" ? "" : b.day !== TODAY ? `<div class="banner warn">이용일(${b.day.slice(5).replace("-", "/")})에 입장 처리할 수 있어요</div>`
+        : !canEnter ? `<div class="banner warn">${hm(b.slot - RULES.earlyMinutes)}부터 입장할 수 있어요</div>` : "";
       el.innerHTML = `
-        <h3 id="sheet-title">네이버 예약 입장 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
+        <h3 id="sheet-title">네이버 예약자 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
         <dl class="facts">
-          <dt>예약자</dt><dd>${esc(b.name)}</dd>
+          <dt>예약자</dt><dd style="font-size:18px">${esc(b.name)} <span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "확정"}</span></dd>
           <dt>전화번호</dt><dd class="num">${fmtPhone(b.phone)}</dd>
           <dt>이용일시</dt><dd class="num">${hm(b.slot)} ${m == null ? "· 무제한" : `~ ${hm(b.slot + m)} (1시간 50분)`}</dd>
           <dt>수량</dt><dd>${b.product} ${b.qty}</dd>
           <dt>결제상태</dt><dd>${b.pay}</dd>
-          <dt>열쇠</dt><dd><div class="bigkeys">${sheet.keys.map((k) => `<span class="bigkey num">${k}</span>`).join("")}</div></dd>
+          ${b.status === "완료" ? `<dt>열쇠</dt><dd>${b.keys.length ? `<div class="bigkeys">${b.keys.map((k) => `<span class="bigkey num">${k}</span>`).join("")}</div>` : b.outAt != null ? `<span class="num">${b.enteredAt != null ? hm(b.enteredAt) + " 입장 · " : ""}${hm(b.outAt)} 퇴장 (반납함)</span>` : "-"}</dd>` : ""}
         </dl>
-        <div class="sheet-foot"><button class="btn" data-act="close">다시 고르기</button><button class="btn btn-ink" data-act="doEnter" data-autofocus>입장 · 네이버 이용완료</button></div>`;
+        ${note}${pickHtml}
+        <div class="sheet-foot">${b.status === "확정"
+          ? `<button class="btn" data-act="close">닫기</button><button class="btn btn-ink" id="enter-done" data-act="doEnter" ${canEnter && sheet.keys.length === b.qty ? "" : "disabled"}>등록 완료</button>`
+          : `<button class="btn btn-ink" data-act="close" data-autofocus>닫기</button>`}</div>`;
       return;
     }
     if (sheet.mode === "walk") {
@@ -638,27 +649,29 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 
   const acts = {
     time(btn) { now += Number(btn.dataset.min); renderAll(); },
-    day(btn) { viewDay = shiftDay(viewDay, Number(btn.dataset.d)); pick = null; renderAll(); },
+    day(btn) { viewDay = shiftDay(viewDay, Number(btn.dataset.d)); renderAll(); },
     slot(btn) { selSlot = Number(btn.dataset.s); renderAll(); },
-    enter(btn) { const b = findB(btn.dataset.id); pick = { id: b.id, need: b.qty, keys: [] }; renderAll(); },
-    pickCancel() { pick = null; renderAll(); },
+    openRes(el) { openSheet({ mode: "enter", id: el.dataset.id, keys: [] }); },
+    pickKey(btn) {
+      const k = Number(btn.dataset.k), b = findB(sheet.id);
+      if (sheet.keys.includes(k)) sheet.keys = sheet.keys.filter((x) => x !== k);
+      else if (sheet.keys.length < b.qty) sheet.keys.push(k);
+      else if (b.qty === 1) sheet.keys = [k];
+      else { toast(`수량 ${b.qty}개를 이미 골랐어요. 고른 번호를 다시 눌러 빼 주세요`); return; }
+      renderSheet();
+    },
     key(btn) {
       const k = Number(btn.dataset.k);
       const h = holderOf(k);
-      if (h) { if (pick) { toast("빈 열쇠를 눌러 주세요"); return; } openSheet({ mode: "key", k }); return; }
-      if (pick) {
-        if (pick.keys.includes(k)) pick.keys = pick.keys.filter((x) => x !== k); else pick.keys.push(k);
-        renderKeys();
-        if (pick.keys.length >= pick.need) openSheet({ mode: "enter", id: pick.id, keys: pick.keys.slice() });
-        return;
-      }
+      if (h) { openSheet({ mode: "key", k }); return; }
       openSheet({ mode: "walk", keys: [k], phone: "", paid: false, flexOk: false });
     },
     doEnter() {
       const b = findB(sheet.id);
-      if (sheet.keys.some((k) => holderOf(k))) { toast("그 사이 다른 손님이 쓴 열쇠가 있어요. 다시 골라 주세요."); pick.keys = []; closeSheet(); renderAll(); return; }
+      if (sheet.keys.length !== b.qty) return;
+      if (sheet.keys.some((k) => holderOf(k))) { toast("그 사이 다른 손님이 쓴 열쇠가 있어요. 다시 골라 주세요."); sheet.keys = []; renderSheet(); return; }
       Object.assign(b, { status: "완료", keys: sheet.keys.slice(), enteredAt: now });
-      pick = null; closeSheet();
+      closeSheet();
       toast(`${b.name}님 입장 · 열쇠 ${b.keys.join(", ")}번 · 네이버 이용완료 처리함`);
       renderAll();
     },
@@ -695,7 +708,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const c = LOT.find((x) => x.id === carSel); const d = c.discs.splice(Number(btn.dataset.i), 1)[0];
       syncMsg = `${c.no} · 할인내역 '${d.type}' 삭제 누름`; renderCars();
     },
-    close() { closeSheet(); if (pick && pick.keys.length >= pick.need) { pick.keys = []; renderKeys(); } },
+    close() { closeSheet(); },
   };
 
   document.addEventListener("click", (e) => {
@@ -705,7 +718,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   });
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape" || !$("pos").hidden) return;
-    if (sheet.mode) acts.close(); else if (pick) acts.pickCancel();
+    if (sheet.mode) acts.close();
   });
   document.addEventListener("input", (e) => {
     const t = e.target;
