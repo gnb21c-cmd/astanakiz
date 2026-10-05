@@ -193,7 +193,7 @@ const nwrap = (fn, limit = 120000) => async (_e, ...args) => {
     return { ok: false, why: String(e.message || e) };
   }
 };
-ipcMain.handle("naver:load", nwrap((day) => naver.loadDay(day), 300000)); // 처음엔 칸을 다 열어 오래 걸릴 수 있음
+ipcMain.handle("naver:load", nwrap((day, only) => naver.loadDay(day, { only }), 300000)); // 처음엔 칸을 다 열어 오래 걸릴 수 있음
 ipcMain.handle("naver:complete", nwrap((b) => naver.complete(b)));
 ipcMain.handle("naver:show", () => {
   if (naverWin) {

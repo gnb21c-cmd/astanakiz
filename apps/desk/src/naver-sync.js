@@ -148,7 +148,8 @@ class NaverSync {
     this.step(`${time} ${kind}: 카드 ${got.size}장`);
     return { ok: true, cards: [...got.values()] };
   }
-  async loadDay(day) {
+  /** opts.only = "14:00" 이면 그 시간 칸만 다시 열어 읽음 (기억한 카드도 무시) — 근무자가 시간 칸을 누를 때 */
+  async loadDay(day, opts = {}) {
     let g = await this.goView("calendar");
     if (!g.ok) return g;
     g = await this.goDate(day);
@@ -165,8 +166,9 @@ class NaverSync {
         const key = `${s.product}|${s.time}|${kind}`;
         if (!n) continue;
         live.add(key);
+        if (opts.only && s.time !== opts.only) continue; // 그 시간만
         const c = cache.get(key);
-        if (c && c.count === n) continue; // 숫자가 그대로면 기억한 카드 그대로
+        if (c && c.count === n && !opts.only) continue; // 숫자가 그대로면 기억한 카드 그대로
         const r = await this.readSlotCards(s.product, s.time, kind);
         if (!r.ok) return r;
         opened = true;

@@ -13,7 +13,7 @@ contextBridge.exposeInMainWorld("desk", {
     learn: (key) => ipcRenderer.invoke("amano:learn", key),
   },
   naver: {
-    load: (day) => ipcRenderer.invoke("naver:load", day),
+    load: (day, only) => ipcRenderer.invoke("naver:load", day, only), // only = "14:00" 이면 그 시간 칸만
     complete: (b) => ipcRenderer.invoke("naver:complete", b),
     show: () => ipcRenderer.invoke("naver:show"),
     setHome: () => ipcRenderer.invoke("naver:setHome"),

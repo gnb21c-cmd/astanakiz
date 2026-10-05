@@ -28,10 +28,13 @@ test("데스크가 네이버 예약을 불러오고, 등록 완료 때 네이버
     const desk = await ctx.newPage();
     await desk.clock.install({ time: new Date("2026-10-05T13:56:00") });
     const loads = [];
-    await desk.exposeFunction("__naverLoad", (day) => (loads.push(day), naver.loadDay(day)));
-    await desk.exposeFunction("__naverComplete", (b) => naver.complete(b));
+    // 앱처럼 네이버 화면 작업은 한 번에 하나씩
+    let q = Promise.resolve();
+    const serial = (fn) => (q = q.then(fn, fn));
+    await desk.exposeFunction("__naverLoad", (day, only) => (only ? null : loads.push(day), serial(() => naver.loadDay(day, { only }))));
+    await desk.exposeFunction("__naverComplete", (b) => serial(() => naver.complete(b)));
     await desk.addInitScript(() => {
-      window.desk = { naver: { load: (d) => window.__naverLoad(d), complete: (b) => window.__naverComplete(b) } };
+      window.desk = { naver: { load: (d, o) => window.__naverLoad(d, o), complete: (b) => window.__naverComplete(b) } };
     });
     const errs = [];
     desk.on("pageerror", (e) => errs.push(e.message));
