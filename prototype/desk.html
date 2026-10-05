@@ -483,12 +483,15 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   // ── 네이버 불러오기 (설치한 앱) ─────────────────────
   const naverSlots = {}; // 날짜 → 시각(분) → { cap, conf, done } (입장권 상품 합계)
   let naverBusy = false;
+  let naverErr = ""; // 마지막 불러오기가 실패한 까닭 (다음에 성공할 때까지 버튼에 보임)
   async function loadNaver(day, loud) {
-    if (!APP || naverBusy) return;
+    if (!APP) return;
+    if (naverBusy) { if (loud) toast("네이버 예약을 불러오는 중이에요 — 잠시만요"); return; }
     naverBusy = true; renderAll();
     const r = await window.desk.naver.load(day).catch((e) => ({ ok: false, why: String(e) }));
     naverBusy = false;
-    if (!r || !r.ok) { toast(`네이버: ${(r && r.why) || "응답 없음"}`); renderAll(); return; }
+    if (!r || !r.ok) { naverErr = (r && r.why) || "응답 없음"; toast(`네이버: ${naverErr}`); renderAll(); return; }
+    naverErr = "";
     applyNaver(day, r);
     if (day === TODAY) restoreState();
     lastRefresh = now;
@@ -713,7 +716,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   }
 
   function refreshText() {
-    if (naverBusy) return "불러오는 중…";
+    if (naverBusy) return "네이버 불러오는 중…";
+    if (naverErr) return `⚠ ${naverErr}`;
     const nx = autoNext(now);
     return [lastRefresh == null ? "" : `${hm(lastRefresh)} 불러옴`, nx == null ? "" : `다음 ${hm(nx)}`].filter(Boolean).join(" · ");
   }
@@ -727,7 +731,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (APP) { loadNaver(TODAY); return; }
     lastRefresh = todayAt = now; renderAll(); toast(`${hm(now)} 네이버 예약 자동 불러옴 (체험)`);
   }
-  function renderAll() { saveState(); $("now").textContent = hm(now); $("refresh-at").textContent = refreshText(); renderSlots(); renderRes(); renderKeys(); renderCars(); }
+  function renderAll() { saveState(); $("now").textContent = hm(now); $("refresh-at").textContent = refreshText(); $("refresh-at").style.color = naverErr && !naverBusy ? "var(--red)" : ""; $("refresh-at").style.color = naverErr && !naverBusy ? "var(--red)" : ""; renderSlots(); renderRes(); renderKeys(); renderCars(); }
 
   // ── 팝업 ─────────────────────────────────────────
   const sheet = { mode: null };

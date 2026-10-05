@@ -28,6 +28,11 @@ let naverWin = null;
 let naver = null;
 // 같은 창을 두 동작이 동시에 만지지 않게 차례로 실행
 const queues = {};
+// 시간 제한: 페이지가 옮겨 가는 중에는 화면 안 실행이 응답 없이 멈출 수 있음 → 끝없이 기다리지 않게
+const timed = (p, ms, why) => {
+  let t;
+  return Promise.race([p, new Promise((_, rej) => (t = setTimeout(() => rej(new Error(why)), ms)))]).finally(() => clearTimeout(t));
+};
 const serial = (name, fn) => (queues[name] = (queues[name] || Promise.resolve()).then(fn, fn));
 
 function loadSettings() {
@@ -48,7 +53,7 @@ const DESK_HTML = () =>
 function openAmano() {
   if (amanoWin && !amanoWin.isDestroyed()) amanoWin.destroy();
   // 맨 뒤 창: 보이기는 하지만 포커스를 가져가지 않는다
-  amanoWin = new BrowserWindow({ width: 1024, height: 768, show: false, title: "아마노 주차 (입장 데스크가 조작 중)", webPreferences: { backgroundThrottling: false } });
+  amanoWin = new BrowserWindow({ width: 1024, height: 768, show: false, skipTaskbar: true, title: "아마노 주차 (입장 데스크가 조작 중)", webPreferences: { backgroundThrottling: false } });
   amanoWin.setMenuBarVisibility(false);
   if (settings.amanoUrl) amanoWin.loadURL(settings.amanoUrl);
   else amanoWin.loadURL("data:text/html;charset=utf-8," + encodeURIComponent("<p style='font:16px sans-serif;padding:24px'>운영 설정 → 아마노 탭에서 아마노 할인등록 주소를 넣어 주세요.</p>"));
@@ -81,16 +86,16 @@ function openAmano() {
     // 근무자가 아마노 창을 닫아도 꺼지지 않고 뒤로만 숨김
     if (!app.isQuitting) {
       e.preventDefault();
-      amanoWin.minimize();
+      if (deskWin) deskWin.focus(); // 닫지 않고 데스크 뒤로 (계속 조작해야 해서)
     }
   });
-  amano = new AmanoSync((code) => amanoWin.webContents.executeJavaScript(code, true), { selectors: settings.amanoSelectors });
+  amano = new AmanoSync((code) => timed(amanoWin.webContents.executeJavaScript(code, true), 8000, "아마노 화면이 응답하지 않음"), { selectors: settings.amanoSelectors });
 }
 
 // 네이버 예약관리 창: 맨 뒤. 로그인(2단계 인증 포함)은 근무자가 처음 한 번 직접, 로그인 상태는 이 PC에 계속 남음(persist:naver)
 function openNaver() {
   if (naverWin && !naverWin.isDestroyed()) naverWin.destroy();
-  naverWin = new BrowserWindow({ width: 1280, height: 800, show: false, title: "네이버 예약관리 (입장 데스크가 읽는 중)", webPreferences: { partition: "persist:naver", backgroundThrottling: false } });
+  naverWin = new BrowserWindow({ width: 1280, height: 800, show: false, skipTaskbar: true, title: "네이버 예약관리 (입장 데스크가 읽는 중)", webPreferences: { partition: "persist:naver", backgroundThrottling: false } });
   naverWin.setMenuBarVisibility(false);
   naverWin.loadURL(settings.naverUrl);
   naverWin.once("ready-to-show", () => {
@@ -100,10 +105,10 @@ function openNaver() {
   naverWin.on("close", (e) => {
     if (!app.isQuitting) {
       e.preventDefault();
-      naverWin.minimize();
+      if (deskWin) deskWin.focus(); // 닫지 않고 데스크 뒤로 (계속 읽어야 해서)
     }
   });
-  naver = new NaverSync((code) => naverWin.webContents.executeJavaScript(code, true), { urls: naverUrls(settings.naverUrl) });
+  naver = new NaverSync((code) => timed(naverWin.webContents.executeJavaScript(code, true), 8000, "네이버 화면이 응답하지 않음"), { urls: naverUrls(settings.naverUrl) });
 }
 
 function createDesk() {
@@ -115,6 +120,11 @@ function createDesk() {
   });
   deskWin.setMenuBarVisibility(false);
   deskWin.loadFile(DESK_HTML());
+  // 데스크 창을 닫으면 프로그램 전체(뒤의 아마노 · 네이버 창 포함)를 끝냄
+  deskWin.on("closed", () => {
+    deskWin = null;
+    app.quit();
+  });
   deskWin.maximize();
 }
 
@@ -166,7 +176,8 @@ ipcMain.handle("amano:learn", wrap(async (key) => {
 const nwrap = (fn) => async (_e, ...args) => {
   try {
     if (!naver) return { ok: false, why: "네이버 창이 아직 열리지 않음" };
-    return await serial("naver", () => fn(...args));
+    // 한 번에 하나씩, 2분 넘으면 포기 (다음 요청이 줄에 막히지 않게)
+    return await serial("naver", () => timed(Promise.resolve().then(() => fn(...args)), 120000, "네이버 응답이 2분 넘게 없음 — '네이버 화면 보기'로 확인해 주세요"));
   } catch (e) {
     return { ok: false, why: String(e.message || e) };
   }
@@ -211,7 +222,18 @@ ipcMain.handle("config:set", (_e, patch) => {
 });
 ipcMain.handle("pos:show", () => showPos());
 
+// 한 번만 켜지게: 이미 켜져 있으면 새로 띄우지 않고 켜진 데스크를 앞으로
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) app.quit();
+app.on("second-instance", () => {
+  if (deskWin) {
+    if (deskWin.isMinimized()) deskWin.restore();
+    deskWin.focus();
+  }
+});
+
 app.whenReady().then(() => {
+  if (!gotLock) return;
   loadSettings();
   openAmano(); // 맨 뒤 아마노
   openNaver(); // 맨 뒤 네이버 예약관리
