@@ -38,13 +38,13 @@ test("데스크 주차등록 칸에서 누른 것이 아마노 화면에 그대�
     await desk.fill("#car-q", "5514");
     await desk.click("#park-form button");
     await desk.waitForSelector(".car");
-    assert.strictEqual(await amanoPage.inputValue("#sNo"), "5514", "아마노 차량번호 칸");
+    assert.strictEqual(await amanoPage.inputValue("#schCarNo"), "5514", "아마노 차량번호 칸");
     assert.match(await desk.textContent(".car"), /117무5514/);
 
     await desk.click(".car");
     await desk.waitForSelector("#pcar .no");
     assert.strictEqual((await desk.textContent("#pcar .no")).trim(), "117무5514");
-    assert.match(await desk.textContent("#pcar .tm"), /3시간 49분/, "아마노 주차시간을 읽어 옴");
+    assert.match(await desk.textContent("#pcar .tm"), /5시간 45분/, "아마노 주차시간을 읽어 옴");
 
     await desk.click('[data-act=discount][data-h="5시간할인"]');
     await desk.waitForFunction(() => document.querySelectorAll("#pcar .dlist div").length === 3);

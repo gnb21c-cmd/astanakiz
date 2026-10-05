@@ -2,95 +2,170 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<title>할인등록 (시험용 가짜 아마노 화면)</title>
-<!-- 사장님이 보내 준 아마노 할인등록 화면 캡처를 본뜬 시험용 페이지.
-     실제 아마노처럼 검색·차량 선택·할인·삭제를 하면 페이지가 새로 열린다(옛날 방식 웹). 자료는 localStorage 에 저장 -->
+<title>화성 카페아스타나 (시험용 가짜 아마노 할인등록 화면)</title>
+<!-- 실제 아마노 할인등록 화면(사장님이 저장해 준 파일)의 구조를 그대로 본뜬 시험용 페이지
+     - 페이지가 새로 열리지 않고 자리에서 바뀜 (AJAX, 요청 중에는 #modal-overlay)
+     - 조회 목록·할인내역은 dhtmlx 표: 머리 표(hdr)와 몸통 표(obj)가 따로, 둘 다 맨 위에 크기용 th 줄
+     - 할인 버튼은 <a href="javascript:fncSetDscntType('1')">3시간할인</a>
+     - 등록·삭제 뒤 "등록되었습니다." / "삭제가 완료 되었습니다." 알림(OK) → OK 누르면 다시 조회하고 첫 줄 자동 선택
+     - 삭제는 "삭제하시겠습니까?" 확인 창(OK / Cancel)
+     - 등록한 계정만 삭제 버튼, 아니면 "미출차" / "출차완료"
+     - ?login=need 로그인 화면(test / 1234), ?notice=1 처음 공지 창 -->
 <style>
-  body { margin: 0; font-family: "Malgun Gothic", sans-serif; font-size: 12px; background: #2b2f3a; color: #222; }
-  .wrap { display: grid; grid-template-columns: 370px 440px; gap: 8px; padding: 8px; }
-  .box { background: #fff; border-radius: 6px; overflow: hidden; }
-  .box h2 { margin: 0; background: #12a5e0; color: #fff; font-size: 15px; text-align: center; padding: 8px; }
-  .note { background: #3a3f4f; color: #fff; margin: 8px; padding: 6px; border-radius: 4px; text-align: center; }
-  .note b { color: #ff0; }
-  form { padding: 8px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-  table { border-collapse: collapse; width: 100%; }
-  th { background: #3a3f4f; color: #fff; padding: 6px; font-weight: normal; }
-  td { border-bottom: 1px solid #ddd; padding: 6px; text-align: center; }
-  tr.sel td { background: #bfe3ff; }
-  .cnt { background: #777; color: #fff; padding: 0 4px; border-radius: 3px; font-size: 11px; }
-  .info th { width: 90px; background: #f0f0f0; color: #555; text-align: center; }
-  .info td { text-align: right; }
-  .bigno { background: #2f3542; color: #fff; font-size: 22px; padding: 4px 10px; border-radius: 4px; display: inline-block; }
-  .red { color: #e00; font-size: 16px; font-weight: bold; }
-  .dbtn { background: #12a5e0; color: #fff; border: 0; border-radius: 3px; padding: 6px 12px; margin: 2px; cursor: pointer; }
-  .login { background: #fff; width: 300px; margin: 80px auto; padding: 20px; border-radius: 6px; display: grid; gap: 8px; }
+  body { margin: 0; font-family: "Malgun Gothic", sans-serif; font-size: 12px; }
+  .wrap { display: grid; grid-template-columns: 490px 590px; gap: 10px; padding: 10px; }
+  h4 { margin: 0; background: #12a5e0; color: #fff; padding: 8px; text-align: center; }
+  table { border-collapse: collapse; }
+  .hdr td { background: #3a3f4f; color: #fff; padding: 4px; }
+  .obj td { padding: 4px; border-bottom: 1px solid #ddd; }
+  .obj tr.rowselected td { background: #d7e641; }
+  .discountCount { background: #8a8985; color: #fff; padding: 2px 4px; border-radius: 4px; }
+  .tableStyle3 th { background: #eee; padding: 6px; }
+  .carNo { background: #363a4b; color: #fff; font-size: 24px; text-align: right; }
+  .price { color: red; font-weight: bold; }
+  #modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.1); }
+  .modal-box, .ui-dialog { position: fixed; top: 30%; left: 30%; background: #fff; border: 2px solid #333; padding: 12px; z-index: 9; }
 </style>
 </head>
 <body>
+<div id="modal-overlay" style="display:none"></div>
 <div id="root"></div>
 <script>
-  const NOW = new Date("2026-10-05T18:15:27");
+  const NOW = new Date("2026-10-05T20:12:05");
   const P = new URLSearchParams(location.search);
-  const KEY = "mockAmano";
+  const ME = "astana";
+  const KEY = "mockAmano2";
   const seed = () => ({
     cars: [
+      { id: "774483", no: "35모9259", at: "2026-10-05 17:23:05" },
       { id: "774362", no: "117무5514", at: "2026-10-05 14:26:27" },
       { id: "774370", no: "12가3456", at: "2026-10-05 13:20:05" },
       { id: "774371", no: "32우3456", at: "2026-10-05 13:31:44" },
       { id: "774301", no: "208라1172", at: "2026-10-04 23:12:09" },
-      { id: "774355", no: "38다1172", at: "2026-10-05 10:05:51" },
+      { id: "774355", no: "38다1172", at: "2026-10-05 10:05:51", pre: true }, // 사전등록 차량
     ],
-    disc: { "774362": [{ type: "3시간할인", by: "alphavision(관리자)", at: "2026-10-05 18:16:12" }, { type: "3시간할인", by: "alphavision(관리자)", at: "2026-10-05 14:40:21" }] },
+    disc: { "774362": [{ type: "3시간할인", by: "alphavision(관리자)", at: "2026-10-05 18:16:12", stat: "00" }, { type: "3시간할인", by: "alphavision(관리자)", at: "2026-10-05 14:40:21", stat: "00" }] },
   });
   let db;
   try { db = JSON.parse(localStorage.getItem(KEY)) || seed(); } catch (e) { db = seed(); }
   const save = () => localStorage.setItem(KEY, JSON.stringify(db));
-  const go = (o) => { const q = new URLSearchParams(Object.assign(Object.fromEntries(P), o)); location.href = location.pathname + "?" + q; };
-  const root = document.getElementById("root");
+  const $ = (id) => document.getElementById(id);
+  const ajax = (fn) => { $("modal-overlay").style.display = ""; setTimeout(() => { $("modal-overlay").style.display = "none"; fn(); }, 250); };
+
+  // jquery.modal 비슷한 알림 창 (OK 를 눌러야 닫힘)
+  function modal(text, buttons) {
+    const box = document.createElement("div");
+    box.className = "modal-box";
+    box.innerHTML = `<div class="modal-inner"><div class="modal-title">알림</div><div class="modal-text">${text}</div><div class="modal-buttons"></div></div>`;
+    for (const [label, fn] of buttons) {
+      const a = document.createElement("a");
+      a.className = "modal-btn";
+      a.href = "javascript:void(0)";
+      a.textContent = label;
+      a.onclick = () => { box.remove(); fn && fn(); };
+      box.querySelector(".modal-buttons").appendChild(a);
+    }
+    document.body.appendChild(box);
+  }
+  const fncAlertMsg = (msg, cb) => modal(msg, [["OK", () => eval(cb)]]);
+  const fncWarningMsg = (msg) => modal(msg, [["OK"]]);
 
   if (P.get("login") === "need") {
-    root.innerHTML = `<form class="login" id="lf"><b>로그인</b><input id="uid" placeholder="아이디"><input id="upw" type="password" placeholder="비밀번호"><button>로그인</button><span id="lerr" style="color:red"></span></form>`;
-    document.getElementById("lf").onsubmit = (e) => {
+    $("root").innerHTML = `<form id="lf" style="width:300px;margin:80px auto;display:grid;gap:8px"><b>로그인</b><input id="uid" placeholder="아이디"><input id="upw" type="password" placeholder="비밀번호"><button>로그인</button><span id="lerr" style="color:red"></span></form>`;
+    $("lf").onsubmit = (e) => {
       e.preventDefault();
-      // 시험용 계정: test / 1234
-      if (document.getElementById("uid").value === "test" && document.getElementById("upw").value === "1234") go({ login: "" });
-      else document.getElementById("lerr").textContent = "아이디 또는 비밀번호가 틀립니다";
+      if ($("uid").value === "test" && $("upw").value === "1234") location.href = location.pathname;
+      else $("lerr").textContent = "아이디 또는 비밀번호가 틀립니다";
     };
   } else {
-    const day = P.get("day") || "2026-10-04", no = P.get("no") || "", sel = P.get("sel") || "";
-    const list = no ? db.cars.filter((c) => c.no.includes(no) && c.at.slice(0, 10) >= day) : [];
-    const car = db.cars.find((c) => c.id === sel);
-    const ds = car ? db.disc[car.id] || [] : [];
-    const parked = car ? (() => { const m = Math.floor((NOW - new Date(car.at.replace(" ", "T"))) / 60000); return `${Math.floor(m / 60)}시간 ${m % 60}분`; })() : "";
-    root.innerHTML = `<div class="wrap">
-      <div>
-        <div class="box"><h2>차량번호 조회</h2>
-          <div class="note"><b>새벽시간</b> 검색편의를 위해 <b>입차일</b> 은 <b>전일</b> 부터 차량을 검색합니다</div>
-          <form id="f"><span>입차일</span><input id="sDay" name="day" value="${day}" size="10"><span>차량번호</span><input id="sNo" name="no" value="${no}" size="8"><input type="button" value="검색" id="btnSearch"></form>
-          <table><thead><tr><th>입차ID</th><th>차량번호</th><th>입차시간</th></tr></thead>
-          <tbody>${list.map((c) => `<tr class="${c.id === sel ? "sel" : ""}" style="cursor:pointer" onclick="go({sel:'${c.id}'})"><td>${c.id}</td><td>${c.no} ${(db.disc[c.id] || []).length ? `<span class="cnt">${db.disc[c.id].length}건</span>` : ""}</td><td>${c.at}</td></tr>`).join("")}</tbody></table>
-        </div>
-        <div class="box" style="margin-top:8px"><h2>할인내역</h2>
-          <table><thead><tr><th>할인값</th><th>등록자</th><th>등록시간</th><th>삭제</th></tr></thead>
-          <tbody>${ds.map((d, i) => `<tr><td>${d.type}</td><td>${d.by}</td><td>${d.at}</td><td><button onclick="del(${i})">삭제</button></td></tr>`).join("")}</tbody></table>
-        </div>
-      </div>
-      <div class="box"><h2>할인정보 등록</h2>
-        <table class="info">
-          <tr><th>차량번호</th><td>${car ? `<span class="bigno">${car.no}</span>` : ""}</td></tr>
-          <tr><th>입차장비</th><td>${car ? "정문입구LPR" : ""}</td></tr>
-          <tr><th>입차시간</th><td>${car ? car.at : ""}</td></tr>
-          <tr><th>주차시간</th><td class="red">${parked}</td></tr>
-          <tr><th>할인유형</th><td>${car ? ["3시간할인", "5시간할인", "15시간할인", "16시간할인", "17시간할인", "18시간할인"].map((t) => `<button class="dbtn" onclick="disc('${t}')">${t}</button>`).join("") : ""}</td></tr>
-          <tr><th>비 고</th><td><textarea></textarea></td></tr>
-        </table>
-      </div>
-    </div>`;
-    document.getElementById("btnSearch").onclick = () => go({ day: document.getElementById("sDay").value, no: document.getElementById("sNo").value, sel: "" });
-    window.disc = (t) => { if (!confirm(`${t}을(를) 등록하시겠습니까?`)) return; (db.disc[sel] = db.disc[sel] || []).unshift({ type: t, by: "astana(근무자)", at: "2026-10-05 18:20:00" }); save(); setTimeout(() => go({}), 300); };
-    window.del = (i) => { if (!confirm("삭제하시겠습니까?")) return; db.disc[sel].splice(i, 1); save(); setTimeout(() => go({}), 300); };
+    $("root").innerHTML = `<div class="wrap"><div>
+      <h4>차량번호 조회</h4>
+      <form id="sForm"><p class="desc"><span>새벽시간</span>검색편의를 위해 <span>입차일</span>은 <span>전일</span>부터 차량을 검색합니다</p>
+        <label>입차일</label><input type="text" name="entryDate" class="dInput hasDatepicker" value="2026-10-04" id="dp1791"><button type="button" class="ui-datepicker-trigger">...</button>
+        <label>차량번호</label><input type="text" name="carNo" id="schCarNo" class="dInput" value="">
+        <input type="button" class="btnS1_1 btn" value="검색" onclick="fncDoListMst()">
+        <div><input type="checkbox" id="checkSaveID" ${P.get("keep") === "1" ? "checked" : ""}><label>검색 상태 유지</label></div></form>
+      <div id="gridMst"></div>
+      <h4>할인내역</h4><div id="gridDtl"></div>
+    </div><div>
+      <h4>할인정보 등록</h4>
+      <form id="theForm" class="tableStyle3" onsubmit="return false;"><input type="hidden" name="peId" id="peId"><table><tbody>
+        <tr><th>차량번호</th><td><input type="text" name="carNo" id="carNo" class="carNo" readonly></td></tr>
+        <tr><th>입차장비</th><td><span id="iInEqpmNm"></span></td></tr>
+        <tr><th>입차시간</th><td><span id="entryDate"></span></td></tr>
+        <tr><th>주차시간</th><td><span id="differentTime" class="price"></span></td></tr>
+        <tr><th class="thTitle">할인유형</th><td id="div_dscntcodes"></td></tr>
+        <tr><th>비 고</th><td><textarea id="memo"></textarea></td></tr>
+      </tbody></table><p class="desc"><span>출차 5분전</span> 반드시 등록바랍니다.</p></form>
+    </div></div>`;
   }
-  window.go = go;
+
+  // dhtmlx 표처럼: 머리 표(hdr) + 몸통 표(obj), 둘 다 맨 위에 크기용 th 줄
+  function grid(el, heads, rows, onSelect, sel) {
+    const sizing = `<tr style="height:auto">${heads.map(() => `<th style="height:0"></th>`).join("")}</tr>`;
+    el.innerHTML = `<div class="xhdr"><table class="hdr"><tbody>${sizing}<tr>${heads.map((h) => `<td><div class="hdrcell">${h}</div></td>`).join("")}</tr></tbody></table></div>
+      <div class="objbox"><table class="obj"><tbody>${sizing}${rows.map((r, i) => `<tr data-i="${i}" class="${i === sel ? "rowselected" : ""}">${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    if (onSelect) el.querySelector(".obj").addEventListener("click", (e) => { const tr = e.target.closest("tr[data-i]"); if (tr) onSelect(+tr.dataset.i); });
+  }
+  let list = [], cur = null;
+  function fncDoListMst() {
+    grid($("gridMst"), ["입차ID", "차량번호", "입차시간"], []);
+    grid($("gridDtl"), ["순번", "할인값", "등록자", "등록시간", "삭제"], []);
+    $("carNo").value = ""; $("entryDate").textContent = ""; $("differentTime").textContent = ""; $("div_dscntcodes").innerHTML = ""; $("peId").value = "";
+    const day = document.querySelector("#sForm input[name='entryDate']").value, no = $("schCarNo").value;
+    ajax(() => {
+      list = db.cars.filter((c) => c.no.includes(no) && c.at.slice(0, 10) >= day);
+      showList(0);
+      if (list.length) fncGridRowSelected(0); // 첫 줄 자동 선택
+    });
+  }
+  function showList(sel) {
+    grid($("gridMst"), ["입차ID", "차량번호", "입차시간"], list.map((c) => {
+      const n = (db.disc[c.id] || []).length;
+      return [c.id, ` ${c.no}` + (n ? ` <label class='discountCount'>${n}건  </label>` : ""), c.at];
+    }), fncGridRowSelected, sel);
+  }
+  function fncGridRowSelected(i) {
+    cur = list[i];
+    showList(i);
+    ajax(() => {
+      if (cur.pre) { fncWarningMsg("사전등록된 차량은 웹할인을 이용할 수 없습니다."); return; }
+      $("peId").value = cur.id; $("carNo").value = cur.no; $("iInEqpmNm").textContent = "정문입구LPR"; $("entryDate").textContent = cur.at;
+      const m = Math.floor((NOW - new Date(cur.at.replace(" ", "T"))) / 60000);
+      $("differentTime").textContent = `${Math.floor(m / 60)}시간 ${m % 60}분`;
+      $("div_dscntcodes").innerHTML = ["3시간할인", "5시간할인", "15시간할인", "16시간할인", "17시간할인", "18시간할인"]
+        .map((t, k) => `<a class="btnGreen btnMarginBottom btn" id="${k + 1}" name="btnDscntType" value="${t}" href="javascript:fncSetDscntType('${k + 1}');">${t}</a>`).join("");
+      showDtl();
+    });
+  }
+  function showDtl() {
+    const ds = db.disc[cur.id] || [];
+    grid($("gridDtl"), ["순번", "할인값", "등록자", "등록시간", "삭제"], ds.map((d, i) => [i + 1, d.type, d.by, d.at,
+      d.stat === "10" ? `<b style="color:red">출차완료</b>` : d.by.startsWith(ME) ? `<input type="button" class="btnS3_1 btn btnDel" value="삭제" onclick="fncGridDeleteParkVisitCar(${i})">` : "미출차"]));
+  }
+  window.fncSetDscntType = (k) => {
+    const t = document.getElementById(String(k)).textContent;
+    ajax(() => {
+      (db.disc[cur.id] = db.disc[cur.id] || []).unshift({ type: t, by: `${ME}(근무자)`, at: "2026-10-05 20:12:30", stat: "00" });
+      save();
+      if (!$("checkSaveID").checked) $("schCarNo").value = ""; // 실제처럼: 검색 상태 유지가 꺼져 있으면 차량번호를 비움
+      fncAlertMsg("등록되었습니다.", "fncDoListMst();");
+    });
+  };
+  window.fncGridDeleteParkVisitCar = (i) => {
+    const d = document.createElement("div");
+    d.className = "ui-dialog";
+    d.innerHTML = `<div id="dialog-confirm" class="ui-dialog-content">삭제하시겠습니까?</div><div class="ui-dialog-buttonpane"><button type="button">OK</button><button type="button">Cancel</button></div>`;
+    const [ok, cancel] = d.querySelectorAll("button");
+    ok.onclick = () => { d.remove(); ajax(() => { db.disc[cur.id].splice(i, 1); save(); fncAlertMsg("삭제가 완료 되었습니다. ", "fncDoListMst();"); }); };
+    cancel.onclick = () => d.remove();
+    document.body.appendChild(d);
+  };
+  window.fncDoListMst = fncDoListMst;
+  if (P.get("login") !== "need") {
+    fncDoListMst();
+    if (P.get("notice") === "1") modal("공지: 시스템 점검 안내", [["7일간 보지 않기"], ["닫기"]]);
+  }
 </script>
 </body>
 </html>

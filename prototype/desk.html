@@ -624,7 +624,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       <div class="no num">${esc(d.detail.no)}</div>
       <div class="tm num"><span>입차 ${esc(d.detail.at.slice(5, 16))}</span><b>${esc(d.detail.parked)}</b></div>
       <div class="dbtns">${DISC.map(btn).join("")}</div>
-      <div class="dlist">${d.history.length ? d.history.map((h, i) => `<div><span class="num">${esc(h.type)} · ${esc(String(h.at).slice(11, 16))}</span><button data-act="discDel" data-i="${i}" aria-label="할인 삭제" ${dis}>삭제</button></div>`).join("") : `<span class="help">할인내역 없음</span>`}</div>`;
+      <div class="dlist">${d.history.length ? d.history.map((h, i) => `<div><span class="num">${esc(h.type)} · ${esc(String(h.at).slice(11, 16))}</span>${h.canDelete === false ? `<span class="help">${esc(h.note || "삭제 불가")}</span>` : `<button data-act="discDel" data-i="${i}" aria-label="할인 삭제" ${dis}>삭제</button>`}</div>`).join("") : `<span class="help">할인내역 없음</span>`}</div>`;
     $("synclog").innerHTML = `아마노${REAL ? "" : "(체험)"}: <b style="color:${park.err ? "var(--red)" : "inherit"}">${esc(park.msg)}</b>`;
   }
 
