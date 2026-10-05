@@ -161,6 +161,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .visits { font-size: 12px; color: var(--ok); font-weight: 600; margin-top: -2px; }
 .visits b { color: var(--fg); }
 .visits.big { font-size: 14px; margin: 0; }
+.gift { display: inline-block; font-size: 11px; font-weight: 700; color: #fff; background: var(--red); border-radius: 5px; padding: 0 6px; margin-left: 2px; }
 .badge { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
 .badge.conf { background: var(--accent-bg); color: var(--accent); }
 .badge.done { background: var(--naver-bg); color: var(--ok); }
@@ -341,6 +342,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     seats: 39,              // 내부 4인석(입식·좌식)
     useMinutes: 110,        // 1시간 50분
     pinkUntil: 120,         // 1시간 50분 ~ 2시간 분홍, 2시간 넘으면 빨강
+    giftEvery: 10,          // 10회 방문마다 사은권 (명함식 카드로 따로 줌)
+    giftName: "2만원 사은권",
     overUnitMin: 10,        // 초과요금: 반납 시각이 지나고 10분마다
     overFee: 5000,          //           열쇠 1개당 5,000원 (열쇠 수만큼 곱함)
     unlimitedFrom: "18:00", // 이 시각 입장부터 무제한
@@ -426,6 +429,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     b.enteredAt = T(at);
     if (out == null) b.keys = keys.slice(); else b.outAt = T(out);
   });
+  // 예시: 14:00 전시윤 = 이번이 10번째 방문(사은권), 홍예준 = 11번째(영수증은 1번째)
+  bookings[TODAY].find((x) => x.name === "전시윤" && x.slot === T("14:00")).prevDone = 9;
+  bookings[TODAY].find((x) => x.name === "홍예준" && x.slot === T("14:00")).prevDone = 10;
   // 다른 날 예시: 날짜마다 같은 결과가 나오게
   function ensureDay(key) {
     if (bookings[key]) return;
@@ -504,9 +510,15 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   }
 
   /** 네이버 '완료 n'에서 이번 방문 회차: 미입장이면 완료 n → 이번 n+1번째, 이용완료면 n+1번째 방문 */
+  /* 근무자 화면은 실제 회차(11번째), 영수증은 10회 단위로 다시 셈(11회차 → 1번째).
+     10·20·30…번째 방문이면 사은권 증정 */
+  const stampOf = (n) => ((n - 1) % RULES.giftEvery) + 1;
+  const isGift = (n) => n > 0 && n % RULES.giftEvery === 0;
   function visitText(b) {
     const c = b.cancels ? ` · 취소 ${b.cancels}` : "";
-    return b.status === "완료" ? `<b>${b.visitNo}번째 방문</b>` : `완료 ${b.prevDone}${c} → 이번 <b>${b.prevDone + 1}번째 방문</b>`;
+    const n = b.status === "완료" ? b.visitNo : b.prevDone + 1;
+    const gift = isGift(n) ? ` <span class="gift">${RULES.giftName} 증정</span>` : "";
+    return (b.status === "완료" ? `<b>${n}번째 방문</b>` : `완료 ${b.prevDone}${c} → 이번 <b>${n}번째 방문</b>`) + gift;
   }
   function renderRes() {
     const list = bookings[viewDay].filter((b) => b.slot === selSlot).sort((a, b) => (a.status === "확정" ? 0 : 1) - (b.status === "확정" ? 0 : 1));
@@ -724,13 +736,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   // ── 영수증 프린터 (80mm 감열지) ─────────────────────
   /* 실제 앱: POS PC 의 프린터 목록을 읽어 고른 프린터로 조용히 출력 (창 안 띄움).
      체험판: 목록과 출력은 흉내만 내고, 양식과 미리보기는 그대로 동작 */
-  const PRINT_KEYS = ["매장", "날짜", "시각", "고객", "전화뒤4", "열쇠", "수량", "입장", "반납", "방문회차", "이전완료", "초과시간", "금액"];
-  const SAMPLE = { 매장: "아스타나키즈", 날짜: "2026-10-05", 시각: "13:55", 고객: "송다온", 전화뒤4: "5489", 열쇠: "5, 13", 수량: "2", 입장: "14:00", 반납: "15:50", 방문회차: "8", 이전완료: "7", 초과시간: "0:12:30", 금액: "10,000원" };
+  const PRINT_KEYS = ["매장", "날짜", "시각", "고객", "전화뒤4", "열쇠", "수량", "입장", "반납", "방문회차", "사은권", "초과시간", "금액"];
+  const SAMPLE = { 매장: "아스타나키즈", 날짜: "2026-10-05", 시각: "13:55", 고객: "송다온", 전화뒤4: "5489", 열쇠: "5, 13", 수량: "2", 입장: "14:00", 반납: "15:50", 방문회차: "10", 사은권: "2만원 사은권 증정!", 초과시간: "0:12:30", 금액: "10,000원" };
   const PRINT = {
     found: false, sel: null, cur: "enter",
     list: ["POS-80C (USB001)", "EPSON TM-T82 Receipt", "Microsoft Print to PDF"],
     forms: {
-      enter: { name: "입장표", when: "등록 완료", auto: true, text: "# {매장}\n^입장표\n---\n고객   {고객} ({전화뒤4})\n열쇠   {열쇠}번\n입장   {입장}\n반납   {반납}까지\n---\n# ★ {방문회차}번째 방문 ★\n^마일리지 획득! (누적 {방문회차}회)\n---\n^열쇠를 잃어버리지 마세요\n^{날짜} {시각}" },
+      enter: { name: "입장표", when: "등록 완료", auto: true, text: "# {매장}\n^입장표\n---\n고객   {고객} ({전화뒤4})\n열쇠   {열쇠}번\n입장   {입장}\n반납   {반납}까지\n---\n# ★ {방문회차}번째 방문 ★\n# {사은권}\n^10회 방문마다 2만원 사은권을 드려요\n---\n^열쇠를 잃어버리지 마세요\n^{날짜} {시각}" },
       over: { name: "초과요금 영수증", when: "초과요금 결제", auto: false, text: "# {매장}\n^초과요금\n---\n고객   {고객}\n열쇠   {열쇠}번\n반납   {반납}\n초과   {초과시간}\n---\n# {금액}\n^{날짜} {시각}" },
     },
   };
@@ -754,7 +766,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   }
   const keyVals = (h, extra = {}) => {
     const m = minutesFor(TODAY, h.slot);
-    return Object.assign({ 매장: "아스타나키즈", 날짜: TODAY, 시각: hm(now), 고객: h.name, 전화뒤4: digits(h.phone).slice(-4), 열쇠: h.keys.join(", "), 수량: String(h.keys.length), 입장: hm(h.enteredAt), 반납: m == null ? "무제한" : hm(h.slot + m), 방문회차: h.visitNo ? String(h.visitNo) : "", 이전완료: h.walk ? "" : String(h.prevDone), 초과시간: "", 금액: "" }, extra);
+    return Object.assign({ 매장: "아스타나키즈", 날짜: TODAY, 시각: hm(now), 고객: h.name, 전화뒤4: digits(h.phone).slice(-4), 열쇠: h.keys.join(", "), 수량: String(h.keys.length), 입장: hm(h.enteredAt), 반납: m == null ? "무제한" : hm(h.slot + m), 방문회차: h.visitNo ? String(stampOf(h.visitNo)) : "", 사은권: h.visitNo && isGift(h.visitNo) ? `${RULES.giftName} 증정!` : "", 초과시간: "", 금액: "" }, extra);
   };
 
   // ── 초과요금 미터 ────────────────────────────────
@@ -838,7 +850,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       if (sheet.keys.some((k) => holderOf(k))) { toast("그 사이 다른 손님이 쓴 열쇠가 있어요. 다시 골라 주세요."); sheet.keys = []; renderSheet(); return; }
       Object.assign(b, { status: "완료", keys: sheet.keys.slice(), enteredAt: now, visitNo: b.prevDone + 1 });
       closeSheet();
-      toast(`${b.name}님 입장 · 열쇠 ${b.keys.join(", ")}번 · 네이버 이용완료${printForm("enter", keyVals(b))}`);
+      toast(`${b.name}님 입장 · 열쇠 ${b.keys.join(", ")}번 · 네이버 이용완료${isGift(b.visitNo) ? ` · ${b.visitNo}번째 방문, ${RULES.giftName}을 드리세요` : ""}${printForm("enter", keyVals(b))}`);
       renderAll();
     },
     qty(btn) {
