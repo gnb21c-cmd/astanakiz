@@ -772,7 +772,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         pickHtml = `<div class="field"><span class="label">지급할 열쇠 <span class="help num">예약 수량 ${b.qty}개만큼 누르세요 · ${sheet.keys.length}/${b.qty} · 흐린 번호는 이미 지급됨</span></span><div class="kpick">${btns}</div></div>`;
       }
       const note = b.status !== "확정" ? "" : b.day !== TODAY ? `<div class="banner warn">이용일(${b.day.slice(5).replace("-", "/")})에 입장 처리할 수 있어요</div>`
-        : early ? `<div class="banner">예약 ${hm(b.slot)}보다 일찍 입장 — 근무자 판단으로 가능해요 (손님 안내 기준은 ${hm(b.slot - RULES.earlyMinutes)})</div>` : "";
+        : early ? `<div class="banner">예약 ${hm(b.slot)}보다 일찍 입장 — 근무자 판단으로 가능해요 (손님 안내 기준은 ${hm(b.slot - RULES.earlyMinutes)}). ${m == null ? "" : `이용시간은 예약 시간부터라 일찍 온 만큼 더 놀 수 있어요 (반납 ${hm(b.slot + m)})`}</div>` : "";
       el.innerHTML = `
         <h3 id="sheet-title">네이버 예약자 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
         <dl class="facts">
