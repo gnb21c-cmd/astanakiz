@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>예약현황 (시험용 가짜 네이버 예약관리 화면)</title>
+<!-- 사장님이 보낸 네이버 스마트플레이스 예약현황 캡처를 본뜬 시험용 페이지 (실제 저장본을 받으면 구조를 다시 맞춤)
+     - 위: ‹ 2026. 10. 5. 월 › 날짜
+     - 가운데 표: 열 = 상품(평일 무제한 / 휴일 1시간 50분 입장권 · 야간자유 입장권 · [평일] 단체 · 열쇠분실), 줄 = 시간(오후 2:00 …)
+       칸 안에 "예약가능 7" · "확정 3" · "이용완료 2"
+     - 칸을 누르면 오른쪽에 탭 "예약가능 7 | 확정 3 | 완료 2" 와 예약자 카드
+       카드: 상태(확정/완료) · 이름 · "완료 1, 취소 1" · 예약자 · 전화번호 · 예약번호 · 예약유형 · 상품 · 이용일시 · 수량 · 결제상태 · [예약취소] [이용완료]
+     - ?login=need 로그인 화면 -->
+<style>
+  body { margin: 0; font-family: "Malgun Gothic", sans-serif; font-size: 13px; display: grid; grid-template-columns: 1fr 340px; }
+  .top { grid-column: 1 / -1; padding: 8px; border-bottom: 1px solid #ddd; }
+  table { border-collapse: collapse; }
+  th, td { border: 1px solid #ddd; padding: 4px; vertical-align: top; min-width: 120px; }
+  .chip { display: flex; justify-content: space-between; padding: 2px 6px; margin: 2px 0; border-radius: 4px; cursor: pointer; }
+  .avail { background: #d8eef0; } .conf { background: #2d5fd3; color: #fff; } .done { background: #eee; }
+  aside { border-left: 1px solid #ddd; padding: 8px; }
+  .tabs a { margin-right: 8px; cursor: pointer; } .tabs a.on { font-weight: bold; text-decoration: underline; }
+  .card { border-bottom: 1px solid #ddd; padding: 8px 0; }
+  .card dl { display: grid; grid-template-columns: 80px 1fr; margin: 4px 0; }
+  .card dt { color: #888; } .card dd { margin: 0; }
+  .sub { color: #1a9a4a; font-size: 12px; }
+  .layer { position: fixed; top: 30%; left: 35%; background: #fff; border: 2px solid #333; padding: 16px; }
+</style>
+</head>
+<body>
+<script>
+  const P = new URLSearchParams(location.search);
+  const KEY = "mockNaver";
+  const DOW = ["일", "월", "화", "수", "목", "금", "토"];
+  const PRODUCTS = ["평일 무제한 / 휴일 1시간 50분 입장권", "야간자유 입장권", "[평일] 단체 입장권", "열쇠분실[미반납]"];
+  const seed = () => ({
+    "2026-10-05": [
+      { no: "1368102888", name: "백연화", phone: "010-7515-4623", time: "14:00", product: 0, qty: 1, status: "확정", done: 1, cancel: 1 },
+      { no: "1368155282", name: "허정은", phone: "010-4674-0736", time: "14:00", product: 0, qty: 1, status: "확정", done: 8, cancel: 2 },
+      { no: "1368177001", name: "송다온", phone: "010-2024-5489", time: "14:00", product: 0, qty: 2, status: "확정", done: 9, cancel: 0 },
+      { no: "1368100555", name: "고성현", phone: "010-9196-0199", time: "13:30", product: 0, qty: 1, status: "완료", done: 3, cancel: 0 },
+      { no: "1370988026", name: "홍길동", phone: "010-1111-2222", time: "18:00", product: 1, qty: 1, status: "확정", done: 0, cancel: 0 },
+      { no: "1370988777", name: "단체손님", phone: "010-3333-4444", time: "14:00", product: 2, qty: 1, status: "확정", done: 0, cancel: 0 },
+    ],
+  });
+  let db;
+  try { db = JSON.parse(localStorage.getItem(KEY)) || seed(); } catch (e) { db = seed(); }
+  const save = () => localStorage.setItem(KEY, JSON.stringify(db));
+  let day = P.get("day") || "2026-10-05", openCell = null, tab = "확정";
+  const hm12 = (t) => { let [h, m] = t.split(":").map(Number); return `${h < 12 ? "오전" : "오후"} ${h > 12 ? h - 12 : h}:${String(m).padStart(2, "0")}`; };
+  const label = (k) => { const d = new Date(k + "T12:00:00"); return `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}. ${DOW[d.getDay()]}`; };
+  const shift = (k, n) => { const d = new Date(k + "T12:00:00"); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+  const times = []; for (let h = 10; h <= 19; h++) times.push(`${h}:00`, `${h}:30`);
+
+  function render() {
+    if (P.get("login") === "need") {
+      document.body.innerHTML = `<form style="margin:80px auto;display:grid;gap:8px;width:280px"><b>NAVER 로그인</b><input placeholder="아이디"><input type="password" placeholder="비밀번호"><button type="button">로그인</button></form>`;
+      return;
+    }
+    const list = db[day] || [];
+    const cell = (p, t) => {
+      // 실제처럼: 야간자유 입장권은 18:00 부터, 평일/휴일 입장권은 17:30 까지만 칸이 있음
+      if ((p === 1 && t < "18:00" && t.length === 5) || (p === 0 && t >= "18:00")) return "";
+      const bs = list.filter((b) => b.product === p && b.time === t);
+      const conf = bs.filter((b) => b.status === "확정").reduce((a, b) => a + b.qty, 0);
+      const done = bs.filter((b) => b.status === "완료").reduce((a, b) => a + b.qty, 0);
+      return `<div class="slotcell" data-p="${p}" data-t="${t}"><div class="time">${hm12(t)}</div>
+        <div class="chip avail" data-tab="예약가능"><span>예약가능</span><b>${10 - conf - done}</b></div>
+        ${conf ? `<div class="chip conf" data-tab="확정"><span>확정</span><b>${conf}</b></div>` : ""}
+        ${done ? `<div class="chip done" data-tab="완료"><span>이용완료</span><b>${done}</b></div>` : ""}</div>`;
+    };
+    let panel = "";
+    if (openCell) {
+      const bs = list.filter((b) => b.product === openCell.p && b.time === openCell.t);
+      const c = (s) => bs.filter((b) => b.status === s).length;
+      const shown = bs.filter((b) => b.status === tab);
+      panel = `<div class="tabs"><a data-tab="예약가능">예약가능 ${10 - c("확정") - c("완료")}</a><a class="${tab === "확정" ? "on" : ""}" data-tab="확정">확정 ${c("확정")}</a><a class="${tab === "완료" ? "on" : ""}" data-tab="완료">완료 ${c("완료")}</a></div>
+        ${shown.map((b) => `<div class="card"><div><span class="badge">${b.status}</span> <strong class="name">${b.name}</strong><div class="sub">완료 ${b.done}${b.cancel ? `, 취소 ${b.cancel}` : ""}</div></div>
+          <dl><dt>예약자</dt><dd>${b.name}</dd><dt>전화번호</dt><dd>${b.phone}</dd><dt>예약번호</dt><dd>${b.no}</dd><dt>예약유형</dt><dd>일반</dd>
+          <dt>상품</dt><dd>${PRODUCTS[b.product]}</dd><dt>이용일시</dt><dd>${label(day).replace(/ (.)$/, ".($1)")} ${hm12(b.time)}</dd><dt>수량</dt><dd>4인 입장권 ${b.qty}</dd><dt>결제상태</dt><dd><span>결제완료</span></dd></dl>
+          ${b.status === "확정" ? `<button type="button" data-cancel="${b.no}">예약취소</button> <button type="button" data-complete="${b.no}">이용완료</button>` : ""}</div>`).join("")}`;
+    }
+    document.body.innerHTML = `<div class="top"><button class="prev">‹</button> <span class="date">${label(day)}</span> <button class="next">›</button></div>
+      <main><table><thead><tr><th></th>${PRODUCTS.map((p) => `<th>${p}</th>`).join("")}</tr></thead>
+      <tbody>${times.map((t) => `<tr><td>${hm12(t)}</td>${PRODUCTS.map((_, p) => `<td>${cell(p, t)}</td>`).join("")}</tr>`).join("")}</tbody></table></main>
+      <aside>${panel}</aside>`;
+  }
+  // 예약관리 화면처럼 자리에서 바뀜 (조금 늦게)
+  const later = (fn) => setTimeout(() => { fn(); render(); }, 200);
+  document.addEventListener("click", (e) => {
+    const t = e.target;
+    if (t.closest(".prev")) return later(() => { day = shift(day, -1); openCell = null; });
+    if (t.closest(".next")) return later(() => { day = shift(day, 1); openCell = null; });
+    const chip = t.closest(".chip");
+    if (chip) { const c = chip.closest(".slotcell"); return later(() => { openCell = { p: +c.dataset.p, t: c.dataset.t }; tab = chip.dataset.tab === "완료" ? "완료" : "확정"; }); }
+    const tb = t.closest(".tabs a");
+    if (tb) return later(() => { tab = tb.dataset.tab; });
+    if (t.dataset.complete) {
+      // 이용완료 누르면 확인 창 (실제 화면에서 확인 필요)
+      const box = document.createElement("div");
+      box.className = "layer";
+      box.innerHTML = `<p>이용완료 처리하시겠습니까?</p><button type="button" class="ok">확인</button> <button type="button" class="no">취소</button>`;
+      box.querySelector(".ok").onclick = () => { box.remove(); later(() => { const b = db[day].find((x) => x.no === t.dataset.complete); b.status = "완료"; b.done += 1; save(); }); };
+      box.querySelector(".no").onclick = () => box.remove();
+      document.body.appendChild(box);
+    }
+  });
+  render();
+</script>
+</body>
+</html>

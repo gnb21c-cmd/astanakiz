@@ -356,7 +356,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
               비수기 — 평일은 무제한, 휴일은 성수기와 같음 */
   const HOLIDAYS = ["2026-09-24", "2026-09-25", "2026-09-26", "2026-10-03", "2026-10-05", "2026-10-09", "2026-12-25", "2027-01-01"];
   const SLOTS = []; for (let h = 10; h <= 19; h++) SLOTS.push(h * 60, h * 60 + 30);
-  const TODAY = "2026-10-05";
+  // 설치한 앱 안에서 열리면 실제 네이버·아마노·POS 와 연결 (window.desk), 아니면 체험판(예시 자료 · 가짜 시계)
+  const APP = !!(window.desk && window.desk.naver);
+  const _d0 = new Date();
+  const TODAY = APP ? `${_d0.getFullYear()}-${String(_d0.getMonth() + 1).padStart(2, "0")}-${String(_d0.getDate()).padStart(2, "0")}` : "2026-10-05";
 
   const hm = (m) => String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
   const toMin = (s) => { const [h, m] = s.split(":").map(Number); return h * 60 + m; };
@@ -374,10 +377,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   const minutesFor = (key, entry) => (timedDay(key) && entry < toMin(RULES.unlimitedFrom) ? RULES.useMinutes : null);
   const dayKind = (key) => (peakOf(key) ? "성수기" : "비수기") + " " + (isHoliday(key) ? "휴일" : "평일") + (timedDay(key) ? " · 시간제" : " · 무제한");
 
-  let now = toMin("13:50");
-  let lastRefresh = toMin("13:48");
+  let now = APP ? _d0.getHours() * 60 + _d0.getMinutes() : toMin("13:50");
+  let lastRefresh = APP ? null : toMin("13:48");
   let viewDay = TODAY;
-  let selSlot = toMin("14:00");
+  let selSlot = APP ? Math.min(19 * 60 + 30, Math.max(600, Math.ceil((now + 5) / 30) * 30)) : toMin("14:00");
 
   // ── 네이버 예약 (예시) ────────────────────────────
   // 날짜별 예약 목록. 오늘 것은 정해 두고, 다른 날은 예시로 만들어 냄
@@ -398,6 +401,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     return b;
   }
   const P = (i) => "010" + String(20000000 + ((i * 7919) % 79999999)).padStart(8, "0");
+  const T = toMin;
+  if (!APP) {
   [
     ["10:00", "홍길동", 1, 1], ["10:00", "김철수", 2, 1], ["10:00", "찟재명", 1, 1], ["10:00", "응석열", 1, 1], ["10:00", "배주원", 1, 1], ["10:00", "김서윤", 1, 1],
     ["10:30", "박하은", 1, 1], ["10:30", "이도윤", 2, 1], ["10:30", "탁서율", 1, 1], ["10:30", "최지호", 1, 1],
@@ -414,7 +419,6 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     ["18:00", "고성현", 1], ["18:30", "홍길동", 1],
   ].forEach(([t, n, q, d], i) => booking(TODAY, t, n, P(i + 3), q, { done: !!d }));
   // 이미 입장한 예약 [이름, 예약시간, 열쇠, 입장 시각, 퇴장 시각(아직이면 null)]
-  const T = toMin;
   [
     ["홍길동", "10:00", [1], "09:58", "11:52"], ["김철수", "10:00", [2, 3], "09:57", "11:40"], ["찟재명", "10:00", [4], "09:59", null],
     ["응석열", "10:00", [5], "10:01", "11:55"], ["배주원", "10:00", [6], "10:00", "11:49"], ["김서윤", "10:00", [7], "10:02", "11:58"],
@@ -433,10 +437,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   // 예시: 14:00 전시윤 = 이번이 10번째 방문(사은권), 홍예준 = 11번째(영수증은 1번째)
   bookings[TODAY].find((x) => x.name === "전시윤" && x.slot === T("14:00")).prevDone = 9;
   bookings[TODAY].find((x) => x.name === "홍예준" && x.slot === T("14:00")).prevDone = 10;
+  }
   // 다른 날 예시: 날짜마다 같은 결과가 나오게
   function ensureDay(key) {
     if (bookings[key]) return;
     bookings[key] = [];
+    if (APP) { loadNaver(key); return; } // 실제: 네이버에서 읽어 옴
     let r = [...key].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
     const rnd = () => ((r = (r * 1103515245 + 12345) >>> 0) / 4294967296);
     const busy = isHoliday(key) ? 0.8 : 0.4;
@@ -457,8 +463,70 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     walkins.push(w);
     return w;
   }
-  walkin("01026659013", [29], T("12:40"));
-  walkin("01084430217", [30, 31], T("13:12"));
+  if (!APP) {
+    walkin("01026659013", [29], T("12:40"));
+    walkin("01084430217", [30, 31], T("13:12"));
+  }
+
+  // ── 네이버 불러오기 (설치한 앱) ─────────────────────
+  const naverSlots = {}; // 날짜 → 시각(분) → { cap, conf, done } (입장권 상품 합계)
+  let naverBusy = false;
+  async function loadNaver(day, loud) {
+    if (!APP || naverBusy) return;
+    naverBusy = true; renderAll();
+    const r = await window.desk.naver.load(day).catch((e) => ({ ok: false, why: String(e) }));
+    naverBusy = false;
+    if (!r || !r.ok) { toast(`네이버: ${(r && r.why) || "응답 없음"}`); renderAll(); return; }
+    applyNaver(day, r);
+    if (day === TODAY) restoreState();
+    lastRefresh = now;
+    renderAll();
+    if (loud) toast(`네이버 예약 ${r.bookings.length}건 불러옴`);
+  }
+  function applyNaver(day, r) {
+    const sl = {};
+    for (const x of r.slots) { const t = toMin(x.time); const o = (sl[t] = sl[t] || { cap: 0, conf: 0, done: 0 }); o.cap += x.cap; o.conf += x.conf; o.done += x.done; }
+    naverSlots[day] = sl;
+    const old = new Map((bookings[day] || []).map((b) => [b.no, b]));
+    const list = [];
+    for (const n of r.bookings) {
+      const done = n.status === "완료";
+      const b = old.get(n.no) || { id: "b" + seq++, keys: [], enteredAt: null, outAt: null, visitNo: null };
+      Object.assign(b, {
+        day, no: n.no, slot: toMin(n.time), name: n.name, phone: n.phone, qty: n.qty,
+        product: (n.qtyText || "").replace(/\s*\d+\s*$/, "") || "입장권", naverProduct: n.product, pay: n.pay || "",
+        cancels: n.cancelCount,
+      });
+      if (!done) { b.prevDone = n.doneCount; if (b.enteredAt == null) b.status = "확정"; }
+      else { b.status = "완료"; if (b.prevDone == null) b.prevDone = Math.max(0, n.doneCount - 1); if (!b.visitNo) b.visitNo = n.doneCount; b.naverPending = false; }
+      list.push(b);
+    }
+    // 네이버에서 사라진 예약(취소)은 열쇠를 받지 않았을 때만 뺌
+    for (const b of old.values()) if (!list.includes(b) && b.keys.length) list.push(b);
+    bookings[day] = list;
+  }
+  // 오늘의 열쇠·입장 기록은 이 PC에 저장 (앱을 껐다 켜도 열쇠판 유지)
+  const STATE_KEY = "astanakiz-desk-" + TODAY;
+  function saveState() {
+    if (!APP) return;
+    try {
+      localStorage.setItem(STATE_KEY, JSON.stringify({
+        b: (bookings[TODAY] || []).filter((b) => b.enteredAt != null).map((b) => ({ no: b.no, keys: b.keys, enteredAt: b.enteredAt, outAt: b.outAt, visitNo: b.visitNo, overPaid: b.overPaid, naverPending: b.naverPending, status: b.status })),
+        w: walkins, seq, posSeq,
+      }));
+    } catch (e) { /* 저장 못 해도 화면은 동작 */ }
+  }
+  let restored = false;
+  function restoreState() {
+    if (restored) return;
+    restored = true;
+    let st = null;
+    try { st = JSON.parse(localStorage.getItem(STATE_KEY)); } catch (e) { st = null; }
+    if (!st) return;
+    seq = Math.max(seq, st.seq || 0); posSeq = Math.max(posSeq, st.posSeq || 0);
+    for (const x of st.b || []) { const b = (bookings[TODAY] || []).find((y) => y.no === x.no); if (b) Object.assign(b, x); }
+    if (!walkins.length) walkins.push(...(st.w || []));
+  }
 
   // ── 열쇠 계산 ─────────────────────────────────────
   const holders = () => bookings[TODAY].concat(walkins).filter((x) => x.keys.length);
@@ -500,8 +568,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     const list = bookings[viewDay];
     $("slots").innerHTML = SLOTS.map((s) => {
       const bs = list.filter((b) => b.slot === s);
-      const conf = bs.reduce((a, b) => a + b.qty, 0);
-      const left = Math.max(0, RULES.slotCap - conf);
+      const ns = (naverSlots[viewDay] || {})[s];
+      const conf = ns ? ns.conf + ns.done : bs.reduce((a, b) => a + b.qty, 0);
+      const left = ns ? Math.max(0, ns.cap - conf) : Math.max(0, RULES.slotCap - conf);
       const pend = viewDay === TODAY ? bs.filter((b) => b.status === "확정").reduce((a, b) => a + b.qty, 0) : 0;
       const isNow = viewDay === TODAY && now >= s - RULES.earlyMinutes && now < s + 25;
       return `<button class="slot ${s === selSlot ? "on" : ""} ${isNow ? "now" : ""}" data-act="slot" data-s="${s}" aria-pressed="${s === selSlot}">
@@ -628,7 +697,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     $("synclog").innerHTML = `아마노${REAL ? "" : "(체험)"}: <b style="color:${park.err ? "var(--red)" : "inherit"}">${esc(park.msg)}</b>`;
   }
 
-  function renderAll() { $("now").textContent = hm(now); $("refresh-at").textContent = `${hm(lastRefresh)} 불러옴`; renderSlots(); renderRes(); renderKeys(); renderCars(); }
+  function renderAll() { saveState(); $("now").textContent = hm(now); $("refresh-at").textContent = naverBusy ? "불러오는 중…" : lastRefresh == null ? "" : `${hm(lastRefresh)} 불러옴`; renderSlots(); renderRes(); renderKeys(); renderCars(); }
 
   // ── 팝업 ─────────────────────────────────────────
   const sheet = { mode: null };
@@ -676,7 +745,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         </dl>
         ${note}${pickHtml}
         <div class="sheet-foot">${b.status === "확정"
-          ? `<button class="btn" data-act="close">닫기</button><button class="btn btn-ink" id="enter-done" data-act="doEnter" ${canEnter && sheet.keys.length === b.qty ? "" : "disabled"}>등록 완료</button>`
+          ? `${sheet.naverErr ? `<div class="banner warn" style="flex-basis:100%">네이버 이용완료 실패: ${esc(sheet.naverErr)}</div><button class="btn" data-act="doEnter" data-skip-naver="1">네이버 없이 열쇠만 등록</button>` : ""}
+             <button class="btn" data-act="close">닫기</button><button class="btn btn-ink" id="enter-done" data-act="doEnter" ${canEnter && sheet.keys.length === b.qty && !sheet.busy ? "" : "disabled"}>${sheet.busy ? "네이버 이용완료 중…" : sheet.naverErr ? "다시 시도" : "등록 완료"}</button>`
           : `<button class="btn btn-ink" data-act="close" data-autofocus>닫기</button>`}</div>`;
       return;
     }
@@ -764,7 +834,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           <div class="btns"><button class="btn btn-ink" data-act="cfgSave" ${dis}>저장</button><button class="btn" data-act="amanoShow" ${dis}>아마노 화면 보기 (로그인)</button></div>
           <div class="field"><span class="label">아마노 칸 배우기 <span class="help">자동으로 못 찾을 때만 · 누르면 아마노 화면이 앞으로 나오고, 그 칸을 한 번 클릭하면 기억</span></span>
             <div class="btns">${[["carNo", "차량번호 칸"], ["day", "입차일 칸"], ["searchBtn", "검색 버튼"]].map(([k, t]) => `<button class="btn btn-sm" data-act="learn" data-k="${k}" ${dis}>${t}${learned(k)}</button>`).join("")}</div></div>
-          <p class="help">창은 한 화면에 겹쳐 둡니다: 맨 뒤 아마노 → 가운데 POS → 맨 앞 입장 데스크. 아마노 창이 가려져 있어도 입력·클릭이 됩니다.</p>
+          <div class="field"><span class="label">네이버 예약관리 <span class="help">처음 한 번: '네이버 화면 보기'로 로그인 → 예약현황 화면까지 들어간 뒤 '지금 화면을 시작 화면으로'</span></span>
+            <div class="btns"><button class="btn" data-act="naverShow" ${dis}>네이버 화면 보기 (로그인)</button><button class="btn" data-act="naverHome" ${dis}>지금 화면을 시작 화면으로</button></div>
+            ${c.naverUrl ? `<span class="help">시작 화면: ${esc(c.naverUrl)}</span>` : ""}</div>
+          <p class="help">창은 한 화면에 겹쳐 둡니다: 맨 뒤 아마노·네이버 → 가운데 POS → 맨 앞 입장 데스크. 아마노 창이 가려져 있어도 입력·클릭이 됩니다.</p>
           <div class="sheet-foot"><button class="btn btn-ink" data-act="close">닫기</button></div>`;
         return;
       }
@@ -855,8 +928,14 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   const holderById = (id) => bookings[TODAY].concat(walkins).find((x) => x.id === id && x.keys.length);
   let sec = 0; // 체험 시계의 초
   setInterval(() => {
-    sec++;
-    if (sec >= 60) { sec = 0; now++; renderAll(); }
+    if (APP) {
+      const d = new Date(); sec = d.getSeconds();
+      const m = d.getHours() * 60 + d.getMinutes();
+      if (m !== now) { now = m; renderAll(); }
+    } else {
+      sec++;
+      if (sec >= 60) { sec = 0; now++; renderAll(); }
+    }
     if (sheet.mode === "key" && $("pos").hidden) { const h = holderById(sheet.hid); const mt = $("meter"); if (h && mt) { const before = !!overInfo(h).due; mt.innerHTML = meterHtml(h); if (sec === 0 || (!!overInfo(h).due !== before)) renderSheet(); } }
   }, 1000);
 
@@ -893,7 +972,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 
   const acts = {
     // 새로고침: 나중에 네이버 예약을 다시 불러오는 데 씀 (체험판은 화면만 다시 그림)
-    refresh() { lastRefresh = now; renderAll(); toast(`${hm(now)} 새로고침 (체험)`); },
+    refresh() {
+      if (APP) { loadNaver(viewDay, true); return; }
+      lastRefresh = now; renderAll(); toast(`${hm(now)} 새로고침 (체험)`);
+    },
     time(btn) { now += Number(btn.dataset.min); renderAll(); if (sheet.mode === "key") renderSheet(); },
     day(btn) { viewDay = shiftDay(viewDay, Number(btn.dataset.d)); renderAll(); },
     slot(btn) { selSlot = Number(btn.dataset.s); renderAll(); },
@@ -912,10 +994,18 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       if (h) { openSheet({ mode: "key", hid: h.id }); return; }
       openSheet({ mode: "walk", keys: [k], phone: "", paid: false, flexOk: false });
     },
-    doEnter() {
+    async doEnter(btn) {
       const b = findB(sheet.id);
-      if (sheet.keys.length !== b.qty) return;
+      if (sheet.keys.length !== b.qty || sheet.busy) return;
       if (sheet.keys.some((k) => holderOf(k))) { toast("그 사이 다른 손님이 쓴 열쇠가 있어요. 다시 골라 주세요."); sheet.keys = []; renderSheet(); return; }
+      // 실제: 네이버에서 이용완료를 누르고 완료로 바뀐 것을 확인한 뒤 열쇠를 등록 ("네이버 없이 등록"은 네이버가 안 될 때만)
+      if (APP && !(btn && btn.dataset.skipNaver)) {
+        sheet.busy = true; sheet.naverErr = ""; renderSheet();
+        const r = await window.desk.naver.complete({ day: b.day, no: b.no, time: hm(b.slot), product: b.naverProduct || "" }).catch((e) => ({ ok: false, why: String(e) }));
+        sheet.busy = false;
+        if (!r || !r.ok) { sheet.naverErr = (r && r.why) || "네이버 응답 없음"; renderSheet(); return; }
+      }
+      if (btn && btn.dataset.skipNaver) b.naverPending = true; // 네이버에는 나중에 이용완료를 눌러야 함
       Object.assign(b, { status: "완료", keys: sheet.keys.slice(), enteredAt: now, visitNo: b.prevDone + 1 });
       closeSheet();
       toast(`${b.name}님 입장 · 열쇠 ${b.keys.join(", ")}번 · 네이버 이용완료${isGift(b.visitNo) ? ` · ${b.visitNo}번째 방문, ${RULES.giftName}을 드리세요` : ""}${printForm("enter", keyVals(b))}`);
@@ -980,6 +1070,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     discount(btn) { parkRun(`'${btn.dataset.h}' 누름`, () => amanoApi.discount(btn.dataset.h)); },
     discDel(btn) { parkRun("할인내역 삭제", () => amanoApi.remove(Number(btn.dataset.i))); },
     amanoShow() { if (REAL) window.desk.amano.show(); },
+    naverShow() { if (APP) window.desk.naver.show(); },
+    async naverHome() {
+      const r = await window.desk.naver.setHome();
+      CFG = await window.desk.config.get();
+      toast(r && r.ok ? "네이버 시작 화면을 기억했어요" : (r && r.why) || "기억하지 못했어요"); renderSheet();
+      if (r && r.ok) loadNaver(viewDay, true);
+    },
     close() { closeSheet(); },
   };
 
@@ -1017,6 +1114,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     st.style.top = Math.max(0, (window.innerHeight - 768 * k) / 2) + "px";
   }
   window.addEventListener("resize", fit);
+  if (APP) {
+    document.querySelectorAll("[data-act=time]").forEach((b) => (b.hidden = true));
+    document.querySelector(".top .tag").textContent = "네이버 · 아마노 · POS 연결";
+    setInterval(() => { if (!sheet.mode && viewDay === TODAY) loadNaver(TODAY); }, 3 * 60 * 1000);
+  }
   fit();
   renderAll();
 })();

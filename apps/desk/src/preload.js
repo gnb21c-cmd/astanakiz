@@ -12,6 +12,12 @@ contextBridge.exposeInMainWorld("desk", {
     show: () => ipcRenderer.invoke("amano:show"),
     learn: (key) => ipcRenderer.invoke("amano:learn", key),
   },
+  naver: {
+    load: (day) => ipcRenderer.invoke("naver:load", day),
+    complete: (b) => ipcRenderer.invoke("naver:complete", b),
+    show: () => ipcRenderer.invoke("naver:show"),
+    setHome: () => ipcRenderer.invoke("naver:setHome"),
+  },
   pos: { show: () => ipcRenderer.invoke("pos:show") },
   config: {
     get: () => ipcRenderer.invoke("config:get"),
