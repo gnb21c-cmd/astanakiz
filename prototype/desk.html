@@ -1118,7 +1118,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     const out = main == null ? "시간제한 없음" : krTime(h.slot + main) + (extra.length ? ` (${extra.map((e) => `${e.k}번 ${krTime(h.slot + e.m)}`).join(", ")})` : "");
     const naver = !h.walk;
     return {
-      구분: naver ? "네이버" : "현장", 고객: h.walk ? "현장입장" : maskName(h.name), 전화뒤4: digits(h.phone).slice(-4), 열쇠: h.keys.join(", "),
+      구분: naver ? "네이버" : "현장", 고객: h.walk ? "   " : maskName(h.name), // 현장 이용자는 이름을 모름 → 빈칸 (줄은 그대로) 전화뒤4: digits(h.phone).slice(-4), 열쇠: h.keys.join(", "),
       입장시간: krTime(h.enteredAt), 퇴장시간: out, 누계: h.visitNo ? String(h.visitNo) : "", 기준회: String(RULES.giftEvery), 사은권: RULES.giftName,
       날짜: TODAY, 시각: hm(now), _네이버: naver && !!h.visitNo, _현장: !naver, _사은권: naver && !!h.visitNo && isGift(h.visitNo),
     };
