@@ -1,0 +1,802 @@
+<title>아스타나키즈 입장 데스크</title>
+<meta name="description" content="네이버 예약 입장, POS 현장 결제, 열쇠·주차 관리를 POS 화면 한 장(1024×768)에서 처리하는 근무자용 체험판">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Jua&display=swap">
+<style>
+/* 배치: POS 화면 1024×768 한 장. 위 막대(현황·시계) / 세 칸 — 네이버 예약 입장 | 현장 판매·열쇠판·POS 결제 | 연동·확인할 일.
+   각 칸 안에서만 스크롤. 1000px 보다 좁으면 한 줄씩 쌓아서 휴대폰에서도 볼 수 있게 */
+:root {
+  --bg: #EEF1F5;
+  --surface: #FFFFFF;
+  --surface-2: #F5F7FA;
+  --fg: #172033;
+  --muted: #5B6679;
+  --line: #DCE1E9;
+  --ink: #172033;
+  --on-ink: #FFFFFF;
+  --sun: #F2B705;
+  --naver: #0B8F47;
+  --naver-bg: #E2F3E9;
+  --walk: #0E6E7A;
+  --walk-bg: #DCF0F2;
+  --use: #2C56C9;
+  --use-bg: #E4EBFB;
+  --grace: #C4650A;
+  --grace-bg: #FCE9D5;
+  --late: #CC3333;
+  --late-bg: #FBE2E2;
+  --ok: #1D7F52;
+  --shadow: 0 1px 2px rgba(23, 32, 51, .06), 0 3px 12px rgba(23, 32, 51, .05);
+  --font-ui: "IBM Plex Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+  --font-brand: "Jua", "IBM Plex Sans KR", "Malgun Gothic", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F141D; --surface: #18202C; --surface-2: #1F2835; --fg: #E8ECF3; --muted: #9AA5B8; --line: #2C3646;
+    --ink: #E8ECF3; --on-ink: #10151E; --sun: #F5C536;
+    --naver: #4CC788; --naver-bg: #173226; --walk: #4FBFCB; --walk-bg: #15303A;
+    --use: #7FA0F5; --use-bg: #1D2A4A; --grace: #F09A4A; --grace-bg: #3A2814; --late: #F07070; --late-bg: #451C1F;
+    --ok: #5BCB92; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 3px 12px rgba(0,0,0,.25);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F141D; --surface: #18202C; --surface-2: #1F2835; --fg: #E8ECF3; --muted: #9AA5B8; --line: #2C3646;
+  --ink: #E8ECF3; --on-ink: #10151E; --sun: #F5C536;
+  --naver: #4CC788; --naver-bg: #173226; --walk: #4FBFCB; --walk-bg: #15303A;
+  --use: #7FA0F5; --use-bg: #1D2A4A; --grace: #F09A4A; --grace-bg: #3A2814; --late: #F07070; --late-bg: #451C1F;
+  --ok: #5BCB92; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 3px 12px rgba(0,0,0,.25);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 14px; line-height: 1.45; padding-inline: 16px; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; touch-action: manipulation; }
+button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px solid var(--use); outline-offset: 2px; }
+.num { font-variant-numeric: tabular-nums; }
+.app { max-width: 1320px; margin: 0 auto; padding-block: 10px; display: grid; gap: 10px; }
+
+/* 위 막대 */
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.brand-mark { width: 36px; height: 36px; border-radius: 10px; background: var(--sun); display: grid; place-items: center; font-family: var(--font-brand); font-size: 20px; color: #172033; flex: none; }
+.brand h1 { margin: 0; font-family: var(--font-brand); font-weight: 400; font-size: 20px; line-height: 1.1; white-space: nowrap; }
+.brand p { margin: 1px 0 0; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; flex: 1 1 100%; min-width: 0; }
+.stat { min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 5px 10px; display: grid; }
+@media (min-width: 600px) { .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.stat .label { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+.stat .val { font-size: 20px; font-weight: 700; line-height: 1.15; white-space: nowrap; }
+.stat .val small { font-size: 12.5px; color: var(--muted); font-weight: 500; }
+.stat.alert { border-color: var(--late); background: var(--late-bg); }
+.stat.alert .val { color: var(--late); }
+.stat.good .val { color: var(--ok); }
+.stat.zero .val { color: var(--grace); }
+.clock { display: flex; align-items: center; gap: 6px; }
+.clock .now { font-size: 24px; font-weight: 700; line-height: 1; }
+.clock .date { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 7px 12px; font-weight: 600; min-height: 38px; }
+.btn:hover { background: var(--surface-2); }
+.btn[disabled] { opacity: .45; cursor: not-allowed; }
+.btn-ink { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+.btn-ink:hover { background: var(--ink); opacity: .9; }
+.btn-sm { padding: 3px 9px; min-height: 30px; font-size: 12.5px; border-radius: 8px; }
+
+/* 세 칸 */
+.cols { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 10px; display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; }
+.panel h2 { margin: 0; font-size: 15px; display: flex; align-items: baseline; gap: 6px; justify-content: space-between; flex-wrap: wrap; }
+.panel h2 .count { font-size: 12px; color: var(--muted); font-weight: 500; }
+.scroll { min-height: 0; display: grid; gap: 6px; align-content: start; }
+.sub-h { font-size: 11.5px; font-weight: 700; color: var(--muted); letter-spacing: .06em; margin: 4px 0 0; display: flex; justify-content: space-between; }
+.empty { color: var(--muted); font-size: 13px; padding: 8px; background: var(--surface-2); border-radius: 8px; text-align: center; }
+.explain { font-size: 11.5px; color: var(--muted); margin: 0; }
+
+@media (min-width: 1000px) and (min-height: 680px) {
+  body { overflow: hidden; }
+  .app { height: 100%; grid-template-rows: auto minmax(0, 1fr) auto; }
+  .cols { grid-template-columns: 300px minmax(0, 1fr) 272px; height: 100%; align-items: stretch; min-height: 0; }
+  .panel { height: 100%; }
+  .scroll { overflow: auto; flex: 1; padding-right: 2px; }
+  .top { flex-wrap: nowrap; }
+  .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); flex: 1 1 auto; }
+  .brand h1 { font-size: 18px; }
+}
+
+/* 검색 */
+.search { display: flex; align-items: center; gap: 6px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 0 10px; min-height: 40px; }
+.search input { border: 0; background: transparent; outline: none; flex: 1; min-width: 0; font-size: 15px; padding: 6px 0; }
+.search label { color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+/* 예약 줄 */
+.row { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 9px; background: var(--surface-2); border: 1px solid transparent; }
+.row.ready { background: var(--naver-bg); border-color: color-mix(in srgb, var(--naver) 35%, transparent); }
+.row .slot { font-weight: 700; }
+.row .who { min-width: 0; line-height: 1.3; }
+.row .who b { font-weight: 600; }
+.row .who .meta { display: block; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.row.done { opacity: .65; }
+.row .btn-ink { min-height: 36px; padding: 4px 14px; font-size: 14px; }
+.chip { display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 700; border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
+.chip.naver { background: var(--naver-bg); color: var(--naver); }
+.chip.walk { background: var(--walk-bg); color: var(--walk); }
+.chip.kc { background: var(--use-bg); color: var(--use); }
+.chip.kc.grace { background: var(--grace-bg); color: var(--grace); }
+.chip.kc.late { background: var(--late-bg); color: var(--late); }
+.kcs { display: inline-flex; gap: 3px; flex-wrap: wrap; }
+.chip.muted { background: var(--surface); color: var(--muted); border: 1px solid var(--line); }
+.chip.ok { background: var(--naver-bg); color: var(--ok); }
+.chip.warn { background: var(--late-bg); color: var(--late); }
+details.more { border-top: 1px dashed var(--line); padding-top: 4px; }
+details.more summary { cursor: pointer; color: var(--muted); font-size: 12.5px; font-weight: 600; padding: 4px 0; }
+details.more .rows { display: grid; gap: 6px; }
+
+/* 가운데: 현장 판매 · 열쇠판 · POS 결제 */
+.sale-btn { font-size: 17px; min-height: 50px; border-radius: 12px; width: 100%; display: flex; justify-content: center; align-items: center; gap: 10px; }
+.sale-btn small { font-size: 12.5px; font-weight: 500; opacity: .8; }
+.keys { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 5px; }
+.key { aspect-ratio: 1 / .92; max-width: 100%; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); display: grid; place-content: center; text-align: center; padding: 1px; line-height: 1.05; }
+.key b { font-size: 17px; font-weight: 700; }
+.key span { font-size: 10px; display: block; margin-top: 2px; white-space: nowrap; }
+.key.free { color: var(--muted); }
+.key.free b { font-weight: 500; }
+.key.spare { border-style: dashed; }
+.key.use { background: var(--use-bg); border: 1.5px solid var(--use); color: var(--use); }
+.key.grace { background: var(--grace-bg); border: 1.5px solid var(--grace); color: var(--grace); }
+.key.late { background: var(--late); border: 1.5px solid var(--late); color: #fff; }
+.key:hover { filter: brightness(.97); }
+.legend { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 11.5px; color: var(--muted); }
+.legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: -1px; margin-right: 4px; border: 1px solid var(--line); }
+.legend .l-use { background: var(--use-bg); border-color: var(--use); }
+.legend .l-grace { background: var(--grace-bg); border-color: var(--grace); }
+.legend .l-late { background: var(--late); border-color: var(--late); }
+.legend .l-spare { border-style: dashed; }
+.pay-row { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 13px; padding: 5px 8px; border-radius: 8px; background: var(--surface-2); }
+.pay-row .meta { color: var(--muted); font-size: 11.5px; display: block; }
+.pay-row .amt { font-weight: 700; text-align: right; }
+@media (max-width: 420px) { .key b { font-size: 14px; } .key span { display: none; } .keys { gap: 3px; } }
+
+/* 오른쪽: 연동 · 확인할 일 */
+.links { display: grid; gap: 4px; }
+.link { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 8px; align-items: center; font-size: 12.5px; padding: 6px 8px; border-radius: 8px; background: var(--surface-2); }
+.link .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); }
+.link .dot.warn { background: var(--late); }
+.link b { font-weight: 700; }
+.link .meta { grid-column: 2; color: var(--muted); font-size: 11.5px; }
+.task { border-radius: 10px; padding: 8px 10px; display: grid; gap: 4px; background: var(--surface-2); border: 1px solid var(--line); }
+.task.late { background: var(--late-bg); border-color: color-mix(in srgb, var(--late) 40%, transparent); }
+.task.grace { background: var(--grace-bg); border-color: color-mix(in srgb, var(--grace) 40%, transparent); }
+.task .line1 { display: flex; justify-content: space-between; gap: 6px; flex-wrap: wrap; align-items: baseline; }
+.task .phone { font-weight: 600; user-select: all; }
+.task .note { font-size: 11.5px; color: var(--muted); }
+.btns { display: flex; gap: 5px; flex-wrap: wrap; }
+.when-late { color: var(--late); font-weight: 700; }
+.when-grace { color: var(--grace); font-weight: 700; }
+.mini { display: flex; align-items: center; gap: 6px; justify-content: space-between; flex-wrap: wrap; font-size: 13px; padding: 5px 8px; background: var(--surface-2); border-radius: 8px; }
+.mini .car { font-weight: 700; }
+
+.foot-note { color: var(--muted); font-size: 11.5px; margin: 0; overflow-wrap: anywhere; }
+
+/* 시트 */
+.overlay { position: fixed; inset: 0; background: rgba(15, 20, 29, .5); display: grid; align-items: center; justify-items: center; z-index: 20; padding: 12px 16px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+.sheet { background: var(--surface); color: var(--fg); width: min(560px, 100%); max-height: 100%; overflow: auto; border-radius: 16px; padding: 16px; display: grid; gap: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+.sheet.wide { width: min(800px, 100%); }
+.sheet h3 { margin: 0; font-size: 18px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.sheet .x { border: 0; background: transparent; font-size: 24px; line-height: 1; padding: 2px 8px; color: var(--muted); }
+.facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 14px; margin: 0; }
+.facts dt { color: var(--muted); font-size: 13px; }
+.facts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.big-keys { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.big-key { font-size: 24px; font-weight: 700; min-width: 58px; text-align: center; padding: 6px 10px; border-radius: 12px; background: var(--use-bg); color: var(--use); border: 2px solid var(--use); }
+.pick { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 4px; }
+.pick button { aspect-ratio: 1.3; border-radius: 7px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; font-size: 13px; padding: 0; }
+.pick button.on { background: var(--use); border-color: var(--use); color: #fff; }
+.pick button[disabled] { opacity: .25; cursor: default; }
+.field { display: grid; gap: 4px; }
+.field label, .field .label { font-size: 13px; font-weight: 600; }
+.help { font-size: 11.5px; color: var(--muted); font-weight: 400; }
+.field input { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; background: var(--surface); font-size: 17px; min-height: 44px; width: 100%; }
+.split { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 700px) { .split { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); } }
+.stack { display: grid; gap: 8px; align-content: start; }
+.stepper { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; }
+.stepper .name b { display: block; }
+.stepper .name span { font-size: 12px; color: var(--muted); }
+.stepper .ctl { display: flex; align-items: center; gap: 6px; }
+.stepper .ctl button { width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); font-size: 22px; font-weight: 700; line-height: 1; }
+.stepper .ctl output { min-width: 30px; text-align: center; font-size: 20px; font-weight: 700; }
+.seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.seg button { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; min-height: 42px; font-weight: 600; }
+.seg button.on { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+.phone-show { font-size: 22px; font-weight: 700; min-height: 46px; display: flex; align-items: center; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); letter-spacing: .02em; }
+.phone-show.placeholder { color: var(--muted); font-weight: 500; font-size: 16px; }
+.pad { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+.pad button { min-height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); font-size: 20px; font-weight: 600; }
+.pad button.fn { font-size: 13px; background: var(--surface-2); }
+.banner { border-radius: 10px; padding: 8px 10px; font-size: 13px; }
+.banner.ok { background: var(--naver-bg); }
+.banner.warn { background: var(--late-bg); border: 1px solid color-mix(in srgb, var(--late) 40%, transparent); }
+.banner b { font-weight: 700; }
+.total { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 14px; padding-top: 6px; border-top: 1px solid var(--line); }
+.total b { font-size: 22px; }
+.sheet-foot { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.sheet-foot .btn { min-height: 48px; padding: 8px 18px; font-size: 15px; }
+.pay-wait { text-align: center; display: grid; gap: 10px; padding: 12px 0; }
+.spinner { width: 40px; height: 40px; border-radius: 50%; border: 4px solid var(--line); border-top-color: var(--use); margin: 0 auto; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+.done-msg { text-align: center; display: grid; gap: 8px; justify-items: center; }
+
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--on-ink); padding: 9px 16px; border-radius: 12px; font-weight: 600; z-index: 30; max-width: calc(100% - 32px); box-shadow: var(--shadow); }
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">키</div>
+      <div>
+        <h1>아스타나키즈 입장 데스크</h1>
+        <p>체험판 · 예시 데이터</p>
+      </div>
+    </div>
+    <section class="stats" id="stats" aria-label="지금 현황"></section>
+    <div class="clock">
+      <div>
+        <div class="now num" id="now">13:50</div>
+        <div class="date">10/10 (토) 휴일</div>
+      </div>
+      <button class="btn btn-sm" data-act="time" data-min="5">+5분</button>
+      <button class="btn btn-sm" data-act="time" data-min="30">+30분</button>
+    </div>
+  </header>
+
+  <div class="cols">
+    <section class="panel" aria-labelledby="h-naver">
+      <h2 id="h-naver">네이버 예약 입장 <span class="count" id="naver-count"></span></h2>
+      <div class="search">
+        <label for="q">찾기</label>
+        <input id="q" type="search" placeholder="이름 또는 전화 뒷자리" autocomplete="off">
+      </div>
+      <div class="scroll" id="naver"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="h-keys">
+      <button class="btn btn-ink sale-btn" data-act="sale">현장 판매 · 입장 <small id="sale-sub"></small></button>
+      <h2 id="h-keys">열쇠판 <span class="count" id="keys-count"></span></h2>
+      <div class="keys" id="keys"></div>
+      <div class="legend">
+        <span><i></i>빈 열쇠</span>
+        <span><i class="l-spare"></i>현장 우선 41~45</span>
+        <span><i class="l-use"></i>이용 중</span>
+        <span><i class="l-grace"></i>반납 시간(10분 안)</span>
+        <span><i class="l-late"></i>반납 지연</span>
+      </div>
+      <h2>오늘 현장 결제 <span class="count num" id="pay-sum"></span></h2>
+      <div class="scroll" id="pays"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="h-tasks">
+      <h2 id="h-tasks">연동 · 확인할 일</h2>
+      <div class="scroll" id="tasks"></div>
+    </section>
+  </div>
+
+  <p class="foot-note">체험판입니다. 이름·전화·차량번호는 예시이고 결제·문자·네이버·주차는 실제로 처리되지 않습니다. 오른쪽 위 +5분 · +30분으로 시간을 넘겨 반납 지연과 자동 안내를 볼 수 있습니다. 가격은 예시(휴일 입장권 4인 16,000원 · 추가 1인 4,000원)입니다.</p>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title"></div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+(() => {
+  // ── 규칙 (체험용 값) ─────────────────────────────
+  const DUR = 110;          // 이용시간 1시간 50분
+  const KEYS = 45;          // 보유 열쇠
+  const SPARE_FROM = 41;    // 41~45번은 현장 손님에게 먼저
+  const GRACE = 10;         // 반납 시간 지나고 10분까지는 주황
+  const EARLY = 5;          // 예약 5분 전부터 입장
+  const PRICE = { ticket: 16000, extra: 4000 }; // 휴일 카드가 (예시)
+
+  const toMin = (s) => { const [h, m] = s.split(":").map(Number); return h * 60 + m; };
+  const hm = (m) => String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+  const won = (n) => n.toLocaleString("ko-KR") + "원";
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const digits = (p) => String(p).replace(/\D/g, "");
+  const last4 = (p) => digits(p).slice(-4);
+  const fmtPhone = (p) => { const d = digits(p); return d.length === 11 ? `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}` : d.length === 10 ? `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}` : d; };
+
+  let now = toMin("13:50");
+  let seq = 1;
+  let posSeq = 30;
+  const visits = [];
+
+  // 네이버 예약 (예시) — keys 가 있으면 이미 입장
+  function naver(slot, name, phone, tickets, o = {}) {
+    const s = toMin(slot);
+    const v = {
+      id: "v" + seq++, src: "naver", no: "N" + (240000 + seq * 37), name, phone, slot: s, tickets, extra: 0,
+      car: o.car || "", park: o.car ? (o.park || "ok") : null, status: "wait", keys: [], enteredAt: null, exp: s + DUR,
+      smsAt: null, resent: null, outAt: null, naverDone: null,
+    };
+    if (o.keys) { v.status = "in"; v.keys = o.keys.slice(); v.enteredAt = s - 3; v.naverDone = s - 3; }
+    if (o.out) { v.status = "out"; v.enteredAt = s - 2; v.outAt = s + 95; v.naverDone = s - 2; }
+    visits.push(v);
+    return v;
+  }
+  function walk(at, phone, tickets, extra, keys, o = {}) {
+    const a = toMin(at);
+    const v = {
+      id: "v" + seq++, src: "walk", name: "현장 구매", phone, slot: a, tickets, extra,
+      car: o.car || "", park: o.car ? (o.park || "ok") : null, status: "in", keys: keys.slice(), enteredAt: a, exp: a + DUR,
+      smsAt: null, resent: null, outAt: null, pay: o.pay || "카드", amount: tickets * PRICE.ticket + extra * PRICE.extra,
+      posNo: "POS-" + String(posSeq++).padStart(4, "0"),
+    };
+    visits.push(v);
+    return v;
+  }
+
+  naver("10:30", "배주원", "01048213390", 1);
+  naver("11:30", "김서윤", "01027384410", 1, { keys: [3], car: "38다 1172" });
+  naver("12:00", "박하은", "01093318820", 1, { out: true, car: "21보 5520" });
+  naver("12:00", "이도윤", "01055102947", 2, { keys: [7, 8], car: "152가 7781", park: "fail" });
+  naver("12:00", "탁서율", "01064420183", 1, { keys: [24] });
+  naver("12:30", "최지호", "01033829051", 1, { keys: [2] });
+  naver("12:30", "정예린", "01087120336", 1, { keys: [4] });
+  naver("12:30", "노윤호", "01022917740", 2, { keys: [15, 16], car: "61머 3020" });
+  naver("13:00", "강민준", "01076643215", 2, { keys: [5, 6] });
+  naver("13:00", "윤서아", "01090047721", 1, { keys: [9], car: "27노 8814" });
+  naver("13:00", "문하윤", "01031156628", 1, { keys: [17] });
+  naver("13:00", "백지우", "01045527719", 2, { keys: [18, 19] });
+  naver("13:00", "장시우", "01068893304", 1);
+  naver("13:30", "임하준", "01012298874", 1, { keys: [10] });
+  naver("13:30", "조아인", "01039906512", 3, { keys: [11, 12, 13], car: "119허 4402" });
+  naver("13:30", "한지안", "01058821137", 1, { keys: [14] });
+  naver("13:30", "남궁민", "01077240098", 1, { keys: [20] });
+  naver("13:30", "유채아", "01020087346", 2, { keys: [21, 22] });
+  naver("13:30", "구본우", "01094471128", 1, { keys: [23] });
+  naver("14:00", "오유나", "01063390471", 1);
+  naver("14:00", "서도현", "01017783305", 2);
+  naver("14:00", "신채원", "01082214490", 1);
+  naver("14:00", "권이준", "01049905123", 1);
+  naver("14:30", "황수아", "01036654018", 1);
+  naver("14:30", "안지후", "01071180942", 2);
+  naver("14:30", "송다온", "01025539987", 1);
+  naver("15:00", "류하린", "01088016634", 1);
+  naver("15:00", "전시윤", "01014472259", 1);
+  naver("15:00", "홍예준", "01052238841", 2);
+  naver("15:30", "고은우", "01097731106", 1);
+  naver("15:30", "문서진", "01030065512", 1);
+  naver("16:00", "양지아", "01069924478", 2);
+  naver("16:00", "손라온", "01041187730", 1);
+  walk("11:05", "01091124478", 1, 0, [44]).status = "out";
+  visits[visits.length - 1].keys = []; visits[visits.length - 1].outAt = toMin("12:58");
+  walk("12:40", "01026659013", 1, 1, [41, 42], { car: "45루 6603" });
+  walk("13:10", "01084430217", 1, 0, [43], { pay: "현금" });
+  let lastImport = toMin("13:48");
+
+  // ── 계산 ─────────────────────────────────────────
+  const holderOf = (k) => visits.find((v) => v.keys.includes(k));
+  const band = (v) => (now < v.exp ? "use" : now < v.exp + GRACE ? "grace" : "late");
+  const freeKeys = () => { const out = []; for (let k = 1; k <= KEYS; k++) if (!holderOf(k)) out.push(k); return out; };
+  const byId = (id) => visits.find((x) => x.id === id);
+
+  function pickKeys(n, src, prefer) {
+    const free = freeKeys();
+    const order = src === "walk"
+      ? free.filter((k) => k >= SPARE_FROM).concat(free.filter((k) => k < SPARE_FROM))
+      : free.filter((k) => k < SPARE_FROM).concat(free.filter((k) => k >= SPARE_FROM));
+    if (prefer && order.includes(prefer)) { order.splice(order.indexOf(prefer), 1); order.unshift(prefer); }
+    return order.slice(0, n);
+  }
+
+  /* 현장 판매 가능 장수: 지금부터 이용시간(1시간 50분) 동안 5분마다
+     (안에 있는 손님 열쇠 + 그때 와 있을 네이버 예약 열쇠)를 빼고 남는 열쇠의 가장 작은 값.
+     예약 손님 자리를 먼저 남기므로 근무자가 "팔아도 되나"를 따로 판단하지 않습니다. */
+  function projection() {
+    let worst = Infinity, worstAt = now;
+    for (let x = now; x <= now + DUR; x += 5) {
+      let used = 0;
+      for (const v of visits) {
+        if (v.status === "in") { if (v.exp > x || x < now + GRACE) used += v.keys.length; }
+        else if (v.status === "wait" && v.src === "naver") { if (v.slot - EARLY <= x && x < v.slot + DUR) used += v.tickets; }
+      }
+      if (KEYS - used < worst) { worst = KEYS - used; worstAt = x; }
+    }
+    return { avail: Math.max(0, Math.min(worst, freeKeys().length)), worstAt };
+  }
+
+  // 시간이 지나면: 안 온 예약은 자동 미입장, 반납 시간이 된 손님에게 자동 안내 문자
+  function settle() {
+    for (const v of visits) {
+      if (v.status === "wait" && now >= v.slot + DUR) v.status = "noshow";
+      if (v.status === "in" && now >= v.exp && v.smsAt == null) v.smsAt = v.exp;
+    }
+  }
+
+  // 주차 웹 자동 입력 (체험: 1.5초 뒤 등록됨)
+  function parkSubmit(v) {
+    v.park = "wait";
+    setTimeout(() => { v.park = "ok"; renderAll(); toast(`${v.car} 주차 등록됨`); }, 1500);
+  }
+
+  // ── 그리기 ───────────────────────────────────────
+  const $ = (id) => document.getElementById(id);
+  let query = "";
+
+  function renderStats() {
+    const inUse = KEYS - freeKeys().length;
+    const { avail } = projection();
+    const late = visits.filter((v) => v.status === "in" && band(v) !== "use").length;
+    const waiting = visits.filter((v) => v.status === "wait" && v.slot - EARLY <= now).length;
+    $("stats").innerHTML = `
+      <div class="stat"><span class="label">사용 중 열쇠</span><span class="val num">${inUse}<small> / ${KEYS}</small></span></div>
+      <div class="stat ${avail > 0 ? "good" : "zero"}"><span class="label">현장 판매 가능</span><span class="val num">${avail}<small>장</small></span></div>
+      <div class="stat"><span class="label">입장 기다림</span><span class="val num">${waiting}<small>팀</small></span></div>
+      <div class="stat ${late ? "alert" : ""}"><span class="label">반납 지연</span><span class="val num">${late}<small>건</small></span></div>`;
+    $("sale-sub").textContent = avail > 0 ? `지금 ${avail}장까지` : "지금은 예약 손님 자리로 꽉 참";
+  }
+
+  function keyChips(v) {
+    const b = v.status === "in" ? band(v) : "use";
+    return `<span class="kcs">${v.keys.map((k) => `<span class="chip kc ${b === "use" ? "" : b}">${k}</span>`).join("")}</span>`;
+  }
+
+  function naverRow(v) {
+    const ready = v.status === "wait" && v.slot - EARLY <= now;
+    let right;
+    if (v.status === "wait") right = ready
+      ? `<button class="btn btn-ink" data-act="checkin" data-id="${v.id}">입장</button>`
+      : `<span class="chip muted num">${hm(v.slot - EARLY)}~</span>`;
+    else if (v.status === "in") right = keyChips(v);
+    else if (v.status === "out") right = `<span class="chip muted num">퇴장 ${hm(v.outAt)}</span>`;
+    else right = `<span class="chip muted">안 옴</span>`;
+    let meta = `${last4(v.phone)} · 입장권 ${v.tickets}장`;
+    if (v.status === "in") meta += ` · ${hm(v.exp)}까지`;
+    if (v.status === "wait" && now > v.slot + 10) meta += ` · <span class="when-grace">${now - v.slot}분 늦음</span>`;
+    return `<div class="row ${ready ? "ready" : ""} ${v.status === "out" || v.status === "noshow" ? "done" : ""}">
+      <span class="slot num">${hm(v.slot)}</span>
+      <span class="who"><b>${esc(v.name)}</b><span class="meta num">${meta}</span></span>
+      <span>${right}</span>
+    </div>`;
+  }
+
+  function renderNaver() {
+    const q = query.trim();
+    const qd = digits(q);
+    const match = (v) => v.src === "naver" && (!q || v.name.includes(q) || (qd && digits(v.phone).includes(qd)));
+    const list = visits.filter(match).sort((a, b) => a.slot - b.slot);
+    const ready = list.filter((v) => v.status === "wait" && v.slot - EARLY <= now);
+    const later = list.filter((v) => v.status === "wait" && v.slot - EARLY > now);
+    const inside = list.filter((v) => v.status === "in");
+    const done = list.filter((v) => v.status === "out" || v.status === "noshow");
+    $("naver-count").textContent = `오늘 ${visits.filter((v) => v.src === "naver").length}건`;
+    let html = `<p class="sub-h"><span>지금 입장</span><span class="num">${ready.length}팀</span></p>`;
+    html += ready.length ? ready.map(naverRow).join("") : `<div class="empty">${q ? "찾는 예약이 없어요" : "지금 입장할 예약이 없어요"}</div>`;
+    if (later.length) html += `<p class="sub-h"><span>곧 도착</span><span class="num">${later.length}팀</span></p>${later.map(naverRow).join("")}`;
+    if (inside.length || done.length) {
+      html += `<details class="more" ${q ? "open" : ""}><summary>입장한 예약 ${inside.length}팀 · 끝난 예약 ${done.length}팀</summary><div class="rows">${inside.concat(done).map(naverRow).join("")}</div></details>`;
+    }
+    $("naver").innerHTML = html;
+  }
+
+  function renderKeys() {
+    let html = "";
+    for (let k = 1; k <= KEYS; k++) {
+      const v = holderOf(k);
+      const spare = k >= SPARE_FROM ? " spare" : "";
+      if (!v) { html += `<button class="key free${spare}" data-act="key" data-k="${k}" aria-label="${k}번 빈 열쇠"><b class="num">${k}</b><span>&nbsp;</span></button>`; continue; }
+      const b = band(v);
+      const label = b === "late" ? `+${now - v.exp}분` : b === "grace" ? "반납" : `~${hm(v.exp)}`;
+      html += `<button class="key ${b}${spare}" data-act="key" data-k="${k}" aria-label="${k}번 ${esc(v.name)} ${label}"><b class="num">${k}</b><span class="num">${label}</span></button>`;
+    }
+    $("keys").innerHTML = html;
+    $("keys-count").textContent = `빈 열쇠 ${freeKeys().length}개`;
+  }
+
+  function renderPays() {
+    const list = visits.filter((v) => v.src === "walk").sort((a, b) => b.enteredAt - a.enteredAt);
+    const sum = list.reduce((a, v) => a + v.amount, 0);
+    $("pay-sum").textContent = `${list.length}건 · ${won(sum)}`;
+    $("pays").innerHTML = list.length ? list.map((v) => `<div class="pay-row">
+        <span class="num">${hm(v.enteredAt)}</span>
+        <span>입장권 ${v.tickets}${v.extra ? ` + 추가 ${v.extra}명` : ""} · ${v.status === "in" ? keyChips(v) : `<span class="chip muted">퇴장</span>`}
+          <span class="meta num">${v.pay} · ${v.posNo} · ${last4(v.phone)}</span></span>
+        <span class="amt num">${won(v.amount)}</span>
+      </div>`).join("") : `<div class="empty">아직 현장 결제가 없어요</div>`;
+  }
+
+  function renderTasks() {
+    const late = visits.filter((v) => v.status === "in" && band(v) !== "use").sort((a, b) => a.exp - b.exp);
+    const parks = visits.filter((v) => v.car && v.status !== "noshow" && v.status !== "wait");
+    const parkFail = parks.filter((v) => v.park === "fail").length;
+    let html = `<div class="links">
+      <div class="link"><span class="dot"></span><b>네이버 예약</b><span class="meta num">${hm(lastImport)} 자동으로 불러옴 · 입장하면 이용완료도 자동 표시</span></div>
+      <div class="link"><span class="dot"></span><b>POS 결제</b><span class="meta">현장 판매 금액을 POS 단말기로 보내고 승인 결과를 받아옴</span></div>
+      <div class="link"><span class="dot ${parkFail ? "warn" : ""}"></span><b>주차 웹</b><span class="meta">${parkFail ? `${parkFail}대 입력 실패 · 아래에서 다시 시도` : "입장할 때 받은 차량번호를 자동 입력"}</span></div>
+      <button class="btn btn-sm" data-act="newBooking">네이버 새 예약 들어오는 모습 보기</button>
+    </div>`;
+
+    html += `<p class="sub-h"><span>반납 지연</span><span class="num">${late.length}건</span></p>`;
+    html += late.length ? late.map((v) => {
+      const b = band(v);
+      return `<div class="task ${b}">
+        <div class="line1"><b>${esc(v.name)} <span class="chip ${v.src}">${v.src === "naver" ? "네이버" : "현장"}</span></b><span>${keyChips(v)}</span></div>
+        <div class="line1"><span class="${b === "late" ? "when-late" : "when-grace"} num">${hm(v.exp)} 반납 · ${now - v.exp}분 지남</span><span class="phone num">${fmtPhone(v.phone)}</span></div>
+        <div class="note num">${hm(v.smsAt)} 반납 안내 문자 자동 발송${v.resent != null ? ` · ${hm(v.resent)} 다시 보냄` : ""}</div>
+        <div class="btns"><button class="btn btn-sm" data-act="returnAll" data-id="${v.id}">반납 받음${v.keys.length > 1 ? ` (${v.keys.length}개)` : ""}</button><button class="btn btn-sm" data-act="resend" data-id="${v.id}">안내 다시 보내기</button></div>
+      </div>`;
+    }).join("") : `<div class="empty">늦은 열쇠가 없어요</div>`;
+
+    html += `<p class="sub-h"><span>주차 등록</span><span class="num">${parks.length}대</span></p>`;
+    html += parks.length ? parks.slice().sort((a, b) => (a.park === "fail" ? -1 : 0) - (b.park === "fail" ? -1 : 0) || b.enteredAt - a.enteredAt).map((v) => {
+      const st = v.park === "ok" ? `<span class="chip ok">등록됨</span>` : v.park === "wait" ? `<span class="chip muted">입력 중…</span>`
+        : `<button class="btn btn-sm" data-act="parkRetry" data-id="${v.id}">다시 시도</button>`;
+      return `<div class="mini"><span><span class="car num">${esc(v.car)}</span> · ${esc(v.name)}${v.park === "fail" ? ` <span class="chip warn">실패</span>` : ""}</span>${st}</div>`;
+    }).join("") : `<div class="empty">등록할 차량이 없어요</div>`;
+    $("tasks").innerHTML = html;
+  }
+
+  function renderAll() { settle(); $("now").textContent = hm(now); renderStats(); renderNaver(); renderKeys(); renderPays(); renderTasks(); if (sheet.mode === "key") renderSheet(); }
+
+  // ── 시트 ─────────────────────────────────────────
+  const sheet = { mode: null };
+  function openSheet(s) {
+    for (const k of Object.keys(sheet)) delete sheet[k];
+    Object.assign(sheet, s);
+    $("overlay").hidden = false;
+    renderSheet();
+    setTimeout(() => { const f = $("sheet").querySelector("[data-autofocus]"); if (f) f.focus(); }, 30);
+  }
+  function closeSheet() { clearTimeout(sheet.timer); sheet.mode = null; $("overlay").hidden = true; }
+
+  function pickGrid(selected) {
+    const free = new Set(freeKeys());
+    let html = "";
+    for (let k = 1; k <= KEYS; k++) {
+      const on = selected.includes(k);
+      html += `<button type="button" class="${on ? "on" : ""} num" data-act="pickKey" data-k="${k}" ${!free.has(k) ? "disabled" : ""} aria-pressed="${on}">${k}</button>`;
+    }
+    return `<div class="pick">${html}</div>`;
+  }
+
+  const saleKeys = () => sheet.tickets + Math.ceil(sheet.extra / 4);
+  const saleAmount = () => sheet.tickets * PRICE.ticket + sheet.extra * PRICE.extra;
+
+  function renderSheet() {
+    const el = $("sheet");
+    el.classList.toggle("wide", sheet.mode === "sale" && sheet.stage === "form");
+    if (sheet.mode === "checkin") {
+      const v = byId(sheet.id);
+      const ok = sheet.keys.length === v.tickets;
+      el.innerHTML = `
+        <h3 id="sheet-title">네이버 예약 입장 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
+        <dl class="facts">
+          <dt>예약</dt><dd class="num">${hm(v.slot)} · ${esc(v.name)} · 입장권 ${v.tickets}장 <span class="chip naver">네이버에서 불러옴</span></dd>
+          <dt>전화</dt><dd class="num">${fmtPhone(v.phone)}</dd>
+          <dt>이용</dt><dd class="num">${hm(v.slot)} ~ ${hm(v.exp)} (1시간 50분)</dd>
+          <dt>예약번호</dt><dd class="num">${v.no}</dd>
+        </dl>
+        <div class="field">
+          <span class="label">드릴 열쇠 <span class="help">입장권 1장에 열쇠 1개 · 자동으로 골랐어요</span></span>
+          <div class="big-keys">${sheet.keys.map((k) => `<span class="big-key num">${k}</span>`).join("")}
+            <button class="btn btn-sm" data-act="togglePick">${sheet.picking ? "다 골랐어요" : "다른 열쇠로"}</button></div>
+          ${sheet.picking ? pickGrid(sheet.keys) + `<span class="help">${v.tickets}개를 골라 주세요 (지금 ${sheet.keys.length}개)</span>` : ""}
+        </div>
+        <div class="field">
+          <label for="car">차량번호 <span class="help">적으면 주차 웹에 자동 입력 · 차가 없으면 비워 두세요</span></label>
+          <input id="car" value="${esc(sheet.car)}" placeholder="예: 12가 3456" autocomplete="off">
+        </div>
+        <p class="explain">입장 처리를 누르면 열쇠 배정, 네이버 이용완료 표시, 주차 등록, 반납 안내 문자 예약이 한 번에 됩니다.</p>
+        <div class="sheet-foot">
+          <button class="btn" data-act="close">취소</button>
+          <button class="btn btn-ink" data-act="doCheckin" ${ok ? "" : "disabled"} data-autofocus>입장 처리 · 열쇠 ${sheet.keys.join(", ")}번</button>
+        </div>`;
+      return;
+    }
+    if (sheet.mode === "sale") {
+      if (sheet.stage === "paying") {
+        const card = sheet.pay === "카드";
+        el.innerHTML = `
+          <h3 id="sheet-title">${card ? "POS 카드 결제 중" : "POS에 " + sheet.pay + " 결제 기록"}</h3>
+          <div class="pay-wait">
+            ${card ? `<div class="spinner" aria-hidden="true"></div><div>POS 단말기로 <b class="num">${won(saleAmount())}</b>을 보냈어요.<br>손님 카드를 단말기에 꽂아 주세요.</div>`
+              : `<div><b class="num">${won(saleAmount())}</b>을 ${sheet.pay === "현금" ? "현금으로" : "계좌이체로"} 받았는지 확인해 주세요.<br>확인하면 POS에 매출로 기록됩니다.</div>`}
+          </div>
+          <div class="sheet-foot">
+            <button class="btn" data-act="saleBack">돌아가기</button>
+            <button class="btn btn-ink" data-act="salePaid" data-autofocus>${card ? "승인됨 (체험)" : "받았어요"}</button>
+          </div>`;
+        return;
+      }
+      if (sheet.stage === "done") {
+        const r = sheet.result;
+        el.innerHTML = `
+          <h3 id="sheet-title">입장 완료 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
+          <div class="done-msg">
+            <div>이 열쇠를 드리세요</div>
+            <div class="big-keys">${r.keys.map((k) => `<span class="big-key num">${k}</span>`).join("")}</div>
+            <div class="num">${hm(r.exp)}까지 이용 · ${won(r.amount)} ${r.pay} · ${r.posNo}</div>
+            <div class="explain">반납 시간이 되면 ${fmtPhone(r.phone)}로 안내 문자가 자동으로 갑니다.${r.car ? ` 차량 ${esc(r.car)}는 주차 웹에 자동 입력합니다.` : ""}</div>
+          </div>
+          <div class="sheet-foot"><button class="btn btn-ink" data-act="close" data-autofocus>닫기</button></div>`;
+        return;
+      }
+      const { avail, worstAt } = projection();
+      const need = saleKeys();
+      const over = need > avail;
+      const phoneOk = digits(sheet.phone).length >= 10;
+      const pad = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "지우기", "0", "←"]
+        .map((d) => `<button type="button" class="${d.length > 1 ? "fn" : ""} num" data-act="padKey" data-d="${d}">${d}</button>`).join("");
+      el.innerHTML = `
+        <h3 id="sheet-title">현장 판매 · 입장 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
+        <div class="banner ${avail > 0 ? "ok" : "warn"}">지금 팔 수 있는 입장권 <b class="num">${avail}장</b> · 예약 손님 열쇠를 먼저 남겨 두고 계산했어요 (<span class="num">${hm(worstAt)}</span>쯤 가장 빠듯)</div>
+        <div class="split">
+          <div class="stack">
+            <div class="stepper"><div class="name"><b>입장권 (4인)</b><span class="num">${won(PRICE.ticket)} · 열쇠 1개</span></div>
+              <div class="ctl"><button data-act="step" data-f="tickets" data-d="-1" aria-label="입장권 줄이기">−</button><output class="num">${sheet.tickets}</output><button data-act="step" data-f="tickets" data-d="1" aria-label="입장권 늘리기">+</button></div></div>
+            <div class="stepper"><div class="name"><b>4인 초과 추가 인원</b><span class="num">1인 ${won(PRICE.extra)} · 4명마다 열쇠 1개</span></div>
+              <div class="ctl"><button data-act="step" data-f="extra" data-d="-1" aria-label="추가 인원 줄이기">−</button><output class="num">${sheet.extra}</output><button data-act="step" data-f="extra" data-d="1" aria-label="추가 인원 늘리기">+</button></div></div>
+            ${over ? `<div class="banner warn">열쇠 <b class="num">${need}개</b>가 필요한데 지금은 <b class="num">${avail}개</b>까지만 내줄 수 있어요. 예약 손님이 오실 자리라서 팔지 않습니다.</div>` : ""}
+            <div class="field"><span class="label">결제 방법 <span class="help">어느 것이든 POS 매출로 남아요</span></span>
+              <div class="seg">${["카드", "현금", "계좌이체"].map((p) => `<button type="button" class="${sheet.pay === p ? "on" : ""}" data-act="pay" data-p="${p}" aria-pressed="${sheet.pay === p}">${p}</button>`).join("")}</div></div>
+            <div class="field">
+              <label for="car">차량번호 <span class="help">적으면 주차 웹에 자동 입력</span></label>
+              <input id="car" value="${esc(sheet.car)}" placeholder="예: 12가 3456" autocomplete="off">
+            </div>
+          </div>
+          <div class="stack">
+            <div class="field"><span class="label">전화번호 <span class="help">반납 안내 문자용 · 손님이 직접 눌러도 돼요</span></span>
+              <div class="phone-show num ${sheet.phone ? "" : "placeholder"}" id="phoneShow">${sheet.phone ? fmtPhone(sheet.phone) : "010 0000 0000"}</div></div>
+            <div class="pad">${pad}</div>
+          </div>
+        </div>
+        <div class="total"><span class="num">열쇠 ${need}개 · ${hm(now)} ~ ${hm(now + DUR)}</span><b class="num">${won(saleAmount())}</b></div>
+        <div class="sheet-foot">
+          <button class="btn" data-act="close">취소</button>
+          <button class="btn btn-ink" id="saleGo" data-act="saleGo" ${over || !phoneOk ? "disabled" : ""}>${sheet.pay === "카드" ? "POS 단말기로 결제" : "결제 받기"} · ${won(saleAmount())}</button>
+        </div>`;
+      return;
+    }
+    if (sheet.mode === "key") {
+      const k = sheet.k;
+      const v = holderOf(k);
+      if (!v) {
+        el.innerHTML = `
+          <h3 id="sheet-title">${k}번 열쇠 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
+          <div class="empty">비어 있는 열쇠예요${k >= SPARE_FROM ? " · 현장 손님에게 먼저 쓰는 열쇠" : ""}</div>
+          <div class="sheet-foot"><button class="btn" data-act="close">닫기</button><button class="btn btn-ink" data-act="sale" data-prefer="${k}" data-autofocus>이 열쇠로 현장 판매</button></div>`;
+        return;
+      }
+      const b = band(v);
+      const state = b === "use" ? `이용 중 · ${hm(v.exp)} 반납 (${v.exp - now}분 남음)` : `${hm(v.exp)} 반납 · <span class="${b === "late" ? "when-late" : "when-grace"}">${now - v.exp}분 지남</span>`;
+      el.innerHTML = `
+        <h3 id="sheet-title">${k}번 열쇠 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
+        <dl class="facts">
+          <dt>손님</dt><dd>${esc(v.name)} <span class="chip ${v.src}">${v.src === "naver" ? "네이버 예약" : "현장 구매"}</span></dd>
+          <dt>전화</dt><dd class="num" style="user-select:all">${fmtPhone(v.phone)}</dd>
+          <dt>입장</dt><dd class="num">${hm(v.enteredAt)}${v.src === "naver" ? ` (예약 ${hm(v.slot)})` : ` · ${v.posNo}`}</dd>
+          <dt>상태</dt><dd class="num">${state}</dd>
+          <dt>받은 열쇠</dt><dd>${keyChips(v)}</dd>
+          ${v.car ? `<dt>차량</dt><dd class="num">${esc(v.car)} · ${v.park === "ok" ? "주차 등록됨" : v.park === "wait" ? "주차 입력 중" : "주차 입력 실패"}</dd>` : ""}
+          ${v.smsAt != null ? `<dt>안내 문자</dt><dd class="num">${hm(v.smsAt)} 자동 발송${v.resent != null ? ` · ${hm(v.resent)} 다시 보냄` : ""}</dd>` : ""}
+        </dl>
+        <div class="sheet-foot">
+          ${b !== "use" ? `<button class="btn" data-act="resend" data-id="${v.id}">안내 다시 보내기</button>` : ""}
+          ${v.keys.length > 1 ? `<button class="btn" data-act="returnOne" data-k="${k}">${k}번만 반납</button>` : ""}
+          <button class="btn btn-ink" data-act="returnAll" data-id="${v.id}" data-autofocus>반납 받음${v.keys.length > 1 ? ` (${v.keys.length}개 모두)` : ""}</button>
+        </div>`;
+    }
+  }
+
+  // ── 동작 ─────────────────────────────────────────
+  let toastTimer;
+  function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 2600); }
+
+  function returnKeys(v, ks) {
+    v.keys = v.keys.filter((k) => !ks.includes(k));
+    if (!v.keys.length) { v.status = "out"; v.outAt = now; }
+    toast(`${ks.join(", ")}번 반납${v.status === "out" ? ` · ${v.src === "walk" ? "현장 손님" : v.name + "님"} 퇴장` : ""}`);
+  }
+
+  function updateSaleGo() {
+    const go = $("saleGo");
+    if (go) go.disabled = saleKeys() > projection().avail || digits(sheet.phone).length < 10;
+  }
+
+  const acts = {
+    time(btn) { now += Number(btn.dataset.min); renderAll(); },
+    sale(btn) {
+      openSheet({ mode: "sale", stage: "form", tickets: 1, extra: 0, phone: "", car: "", pay: "카드", prefer: btn.dataset.prefer ? Number(btn.dataset.prefer) : null });
+    },
+    checkin(btn) {
+      const v = byId(btn.dataset.id);
+      openSheet({ mode: "checkin", id: v.id, keys: pickKeys(v.tickets, "naver"), car: v.car, picking: false });
+    },
+    togglePick() { sheet.picking = !sheet.picking; renderSheet(); },
+    pickKey(btn) {
+      const k = Number(btn.dataset.k);
+      const v = byId(sheet.id);
+      if (sheet.keys.includes(k)) sheet.keys = sheet.keys.filter((x) => x !== k);
+      else if (sheet.keys.length < v.tickets) sheet.keys.push(k);
+      else { sheet.keys.shift(); sheet.keys.push(k); }
+      renderSheet();
+    },
+    doCheckin() {
+      const v = byId(sheet.id);
+      if (sheet.keys.some((k) => holderOf(k))) { toast("그 사이 다른 손님이 쓴 열쇠가 있어요. 다시 골라 주세요."); sheet.keys = pickKeys(v.tickets, "naver"); renderSheet(); return; }
+      Object.assign(v, { status: "in", keys: sheet.keys.slice(), enteredAt: now, naverDone: now, car: sheet.car.trim() });
+      if (v.car) parkSubmit(v); else v.park = null;
+      closeSheet();
+      toast(`${v.name}님 입장 · 열쇠 ${v.keys.join(", ")}번 · 네이버 이용완료 표시함`);
+      renderAll();
+    },
+    step(btn) {
+      const f = btn.dataset.f, d = Number(btn.dataset.d);
+      sheet[f] = Math.max(f === "tickets" ? 1 : 0, Math.min(f === "tickets" ? 10 : 20, sheet[f] + d));
+      renderSheet();
+    },
+    padKey(btn) {
+      const d = btn.dataset.d;
+      if (d === "지우기") sheet.phone = "";
+      else if (d === "←") sheet.phone = sheet.phone.slice(0, -1);
+      else if (sheet.phone.length < 11) sheet.phone += d;
+      const show = $("phoneShow");
+      show.textContent = sheet.phone ? fmtPhone(sheet.phone) : "010 0000 0000";
+      show.classList.toggle("placeholder", !sheet.phone);
+      updateSaleGo();
+    },
+    pay(btn) { sheet.pay = btn.dataset.p; renderSheet(); },
+    saleGo() {
+      sheet.stage = "paying"; renderSheet();
+      if (sheet.pay === "카드") { clearTimeout(sheet.timer); sheet.timer = setTimeout(() => { if (sheet.mode === "sale" && sheet.stage === "paying") acts.salePaid(); }, 2500); }
+    },
+    saleBack() { clearTimeout(sheet.timer); sheet.stage = "form"; renderSheet(); },
+    salePaid() {
+      clearTimeout(sheet.timer);
+      const need = saleKeys();
+      if (need > projection().avail) { sheet.stage = "form"; renderSheet(); toast("그 사이 자리가 줄었어요. 다시 확인해 주세요."); return; }
+      const keys = pickKeys(need, "walk", sheet.prefer);
+      const v = walk(hm(now), digits(sheet.phone), sheet.tickets, sheet.extra, keys, { car: sheet.car.trim(), pay: sheet.pay });
+      if (v.car) parkSubmit(v);
+      sheet.stage = "done";
+      sheet.result = { keys, exp: v.exp, amount: v.amount, pay: sheet.pay, phone: v.phone, posNo: v.posNo, car: v.car };
+      renderAll();
+      renderSheet();
+    },
+    key(btn) { openSheet({ mode: "key", k: Number(btn.dataset.k) }); },
+    returnAll(btn) { const v = byId(btn.dataset.id); returnKeys(v, v.keys.slice()); if (sheet.mode === "key") closeSheet(); renderAll(); },
+    returnOne(btn) { const k = Number(btn.dataset.k); returnKeys(holderOf(k), [k]); closeSheet(); renderAll(); },
+    resend(btn) { const v = byId(btn.dataset.id); v.resent = now; toast(`${fmtPhone(v.phone)}로 반납 안내를 다시 보냈어요 (체험)`); renderAll(); },
+    parkRetry(btn) { const v = byId(btn.dataset.id); parkSubmit(v); renderAll(); },
+    newBooking() {
+      const names = ["차예나", "변시후", "엄다인", "주하람", "편우진", "석보미"];
+      const slot = Math.ceil((now + 40) / 30) * 30;
+      if (slot > toMin("19:30")) { toast("오늘 예약 시간이 끝났어요"); return; }
+      const name = names[seq % names.length];
+      naver(hm(slot), name, "010" + String(10000000 + ((seq * 7919) % 89999999)), 1 + (seq % 2));
+      lastImport = now;
+      toast(`네이버 새 예약 자동으로 들어옴 · ${hm(slot)} ${name}님`);
+      renderAll();
+    },
+    close() { closeSheet(); },
+  };
+
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-act]");
+    if (btn && !btn.disabled && acts[btn.dataset.act]) { acts[btn.dataset.act](btn); return; }
+    if (e.target === $("overlay") && sheet.stage !== "paying") closeSheet();
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sheet.mode && sheet.stage !== "paying") closeSheet(); });
+  document.addEventListener("input", (e) => {
+    if (e.target.id === "q") { query = e.target.value; renderNaver(); return; }
+    if (sheet.mode && e.target.id === "car") sheet.car = e.target.value;
+  });
+
+  renderAll();
+})();
+</script>
