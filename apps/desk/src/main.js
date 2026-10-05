@@ -14,7 +14,7 @@ const DEFAULTS = {
   amanoUrl: "", // 아마노 로그인 주소 (예: http://아마노주소/login). 저장소에 적지 않고 운영 설정에서 넣음
   amanoPage: "/discount/registration", // 로그인 뒤 자동으로 옮겨 갈 할인등록 화면
   amanoSelectors: {}, // 배우기로 기억한 칸 (carNo · day · searchBtn)
-  posTitle: "", // POS 프로그램 창 제목 (앞으로 띄울 때 씀)
+  posTitle: "OKPOS Program", // POS 프로그램 창 제목 (작업표시줄에 마우스를 올리면 보이는 이름, 매장 확인 2026-10)
   amanoId: "", // 아마노 아이디
   amanoPwEnc: "", // 아마노 비밀번호: Windows 암호화로 이 PC 계정만 풀 수 있게 저장 (저장소·설치파일에 넣지 않음)
 };

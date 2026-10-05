@@ -760,7 +760,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
             <div class="btns" style="flex-wrap:nowrap"><input id="cfg-id" class="cfg" value="${esc(c.amanoId || "")}" placeholder="아이디" autocomplete="off" ${dis}>
             <input id="cfg-pw" class="cfg" type="password" placeholder="${c.hasAmanoPw ? "저장됨 (바꿀 때만 입력)" : "비밀번호"}" autocomplete="new-password" ${dis}></div></div>
           <div class="field"><label for="cfg-pos">POS 프로그램 창 제목 <span class="help">"결제하기"를 누르면 이 창을 앞으로 띄움 (일부만 써도 됨)</span></label>
-            <input id="cfg-pos" class="cfg" value="${esc(c.posTitle || "")}" placeholder="예: OKPOS" ${dis}></div>
+            <input id="cfg-pos" class="cfg" value="${esc(c.posTitle || "")}" placeholder="OKPOS Program" ${dis}></div>
           <div class="btns"><button class="btn btn-ink" data-act="cfgSave" ${dis}>저장</button><button class="btn" data-act="amanoShow" ${dis}>아마노 화면 보기 (로그인)</button></div>
           <div class="field"><span class="label">아마노 칸 배우기 <span class="help">자동으로 못 찾을 때만 · 누르면 아마노 화면이 앞으로 나오고, 그 칸을 한 번 클릭하면 기억</span></span>
             <div class="btns">${[["carNo", "차량번호 칸"], ["day", "입차일 칸"], ["searchBtn", "검색 버튼"]].map(([k, t]) => `<button class="btn btn-sm" data-act="learn" data-k="${k}" ${dis}>${t}${learned(k)}</button>`).join("")}</div></div>
