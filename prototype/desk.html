@@ -120,6 +120,28 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .kpick button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .kpick button[disabled] { border-color: var(--line); background: var(--surface-2); color: var(--faint); opacity: .45; cursor: default; font-weight: 500; }
 .sheet.wide { width: min(620px, 100%); }
+.sheet.setsheet { width: min(760px, 100%); }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+.tabs button { border: 0; background: transparent; padding: 6px 12px; font-weight: 700; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tabs button.on { color: var(--fg); border-bottom-color: var(--ink); }
+.date-in { font-size: 14px; min-height: 36px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.prn { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 14px; }
+.plist { display: grid; gap: 4px; }
+.plist button { text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 10px; font-weight: 600; }
+.plist button.on { border: 2px solid var(--ink); }
+.seg2 { display: flex; gap: 6px; }
+.seg2 button { flex: 1; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; min-height: 34px; font-weight: 600; }
+.seg2 button.on { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+.chk { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+.field .chk input { width: 20px; height: 20px; min-height: 0; padding: 0; flex: none; }
+.prn > .field { align-content: start; }
+#form-text { width: 100%; min-height: 150px; border: 1px solid var(--line); border-radius: 8px; padding: 8px; font-family: ui-monospace, Consolas, "D2Coding", monospace; font-size: 13px; background: var(--surface); color: var(--fg); resize: vertical; }
+/* 80mm 감열지 미리보기 (인쇄 폭 약 72mm) */
+.paper { width: 288px; max-width: 100%; justify-self: center; background: #fff; color: #111; border-radius: 4px; padding: 14px 12px 22px; box-shadow: 0 1px 6px rgba(0,0,0,.25); font-family: ui-monospace, Consolas, "D2Coding", monospace; font-size: 13px; line-height: 1.45; max-height: 420px; overflow: auto; }
+.paper .pl { white-space: pre-wrap; overflow-wrap: anywhere; }
+.paper .ctr { text-align: center; }
+.paper .big { text-align: center; font-size: 20px; font-weight: 700; }
+.paper .hr { border-top: 1px dashed #111; margin: 6px 0; }
 .sheet.keysheet { width: min(560px, 100%); }  /* 열쇠 10개(5개 × 2줄)가 들어가는 크기 */
 .rbtns { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
 .rbtns .btn { min-height: 44px; font-size: 15px; }
@@ -567,6 +589,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     const el = $("sheet");
     el.classList.toggle("wide", sheet.mode === "enter");
     el.classList.toggle("keysheet", sheet.mode === "key");
+    el.classList.toggle("setsheet", sheet.mode === "settings");
     if (sheet.mode === "enter") {
       const b = findB(sheet.id);
       const m = minutesFor(b.day, b.slot);
@@ -647,20 +670,77 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       return;
     }
     if (sheet.mode === "settings") {
-      const dateIn = (id, v) => `<input type="date" id="${id}" value="${v}" style="font-size:14px;min-height:36px;width:auto;letter-spacing:0;font-weight:500;padding:4px 8px">`;
+      const tab = sheet.tab || "rules";
+      const tabs = `<div class="tabs" role="tablist">${[["rules", "운영 규칙"], ["printer", "프린터"]].map(([k, t]) => `<button role="tab" class="${tab === k ? "on" : ""}" aria-selected="${tab === k}" data-act="setTab" data-t="${k}">${t}</button>`).join("")}</div>`;
+      if (tab === "rules") {
+        const dateIn = (id, v) => `<input type="date" id="${id}" value="${v}" class="date-in">`;
+        el.innerHTML = `
+          <h3 id="sheet-title">운영 설정 <button class="x" data-act="close" aria-label="닫기">×</button></h3>${tabs}
+          <div class="field"><span class="label">성수기 기간 <span class="help">이 기간은 평일·휴일 모두 시간제</span></span>
+            ${RULES.peaks.map((p, i) => `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><b style="width:70px">${esc(p.name)}</b>${dateIn("pf-" + i, p.from)} ~ ${dateIn("pt-" + i, p.to)}</div>`).join("")}</div>
+          <ul class="steps" style="list-style:disc">
+            <li>성수기: 평일·휴일 모두 17:30 입장까지 1시간 50분, 18:00 입장부터 무제한</li>
+            <li>비수기: 평일은 무제한, 휴일(토·일·공휴일)은 성수기와 같음</li>
+            <li>열쇠 ${RULES.keys}개 = 기본 ${RULES.baseKeys}개 + 유동 ${RULES.keys - RULES.baseKeys}개 · 좌석 ${RULES.seats}석</li>
+            <li>열쇠 색: 예약 입장시간부터 1시간 50분까지 검정 → 2시간까지 분홍 → 그 뒤 빨강</li>
+            <li>초과요금: 1:50:01부터 카운트, 2:00:00 정각 5,000원 · 10분이 꽉 찰 때마다 5,000원 × 열쇠 수</li>
+          </ul>
+          <div class="sheet-foot"><button class="btn btn-ink" data-act="close" data-autofocus>닫기</button></div>`;
+        return;
+      }
+      const f = PRINT.forms[PRINT.cur];
       el.innerHTML = `
-        <h3 id="sheet-title">운영 설정 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
-        <div class="field"><span class="label">성수기 기간 <span class="help">이 기간은 평일·휴일 모두 시간제</span></span>
-          ${RULES.peaks.map((p, i) => `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><b style="width:70px">${esc(p.name)}</b>${dateIn("pf-" + i, p.from)} ~ ${dateIn("pt-" + i, p.to)}</div>`).join("")}</div>
-        <ul class="steps" style="list-style:disc">
-          <li>성수기: 평일·휴일 모두 17:30 입장까지 1시간 50분, 18:00 입장부터 무제한</li>
-          <li>비수기: 평일은 무제한, 휴일(토·일·공휴일)은 성수기와 같음</li>
-          <li>열쇠 ${RULES.keys}개 = 기본 ${RULES.baseKeys}개 + 유동 ${RULES.keys - RULES.baseKeys}개 · 좌석 ${RULES.seats}석</li>
-          <li>열쇠 색: 예약 입장시간부터 1시간 50분까지 검정 → 2시간까지 분홍 → 그 뒤 빨강</li>
-        </ul>
-        <div class="sheet-foot"><button class="btn btn-ink" data-act="close" data-autofocus>닫기</button></div>`;
+        <h3 id="sheet-title">운영 설정 <button class="x" data-act="close" aria-label="닫기">×</button></h3>${tabs}
+        <div class="prn">
+          <div class="stack">
+            <div class="field"><span class="label">연결된 프린터 <span class="help">POS PC에 연결된 프린터를 찾아 고르세요 · 80mm 감열지</span></span>
+              <div class="plist">${PRINT.found ? PRINT.list.map((n) => `<button class="${PRINT.sel === n ? "on" : ""}" data-act="pickPrinter" data-n="${esc(n)}" aria-pressed="${PRINT.sel === n}">${esc(n)}${PRINT.sel === n ? " · 사용 중" : ""}</button>`).join("") : `<span class="help">아직 찾지 않았어요</span>`}</div>
+              <div class="btns"><button class="btn btn-sm" data-act="findPrinters">프린터 찾기</button><button class="btn btn-sm" data-act="testPrint" ${PRINT.sel ? "" : "disabled"}>테스트 출력</button></div></div>
+            <div class="field"><span class="label">출력 양식</span>
+              <div class="seg2">${Object.entries(PRINT.forms).map(([k, x]) => `<button class="${PRINT.cur === k ? "on" : ""}" data-act="pickForm" data-k="${k}" aria-pressed="${PRINT.cur === k}">${x.name}</button>`).join("")}</div>
+              <label class="chk"><input type="checkbox" id="form-auto" ${f.auto ? "checked" : ""}> ${f.when}에 자동 출력</label>
+              <textarea id="form-text" spellcheck="false" aria-label="양식 내용">${esc(f.text)}</textarea>
+              <span class="help">넣을 수 있는 값: ${PRINT_KEYS.map((k) => `{${k}}`).join(" ")}<br>줄 앞에 <b>#</b> 크게 가운데 · <b>^</b> 가운데 · <b>---</b> 구분선</span></div>
+          </div>
+          <div class="field"><span class="label">미리보기 <span class="help">80mm 폭 (예시 값)</span></span><div class="paper" id="paper">${paperHtml(f.text, SAMPLE)}</div></div>
+        </div>
+        <div class="sheet-foot"><button class="btn btn-ink" data-act="close">닫기</button></div>`;
     }
   }
+
+  // ── 영수증 프린터 (80mm 감열지) ─────────────────────
+  /* 실제 앱: POS PC 의 프린터 목록을 읽어 고른 프린터로 조용히 출력 (창 안 띄움).
+     체험판: 목록과 출력은 흉내만 내고, 양식과 미리보기는 그대로 동작 */
+  const PRINT_KEYS = ["매장", "날짜", "시각", "고객", "전화뒤4", "열쇠", "수량", "입장", "반납", "초과시간", "금액"];
+  const SAMPLE = { 매장: "아스타나키즈", 날짜: "2026-10-05", 시각: "13:55", 고객: "송다온", 전화뒤4: "5489", 열쇠: "5, 13", 수량: "2", 입장: "14:00", 반납: "15:50", 초과시간: "0:12:30", 금액: "10,000원" };
+  const PRINT = {
+    found: false, sel: null, cur: "enter",
+    list: ["POS-80C (USB001)", "EPSON TM-T82 Receipt", "Microsoft Print to PDF"],
+    forms: {
+      enter: { name: "입장표", when: "등록 완료", auto: true, text: "# {매장}\n^입장표\n---\n고객   {고객} ({전화뒤4})\n열쇠   {열쇠}번\n입장   {입장}\n반납   {반납}까지\n---\n^열쇠를 잃어버리지 마세요\n^{날짜} {시각}" },
+      over: { name: "초과요금 영수증", when: "초과요금 결제", auto: false, text: "# {매장}\n^초과요금\n---\n고객   {고객}\n열쇠   {열쇠}번\n반납   {반납}\n초과   {초과시간}\n---\n# {금액}\n^{날짜} {시각}" },
+    },
+  };
+  function paperHtml(text, v) {
+    const fill = (line) => esc(line).replace(/\{([^}]+)\}/g, (m, k) => (k in v ? esc(v[k]) : m));
+    return text.split("\n").map((l) => {
+      if (l.trim() === "---") return `<div class="pl hr"></div>`;
+      if (l.startsWith("# ")) return `<div class="pl big">${fill(l.slice(2))}</div>`;
+      if (l.startsWith("^")) return `<div class="pl ctr">${fill(l.slice(1))}</div>`;
+      return `<div class="pl">${fill(l) || "&nbsp;"}</div>`;
+    }).join("");
+  }
+  /** 양식대로 출력 (체험: 알림만). auto 가 꺼져 있으면 출력하지 않음 */
+  function printForm(kind, v) {
+    const f = PRINT.forms[kind];
+    if (!f.auto) return "";
+    if (!PRINT.sel) return " · 프린터를 아직 고르지 않아 출력 못 함";
+    return ` · ${f.name} 출력 (${PRINT.sel.split(" ")[0]})`;
+  }
+  const keyVals = (h, extra = {}) => {
+    const m = minutesFor(TODAY, h.slot);
+    return Object.assign({ 매장: "아스타나키즈", 날짜: TODAY, 시각: hm(now), 고객: h.name, 전화뒤4: digits(h.phone).slice(-4), 열쇠: h.keys.join(", "), 수량: String(h.keys.length), 입장: hm(h.enteredAt), 반납: m == null ? "무제한" : hm(h.slot + m), 초과시간: "", 금액: "" }, extra);
+  };
 
   // ── 초과요금 미터 ────────────────────────────────
   /* 초과요금 (열쇠 1개 기준, 예약 입장시간부터)
@@ -743,7 +823,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       if (sheet.keys.some((k) => holderOf(k))) { toast("그 사이 다른 손님이 쓴 열쇠가 있어요. 다시 골라 주세요."); sheet.keys = []; renderSheet(); return; }
       Object.assign(b, { status: "완료", keys: sheet.keys.slice(), enteredAt: now });
       closeSheet();
-      toast(`${b.name}님 입장 · 열쇠 ${b.keys.join(", ")}번 · 네이버 이용완료 처리함`);
+      toast(`${b.name}님 입장 · 열쇠 ${b.keys.join(", ")}번 · 네이버 이용완료${printForm("enter", keyVals(b))}`);
       renderAll();
     },
     qty(btn) {
@@ -761,20 +841,25 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     },
     posDone() {
       $("pos").hidden = true;
-      if (sheet.mode === "key" && sheet.pending) { const h = holderById(sheet.hid); if (h) h.overPaid = sheet.pending; sheet.pending = null; toast(`초과요금 ${won(h.overPaid.amount)} 결제됨 · 이제 반납 처리하세요`); }
+      if (sheet.mode === "key" && sheet.pending) { const h = holderById(sheet.hid); if (h) h.overPaid = sheet.pending; sheet.pending = null; toast(`초과요금 ${won(h.overPaid.amount)} 결제됨${printForm("over", keyVals(h, { 초과시간: clock(h.overPaid.sec), 금액: won(h.overPaid.amount) }))}`); }
       renderSheet(); const p = $("w-phone"); if (p) p.focus();
     },
     walkDone() {
       if (sheet.keys.some((k) => holderOf(k))) { toast("그 사이 다른 손님이 쓴 열쇠가 있어요"); closeSheet(); renderAll(); return; }
       const w = walkin(digits(sheet.phone), sheet.keys, now);
-      closeSheet(); toast(`현장입장자 · 열쇠 ${w.keys.join(", ")}번 등록`); renderAll();
+      closeSheet(); toast(`현장입장자 · 열쇠 ${w.keys.join(", ")}번 등록${printForm("enter", keyVals(w))}`); renderAll();
     },
     returnAll() { const h = holderById(sheet.hid); returnKeys(h, h.keys.slice()); closeSheet(); renderAll(); },
     returnKey(btn) {
       const h = holderById(sheet.hid); returnKeys(h, [Number(btn.dataset.k)]); renderAll();
       if (h.keys.length) renderSheet(); else closeSheet();
     },
-    settings() { openSheet({ mode: "settings" }); },
+    settings() { openSheet({ mode: "settings", tab: "rules" }); },
+    setTab(btn) { sheet.tab = btn.dataset.t; renderSheet(); },
+    findPrinters() { PRINT.found = true; if (!PRINT.sel) PRINT.sel = PRINT.list[0]; toast(`프린터 ${PRINT.list.length}대 찾음 (체험)`); renderSheet(); },
+    pickPrinter(btn) { PRINT.sel = btn.dataset.n; renderSheet(); },
+    testPrint() { toast(`${PRINT.sel}로 테스트 출력 보냄 (체험)`); },
+    pickForm(btn) { PRINT.cur = btn.dataset.k; renderSheet(); },
     car(btn) {
       carSel = Number(btn.dataset.id);
       const c = LOT.find((x) => x.id === carSel);
@@ -804,6 +889,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   });
   document.addEventListener("input", (e) => {
     const t = e.target;
+    if (t.id === "form-text") { PRINT.forms[PRINT.cur].text = t.value; $("paper").innerHTML = paperHtml(t.value, SAMPLE); }
+    if (t.id === "form-auto") PRINT.forms[PRINT.cur].auto = t.checked;
     if (t.id === "w-phone") { sheet.phone = digits(t.value).slice(0, 11); t.value = fmtPhone(sheet.phone); updateWalkButtons(); }
     if (t.id === "car-q") carQ = t.value;
     const m = /^p(f|t)-(\d+)$/.exec(t.id);
