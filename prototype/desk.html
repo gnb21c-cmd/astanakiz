@@ -513,8 +513,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   // 현장입장자
   let posSeq = 31;
   const walkins = [];
+  /* 현장입장의 입장시간 = 접수한 시각 직전의 30분 칸 (10:12 접수 → 10:00 입장, 늦게 들어가고 싶으면 10:31 이후에 접수).
+     이용시간 · 반납 · 초과요금 · 입장권의 입장시간 모두 이 시각 기준 */
+  const walkSlot = (m) => Math.floor(m / 30) * 30;
   function walkin(phone, keys, at) {
-    const w = { id: "w" + seq++, name: "현장입장자", phone, keys: keys.slice(), enteredAt: at, slot: at, posNo: "POS-" + String(posSeq++).padStart(4, "0"), outAt: null, walk: true };
+    const w = { id: "w" + seq++, name: "현장입장자", phone, keys: keys.slice(), enteredAt: at, slot: walkSlot(at), posNo: "POS-" + String(posSeq++).padStart(4, "0"), outAt: null, walk: true };
     walkins.push(w);
     return w;
   }
@@ -947,7 +950,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     }
     if (sheet.mode === "walk") {
       const st = walkState();
-      const m = minutesFor(TODAY, now);
+      const ws = walkSlot(now);
+      const m = minutesFor(TODAY, ws);
       el.innerHTML = `
         <h3 id="sheet-title">현장입장 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
         <div class="banner ${st.over || st.flex ? "warn" : ""}">${st.over ? `지금은 열쇠 <b class="num">${st.all}</b>개까지만 내줄 수 있어요. 예약 손님이 오실 자리라서 팔지 않습니다.`
@@ -957,7 +961,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           <dt>고객명</dt><dd><span class="fixed">현장입장자</span></dd>
           <dt>열쇠</dt><dd><div class="bigkeys">${sheet.keys.map((k) => `<span class="bigkey num">${k}</span>`).join("")}</div></dd>
           <dt>수량</dt><dd><div class="stepper"><button data-act="qty" data-d="-1" aria-label="수량 줄이기">−</button><output class="num">${st.need}</output><button data-act="qty" data-d="1" aria-label="수량 늘리기">+</button><span class="help">수량만큼 열쇠를 이어서 드려요</span></div></dd>
-          <dt>이용</dt><dd class="num">${hm(now)} ${m == null ? "· 무제한" : `~ ${hm(now + m)} (1시간 50분)`}</dd>
+          <dt>이용</dt><dd class="num">${hm(ws)} 입장${ws !== now ? ` (접수 ${hm(now)})` : ""} ${m == null ? "· 무제한" : `~ ${hm(ws + m)} (1시간 50분)`}</dd>
         </dl>
         <div class="field"><label for="w-phone">전화번호 <span class="help">USB 키패드로 누르세요</span></label>
           <input id="w-phone" inputmode="numeric" autocomplete="off" value="${esc(fmtPhone(sheet.phone))}" placeholder="010-0000-0000" data-autofocus></div>
