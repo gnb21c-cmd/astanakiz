@@ -147,6 +147,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .paper .pl { white-space: pre-wrap; overflow-wrap: anywhere; }
 .paper .ctr { text-align: center; }
 .paper .big { text-align: center; font-size: 20px; font-weight: 700; }
+.paper .mid { text-align: center; font-size: 16px; font-weight: 700; }
+.paper .bd { font-weight: 700; }
 .paper .hr { border-top: 1px dashed #111; margin: 6px 0; }
 .sheet.keysheet { width: min(560px, 100%); }  /* 열쇠 10개(5개 × 2줄)가 들어가는 크기 */
 .rbtns { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
@@ -1021,7 +1023,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
               <div class="help">입장권 (네이버 · 현장) · 초과요금은 POS에서 결제하고 POS 영수증을 드려요 · <button class="btn btn-sm" data-act="resetForm">기본 양식으로</button></div>
               <label class="chk"><input type="checkbox" id="form-auto" ${f.auto ? "checked" : ""}> ${f.when}에 자동 출력</label>
               <textarea id="form-text" spellcheck="false" aria-label="양식 내용">${esc(f.text)}</textarea>
-              <span class="help">넣을 수 있는 값: ${PRINT_KEYS.map((k) => `{${k}}`).join(" ")}<br>줄 앞에 <b>#</b> 크게 가운데 · <b>^</b> 가운데 · <b>---</b> 구분선 · <b>[네이버]</b> 네이버 예약만 · <b>[현장]</b> 현장입장만 · <b>[사은권]</b> 사은권 회차만</span></div>
+              <span class="help">넣을 수 있는 값: ${PRINT_KEYS.map((k) => `{${k}}`).join(" ")}<br>줄 앞에 <b>#</b> 크게 · <b>##</b> 중간 (둘 다 가운데 굵게) · <b>^</b> 가운데 · <b>*</b> 굵게 (<b>^*</b> 가운데 굵게) · <b>---</b> 구분선 · <b>[네이버]</b> 네이버 예약만 · <b>[현장]</b> 현장입장만 · <b>[사은권]</b> 사은권 회차만</span></div>
           </div>
           <div class="field"><span class="label">미리보기 <span class="help">80mm 폭 (예시 값)</span></span><div class="paper" id="paper">${paperHtml(f.text, SAMPLE)}</div></div>
         </div>
@@ -1102,15 +1104,20 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       if (skip) continue;
       // 값이 비어 있는 칸이 든 줄은 뺌
       if ([...l.matchAll(/\{([^}]+)\}/g)].some(([, k]) => k in v && v[k] === "")) continue;
-      if (l.trim() === "---") out.push({ k: "hr", t: "" });
-      else if (l.startsWith("# ")) out.push({ k: "big", t: fill(l.slice(2)) });
-      else if (l.startsWith("^")) out.push({ k: "ctr", t: fill(l.slice(1)) });
-      else out.push({ k: "txt", t: fill(l) });
+      if (l.trim() === "---") { out.push({ k: "hr", t: "" }); continue; }
+      // 줄 앞 표시: "# " 크게 · "## " 중간 (둘 다 가운데 · 굵게) · "^" 가운데 · "*" 굵게 ("^*" 가운데 굵게)
+      let k = "txt", bold = false, ctr = false;
+      if (l.startsWith("## ")) { k = "mid"; l = l.slice(3); }
+      else if (l.startsWith("# ")) { k = "big"; l = l.slice(2); }
+      if (l.startsWith("^")) { ctr = true; l = l.slice(1); }
+      if (l.startsWith("*")) { bold = true; l = l.slice(1); }
+      if (k === "txt" && ctr) k = "ctr";
+      out.push({ k, t: fill(l), bold: bold || k === "big" || k === "mid" });
     }
     return out;
   }
   function paperLines(text, v) {
-    return receiptLines(text, v).map((x) => x.k === "hr" ? `<div class="pl hr"></div>` : `<div class="pl ${x.k === "big" ? "big" : x.k === "ctr" ? "ctr" : ""}">${esc(x.t) || "&nbsp;"}</div>`).join("");
+    return receiptLines(text, v).map((x) => x.k === "hr" ? `<div class="pl hr"></div>` : `<div class="pl ${x.k === "txt" ? "" : x.k}${x.bold ? " bd" : ""}">${esc(x.t) || "&nbsp;"}</div>`).join("");
   }
   /** POS 영수증 프린터(ESC/POS)로 바로 보낼 조각: { b: [바이트] } 명령 · { t: "글" } 한글(CP949) — 80mm 글꼴 A 48칸 */
   function escposParts(text, v, cut) {
@@ -1118,9 +1125,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     for (const x of receiptLines(text, v)) {
       if (x.k === "hr") { P.push({ b: [0x1b, 0x61, 0] }, { t: "-".repeat(48) + "\n" }); continue; }
       P.push({ b: [0x1b, 0x61, x.k === "txt" ? 0 : 1] }); // 왼쪽 · 가운데
-      if (x.k === "big") P.push({ b: [0x1b, 0x45, 1, 0x1d, 0x21, 0x11, 0x1c, 0x21, 0x0c] }); // 굵게 · 가로세로 2배 (한글도)
+      // 크기: 크게 = 가로세로 2배 · 중간 = 세로만 2배 (영문 GS ! · 한글 FS !)
+      const size = x.k === "big" ? [0x1d, 0x21, 0x11, 0x1c, 0x21, 0x0c] : x.k === "mid" ? [0x1d, 0x21, 0x01, 0x1c, 0x21, 0x08] : [];
+      P.push({ b: [0x1b, 0x45, x.bold ? 1 : 0, ...size] });
       P.push({ t: x.t + "\n" });
-      if (x.k === "big") P.push({ b: [0x1b, 0x45, 0, 0x1d, 0x21, 0x00, 0x1c, 0x21, 0x00] });
+      P.push({ b: [0x1b, 0x45, 0, 0x1d, 0x21, 0x00, 0x1c, 0x21, 0x00] });
     }
     P.push({ b: [0x1b, 0x61, 0, 0x1b, 0x64, 0x04] }); // 4줄 올림
     if (cut) P.push({ b: [0x1d, 0x56, 0x01] }); // 부분 자르기
@@ -1136,6 +1145,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       .pl { white-space: pre-wrap; overflow-wrap: anywhere; }
       .ctr { text-align: center; }
       .big { text-align: center; font-family: "Malgun Gothic", "맑은 고딕", sans-serif; font-size: 14pt; font-weight: 700; }
+      .mid { text-align: center; font-family: "Malgun Gothic", "맑은 고딕", sans-serif; font-size: 12pt; font-weight: 700; }
+      .bd { font-weight: 700; }
       .hr { border-top: 1px dashed #000; margin: 2mm 0; }
     </style></head><body>${paperLines(text, v)}</body></html>`;
   }
