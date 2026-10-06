@@ -70,11 +70,15 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .btn-sm { padding: 2px 9px; min-height: 28px; font-size: 12.5px; border-radius: 7px; }
 
 /* 위 막대 */
-.top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.top { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; }
+.top .tag { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .top h1 { margin: 0; font-size: 16px; font-weight: 700; white-space: nowrap; }
 .top .tag { font-size: 11.5px; color: var(--muted); }
 .top .spacer { flex: 1; }
 .top .now { font-size: 22px; font-weight: 700; }
+.top .sold { font-size: 14px; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
+.top .btn { white-space: nowrap; flex-shrink: 0; }
+.top .sold b { font-size: 19px; color: var(--accent); }
 
 /* 세 칸 */
 .cols { display: grid; gap: 8px; grid-template-columns: 222px 244px minmax(0, 1fr); height: 100%; min-height: 0; }
@@ -312,6 +316,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     <h1>아스타나키즈 입장 데스크</h1>
     <span class="tag">체험판 · 예시 데이터 · 네이버·POS·아마노는 실제로 연결되지 않음</span>
     <span class="spacer"></span>
+    <span class="sold" id="sold" aria-live="polite"></span>
     <span class="now num" id="now">13:50</span>
     <button class="btn btn-sm" data-act="time" data-min="5">+5분</button>
     <button class="btn btn-sm" data-act="time" data-min="30">+30분</button>
@@ -547,7 +552,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
      이용시간 · 반납 · 초과요금 · 입장권의 입장시간 모두 이 시각 기준 */
   const walkSlot = (m) => Math.floor(m / 30) * 30;
   function walkin(phone, keys, at) {
-    const w = { id: "w" + seq++, name: "현장입장자", phone, keys: keys.slice(), enteredAt: at, slot: walkSlot(at), posNo: "POS-" + String(posSeq++).padStart(4, "0"), outAt: null, walk: true };
+    const w = { id: "w" + seq++, name: "현장입장자", phone, keys: keys.slice(), qty: keys.length, enteredAt: at, slot: walkSlot(at), posNo: "POS-" + String(posSeq++).padStart(4, "0"), outAt: null, walk: true };
     walkins.push(w);
     return w;
   }
@@ -794,6 +799,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         <span class="t num">${hm(s)}</span>
         <span class="c num dn">${done}</span><span class="c num ${conf ? "cf" : "lf"}">${conf}</span><span class="c num ${left ? "lf" : "full"}" title="기준 ${cap}">${left}</span></button>`;
     }).join("");
+    renderSold(tot.done);
     $("slot-sum").innerHTML = `<span class="lb">${viewDay === TODAY ? "오늘 합" : "이날 합"}</span><span class="dn">${tot.done}</span><span class="${tot.conf ? "cf" : "lf"}">${tot.conf}</span><span class="${tot.left ? "lf" : "full"}">${tot.left}</span>`;
   }
 
@@ -961,6 +967,25 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     $("synclog").innerHTML = bad.length
       ? `<b style="color:var(--red)">⚠ 할인 등록 실패 ${bad.map((j) => `${esc(j.carNo)} ${esc(j.type)}`).join(", ")} — ${esc(bad[0].why)}</b> <button class="btn btn-sm" data-act="parkRetry">다시</button> <button class="btn btn-sm" data-act="parkDrop">지우기</button>`
       : `아마노${REAL ? "" : "(체험)"}: ${going ? `<b>뒤에서 할인 등록 중 ${going}건</b> · ` : ""}<b style="color:${park.err ? "var(--red)" : "inherit"}">${esc(park.msg)}</b>`;
+  }
+
+  /* 맨 위 '입장권 총 판매수' = 고른 날의 네이버 이용완료 장수(시간표 완료 합) + 현장입장 장수 (현장 10/6)
+     현장입장 장수는 열쇠를 받은 개수(qty) — 반납해도 줄지 않음. 다른 날은 그날 저장 파일에서 읽음 */
+  const walkByDay = {};
+  function walkTickets(day) {
+    let ws = day === TODAY ? walkins : walkByDay[day];
+    if (!ws) {
+      ws = [];
+      try { const t = APP && window.desk.state ? window.desk.state.load(day) : null; if (t) ws = JSON.parse(t).w || []; } catch (e) { ws = []; }
+      if (day < TODAY) walkByDay[day] = ws; // 지난날은 바뀌지 않으니 한 번만 읽음
+    }
+    return ws.reduce((a, w) => a + (w.qty || Math.max(1, (w.keys || []).length)), 0);
+  }
+  function renderSold(naverDone) {
+    const walk = walkTickets(viewDay), all = naverDone + walk;
+    const el = $("sold");
+    el.innerHTML = `${viewDay === TODAY ? "오늘" : `${Number(viewDay.slice(5, 7))}/${Number(viewDay.slice(8))}`} 입장권 총 판매수 = <b class="num">${all}</b>장`;
+    el.title = `네이버 이용완료 ${naverDone}장 + 현장입장 ${walk}장`;
   }
 
   function refreshText() {
