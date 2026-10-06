@@ -6,7 +6,7 @@
 const { app, BrowserWindow, ipcMain, safeStorage, shell } = require("electron");
 const path = require("path");
 const fs = require("fs");
-const { execFile } = require("child_process");
+const { execFile, spawn } = require("child_process");
 const { AmanoSync } = require("./amano-sync");
 const { NaverSync, naverUrls } = require("./naver-sync");
 
@@ -160,8 +160,10 @@ function createDesk() {
 /* POS 프로그램(OKPOS) 창을 맨 앞으로 — Alt+Tab 처럼 그 창으로 바로 넘어감 (현장 10/6)
    찾는 순서: 운영 설정의 POS 창 제목 → 제목에 OKPOS · NICE · POS 가 든 창 → 프로그램 이름에 okpos 가 든 것
    최소화돼 있으면 펼치고, Windows 가 다른 프로그램의 창 바꾸기를 막지 않게 Alt 키를 한 번 눌렀다 뗀 뒤 앞으로 */
-const POS_PS = `
+// POS 창 찾기 · 펼치기 · 앞으로 (PowerShell). 함수만 정의 — 아래 POS_PS(한 번 실행)와 posAgent(미리 띄워 둠)가 같이 씀
+const POS_LIB = `
 $ErrorActionPreference = "SilentlyContinue"
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
 Add-Type @"
 using System; using System.Text; using System.Runtime.InteropServices;
 public class W {
@@ -194,37 +196,106 @@ function All {
   [void][W]::EnumWindows($cb, [IntPtr]::Zero)
   return $l
 }
-$wins = All
-$named = $wins | Where-Object { $_.v -and $_.t }
-$names = @{}; foreach ($w in $named) { if (-not $names.ContainsKey($w.p)) { try { $names[$w.p] = (Get-Process -Id $w.p).ProcessName } catch { $names[$w.p] = "" } } }
-$want = $env:ASTANA_POS
-$hit = $null
-if ($want) { $hit = $named | Where-Object { $_.t -like "*$want*" } | Select-Object -First 1 }
-if (-not $hit) { $hit = $named | Where-Object { $_.t -match "OKPOS|NICE|POS" -and $_.t -notmatch "아스타나키즈|입장 데스크" } | Select-Object -First 1 }
-if (-not $hit) { $hit = $named | Where-Object { $names[$_.p] -match "okpos" } | Select-Object -First 1 }
-if (-not $hit) { [Console]::Out.Write("none|" + (($named | ForEach-Object { $_.t }) -join " / ")); exit }
-$pid0 = $hit.p
 # 그 프로그램에서 실제로 펼쳐져 보이는 큰 창 (작업표시줄 단추용 크기 0 창은 빼고)
-function Main { All | Where-Object { $_.p -eq $pid0 -and $_.v -and -not $_.ic -and $_.a -gt 40000 } | Sort-Object a -Descending | Select-Object -First 1 }
-$main = Main
-if (-not $main) {
-  # 최소화돼 있음 → 작업표시줄의 POS 아이콘을 누른 것과 같은 '복원' 신호를 그 프로그램의 창들에 보냄 (현장 10/6: ShowWindow 만으로는 OKPOS가 안 펼쳐짐)
-  foreach ($w in ($wins | Where-Object { $_.p -eq $pid0 -and $_.v })) {
-    if ($w.ic) { [void][W]::PostMessage($w.h, 0x0112, [IntPtr]0xF120, [IntPtr]::Zero); [void][W]::ShowWindow($w.h, 9) }
+function Main { All | Where-Object { $_.p -eq $script:pid0 -and $_.v -and -not $_.ic -and $_.a -gt 40000 } | Sort-Object a -Descending | Select-Object -First 1 }
+function ShowPos($want) {
+  $wins = All
+  $named = $wins | Where-Object { $_.v -and $_.t }
+  $names = @{}; foreach ($w in $named) { if (-not $names.ContainsKey($w.p)) { try { $names[$w.p] = (Get-Process -Id $w.p).ProcessName } catch { $names[$w.p] = "" } } }
+  $hit = $null
+  if ($want) { $hit = $named | Where-Object { $_.t -like "*$want*" } | Select-Object -First 1 }
+  if (-not $hit) { $hit = $named | Where-Object { $_.t -match "OKPOS|NICE|POS" -and $_.t -notmatch "아스타나키즈|입장 데스크" } | Select-Object -First 1 }
+  if (-not $hit) { $hit = $named | Where-Object { $names[$_.p] -match "okpos" } | Select-Object -First 1 }
+  if (-not $hit) { return "none|" + (($named | ForEach-Object { $_.t }) -join " / ") }
+  $script:pid0 = $hit.p
+  $main = Main
+  if (-not $main) {
+    # 최소화돼 있음 → 작업표시줄의 POS 아이콘을 누른 것과 같은 '복원' 신호를 그 프로그램의 창들에 보냄 (현장 10/6: ShowWindow 만으로는 OKPOS가 안 펼쳐짐)
+    foreach ($w in ($wins | Where-Object { $_.p -eq $pid0 -and $_.v })) {
+      if ($w.ic) { [void][W]::PostMessage($w.h, 0x0112, [IntPtr]0xF120, [IntPtr]::Zero); [void][W]::ShowWindow($w.h, 9) }
+    }
+    for ($i = 0; $i -lt 20 -and -not $main; $i++) { Start-Sleep -Milliseconds 100; $main = Main }
   }
-  for ($i = 0; $i -lt 20 -and -not $main; $i++) { Start-Sleep -Milliseconds 100; $main = Main }
+  if (-not $main) { return "shut|" + $hit.t }
+  $h = $main.h
+  # 다른 프로그램을 앞으로 올릴 때 Windows가 막는 것 풀기: Alt 한 번 + 지금 앞 창의 입력에 잠깐 붙기
+  $fg = [W]::GetForegroundWindow(); $q = 0
+  $ft = [W]::GetWindowThreadProcessId($fg, [ref]$q); $me = [W]::GetCurrentThreadId()
+  [void][W]::AttachThreadInput($me, $ft, $true)
+  [W]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero); [W]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
+  [void][W]::BringWindowToTop($h); [void][W]::SetForegroundWindow($h)
+  [void][W]::AttachThreadInput($me, $ft, $false)
+  return "ok|" + $h.ToInt64() + "|" + $main.t + " (" + $names[$pid0] + ")"
 }
-if (-not $main) { [Console]::Out.Write("shut|" + $hit.t); exit }
-$h = $main.h
-# 다른 프로그램을 앞으로 올릴 때 Windows가 막는 것 풀기: Alt 한 번 + 지금 앞 창의 입력에 잠깐 붙기
-$fg = [W]::GetForegroundWindow(); $q = 0
-$ft = [W]::GetWindowThreadProcessId($fg, [ref]$q); $me = [W]::GetCurrentThreadId()
-[void][W]::AttachThreadInput($me, $ft, $true)
-[W]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero); [W]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
-[void][W]::BringWindowToTop($h); [void][W]::SetForegroundWindow($h)
-[void][W]::AttachThreadInput($me, $ft, $false)
-[Console]::Out.Write("ok|" + $h.ToInt64() + "|" + $main.t + " (" + $names[$pid0] + ")")
 `;
+const POS_PS = POS_LIB + "[Console]::Out.Write((ShowPos $env:ASTANA_POS))";
+/* POS 도우미를 앱이 켜질 때 미리 띄워 둠: 누를 때마다 PowerShell을 새로 켜면 1~2초 걸려서 (현장 10/6 "POS로 넘어가는 딜레이")
+   한 줄(POS 창 제목, base64)을 받으면 결과 한 줄을 돌려줌 */
+let posAgent = null; // { proc, wait: [], buf, ready }
+let posAgentBroken = false; // 이 PC에서 도우미가 안 되면 예전 방식(한 번씩 실행)만
+function startPosAgent() {
+  if (process.platform !== "win32" || posAgent || posAgentBroken) return;
+  const script = POS_LIB + `
+while ($true) {
+  $line = [Console]::In.ReadLine()
+  if ($line -eq $null) { break }
+  if ($line -eq "PING") { [Console]::Out.WriteLine("PONG"); [Console]::Out.Flush(); continue }
+  $want = ""; if ($line) { $want = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($line.Trim())) }
+  $r = "" + (ShowPos $want)
+  [Console]::Out.WriteLine(($r -replace "[\r\n]+", " ")); [Console]::Out.Flush()
+}`;
+  const enc = Buffer.from(script, "utf16le").toString("base64");
+  let proc;
+  try {
+    proc = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", enc], { windowsHide: true });
+  } catch (e) {
+    return;
+  }
+  const me = { proc, wait: [], buf: "", ready: false };
+  posAgent = me;
+  proc.stdout.setEncoding("utf8");
+  proc.stdout.on("data", (d) => {
+    me.buf += d;
+    let i;
+    while ((i = me.buf.indexOf("\n")) >= 0) {
+      const line = me.buf.slice(0, i).trim();
+      me.buf = me.buf.slice(i + 1);
+      const w = me.wait.shift();
+      if (w) w(line);
+    }
+  });
+  const gone = () => {
+    if (posAgent === me) posAgent = null;
+    me.wait.splice(0).forEach((w) => w(""));
+  };
+  proc.on("exit", gone);
+  proc.on("error", gone);
+  // 시작 확인: 20초 안에 PONG이 없으면 이 PC에선 도우미를 안 씀
+  const t = setTimeout(() => { if (!me.ready) { posAgentBroken = true; stopPosAgent(me); } }, 20000);
+  me.wait.push((l) => { clearTimeout(t); if (l === "PONG") me.ready = true; });
+  try { proc.stdin.write("PING\n"); } catch (e) {}
+}
+function stopPosAgent(me = posAgent) {
+  if (!me) return;
+  if (posAgent === me) posAgent = null;
+  try { me.proc.kill(); } catch (e) {}
+}
+// 도우미에게 물어봄. 도우미가 아직 준비 안 됐거나 5초 안에 답이 없으면 예전처럼 한 번 실행
+async function posShowFast(title) {
+  const me = posAgent;
+  if (me && me.ready) {
+    const line = await new Promise((resolve) => {
+      const t = setTimeout(() => resolve(""), 5000);
+      me.wait.push((l) => { clearTimeout(t); resolve(l); });
+      try { me.proc.stdin.write(Buffer.from(title || "", "utf8").toString("base64") + "\n"); } catch (e) { resolve(""); }
+    });
+    if (line) return line;
+    stopPosAgent(me); // 꼬였으면 버리고 새로
+  }
+  const out = await psRun(POS_PS, { ASTANA_POS: title || "" });
+  startPosAgent(); // 다음 번엔 빠르게
+  return out;
+}
 // POS 창이 펼쳐진 걸 본 뒤, 다시 최소화(숨김 · 닫힘)될 때까지 기다림 → 그때 데스크를 다시 올림
 const POS_WAIT_PS = `
 Add-Type @"
@@ -245,7 +316,7 @@ async function showPos() {
   if (process.platform !== "win32") return { ok: false, why: "Windows 에서만 됨" };
   // 최소화 단추를 누른 것처럼 데스크를 먼저 내리고 POS를 올림 (데스크가 앞에 버티고 있으면 POS가 안 보여서 · 현장 10/6)
   if (deskWin) deskWin.minimize();
-  const out = await psRun(POS_PS, { ASTANA_POS: settings.posTitle || "" });
+  const out = await posShowFast(settings.posTitle || "");
   const m = /^ok\|(-?\d+)\|(.*)$/s.exec(out);
   if (!m) {
     if (deskWin) { deskWin.restore(); deskWin.focus(); }
@@ -570,8 +641,10 @@ app.whenReady().then(() => {
   openAmano(); // 맨 뒤 아마노
   openNaver(); // 맨 뒤 네이버 예약관리
   createDesk(); // 맨 앞 데스크 (POS 는 원래대로 따로 켜져 있음)
+  startPosAgent(); // POS로 넘어가는 도우미를 미리 켜 둠
 });
 app.on("before-quit", () => {
   app.isQuitting = true;
+  stopPosAgent();
 });
 app.on("window-all-closed", () => app.quit());

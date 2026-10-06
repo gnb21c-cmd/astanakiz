@@ -258,6 +258,14 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .stepper { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .stepper button { width: 42px; height: 42px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); font-size: 22px; font-weight: 700; line-height: 1; }
 .stepper output { min-width: 28px; text-align: center; font-size: 20px; font-weight: 700; }
+/* 현장입장: 왼쪽 정보 · 오른쪽 터치 키패드 (현장 10/6) */
+.sheet.walksheet { width: min(600px, 100%); }
+.walktop { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 14px; align-items: start; }
+.stepnote { flex-basis: 100%; }
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.keypad button { height: 50px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); font-size: 22px; font-weight: 700; touch-action: manipulation; }
+.keypad button:active { background: var(--accent); color: #fff; }
+.keypad button.fn { font-size: 15px; }
 .banner { border-radius: 9px; padding: 7px 10px; font-size: 13px; background: var(--naver-bg); }
 .banner.warn { background: var(--warn-bg); }
 .banner b { font-weight: 700; }
@@ -971,12 +979,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     const { base, all } = projection();
     const need = sheet.keys.length;
     const over = need > all, flex = !over && need > base;
-    return { base, all, need, over, flex, phoneOk: digits(sheet.phone).length >= 10 };
+    return { base, all, need, over, flex, phoneOk: digits(sheet.phone).length === 11 };
   }
 
   function renderSheet() {
     const el = $("sheet");
     el.classList.toggle("wide", sheet.mode === "enter");
+    el.classList.toggle("walksheet", sheet.mode === "walk");
     el.classList.toggle("keysheet", sheet.mode === "key");
     el.classList.toggle("setsheet", sheet.mode === "settings");
     if (sheet.mode === "enter") {
@@ -1029,14 +1038,15 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         <div class="banner ${st.over || st.flex ? "warn" : ""}">${st.over ? `지금은 열쇠 <b class="num">${st.all}</b>개까지만 내줄 수 있어요. 예약 손님이 오실 자리라서 팔지 않습니다.`
           : st.flex ? `기본 열쇠 ${RULES.baseKeys}개를 넘어 <b>유동 열쇠</b>를 씁니다. 안에 빈 좌석이 있는지 보고 판매하세요.`
           : `현장 판매 가능 <b class="num">${st.base}</b>개 · 예약 손님 자리를 먼저 남겨 두고 계산했어요`}</div>
-        <dl class="facts">
+        <div class="walktop"><dl class="facts">
           <dt>고객명</dt><dd><span class="fixed">현장입장자</span></dd>
           <dt>열쇠</dt><dd><div class="bigkeys">${sheet.keys.map((k) => `<span class="bigkey num">${k}</span>`).join("")}</div></dd>
-          <dt>수량</dt><dd><div class="stepper"><button data-act="qty" data-d="-1" aria-label="수량 줄이기">−</button><output class="num">${st.need}</output><button data-act="qty" data-d="1" aria-label="수량 늘리기">+</button><span class="help">수량만큼 열쇠를 이어서 드려요</span></div></dd>
+          <dt>수량</dt><dd><div class="stepper"><button data-act="qty" data-d="-1" aria-label="수량 줄이기">−</button><output class="num">${st.need}</output><button data-act="qty" data-d="1" aria-label="수량 늘리기">+</button><span class="help stepnote">수량만큼 열쇠를 이어서 드려요</span></div></dd>
           <dt>이용</dt><dd class="num">${hm(ws)} 입장${ws !== now ? ` (접수 ${hm(now)})` : ""} ${m == null ? "· 무제한" : `~ ${hm(ws + m)} (1시간 50분)`}</dd>
         </dl>
-        <div class="field"><label for="w-phone">전화번호 <span class="help">USB 키패드로 누르세요</span></label>
-          <input id="w-phone" inputmode="numeric" autocomplete="off" value="${esc(fmtPhone(sheet.phone))}" placeholder="010-0000-0000" data-autofocus></div>
+        <div class="keypad" aria-label="전화번호 키패드">${["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((n) => `<button data-act="kp" data-k="${n}">${n}</button>`).join("")}<button class="fn" data-act="kp" data-k="clr">지우기</button><button data-act="kp" data-k="0">0</button><button class="fn" data-act="kp" data-k="del" aria-label="한 자리 지우기">←</button></div></div>
+        <div class="field"><label for="w-phone">전화번호 <span class="help">010 뒤 8자리</span></label>
+          <input id="w-phone" inputmode="numeric" autocomplete="off" value="${esc(walkFmt(sheet.phone))}" placeholder="010-0000-0000" data-autofocus></div>
         ${st.flex ? `<button class="btn ${sheet.flexOk ? "btn-ink" : ""}" data-act="flexOk" aria-pressed="${!!sheet.flexOk}">${sheet.flexOk ? "빈 좌석 확인함" : "빈 좌석 확인했어요"}</button>` : ""}
         <ol class="steps"><li class="${sheet.paid ? "done" : ""}">결제하기 → POS 화면에서 결제 → POS를 최소화하면 이 팝업으로 돌아옴${sheet.paid ? " ✓" : ""}</li><li>결제 완료 → 열쇠판에 등록</li></ol>
         <div class="stack-btns">
@@ -1414,6 +1424,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (!h.keys.length) h.outAt = now;
     toast(`${ks.join(", ")}번 반납${h.keys.length ? "" : ` · ${h.walk ? "현장입장자" : h.name + "님"} 퇴장`}`);
   }
+  // 현장입장 전화번호: 010은 고정, 뒤 8자리만 받음 (010을 지워도 다시 붙음)
+  function walkPhone(v) {
+    const d = digits(v);
+    return "010" + (d.startsWith("010") ? d.slice(3) : d.length < 3 ? "" : d).slice(0, 8);
+  }
+  const walkFmt = (p) => { const r = digits(p).slice(3); return "010-" + r.slice(0, 4) + (r.length > 4 ? "-" + r.slice(4) : ""); };
   function updateWalkButtons() {
     const done = $("w-done"); if (!done) return;
     const st = walkState();
@@ -1443,7 +1459,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const k = Number(btn.dataset.k);
       const h = holderOf(k);
       if (h) { openSheet({ mode: "key", hid: h.id }); return; }
-      openSheet({ mode: "walk", keys: [k], phone: "", paid: false, flexOk: false });
+      openSheet({ mode: "walk", keys: [k], phone: "010", paid: false, flexOk: false }); // 010은 미리 넣어 둠
     },
     async doEnter(btn) {
       const b = findB(sheet.id);
@@ -1483,6 +1499,15 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       renderSheet(); $("w-phone").focus();
     },
     flexOk() { sheet.flexOk = !sheet.flexOk; renderSheet(); },
+    // 터치 키패드: 전화번호 뒤 8자리
+    kp(btn) {
+      const k = btn.dataset.k;
+      let rest = digits(sheet.phone).slice(3);
+      if (k === "del") rest = rest.slice(0, -1); else if (k === "clr") rest = ""; else if (rest.length < 8) rest += k;
+      sheet.phone = "010" + rest;
+      const p = $("w-phone"); if (p) p.value = walkFmt(sheet.phone);
+      updateWalkButtons();
+    },
     pay() { sheet.paid = true; $("pos-amt").textContent = `현장입장 ${sheet.keys.length}장`; goPos(); },
     payOver() {
       const h = holderById(sheet.hid); const o = overInfo(h); if (!o.due) return;
@@ -1628,7 +1653,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (t.id === "form-auto") { PRINT.forms[PRINT.cur].auto = t.checked; savePrint(); }
     if (t.id === "print-cut") { PRINT.cut = t.checked; savePrint(); }
     if (t.id === "com-baud") { PRINT.baud = Number(t.value); savePrint(); }
-    if (t.id === "w-phone") { sheet.phone = digits(t.value).slice(0, 11); t.value = fmtPhone(sheet.phone); updateWalkButtons(); }
+    if (t.id === "w-phone") { sheet.phone = walkPhone(t.value); t.value = walkFmt(sheet.phone); updateWalkButtons(); }
     const m = /^p(f|t)-(\d+)$/.exec(t.id);
     if (m && t.value) { RULES.peaks[+m[2]][m[1] === "f" ? "from" : "to"] = t.value; savePeaks(); renderAll(); }
   });
