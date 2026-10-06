@@ -166,13 +166,18 @@ Add-Type @"
 using System; using System.Text; using System.Runtime.InteropServices;
 public class W {
   public delegate bool EnumProc(IntPtr h, IntPtr l);
+  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
   [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc f, IntPtr l);
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
   [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint a, uint b, bool f);
+  [DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
   [DllImport("user32.dll")] public static extern void keybd_event(byte k, byte s, uint f, UIntPtr e);
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint p);
 }
@@ -180,25 +185,45 @@ public class W {
 $wins = New-Object System.Collections.ArrayList
 $cb = [W+EnumProc]{ param($h, $l)
   if ([W]::IsWindowVisible($h)) { $sb = New-Object System.Text.StringBuilder 512; [void][W]::GetWindowText($h, $sb, 512); $t = $sb.ToString()
-    if ($t) { $p = 0; [void][W]::GetWindowThreadProcessId($h, [ref]$p); $n = ""; try { $n = (Get-Process -Id $p).ProcessName } catch {}; [void]$wins.Add([pscustomobject]@{ h = $h; t = $t; n = $n }) } }
+    $p = 0; [void][W]::GetWindowThreadProcessId($h, [ref]$p); $n = ""; try { $n = (Get-Process -Id $p).ProcessName } catch {}
+    $r = New-Object W+RECT; [void][W]::GetWindowRect($h, [ref]$r)
+    [void]$wins.Add([pscustomobject]@{ h = $h; t = $t; n = $n; p = $p; a = [Math]::Max(0, $r.R - $r.L) * [Math]::Max(0, $r.B - $r.T); ic = [W]::IsIconic($h) }) }
   return $true }
 [void][W]::EnumWindows($cb, [IntPtr]::Zero)
+$named = $wins | Where-Object { $_.t }
 $want = $env:ASTANA_POS
 $hit = $null
-if ($want) { $hit = $wins | Where-Object { $_.t -like "*$want*" } | Select-Object -First 1 }
-if (-not $hit) { $hit = $wins | Where-Object { $_.t -match "OKPOS|NICE|POS" -and $_.t -notmatch "아스타나키즈|입장 데스크" } | Select-Object -First 1 }
-if (-not $hit) { $hit = $wins | Where-Object { $_.n -match "okpos" } | Select-Object -First 1 }
-if (-not $hit) { [Console]::Out.Write("none|" + (($wins | ForEach-Object { $_.t }) -join " / ")); exit }
-$h = $hit.h
+if ($want) { $hit = $named | Where-Object { $_.t -like "*$want*" } | Select-Object -First 1 }
+if (-not $hit) { $hit = $named | Where-Object { $_.t -match "OKPOS|NICE|POS" -and $_.t -notmatch "아스타나키즈|입장 데스크" } | Select-Object -First 1 }
+if (-not $hit) { $hit = $named | Where-Object { $_.n -match "okpos" } | Select-Object -First 1 }
+if (-not $hit) { [Console]::Out.Write("none|" + (($named | ForEach-Object { $_.t }) -join " / ")); exit }
+# 작업표시줄 단추만 있는 크기 0 창(델파이 프로그램 등)이 걸리면 화면이 안 바뀜 → 같은 프로그램에서 실제로 보이는 가장 큰 창을 앞으로 (현장 10/6)
+if ($hit.ic) { [void][W]::ShowWindow($hit.h, 9) }
+$same = $wins | Where-Object { $_.p -eq $hit.p }
+$main = $same | Where-Object { -not $_.ic -and $_.a -gt 40000 } | Sort-Object a -Descending | Select-Object -First 1
+if (-not $main) { $main = $same | Where-Object { $_.ic } | Select-Object -First 1 }
+if (-not $main) { $main = $hit }
+$h = $main.h
 if ([W]::IsIconic($h)) { [void][W]::ShowWindow($h, 9) } else { [void][W]::ShowWindow($h, 5) }
+# 다른 프로그램을 앞으로 올릴 때 Windows가 막는 것 풀기: Alt 한 번 + 지금 앞 창의 입력에 잠깐 붙기
+$fg = [W]::GetForegroundWindow(); $q = 0
+$ft = [W]::GetWindowThreadProcessId($fg, [ref]$q); $me = [W]::GetCurrentThreadId()
+[void][W]::AttachThreadInput($me, $ft, $true)
 [W]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero); [W]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
 [void][W]::BringWindowToTop($h); [void][W]::SetForegroundWindow($h)
-[Console]::Out.Write("ok|" + $hit.t)
+[void][W]::AttachThreadInput($me, $ft, $false)
+$ok = [W]::GetForegroundWindow() -eq $h
+[Console]::Out.Write($(if ($ok) { "ok|" } else { "fg|" }) + $main.t + " (" + $hit.n + ", 창 " + $same.Count + "개)")
 `;
 async function showPos() {
   if (process.platform !== "win32") return { ok: false, why: "Windows 에서만 됨" };
   const out = await psRun(POS_PS, { ASTANA_POS: settings.posTitle || "" });
   if (out.startsWith("ok|")) return { ok: true, title: out.slice(3) };
+  // Windows가 앞으로 올리기를 막았으면 데스크를 내려서라도 POS가 보이게 (POS를 최소화하면 데스크가 다시 올라옴)
+  if (out.startsWith("fg|")) {
+    if (deskWin) deskWin.minimize();
+    return { ok: true, title: out.slice(3), minimized: true };
+  }
   if (out.startsWith("none|")) return { ok: false, why: `POS 창을 찾지 못함 — OKPOS가 켜져 있는지 확인해 주세요 (열린 창: ${out.slice(5).slice(0, 200)})` };
   return { ok: false, why: `POS 창으로 못 넘어감: ${out.slice(0, 200)}` };
 }
