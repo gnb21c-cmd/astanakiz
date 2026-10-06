@@ -1335,9 +1335,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   let CFG = null; // 설치한 앱의 설정 (아마노 주소 · POS 창 제목 · 배운 칸)
   async function goPos() {
     if (window.desk && window.desk.pos) {
+      // 설치한 앱: 실제 OKPOS 창으로 바로 넘어감 (못 찾으면 알리기만 — 가짜 POS 화면은 띄우지 않음)
       const r = await window.desk.pos.show();
       if (r && r.ok) { posAway = true; return; }
       toast((r && r.why) || "POS 창을 찾지 못함");
+      return;
     }
     $("pos").hidden = false; // 체험판: 가짜 POS 화면
   }

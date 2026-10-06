@@ -141,15 +141,50 @@ function createDesk() {
   deskWin.maximize();
 }
 
-/** POS 프로그램 창을 앞으로 (Windows). 창 제목 일부로 찾는다 */
-function showPos() {
-  return new Promise((resolve) => {
-    if (process.platform !== "win32" || !settings.posTitle) return resolve({ ok: false, why: "운영 설정에 POS 창 제목을 넣어 주세요" });
-    const ps = `(New-Object -ComObject WScript.Shell).AppActivate('${settings.posTitle.replace(/'/g, "''")}')`;
-    execFile("powershell.exe", ["-NoProfile", "-Command", ps], (err, out) =>
-      resolve(err || String(out).trim() === "False" ? { ok: false, why: "POS 창을 찾지 못함" } : { ok: true }),
-    );
-  });
+/* POS 프로그램(OKPOS) 창을 맨 앞으로 — Alt+Tab 처럼 그 창으로 바로 넘어감 (현장 10/6)
+   찾는 순서: 운영 설정의 POS 창 제목 → 제목에 OKPOS · NICE · POS 가 든 창 → 프로그램 이름에 okpos 가 든 것
+   최소화돼 있으면 펼치고, Windows 가 다른 프로그램의 창 바꾸기를 막지 않게 Alt 키를 한 번 눌렀다 뗀 뒤 앞으로 */
+const POS_PS = `
+$ErrorActionPreference = "SilentlyContinue"
+Add-Type @"
+using System; using System.Text; using System.Runtime.InteropServices;
+public class W {
+  public delegate bool EnumProc(IntPtr h, IntPtr l);
+  [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc f, IntPtr l);
+  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+  [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+  [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c);
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr h);
+  [DllImport("user32.dll")] public static extern void keybd_event(byte k, byte s, uint f, UIntPtr e);
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint p);
+}
+"@
+$wins = New-Object System.Collections.ArrayList
+$cb = [W+EnumProc]{ param($h, $l)
+  if ([W]::IsWindowVisible($h)) { $sb = New-Object System.Text.StringBuilder 512; [void][W]::GetWindowText($h, $sb, 512); $t = $sb.ToString()
+    if ($t) { $p = 0; [void][W]::GetWindowThreadProcessId($h, [ref]$p); $n = ""; try { $n = (Get-Process -Id $p).ProcessName } catch {}; [void]$wins.Add([pscustomobject]@{ h = $h; t = $t; n = $n }) } }
+  return $true }
+[void][W]::EnumWindows($cb, [IntPtr]::Zero)
+$want = $env:ASTANA_POS
+$hit = $null
+if ($want) { $hit = $wins | Where-Object { $_.t -like "*$want*" } | Select-Object -First 1 }
+if (-not $hit) { $hit = $wins | Where-Object { $_.t -match "OKPOS|NICE|POS" -and $_.t -notmatch "아스타나키즈|입장 데스크" } | Select-Object -First 1 }
+if (-not $hit) { $hit = $wins | Where-Object { $_.n -match "okpos" } | Select-Object -First 1 }
+if (-not $hit) { [Console]::Out.Write("none|" + (($wins | ForEach-Object { $_.t }) -join " / ")); exit }
+$h = $hit.h
+if ([W]::IsIconic($h)) { [void][W]::ShowWindow($h, 9) } else { [void][W]::ShowWindow($h, 5) }
+[W]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero); [W]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
+[void][W]::BringWindowToTop($h); [void][W]::SetForegroundWindow($h)
+[Console]::Out.Write("ok|" + $hit.t)
+`;
+async function showPos() {
+  if (process.platform !== "win32") return { ok: false, why: "Windows 에서만 됨" };
+  const out = await psRun(POS_PS, { ASTANA_POS: settings.posTitle || "" });
+  if (out.startsWith("ok|")) return { ok: true, title: out.slice(3) };
+  if (out.startsWith("none|")) return { ok: false, why: `POS 창을 찾지 못함 — OKPOS가 켜져 있는지 확인해 주세요 (열린 창: ${out.slice(5).slice(0, 200)})` };
+  return { ok: false, why: `POS 창으로 못 넘어감: ${out.slice(0, 200)}` };
 }
 
 // 데스크 화면 ↔ 이 프로그램
