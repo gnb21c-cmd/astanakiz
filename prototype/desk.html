@@ -74,6 +74,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .top .tag { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .top h1 { margin: 0; font-size: 16px; font-weight: 700; white-space: nowrap; }
 .top .tag { font-size: 11.5px; color: var(--muted); }
+.captable { width: 100%; border-collapse: collapse; font-size: 14px; }
+.captable th, .captable td { border-bottom: 1px solid var(--line); padding: 4px 6px; text-align: center; }
+.captable th { font-size: 12px; color: var(--muted); font-weight: 600; }
+.captable tr.adj td { background: var(--accent-bg); }
+.captable .up { color: var(--ok); font-size: 12px; } .captable .down { color: var(--red); font-size: 12px; } .captable td.over { color: var(--red); font-weight: 700; }
+.caplog { display: grid; gap: 2px; font-size: 12.5px; max-height: 150px; overflow: auto; } .caplog .bad { color: var(--red); }
 .top .posgo { border: 2px solid var(--accent); color: var(--accent); font-weight: 800; padding: 4px 14px; }
 .top .spacer { flex: 1; }
 .top .now { font-size: 22px; font-weight: 700; }
@@ -419,6 +425,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     //   그 사이에 들어온 예약(예: 09:58에 10:00 예약)은 근무자가 [새로고침]으로 바로 불러옴
     naverAuto: { from: "09:50", until: "19:20", at: [20, 50] },
     peaks: [{ from: "2026-07-20", to: "2026-08-23" }, { from: "2026-12-28", to: "2027-02-28" }], // 성수기 기간 (운영 설정에서 고치고 더함)
+    /* 네이버 판매 수량 자동 조절 (시간제인 날 · 시간제 타임만): 2시간(4타임) 안의 손님(네이버 예약 + 현장)이 target 에 가깝게
+       10분마다 지금 · 앞 3타임의 네이버 '회차당 수량'을 바꿈. 한 타임 최대 max (현장으로 갑자기 오는 손님 · 10분 사이 예약을 생각해서) */
+    capAuto: { on: false, target: 42, max: 13, ahead: 3, every: 10, product: "1시간 50분" },
   };
   /* 이용시간: 성수기 — 평일·휴일 모두 17:30 입장까지 1시간 50분, 18:00 입장부터 무제한
               비수기 — 평일은 무제한, 휴일은 성수기와 같음 */
@@ -565,6 +574,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 
   // ── 네이버 불러오기 (설치한 앱) ─────────────────────
   const naverSlots = {}; // 날짜 → 시각(분) → { cap, conf, done } (입장권 상품 합계)
+  const capDemo = {}; // 체험판: 시각 → 회차당 수량 (네이버 대신 · 수량 자동 조절)
+  const naverRaw = {}; // 날짜 → 네이버 칸 그대로 [{ time, product, cap, conf, done }] (수량 자동 조절이 상품 칸을 고를 때)
   let naverBusy = false;
   let naverErr = "";
   let naverStep = ""; // 네이버에서 지금 하는 단계 (불러오는 동안 버튼에 보임)
@@ -593,6 +604,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     const sl = {};
     for (const x of r.slots) { const t = toMin(x.time); const o = (sl[t] = sl[t] || { cap: 0, conf: 0, done: 0 }); o.cap += x.cap; o.conf += x.conf; o.done += x.done; }
     naverSlots[day] = sl;
+    if (!only) naverRaw[day] = r.slots.map((x) => Object.assign({}, x));
+    else naverRaw[day] = (naverRaw[day] || []).filter((x) => x.time !== only).concat(r.slots.filter((x) => x.time === only).map((x) => Object.assign({}, x)));
     const old = new Map((bookings[day] || []).map((b) => [b.no, b]));
     const list = [];
     for (const n of r.bookings) {
@@ -793,7 +806,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const sum = (st) => bs.filter((b) => b.status === st).reduce((a, b) => a + b.qty, 0);
       const done = ns ? ns.done : sum("완료");
       const conf = ns ? ns.conf : sum("확정");
-      const cap = ns ? ns.cap : RULES.slotCap;
+      const cap = ns ? ns.cap : viewDay === TODAY && capDemo[s] != null ? capDemo[s] : RULES.slotCap;
       const left = Math.max(0, cap - conf - done);
       tot.done += done; tot.conf += conf; tot.left += left;
       const isNow = viewDay === TODAY && now >= s - RULES.earlyMinutes && now < s + 25;
@@ -990,6 +1003,104 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     el.title = `네이버 이용완료 ${naverDone}장 + 현장입장 ${walk}장`;
   }
 
+  // ── 네이버 판매 수량 자동 조절 ─────────────────────
+  /* 2시간(4타임) 동안 안에 있는 손님 = 그 4타임의 네이버 예약(확정+완료) + 현장입장. 이 합이 목표(40~43)에 가깝게.
+     - 이미 시작한 타임은 실제 숫자, 앞으로 올 타임은 예약 + 현장 추세(최근 3타임 현장 평균)
+     - 바꿀 수 있는 타임(아직 시작 안 한 지금 · 앞 3타임)마다 '더 열 수 있는 수' = 그 타임이 들어간 모든 4타임 묶음의 남은 자리 중 가장 적은 것
+     - 남은 자리를 한 장씩 나눠 줌: 예약이 많이 찬(인기) 타임에 더 (예약+1)/(더 준 수+1) 이 큰 순서 → 비인기 타임은 적게, 인기 타임은 많이
+     - 회차당 수량 = 그 타임 예약 + 더 연 수, 한 타임 최대 max · 이미 예약된 것보다 적게는 안 함 */
+  function planCaps(slots, adj, o) {
+    const K = 4, idx = new Map(slots.map((x, i) => [x.t, i]));
+    const base = slots.map((x) => x.used + x.walk + (x.started ? 0 : o.walkAvg || 0));
+    const add = new Map(adj.map((t) => [idx.get(t), 0]).filter(([i]) => i != null));
+    const winSum = (st) => { let v = 0; for (let j = Math.max(0, st); j < Math.min(slots.length, st + K); j++) v += base[j] + (add.get(j) || 0); return v; };
+    const room = (i) => { let r = Infinity; for (let st = i - K + 1; st <= i; st++) r = Math.min(r, o.target - winSum(st)); return r; };
+    for (let guard = 0; guard < 200; guard++) {
+      let best = null, bv = -1;
+      for (const [i, x] of add) {
+        if (slots[i].mainUsed + x >= o.max || room(i) < 1) continue;
+        const v = (1 + slots[i].used) / (x + 1);
+        if (v > bv) { bv = v; best = i; }
+      }
+      if (best == null) break;
+      add.set(best, add.get(best) + 1);
+    }
+    return [...add].map(([i, x]) => ({ t: slots[i].t, product: slots[i].product, from: slots[i].cap, to: slots[i].mainUsed + x, used: slots[i].used, walk: slots[i].walk, open: x }));
+  }
+  const capMain = (name) => new RegExp(RULES.capAuto.product.replace(/\s+/g, "\\s*")).test(name || "");
+  /** 오늘 시간제 타임마다 { t, used(네이버 확정+완료 · 입장권 전부), mainUsed(조절할 상품), cap(조절할 상품의 회차당 수량), walk(현장), started } */
+  function capSlots(day) {
+    const list = bookings[day] || [];
+    return SLOTS.filter((t) => minutesFor(day, t) != null).map((t) => {
+      const ns = (naverSlots[day] || {})[t];
+      const used = ns ? ns.conf + ns.done : list.filter((b) => b.slot === t && (b.status === "확정" || b.status === "완료")).reduce((a, b) => a + b.qty, 0);
+      const raw = (naverRaw[day] || []).find((x) => toMin(x.time) === t && capMain(x.product));
+      const walk = day === TODAY ? walkins.filter((w) => w.slot === t).reduce((a, w) => a + (w.qty || Math.max(1, w.keys.length)), 0) : 0;
+      return { t, used, mainUsed: raw ? raw.conf + raw.done : used, cap: raw ? raw.cap : capDemo[t] ?? (ns ? ns.cap : RULES.slotCap), product: raw ? raw.product : "", walk, started: day === TODAY && t <= now };
+    });
+  }
+  /** 지금 계획: { skip } 또는 { rows, adj, changes, walkAvg } */
+  function capPlan() {
+    const A = RULES.capAuto;
+    if (!timedDay(TODAY)) return { skip: "오늘은 무제한인 날(비수기 평일)이라 조절하지 않아요" };
+    const slots = capSlots(TODAY);
+    const cur = Math.floor(now / 30) * 30;
+    const adj = slots.filter((x) => x.t > now && x.t <= cur + 30 * A.ahead).map((x) => x.t);
+    if (!adj.length) return { skip: "조절할 타임이 없어요 (시간제 타임이 끝남)" };
+    const recent = slots.filter((x) => x.started && x.t >= cur - 60);
+    const walkAvg = recent.length ? Math.round((recent.reduce((a, x) => a + x.walk, 0) / recent.length) * 10) / 10 : 0;
+    const plan = planCaps(slots, adj, { target: A.target, max: A.max, walkAvg });
+    // 이 타임으로 끝나는 4타임 묶음의 예상 손님 (계획대로 다 팔리면)
+    const occ = (x) => { const c = plan.find((y) => y.t === x.t); return x.used + x.walk + (x.started ? 0 : walkAvg) + (c ? c.to - x.mainUsed : 0); };
+    const win = (t) => { const i = slots.findIndex((x) => x.t === t); let v = 0; for (let j = Math.max(0, i - 3); j <= i; j++) v += occ(slots[j]); return Math.round(v); };
+    return { slots, adj, walkAvg, plan, win, changes: plan.filter((c) => c.to !== c.from) };
+  }
+  let capBusy = false, capLastAt = null, capMark = null;
+  const capLog = (() => { try { return JSON.parse(localStorage.getItem("astanakiz-caplog-" + TODAY)) || []; } catch (e) { return []; } })();
+  function capNote(x) { capLog.unshift(Object.assign({ at: hm(now) }, x)); capLog.length = Math.min(capLog.length, 60); try { localStorage.setItem("astanakiz-caplog-" + TODAY, JSON.stringify(capLog)); } catch (e) { /* 저장 못 해도 동작 */ } }
+  /** 한 번 조절: 네이버를 새로 읽고 → 계획 → 바뀌는 타임만 네이버에 넣음 (manual = 근무자가 누름) */
+  async function capRun(manual) {
+    if (capBusy) return;
+    if (!manual && (naverBusy || sheet.mode === "enter" || sheet.mode === "walk")) return "wait";
+    capBusy = true; if (sheet.mode === "settings") renderSheet();
+    try {
+      if (APP) { if (naverBusy) { toast("네이버를 불러오는 중이에요 — 잠시 뒤에 다시"); return "wait"; } await loadNaver(TODAY, false); if (naverErr && /로그인/.test(naverErr)) { capNote({ ok: false, why: naverErr }); return; } }
+      const p = capPlan();
+      capLastAt = now;
+      if (p.skip) { if (manual) toast(p.skip); return; }
+      if (!p.changes.length) { capNote({ ok: true, msg: `바꿀 것 없음 (${p.plan.map((c) => `${hm(c.t)} ${c.to}`).join(" · ")})` }); return; }
+      const done = [];
+      for (const c of p.changes) {
+        // 조절할 상품 칸을 못 찾았으면 손대지 않음 (다른 상품 칸을 바꾸지 않게)
+        if (APP && !c.product) { capNote({ t: hm(c.t), from: c.from, to: c.to, ok: false, why: `네이버에서 '${RULES.capAuto.product}' 상품 칸을 못 찾음` }); continue; }
+        const r = APP ? await window.desk.naver.setCap({ day: TODAY, product: c.product, time: hm(c.t), n: c.to }).catch((e) => ({ ok: false, why: String(e) })) : { ok: true, from: c.from, to: c.to };
+        capNote({ t: hm(c.t), from: c.from, to: c.to, ok: !!(r && r.ok), why: r && !r.ok ? r.why : "" });
+        if (r && r.ok) {
+          done.push(`${hm(c.t)} ${c.from}→${c.to}`);
+          const raw = (naverRaw[TODAY] || []).find((x) => toMin(x.time) === c.t && capMain(x.product));
+          if (raw) raw.cap = c.to; else capDemo[c.t] = c.to;
+          const ns = (naverSlots[TODAY] || {})[c.t]; if (ns) ns.cap += c.to - c.from;
+        }
+      }
+      const bad = p.changes.length - done.length;
+      toast(`네이버 판매 수량 조절${done.length ? `: ${done.join(" · ")}` : ""}${bad ? ` · 실패 ${bad}건 (운영 설정 → 수량 자동조절)` : ""}`);
+    } finally { capBusy = false; renderAll(); if (sheet.mode === "settings") renderSheet(); }
+  }
+  /** 매분: 켜져 있으면 10분마다 (실패 · 바쁨이면 다음 분에 다시) */
+  function capTick() {
+    const A = RULES.capAuto;
+    if (!A.on || !timedDay(TODAY)) return;
+    const mark = Math.floor(now / A.every) * A.every;
+    if (capMark === mark || now < toMin(RULES.naverAuto.from) || now > toMin(RULES.unlimitedFrom)) return;
+    capMark = mark; // 같은 10분에 두 번 안 돌게 — 바빠서 못 했으면 다음 분에 다시
+    capRun(false).then((r) => { if (r === "wait" && capMark === mark) capMark = null; });
+  }
+  function saveCapAuto() {
+    const v = Object.assign({}, RULES.capAuto);
+    if (APP && window.desk.config) window.desk.config.set({ capAuto: v });
+    else try { localStorage.setItem("astanakiz-capauto", JSON.stringify(v)); } catch (e) { /* 저장 못 해도 동작 */ }
+  }
+
   function refreshText() {
     if (naverBusy) return `네이버: ${naverStep || "불러오는 중…"}`;
     // 뒤에서 하는 네이버 이용완료가 실패한 예약이 있으면 계속 빨간 글로 (성공하면 사라짐)
@@ -997,7 +1108,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (fail.length) return `⚠ 네이버 이용완료 실패 ${fail.length}건: ${fail.map((b) => `${b.name} ${hm(b.slot)}`).join(", ")} — 2분마다 다시 · 안 되면 네이버에서 직접`;
     if (naverErr) return `⚠ ${naverErr}`;
     const nx = autoNext(now);
-    return [lastRefresh == null ? "" : `${hm(lastRefresh)} 불러옴`, nx == null ? "" : `다음 ${hm(nx)}`].filter(Boolean).join(" · ");
+    return [lastRefresh == null ? "" : `${hm(lastRefresh)} 불러옴`, nx == null ? "" : `다음 ${hm(nx)}`, RULES.capAuto.on && timedDay(TODAY) ? `수량조절 ${capBusy ? "중…" : capLastAt == null ? "켜짐" : hm(capLastAt)}` : ""].filter(Boolean).join(" · ");
   }
   /** 정해진 자동 시각이 지났는데 그 뒤로 오늘 예약을 안 불러왔으면 불러옴
       (팝업을 쓰는 중이면 닫을 때까지 기다림 · 실패하면 1분 뒤 다시 · PC가 잠깐 멈췄어도 놓치지 않음) */
@@ -1136,7 +1247,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     }
     if (sheet.mode === "settings") {
       const tab = sheet.tab || "rules";
-      const tabs = `<div class="tabs" role="tablist">${[["rules", "운영 규칙"], ["printer", "프린터"], ["link", "아마노 · POS"]].map(([k, t]) => `<button role="tab" class="${tab === k ? "on" : ""}" aria-selected="${tab === k}" data-act="setTab" data-t="${k}">${t}</button>`).join("")}</div>`;
+      const tabs = `<div class="tabs" role="tablist">${[["rules", "운영 규칙"], ["cap", "수량 자동조절"], ["printer", "프린터"], ["link", "아마노 · POS"]].map(([k, t]) => `<button role="tab" class="${tab === k ? "on" : ""}" aria-selected="${tab === k}" data-act="setTab" data-t="${k}">${t}</button>`).join("")}</div>`;
       if (tab === "rules") {
         const dateIn = (id, v) => `<input type="date" id="${id}" value="${v}" class="date-in">`;
         el.innerHTML = `
@@ -1152,6 +1263,28 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
             <li>초과요금: 1:50:01부터 카운트, 2:00:00 정각 5,000원 · 10분이 꽉 찰 때마다 5,000원 × 열쇠 수</li>
             <li>네이버 예약 자동 불러오기: ${RULES.naverAuto.from}부터 매시 ${RULES.naverAuto.at.join("분 · ")}분 (${RULES.naverAuto.until}까지) · 그 사이에 들어온 예약은 [새로고침]</li>
           </ul>
+          <div class="sheet-foot"><button class="btn btn-ink" data-act="close" data-autofocus>닫기</button></div>`;
+        return;
+      }
+      if (tab === "cap") {
+        const A = RULES.capAuto, p = capPlan();
+        const rows = p.skip ? "" : p.slots.filter((x) => x.t >= Math.floor(now / 30) * 30 - 90 && x.t <= Math.floor(now / 30) * 30 + 30 * A.ahead).map((x) => {
+          const c = p.plan.find((y) => y.t === x.t);
+          const w = p.win(x.t);
+          return `<tr class="${c ? "adj" : ""}"><td class="num">${hm(x.t)}${x.started ? "" : c ? " ●" : ""}</td><td class="num">${x.used}</td><td class="num">${x.walk}</td><td class="num">${x.cap}</td><td class="num">${c ? `<b>${c.to}</b>${c.to !== c.from ? ` <span class="${c.to > c.from ? "up" : "down"}">${c.to > c.from ? "▲" : "▼"}${Math.abs(c.to - c.from)}</span>` : ""}` : x.started ? "시작함" : "—"}</td><td class="num ${w > A.target ? "over" : ""}">${w}</td></tr>`;
+        }).join("");
+        el.innerHTML = `
+          <h3 id="sheet-title">운영 설정 <button class="x" data-act="close" aria-label="닫기">×</button></h3>${tabs}
+          <div class="field"><label class="chk"><input type="checkbox" id="cap-on" ${A.on ? "checked" : ""}> <b>10분마다 네이버 판매 수량 자동 조절</b> <span class="help">(시간제인 날: 성수기 · 휴일)</span></label>
+            <div class="help">2시간(4타임) 동안 안에 있는 손님(네이버 예약 + 현장입장)이 목표에 가깝게, 아직 시작 안 한 지금 · 앞 ${A.ahead}타임의 네이버 '회차당 수량'을 바꿔요. 인기 타임은 더, 비인기 타임은 덜 열어요.</div>
+            <div class="btns" style="align-items:center"><label class="help" for="cap-target">4타임 목표</label><input id="cap-target" type="number" min="30" max="50" value="${A.target}" class="cfg" style="width:76px">
+              <label class="help" for="cap-max">한 타임 최대</label><input id="cap-max" type="number" min="5" max="20" value="${A.max}" class="cfg" style="width:76px">
+              <button class="btn btn-sm btn-ink" data-act="capNow" ${capBusy ? "disabled" : ""}>${capBusy ? "조절 중…" : "지금 한 번 조절"}</button></div></div>
+          ${p.skip ? `<div class="banner">${esc(p.skip)}</div>` : `
+          <div class="help">지금 ${hm(now)} · 현장 추세 타임당 ${p.walkAvg}장 · ● = 이번에 바꿀 수 있는 타임 · 4타임 합 = 그 타임으로 끝나는 2시간 동안의 예상 손님</div>
+          <table class="captable"><tr><th>타임</th><th>네이버 예약</th><th>현장</th><th>지금 수량</th><th>계획</th><th>4타임 합</th></tr>${rows}</table>`}
+          <div class="field"><span class="label">기록 <span class="help">${capLastAt == null ? "아직 안 함" : `마지막 ${hm(capLastAt)}`}</span></span>
+            <div class="caplog">${capLog.length ? capLog.slice(0, 14).map((x) => `<div class="${x.ok ? "" : "bad"}"><span class="num">${esc(x.at)}</span> ${x.t ? `${esc(x.t)} ${x.from} → <b>${x.to}</b>${x.ok ? "" : ` 실패: ${esc(x.why || "")}`}` : esc(x.msg || x.why || "")}</div>`).join("") : `<span class="help">없음</span>`}</div></div>
           <div class="sheet-foot"><button class="btn btn-ink" data-act="close" data-autofocus>닫기</button></div>`;
         return;
       }
@@ -1282,8 +1415,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (APP && window.desk.config) window.desk.config.set({ peaks: v });
     else try { localStorage.setItem("astanakiz-peaks", JSON.stringify(v)); } catch (e) { /* 저장 못 해도 동작 */ }
   }
-  if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c && Array.isArray(c.peaks) && c.peaks.length) { RULES.peaks = c.peaks; renderAll(); } }).catch(() => {});
+  if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c && Array.isArray(c.peaks) && c.peaks.length) { RULES.peaks = c.peaks; renderAll(); } if (c && c.capAuto) Object.assign(RULES.capAuto, c.capAuto); }).catch(() => {});
   else try { const v = JSON.parse(localStorage.getItem("astanakiz-peaks")); if (Array.isArray(v) && v.length) RULES.peaks = v; } catch (e) { /* 없음 */ }
+  if (!APP) try { const v = JSON.parse(localStorage.getItem("astanakiz-capauto")); if (v) Object.assign(RULES.capAuto, v); } catch (e) { /* 없음 */ }
   const savePrint = () => { if (APP && window.desk.config) window.desk.config.set({ printer: PRINT.sel, printCut: PRINT.cut, printMode: PRINT.mode, comPort: PRINT.port, comBaud: PRINT.baud, printForm: { text: PRINT.forms.enter.text, auto: PRINT.forms.enter.auto, ver: ENTER_FORM_VER } }); };
   // 영수증 프린터처럼 보이는 이름 (처음 찾을 때 자동으로 고름)
   const RECEIPT_RE = /pos|receipt|영수증|감열|thermal|80|srp|bixolon|빅솔론|sewoo|세우|lk-|tm-|epson|rongta|xprinter|hwasung|화성|hmk|star|citizen|okpos/i;
@@ -1436,6 +1570,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       if (sec >= 60) { sec = 0; now++; renderAll(); }
     }
     autoLoad();
+    capTick();
     if (sheet.mode === "key" && $("pos").hidden) { const h = holderById(sheet.hid); const mt = $("meter"); if (h && mt) { const before = !!overInfo(h).due; mt.innerHTML = meterHtml(h); if (sec === 0 || (!!overInfo(h).due !== before)) renderSheet(); } }
   }, 1000);
 
@@ -1620,6 +1755,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       PRINT.msg = `프린터 ${PRINT.list.length}대 찾음${PRINT.sel ? ` · ${PRINT.sel} 고름` : " · 영수증 프린터를 직접 골라 주세요"}${APP ? "" : " (체험)"}`;
       savePrint(); renderSheet();
     },
+    capNow() { capRun(true); },
     addPeak() { const last = RULES.peaks[RULES.peaks.length - 1]; RULES.peaks.push({ from: last ? last.to : TODAY, to: last ? last.to : TODAY }); savePeaks(); renderSheet(); },
     delPeak(btn) { RULES.peaks.splice(Number(btn.dataset.i), 1); savePeaks(); renderSheet(); renderAll(); },
     printMode(btn) { PRINT.mode = btn.dataset.m; PRINT.msg = ""; savePrint(); renderSheet(); },
@@ -1703,6 +1839,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (t.id === "form-text") { PRINT.forms[PRINT.cur].text = t.value; $("paper").innerHTML = paperHtml(t.value, SAMPLE); savePrint(); }
     if (t.id === "form-auto") { PRINT.forms[PRINT.cur].auto = t.checked; savePrint(); }
     if (t.id === "print-cut") { PRINT.cut = t.checked; savePrint(); }
+    if (t.id === "cap-on") { RULES.capAuto.on = t.checked; capMark = null; saveCapAuto(); renderAll(); toast(t.checked ? "네이버 판매 수량 자동 조절을 켰어요 (10분마다)" : "자동 조절을 껐어요"); }
+    if ((t.id === "cap-target" || t.id === "cap-max") && t.value) { RULES.capAuto[t.id === "cap-target" ? "target" : "max"] = Math.max(1, Math.min(60, Number(t.value) || 0)); saveCapAuto(); }
     if (t.id === "com-baud") { PRINT.baud = Number(t.value); savePrint(); }
     if (t.id === "w-phone") { sheet.phone = walkPhone(t.value); t.value = walkFmt(sheet.phone); updateWalkButtons(); }
     const m = /^p(f|t)-(\d+)$/.exec(t.id);
@@ -1759,7 +1897,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   }
 
   // 시험용: 입장권을 만드는 함수들 (자동 시험이 실제 입장 손님으로 출력 내용을 확인)
-  window.__deskTest = { keyVals, receiptLines, escposParts, form: () => PRINT.forms.enter.text, holders: () => holders(), LINE_COLS };
+  document.addEventListener("change", (e) => { if (e.target.id === "cap-target" || e.target.id === "cap-max") renderSheet(); }); // 숫자를 다 넣으면 계획 다시
+  window.__deskTest = { planCaps, capPlan, capRun, capLog, capDemo, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => PRINT.forms.enter.text, holders: () => holders(), LINE_COLS };
 
   // ── 반납안내 커튼 ─────────────────────────────────
   (function curtain() {

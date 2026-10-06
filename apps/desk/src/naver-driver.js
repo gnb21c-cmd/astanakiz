@@ -12,10 +12,12 @@
    - 예약이 1건인 칸의 [확정]을 누르면 목록(탭 · 카드) 대신 오른쪽에 '예약 상세정보'가 바로 뜸 (현장 화면 10/6)
        상태 동그라미(확정) · 이름 · 처음 온 손님은 '완료 n' 대신 '신규예약' · 예약자/전화번호/예약번호/상품/이용일시/수량 · [예약취소] [이용완료] · 오른쪽 위 X
        → 상세정보도 카드 한 장으로 읽고, 칸의 이름표는 글자로 찾음
+   - 판매 수량 바꾸기 (현장 화면 10/6): 칸의 하늘색 [예약가능 n](예약이 있으면 [잔여예약 n]) → 오른쪽 '예약정보 · 예약가능 n · 예약가능 설정'
+       상품 · 적용날짜 · 적용회차(오전 10:00) · 수량(입력칸 '회차당 수량', 지금 수량이 들어 있음) · 예약현황 0 / 10 · [변경취소] [설정변경]
    - 이용완료는 두 단계 (현장 화면 10/6): 카드의 [이용완료] → 오른쪽이 '이용완료' 화면("이용완료 시 사용자에게 이용완료 알림이 발송됩니다.")으로 바뀜 → 맨 아래 초록 [이용완료]: window.confirm 이면 자동 확인, 화면 안 창이면 "하시겠습니까" 글자 옆 [확인] */
 
 function installNaverDriver() {
-  if (window.__naver && window.__naver.v === 8) return true;
+  if (window.__naver && window.__naver.v === 9) return true;
 
   const norm = (s) => String(s || "").replace(/\s+/g, "");
   const vis = (el) => !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== "hidden");
@@ -194,11 +196,34 @@ function installNaverDriver() {
     };
   };
 
+  // 예약가능 설정 창: '예약가능 설정' 글자에서 위로 올라가 입력칸과 [설정변경]을 품은 칸
+  const capPanel = () => {
+    const t = leafs(document).find((e) => norm(e.textContent) === "예약가능설정");
+    for (let p = t && t.parentElement; p && p !== document.body; p = p.parentElement) {
+      if (p.querySelector("input") && clickables(p).some((b) => textOf(b) === "설정변경")) return p;
+    }
+    return null;
+  };
+  // 수량 입력칸: placeholder '회차당 수량', 없으면 '수량' 이름표 옆 입력칸, 그래도 없으면 창 안의 첫 숫자 칸
+  const capInput = (panel) => {
+    const ins = $$("input", panel).filter((i) => vis(i) && !/^(hidden|checkbox|radio)$/.test(i.type));
+    const byPh = ins.find((i) => /수량/.test(i.placeholder || ""));
+    if (byPh) return byPh;
+    const lab = leafs(panel).find((e) => norm(e.textContent) === "수량");
+    if (lab) for (let p = lab.parentElement, k = 0; p && p !== panel && k < 4; p = p.parentElement, k++) { const i = ins.find((x) => p.contains(x)); if (i) return i; }
+    return ins[0] || null;
+  };
+  const capInfo = (panel) => {
+    const val = (label) => { const l = leafs(panel).find((e) => norm(e.textContent) === label); const v = l && (l.nextElementSibling || (l.parentElement && l.parentElement.nextElementSibling)); return v ? txt(v) : ""; };
+    const inp = capInput(panel);
+    return { open: true, product: val("상품"), date: val("적용날짜"), time: to24(val("적용회차")), qty: inp ? +inp.value || 0 : null };
+  };
+
   window.confirm = () => true;
   window.alert = () => {};
 
   window.__naver = {
-    v: 8,
+    v: 9,
     read() {
       const page = cls(document, "Calendar__inner-contents") ? "calendar" : $$('a[class*="contents-user"]').length || cls(document, "BookingListView__root") ? "list" : "";
       const total = (document.body.innerText.match(/(\d+)\s*건\s*내려받기/) || [])[1];
@@ -212,6 +237,7 @@ function installNaverDriver() {
         list: page === "list" ? readList() : [],
         slots: page === "calendar" ? readSlots() : [],
         cards: cards().map(readCard),
+        cap: (() => { const p = capPanel(); return p ? capInfo(p) : null; })(), // 예약가능 설정 창
         listTotal: total ? +total : null, // 예약 목록 위의 "124건"
         loading: $$('[class*="Loading__load_area"], .spinner').some(vis),
       };
@@ -266,6 +292,48 @@ function installNaverDriver() {
       if (!b) return { ok: false, why: `${time} 칸에 '${kind}' 버튼이 없음` };
       press(b);
       return { ok: true };
+    },
+    /** 칸의 하늘색 [예약가능] (예약이 있으면 [잔여예약]) 누르기 → 오른쪽에 예약가능 설정 창 */
+    openCap(product, time) {
+      const c = findSlotCell(product, time);
+      if (!c) return { ok: false, why: `네이버 예약현황에서 ${time} 칸을 못 찾음` };
+      const b = c.querySelector('button[title="예약가능"]') || c.querySelector('button[title="잔여예약"]');
+      if (!b) return { ok: false, why: `${time} 칸에 '예약가능' 버튼이 없음 (매진이면 네이버에서 직접)` };
+      press(b);
+      return { ok: true };
+    },
+    /** 예약가능 설정 창의 수량 칸에 n 넣기 (네이버 화면은 React → 값 넣는 함수로 넣고 input 알림) */
+    setCapQty(n) {
+      const p = capPanel();
+      if (!p) return { ok: false, why: "예약가능 설정 창이 안 열림" };
+      const inp = capInput(p);
+      if (!inp) return { ok: false, why: "수량 입력칸을 못 찾음" };
+      inp.focus();
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+      setter.call(inp, String(n));
+      inp.dispatchEvent(new Event("input", { bubbles: true }));
+      inp.dispatchEvent(new Event("change", { bubbles: true }));
+      inp.blur();
+      return { ok: true, value: inp.value };
+    },
+    /** [설정변경] */
+    saveCap() {
+      const p = capPanel();
+      const b = p && clickables(p).find((e) => textOf(e) === "설정변경");
+      if (!b) return { ok: false, why: "[설정변경] 버튼을 못 찾음" };
+      press(b);
+      return { ok: true };
+    },
+    /** 예약가능 설정 창 닫기: [변경취소], 없으면 X */
+    closeCap() {
+      const p = capPanel();
+      if (!p) return { ok: true, had: false };
+      let box = p;
+      for (let k = 0; k < 4 && box.parentElement && box.parentElement !== document.body; k++) box = box.parentElement;
+      const b = clickables(p).find((e) => textOf(e) === "변경취소") || clickables(box).find((e) => /닫기/.test(e.getAttribute("aria-label") || "") || /close/i.test(typeof e.className === "string" ? e.className : ""));
+      if (b) press(b);
+      else document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      return { ok: true, had: true };
     },
     /** 예약정보 탭: "확정" | "완료" */
     openTab(kind) {

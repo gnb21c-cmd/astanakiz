@@ -247,6 +247,75 @@ class NaverSync {
     await this.snap("이용완료 안 됨");
     return { ok: false, why: `네이버에서 이용완료로 바뀌지 않음${confirmed ? "" : " (확인 창을 못 찾음)"} — 바탕화면 '아스타나키즈-진단' 폴더의 사진을 보내 주세요` };
   }
+  /** 판매 수량(회차당 수량) 바꾸기: 예약현황 → 그 날짜 → 칸의 [예약가능]/[잔여예약] → 수량 n → [설정변경] → 확인 창 → 칸 숫자로 확인
+      c = { day, product, time, n } · 칸의 판매 수량 = 예약가능(잔여) + 확정 + 이용완료 + 신청 */
+  async setCap(c) {
+    let g = await this.goView("calendar");
+    if (!g.ok) return g;
+    g = await this.goDate(c.day);
+    if (!g.ok) return g;
+    const cellOf = (s) => s.slots.find((x) => x.time === c.time && (!c.product || x.product === c.product));
+    const capOf = (x) => x.avail + x.conf + x.done + x.apply;
+    const before = cellOf(g.state);
+    if (!before) return { ok: false, why: `네이버 예약현황에서 ${c.time} 칸을 못 찾음` };
+    const from = capOf(before);
+    if (from === c.n) return { ok: true, from, to: c.n, same: true };
+    if (c.n < before.conf + before.done + before.apply) return { ok: false, why: `${c.time} 이미 예약 ${before.conf + before.done + before.apply}장 — 그보다 적게는 못 줄임` };
+    // 열린 창 정리 → 칸의 [예약가능]
+    let s = await this.read();
+    if (s.cards.length) await this.act("window.__naver.closePanel()");
+    if ((await this.read()).cap) await this.act("window.__naver.closeCap()");
+    this.step(`네이버 ${c.time} 판매 수량 ${from} → ${c.n}`);
+    let r = await this.act(`window.__naver.openCap(${JSON.stringify(c.product || "")}, ${JSON.stringify(c.time)})`);
+    if (!r.ok) return r;
+    for (let i = 0; i < 24 && !(s = await this.read()).cap; i++) await sleep(250);
+    if (!s.cap) {
+      await this.snap("수량 창 안 열림");
+      return { ok: false, why: "네이버 '예약가능 설정' 창이 안 열림 — 바탕화면 '아스타나키즈-진단' 폴더의 사진을 보내 주세요" };
+    }
+    if (s.cap.time && s.cap.time !== c.time) {
+      await this.act("window.__naver.closeCap()");
+      return { ok: false, why: `다른 회차 창이 열림 (${s.cap.time})` };
+    }
+    r = await this.call(`window.__naver.setCapQty(${Number(c.n)})`);
+    if (!r || !r.ok) return r || { ok: false, why: "수량을 못 넣음" };
+    await sleep(200);
+    s = await this.read();
+    if (!s.cap || s.cap.qty !== c.n) {
+      await this.snap("수량 안 들어감");
+      await this.act("window.__naver.closeCap()");
+      return { ok: false, why: `수량 칸에 ${c.n}이 안 들어감` };
+    }
+    r = await this.act("window.__naver.saveCap()");
+    if (!r.ok) return r;
+    // "변경하시겠습니까?" 같은 확인 창이 뜨면 [확인] (안 뜨는 화면도 있음)
+    for (let i = 0; i < 10; i++) {
+      const k = await this.call("window.__naver.confirm()").catch(() => null);
+      if (k && k.clicked) {
+        await this.act("({ ok: true })");
+        break;
+      }
+      await sleep(200);
+    }
+    // 칸 숫자로 확인 — 안 바뀌어 보이면 예약현황을 다시 열어 한 번 더
+    for (let round = 0; round < 2; round++) {
+      for (let i = 0; i < 20; i++) {
+        const x = cellOf(await this.read());
+        if (x && capOf(x) === c.n) {
+          if ((await this.read()).cap) await this.act("window.__naver.closeCap()");
+          return { ok: true, from, to: c.n };
+        }
+        await sleep(300);
+      }
+      if (round === 0 && this.urls) {
+        await this.act(`window.__naver.go(${JSON.stringify(this.urls.calendar)})`);
+        const gg = await this.goDate(c.day);
+        if (!gg.ok) break;
+      }
+    }
+    await this.snap("수량 안 바뀜");
+    return { ok: false, why: `네이버 ${c.time} 판매 수량이 ${c.n}으로 안 바뀜 — 바탕화면 '아스타나키즈-진단' 폴더의 사진을 보내 주세요` };
+  }
   async snap(label) {
     try {
       if (this.onSnap) await this.onSnap(label);

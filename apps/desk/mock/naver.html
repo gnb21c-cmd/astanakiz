@@ -12,7 +12,9 @@
      &nocards=1 칸을 눌러도 카드가 안 나옴 (못 읽는 경우)
      &range=1 날짜가 기간으로 보임 (일간이 아닐 때)
      &compact=1 칸이 좁을 때처럼 시각에 오전·오후가 없음 ("1:00" = 13:00)
-     ?login=need 로그인 화면 -->
+     ?login=need 로그인 화면
+     예약가능 · 잔여예약 버튼 → 오른쪽 "예약정보 / 예약가능 n / 예약가능 설정": 상품 · 적용날짜 · 적용회차 · 수량(회차당 수량 입력칸) · 예약현황 n / n
+                     · [변경취소] [설정변경] → "변경하시겠습니까?" 창 [확인] → 그 칸의 판매 수량이 바뀜 (현장 화면 10/6) -->
 <style>
   body { margin: 0; font-family: "Malgun Gothic", sans-serif; font-size: 13px; }
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
@@ -57,6 +59,8 @@
   const D = new Date(day + "T12:00:00");
   const ampm = (t) => { let [h, m] = t.split(":").map(Number); return [h < 12 ? "오전" : "오후", `${h > 12 ? h - 12 : h}:${String(m).padStart(2, "0")}`]; };
   const list = db[day] || [];
+  db.caps = db.caps || {}; // "날짜|상품|시각" → 회차당 수량 (없으면 10)
+  const capOf = (p, t) => db.caps[`${day}|${p}|${t}`] ?? 10;
   const dateNav = (txt) => `<button type="button" class="DatePeriodCalendar__btn-date__TWrZb DatePeriodCalendar__prev__lUBcO" onclick="go({day:'${shift(day, -1)}',sel:''})"><span class="sr-only">이전</span>‹</button>
     <span class="DatePeriodCalendar__date__x1">${txt}</span>
     <button type="button" class="DatePeriodCalendar__btn-date__TWrZb DatePeriodCalendar__next__1Ox-q" onclick="go({day:'${shift(day, 1)}',sel:''})"><span class="sr-only">다음</span>›</button>`;
@@ -102,10 +106,23 @@
       const [ap, hm] = ampm(t);
       return `<div class="Calendar__week-cell__ntFou" title="예약 등록"><div class="Calendar__week-cell-inner__tqaOB Calendar__clickable__lL1Wp" data-p="${p}" data-t="${t}">
         <span class="btn btn-xs calendar-btn btn-trans">${P.get("compact") ? "" : `<span class="text">${ap}</span>`}<span class="time">${hm}</span></span>
-        ${conf || done ? btn("잔여예약", 10 - conf - done, "remaining") : btn("예약가능", 10, "avail")}${conf ? btn("확정", conf, "confirmed") : ""}${done ? btn("이용완료", done, "completed") : ""}</div></div>`;
+        ${conf || done ? btn("잔여예약", Math.max(0, capOf(p, t) - conf - done), "remaining") : btn("예약가능", capOf(p, t), "avail")}${conf ? btn("확정", conf, "confirmed") : ""}${done ? btn("이용완료", done, "completed") : ""}</div></div>`;
     };
     const sel = P.get("sel") ? JSON.parse(P.get("sel")) : null; // { p, t, s: "확정"|"완료" }
+    const capSel = P.get("cap") ? JSON.parse(P.get("cap")) : null; // { p, t } 예약가능 설정
     let panel = "";
+    if (capSel) {
+      const bs = list.filter((b) => b.product === capSel.p && b.time === capSel.t && b.status !== "취소");
+      const used = bs.reduce((a, b) => a + b.qty, 0), cap = capOf(capSel.p, capSel.t);
+      const [ap, hm] = ampm(capSel.t);
+      panel = `<section class="SettingPanel__root__q2"><div><b>예약정보</b> <button type="button" class="btn_close" aria-label="닫기" onclick="go({cap:''})">×</button></div>
+        <div class="tab">예약가능 ${cap - used}</div>
+        <h3>예약가능 설정</h3>
+        <dl><dt>상품</dt><dd>${PRODUCTS[capSel.p]}</dd><dt>적용날짜</dt><dd>${D.getFullYear()}. ${D.getMonth() + 1}. ${D.getDate()}. (${DOW[D.getDay()]})</dd><dt>적용회차</dt><dd>${ap} ${hm}</dd>
+        <dt><span>수량</span></dt><dd><input type="text" class="Input__input__x1" placeholder="회차당 수량" value="${cap}" id="cap-qty"></dd>
+        <dt>예약현황</dt><dd>${used} / ${cap}</dd></dl>
+        <button type="button" onclick="go({cap:''})">변경취소</button><button type="button" class="green" id="cap-save">설정변경</button></section>`;
+    }
     if (sel) {
       const bs = list.filter((b) => b.product === sel.p && b.time === sel.t);
       const n = (s) => bs.filter((b) => b.status === s).length;
@@ -143,8 +160,19 @@
     if (wrapEl) wrapEl.addEventListener("scroll", () => {
       if (wrapEl.scrollTop + wrapEl.clientHeight >= wrapEl.scrollHeight - 30) setTimeout(() => [...wrapEl.querySelectorAll("[hidden]")].slice(0, 2).forEach((c) => (c.hidden = false)), 150);
     });
+    const capSave = document.getElementById("cap-save");
+    if (capSave) capSave.onclick = () => {
+      const n = +document.getElementById("cap-qty").value;
+      const layer = document.createElement("div");
+      layer.className = "layer";
+      layer.innerHTML = `<p>회차당 수량을 ${n}(으)로 변경하시겠습니까?</p><button type="button" id="cap-cancel">취소</button><button type="button" id="cap-ok">확인</button>`;
+      document.body.appendChild(layer);
+      layer.querySelector("#cap-cancel").onclick = () => layer.remove();
+      layer.querySelector("#cap-ok").onclick = () => { db.caps[`${day}|${capSel.p}|${capSel.t}`] = n; save(); layer.remove(); setTimeout(() => go({ cap: "" }), 200); };
+    };
     document.addEventListener("click", (e) => {
       const b = e.target.closest("button[data-act]");
+      if (b && (b.dataset.act === "예약가능" || b.dataset.act === "잔여예약")) { const c = b.closest("[data-p]"); setTimeout(() => go({ sel: "", cap: JSON.stringify({ p: +c.dataset.p, t: c.dataset.t }) }), 150); return; }
       if (b && (b.dataset.act === "확정" || b.dataset.act === "이용완료")) { const c = b.closest("[data-p]"); setTimeout(() => go({ sel: JSON.stringify({ p: +c.dataset.p, t: c.dataset.t, s: b.dataset.act === "확정" ? "확정" : "완료" }) }), 150); return; }
       const tab = e.target.closest("[data-tab]");
       if (tab) { e.preventDefault(); setTimeout(() => go({ sel: JSON.stringify(Object.assign(sel, { s: tab.dataset.tab })) }), 150); return; }
