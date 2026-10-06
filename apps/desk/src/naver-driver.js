@@ -15,7 +15,7 @@
    - 이용완료는 두 단계 (현장 화면 10/6): 카드의 [이용완료] → 오른쪽이 '이용완료' 화면("이용완료 시 사용자에게 이용완료 알림이 발송됩니다.")으로 바뀜 → 맨 아래 초록 [이용완료]: window.confirm 이면 자동 확인, 화면 안 창이면 "하시겠습니까" 글자 옆 [확인] */
 
 function installNaverDriver() {
-  if (window.__naver && window.__naver.v === 7) return true;
+  if (window.__naver && window.__naver.v === 8) return true;
 
   const norm = (s) => String(s || "").replace(/\s+/g, "");
   const vis = (el) => !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== "hidden");
@@ -157,11 +157,15 @@ function installNaverDriver() {
   const visitsOf = (c) => {
     const m = txt(c.querySelector(".text-info-sub")).match(/완료\s*(\d+)(?:\s*,\s*취소\s*(\d+))?/);
     if (m) return [+m[1], m[2] ? +m[2] : 0];
-    for (const e of leafs(c)) {
+    // 상세정보는 "완료 2 >" · "신규예약 >" 처럼 글자 옆에 화살표 그림이 붙은 링크 → 그 요소의 자기 글자만 봄 (현장 10/6: 못 읽어 방문 횟수가 빠졌음)
+    const own = (e) => [...e.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join("").trim().replace(/\s+/g, " ");
+    for (const e of [...c.querySelectorAll("*")].filter(vis)) {
       if (e.closest("button")) continue;
-      const k = txt(e).match(/^완료\s*(\d+)(?:\s*[,·]\s*취소\s*(\d+))?/);
+      const t = own(e) || (!e.children.length ? txt(e) : "");
+      if (!t) continue;
+      const k = t.match(/^완료\s*(\d+)(?:\s*[,·]\s*취소\s*(\d+))?/);
       if (k) return [+k[1], k[2] ? +k[2] : 0];
-      if (/^신규예약/.test(norm(e.textContent))) return [0, 0];
+      if (/^신규예약/.test(norm(t))) return [0, 0];
     }
     return [null, 0];
   };
@@ -194,7 +198,7 @@ function installNaverDriver() {
   window.alert = () => {};
 
   window.__naver = {
-    v: 7,
+    v: 8,
     read() {
       const page = cls(document, "Calendar__inner-contents") ? "calendar" : $$('a[class*="contents-user"]').length || cls(document, "BookingListView__root") ? "list" : "";
       const total = (document.body.innerText.match(/(\d+)\s*건\s*내려받기/) || [])[1];

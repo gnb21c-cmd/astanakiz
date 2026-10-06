@@ -114,7 +114,7 @@
       if (shown.length === 1) {
         const b = shown[0]; const [ap, hm] = ampm(b.time);
         panel = `<section class="BookingDetail__root__x9"><div class="BookingDetail__head"><h2>예약 상세정보</h2><button type="button" class="btn_close" onclick="go({sel:''})"><svg width="10" height="10"></svg></button></div>
-          <div class="BookingDetail__user"><span class="badge">${b.status}</span><strong>${b.name}</strong><a href="#">${b.done ? `완료 ${b.done}${b.cancel ? `, 취소 ${b.cancel}` : ""}` : "신규예약"}</a></div>
+          <div class="BookingDetail__user"><span class="badge">${b.status}</span><strong>${b.name}</strong><a href="#">${b.done ? `완료 ${b.done}${b.cancel ? `, 취소 ${b.cancel}` : ""}` : "신규예약"}<svg width="6" height="10" aria-hidden="true"></svg></a></div>
           <dl><dt>예약자</dt><dd>${b.name}</dd><dt>전화번호</dt><dd>${b.phone}</dd><dt>예약번호</dt><dd>${b.no}</dd><dt>예약유형</dt><dd>일반</dd></dl>
           <h3>예약내역</h3><dl><dt>상품</dt><dd>${PRODUCTS[b.product]}</dd><dt>이용일시</dt><dd>${D.getFullYear()}. ${D.getMonth() + 1}. ${D.getDate()}.(${DOW[D.getDay()]}) ${ap} ${hm}</dd><dt>수량</dt><dd>[평일할인] 4인 입장권 ${b.qty}</dd><dt>유입경로</dt><dd>네이버 지도</dd></dl>
           ${b.status === "확정" ? `<button type="button">예약취소</button><button type="button" data-complete="${b.no}">이용완료</button>` : ""}</section>`;

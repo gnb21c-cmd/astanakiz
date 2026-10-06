@@ -205,7 +205,9 @@ class NaverSync {
     if (!r.ok) return r;
     // 카드가 아래에 있으면 목록을 내려 가며 찾음
     for (let i = 0; i < 30 && !(await this.read()).cards.some((c) => c.no === b.no); i++) if (!(await this.moreCards())) break;
-    if (!(await this.read()).cards.some((c) => c.no === b.no)) return { ok: false, why: `네이버 예약정보에서 예약번호 ${b.no} 카드를 못 찾음` };
+    const card = (await this.read()).cards.find((c) => c.no === b.no);
+    if (!card) return { ok: false, why: `네이버 예약정보에서 예약번호 ${b.no} 카드를 못 찾음` };
+    const visit = { doneCount: card.doneCount, cancelCount: card.cancelCount }; // 누르기 전 '완료 n' (방문 횟수를 몰랐을 때 채움)
     this.step("네이버 [이용완료] 누름");
     r = await this.act(`window.__naver.complete(${JSON.stringify(b.no)})`);
     if (!r.ok) return r;
@@ -226,7 +228,7 @@ class NaverSync {
     for (let round = 0; round < 2; round++) {
       for (let i = 0; i < 20; i++) {
         const s = await this.read();
-        if (changed(s)) return { ok: true, slot: cellOf(s) };
+        if (changed(s)) return { ok: true, slot: cellOf(s), ...visit };
         if (!before) break;
         await sleep(300);
       }
@@ -238,7 +240,7 @@ class NaverSync {
           // 칸 숫자를 못 읽었으면 카드로 확인: 확정 칸에 아직 [이용완료] 단추가 있으면 실패
           const o = await this.openSlot(b.product || "", b.time, "확정");
           const still = o.ok && (await this.read()).cards.some((c) => c.no === b.no && (c.canComplete || c.status === "확정"));
-          return still ? { ok: false, why: "네이버에서 이용완료로 바뀌지 않음" } : { ok: true };
+          return still ? { ok: false, why: "네이버에서 이용완료로 바뀌지 않음" } : { ok: true, ...visit };
         }
       }
     }

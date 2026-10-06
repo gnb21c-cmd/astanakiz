@@ -598,8 +598,16 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         x.naverBusy = true; renderAll();
         const r = await window.desk.naver.complete({ day: x.day, no: x.no, time: hm(x.slot), product: x.naverProduct || "" }).catch((e) => ({ ok: false, why: String(e) }));
         x.naverBusy = false;
-        if (r && r.ok) { x.naverPending = false; x.naverWhy = ""; toast(`${x.name}님 네이버 이용완료 됨`); }
-        else { x.naverWhy = (r && r.why) || "응답 없음"; toast(`${x.name}님 네이버 이용완료 실패: ${x.naverWhy} — 2분 뒤 다시 해요`); }
+        if (r && r.ok) {
+          x.naverPending = false; x.naverWhy = "";
+          // 방문 횟수를 몰랐으면 이용완료 때 카드에서 읽은 '완료 n'으로 채움
+          if (x.prevDone == null && r.doneCount != null) { x.prevDone = r.doneCount; x.visitNo = r.doneCount + 1; if (r.cancelCount != null) x.cancels = r.cancelCount; }
+          toast(`${x.name}님 네이버 이용완료 됨${x.visitNo ? ` · ${x.visitNo}번째 방문` : ""}${x.printWaiting ? printForm("enter", keyVals(x)) : ""}`);
+        } else {
+          x.naverWhy = (r && r.why) || "응답 없음";
+          toast(`${x.name}님 네이버 이용완료 실패: ${x.naverWhy} — 2분 뒤 다시 해요${x.printWaiting ? ` · 입장권은 방문 횟수 없이 출력${printForm("enter", keyVals(x))}` : ""}`);
+        }
+        x.printWaiting = false;
         renderAll();
       }
     } finally { flushing = false; }
@@ -1392,7 +1400,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       }
       closeSheet();
       if (APP) setTimeout(naverFlush, 0); // 네이버 이용완료는 뒤에서
-      toast(`${b.name}님 입장 · 열쇠 ${b.keys.join(", ")}번${APP ? " · 네이버 이용완료는 뒤에서 처리 중" : " · 네이버 이용완료"}${isGift(b.visitNo) ? ` · ${b.visitNo}번째 방문, ${RULES.giftName}을 드리세요` : ""}${printForm("enter", keyVals(b))}`);
+      // 방문 횟수를 아직 모르면(네이버 카드에서 못 읽음) 입장권은 뒤에서 네이버 이용완료 때 '완료 n'을 읽은 뒤 출력
+      const waitVisit = APP && b.prevDone == null && PRINT.forms.enter.auto;
+      if (waitVisit) b.printWaiting = true;
+      toast(`${b.name}님 입장 · 열쇠 ${b.keys.join(", ")}번${APP ? " · 네이버 이용완료는 뒤에서 처리 중" : " · 네이버 이용완료"}${isGift(b.visitNo) ? ` · ${b.visitNo}번째 방문, ${RULES.giftName}을 드리세요` : ""}${waitVisit ? " · 입장권은 방문 횟수를 확인한 뒤 출력" : printForm("enter", keyVals(b))}`);
       renderAll();
     },
     qty(btn) {
