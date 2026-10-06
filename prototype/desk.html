@@ -74,6 +74,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .top .tag { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .top h1 { margin: 0; font-size: 16px; font-weight: 700; white-space: nowrap; }
 .top .tag { font-size: 11.5px; color: var(--muted); }
+.top .posgo { border: 2px solid var(--accent); color: var(--accent); font-weight: 800; padding: 4px 14px; }
 .top .spacer { flex: 1; }
 .top .now { font-size: 22px; font-weight: 700; }
 .top .sold { font-size: 14px; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
@@ -314,7 +315,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 <div class="app">
   <header class="top">
     <h1>아스타나키즈 입장 데스크</h1>
-    <span class="tag">체험판 · 예시 데이터 · 네이버·POS·아마노는 실제로 연결되지 않음</span>
+    <span class="tag" title="체험판 · 예시 데이터 · 네이버·POS·아마노는 실제로 연결되지 않음">체험판</span>
+    <button class="btn btn-sm posgo" data-act="posGo">POS로 이동</button>
     <span class="spacer"></span>
     <span class="sold" id="sold" aria-live="polite"></span>
     <span class="now num" id="now">13:50</span>
@@ -1548,6 +1550,15 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const p = $("w-phone"); if (p) p.value = walkFmt(sheet.phone);
       updateWalkButtons();
     },
+    // 맨 위 'POS로 이동': 결제와 상관없이 POS 화면으로 (POS를 최소화하면 데스크로 돌아옴)
+    async posGo() {
+      if (window.desk && window.desk.pos) {
+        const r = await window.desk.pos.show();
+        if (!r || !r.ok) toast((r && r.why) || "POS 창을 찾지 못함");
+        return;
+      }
+      $("pos-amt").textContent = "POS 화면"; $("pos").hidden = false; // 체험판: 가짜 POS 화면
+    },
     pay() { sheet.paid = true; $("pos-amt").textContent = `현장입장 ${sheet.keys.length}장`; goPos(); },
     payOver() {
       const h = holderById(sheet.hid); const o = overInfo(h); if (!o.due) return;
@@ -1742,8 +1753,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     // 자정이 지나 날짜가 바뀌면 새 날로 다시 열기 (열쇠·입장 기록은 날짜별로 저장돼 있음). 팝업을 쓰는 중이면 닫은 뒤
     setInterval(() => { if (localKey(new Date()) !== TODAY && !sheet.mode) location.reload(); }, 30 * 1000);
     document.querySelectorAll("[data-act=time]").forEach((b) => (b.hidden = true));
-    document.querySelector(".top .tag").textContent = "네이버 · 아마노 · POS 연결";
-    if (window.desk.config) window.desk.config.get().then((c) => { if (c && c.build) document.querySelector(".top .tag").textContent = `네이버 · 아마노 · POS 연결 ver.${c.build}`; }).catch(() => {});
+    document.querySelector(".top .tag").textContent = "";
+    document.querySelector(".top .tag").title = "";
+    if (window.desk.config) window.desk.config.get().then((c) => { if (c && c.build) document.querySelector(".top .tag").textContent = `ver.${c.build}`; }).catch(() => {});
   }
 
   // 시험용: 입장권을 만드는 함수들 (자동 시험이 실제 입장 손님으로 출력 내용을 확인)
