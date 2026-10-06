@@ -1109,7 +1109,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (!timedDay(TODAY)) return { skip: "오늘은 비수기 평일(무제한)이라 조절하지 않아요" };
     const slots = capSlots(TODAY);
     const cur = Math.floor(now / 30) * 30;
-    const adj = slots.filter((x) => x.t > now && x.t <= cur + 30 * A.ahead).map((x) => x.t);
+    // 영업 전(새벽 · 아침)이면 그날 첫 타임들을 (현장 10/7: 새벽 2시에 눌렀더니 조절할 타임이 없었음)
+    const first = slots.find((x) => x.t > now);
+    const upTo = first && first.t > cur + 30 ? first.t - 30 + 30 * A.ahead : cur + 30 * A.ahead;
+    const adj = slots.filter((x) => x.t > now && x.t <= upTo).map((x) => x.t);
     if (!adj.length) return { skip: "조절할 타임이 없어요 (시간제 타임이 끝남)" };
     const recent = slots.filter((x) => x.started && x.t >= cur - 60);
     const walkAvg = recent.length ? recent.reduce((a, x) => a + x.walk, 0) / recent.length : 0;
@@ -1120,6 +1123,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     const win = (t) => { const i = slots.findIndex((x) => x.t === t); let v = 0; for (let j = Math.max(0, i - 3); j <= i; j++) v += occ(slots[j]); return Math.round(v); };
     return { slots, adj, walkAvg: Math.round(walkAvg * 10) / 10, plan, win, changes: plan.filter((c) => c.to !== c.from) };
   }
+  const capTry = { day: shiftDay(TODAY, 7), time: "10:00", n: 11 }; // 한 칸 시험 (기본: 다음 주 같은 요일 10:00)
   let capBusy = false, capLastAt = null, capMark = null, capFails = 0, capPauseUntil = -1;
   const capLog = (() => { try { return JSON.parse(localStorage.getItem("astanakiz-caplog-" + TODAY)) || []; } catch (e) { return []; } })();
   function capNote(x) { capLog.unshift(Object.assign({ at: hm(now) }, x)); capLog.length = Math.min(capLog.length, 60); try { localStorage.setItem("astanakiz-caplog-" + TODAY, JSON.stringify(capLog)); } catch (e) { /* 저장 못 해도 동작 */ } }
@@ -1354,6 +1358,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           ${p.skip ? `<div class="banner">${esc(p.skip)}</div>` : `
           <div class="help">지금 ${hm(now)} · ● = 이번에 바꿀 타임 · 예약 (예상 수요: 예약 속도 + 과거 같은 날 실제) · 현장 +예상 · <b>최악 4타임 합</b> = 그 타임으로 끝나는 2시간에 열린 수량이 다 팔리고 현장도 예상만큼 올 때 — 상한 ${A.ceiling}을 넘지 않게 계산해요</div>
           <table class="captable"><tr><th>타임</th><th>네이버 예약</th><th>현장</th><th>지금 수량</th><th>계획</th><th>최악 4타임 합</th></tr>${rows}</table>`}
+          <div class="field"><span class="label">한 칸 시험 <span class="help">네이버 수량을 실제로 바꿀 수 있는지 — 손님 영향이 없는 먼 날짜로 해 보고, 끝나면 원래 수량으로 되돌리세요</span></span>
+            <div class="btns" style="align-items:center"><input type="date" id="cap-t-day" value="${esc(capTry.day)}" class="date-in">
+              <select id="cap-t-time" class="cfg" style="width:96px">${SLOTS.map((t) => `<option ${hm(t) === capTry.time ? "selected" : ""}>${hm(t)}</option>`).join("")}</select>
+              <input id="cap-t-n" type="number" min="0" max="30" value="${capTry.n}" class="cfg" style="width:70px"><span class="help">장으로</span>
+              <button class="btn btn-sm" data-act="capTry" ${capBusy || !APP ? "disabled" : ""}>${capBusy ? "넣는 중…" : "네이버에 넣기"}</button></div>
+            ${APP ? "" : `<span class="help">체험판에서는 네이버가 없어 시험할 수 없어요</span>`}</div>
           <div class="field"><span class="label">기록 <span class="help">${capLastAt == null ? "아직 안 함" : `마지막 ${hm(capLastAt)}`}</span></span>
             <div class="caplog">${capLog.length ? capLog.slice(0, 14).map((x) => `<div class="${x.ok ? "" : "bad"}"><span class="num">${esc(x.at)}</span> ${x.t ? `${esc(x.t)} ${x.from} → <b>${x.to}</b>${x.ok ? "" : ` 실패: ${esc(x.why || "")}`}` : esc(x.msg || x.why || "")}</div>`).join("") : `<span class="help">없음</span>`}</div></div>
           <div class="sheet-foot"><button class="btn btn-ink" data-act="close" data-autofocus>닫기</button></div>`;
@@ -1827,6 +1837,18 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       savePrint(); renderSheet();
     },
     capNow() { capRun(true); },
+    // 한 칸 시험: 고른 날짜 · 타임의 회차당 수량을 그대로 넣어 봄 (계산 없이)
+    async capTry() {
+      if (!APP || capBusy) return;
+      const prod = Object.values(naverRaw).flat().find((x) => capMain(x.product));
+      if (!prod) { toast("네이버를 먼저 불러와 주세요 (새로고침)"); return; }
+      capBusy = true; renderSheet();
+      const r = await window.desk.naver.setCap({ day: capTry.day, product: prod.product, time: capTry.time, n: capTry.n }).catch((e) => ({ ok: false, why: String(e) }));
+      capBusy = false;
+      capNote({ t: `시험 ${capTry.day.slice(5)} ${capTry.time}`, from: r && r.from != null ? r.from : "?", to: capTry.n, ok: !!(r && r.ok), why: r && !r.ok ? r.why : "" });
+      toast(r && r.ok ? (r.same ? `이미 ${capTry.n}장이에요` : `네이버 ${capTry.day.slice(5)} ${capTry.time} 수량 ${r.from} → ${r.to} 바뀜 — 네이버 화면에서 확인해 보세요`) : `실패: ${(r && r.why) || "응답 없음"}`);
+      renderSheet();
+    },
     addPeak() { const last = RULES.peaks[RULES.peaks.length - 1]; RULES.peaks.push({ from: last ? last.to : TODAY, to: last ? last.to : TODAY }); savePeaks(); renderSheet(); },
     delPeak(btn) { RULES.peaks.splice(Number(btn.dataset.i), 1); savePeaks(); renderSheet(); renderAll(); },
     printMode(btn) { PRINT.mode = btn.dataset.m; PRINT.msg = ""; savePrint(); renderSheet(); },
@@ -1910,6 +1932,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (t.id === "form-text") { PRINT.forms[PRINT.cur].text = t.value; $("paper").innerHTML = paperHtml(t.value, SAMPLE); savePrint(); }
     if (t.id === "form-auto") { PRINT.forms[PRINT.cur].auto = t.checked; savePrint(); }
     if (t.id === "print-cut") { PRINT.cut = t.checked; savePrint(); }
+    if (t.id === "cap-t-day" && t.value) capTry.day = t.value;
+    if (t.id === "cap-t-time") capTry.time = t.value;
+    if (t.id === "cap-t-n" && t.value !== "") capTry.n = Math.max(0, Number(t.value) || 0);
     if (t.id === "cap-on") { RULES.capAuto.on = t.checked; capMark = null; saveCapAuto(); renderAll(); toast(t.checked ? "네이버 판매 수량 자동 조절을 켰어요 (10분마다)" : "자동 조절을 껐어요"); }
     if ((t.id === "cap-target" || t.id === "cap-max" || t.id === "cap-ceil") && t.value) { RULES.capAuto[{ "cap-target": "target", "cap-max": "max", "cap-ceil": "ceiling" }[t.id]] = Math.max(1, Math.min(60, Number(t.value) || 0)); saveCapAuto(); }
     if (t.id === "com-baud") { PRINT.baud = Number(t.value); savePrint(); }

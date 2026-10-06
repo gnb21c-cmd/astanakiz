@@ -136,6 +136,22 @@ test("데스크 [지금 한 번 조절] → 네이버 칸의 회차당 수량이
     // 데스크 시간표 잔여도 바로 반영 (14:00: 수량 − 확정 4)
     const c14 = await desk.$$eval('.slot[data-s="840"] .c', (e) => e.map((x) => x.textContent.trim()));
     assert.deepStrictEqual(c14, ["0", "4", String(capAt("14:00") - 4)]);
+
+    // 한 칸 시험: 운영 설정 → 수량 자동조절 → 다음 날 10:30 을 12장으로
+    await desk.click("text=운영 설정"); await desk.click('[data-t="cap"]');
+    await desk.fill("#cap-t-day", "2026-10-06");
+    await desk.selectOption("#cap-t-time", "10:30");
+    await desk.fill("#cap-t-n", "12");
+    await desk.click("[data-act=capTry]");
+    await desk.waitForFunction(() => window.__deskTest.capLog.some((x) => /시험/.test(x.t || "")), null, { timeout: 30000 });
+    const tl = await desk.evaluate(() => window.__deskTest.capLog.find((x) => /시험/.test(x.t || "")));
+    assert.ok(tl.ok, JSON.stringify(tl));
+    const s6 = (await naver.loadDay("2026-10-06")).slots.find((x) => x.time === "10:30" && /1시간 50분/.test(x.product));
+    assert.strictEqual(s6.cap, 12, "다음 날 10:30 이 12장으로");
+
+    // 새벽(02:27)에 눌러도 그날 첫 3타임을 조절 (현장 10/7)
+    const adj = await desk.evaluate(() => { window.__deskTest.setNow(147); return window.__deskTest.capPlan().adj; });
+    assert.deepStrictEqual(adj, [600, 630, 660]);
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();
