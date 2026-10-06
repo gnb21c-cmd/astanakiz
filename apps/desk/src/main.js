@@ -119,6 +119,8 @@ function openNaver() {
   naver = new NaverSync((code) => timed(naverWin.webContents.executeJavaScript(code, true), 8000, "네이버 화면이 응답하지 않음"), {
     urls: naverUrls(settings.naverUrl),
     onStep: (msg) => deskWin && !deskWin.isDestroyed() && deskWin.webContents.send("naver:step", msg),
+    // 이용완료 때 네이버 화면을 남김 (확인 창 모양 확인용 · 늘 같은 이름으로 덮어씀)
+    onSnap: (label) => dumpNaver(label === "이용완료 안 됨" ? "naver-complete-fail" : "naver-complete-last"),
   });
 }
 
@@ -204,22 +206,26 @@ ipcMain.handle("naver:show", () => {
 });
 // 진단: 지금 네이버 창의 화면(HTML)과 사진을 바탕화면 '아스타나키즈-진단' 폴더에 저장 → 개발자에게 보내 화면 구조를 맞춤
 // (예약자 이름 · 전화번호가 들어 있으니 개발 확인용으로만)
+async function dumpNaver(name) {
+  if (!naverWin) throw new Error("네이버 창이 없음");
+  const dir = path.join(app.getPath("desktop"), "아스타나키즈-진단");
+  fs.mkdirSync(dir, { recursive: true });
+  const wc = naverWin.webContents;
+  const frames = (wc.mainFrame ? wc.mainFrame.framesInSubtree : []).map((f) => f.url);
+  const html = await timed(wc.executeJavaScript("document.documentElement.outerHTML", true), 8000, "네이버 화면이 응답하지 않음");
+  const head = `<!-- 주소: ${wc.getURL()}\n액자: ${frames.join(" | ")}\n버전: ver.${BUILD} ${SHA} · ${new Date().toLocaleString("ko-KR")} -->\n`;
+  fs.writeFileSync(path.join(dir, `${name}.html`), head + html);
+  const img = await wc.capturePage();
+  fs.writeFileSync(path.join(dir, `${name}.png`), img.toPNG());
+  return path.join(dir, `${name}.html`);
+}
 ipcMain.handle("naver:dump", async () => {
   try {
-    if (!naverWin) return { ok: false, why: "네이버 창이 없음" };
-    const dir = path.join(app.getPath("desktop"), "아스타나키즈-진단");
-    fs.mkdirSync(dir, { recursive: true });
     const d = new Date();
     const stamp = `${d.getMonth() + 1}${String(d.getDate()).padStart(2, "0")}-${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}${String(d.getSeconds()).padStart(2, "0")}`;
-    const wc = naverWin.webContents;
-    const frames = (wc.mainFrame ? wc.mainFrame.framesInSubtree : []).map((f) => f.url);
-    const html = await timed(wc.executeJavaScript("document.documentElement.outerHTML", true), 8000, "네이버 화면이 응답하지 않음");
-    const head = `<!-- 주소: ${wc.getURL()}\n액자: ${frames.join(" | ")}\n버전: ver.${BUILD} ${SHA} -->\n`;
-    fs.writeFileSync(path.join(dir, `naver-${stamp}.html`), head + html);
-    const img = await naverWin.webContents.capturePage();
-    fs.writeFileSync(path.join(dir, `naver-${stamp}.png`), img.toPNG());
-    shell.showItemInFolder(path.join(dir, `naver-${stamp}.html`));
-    return { ok: true, dir };
+    const file = await dumpNaver(`naver-${stamp}`);
+    shell.showItemInFolder(file);
+    return { ok: true, dir: path.dirname(file) };
   } catch (e) {
     return { ok: false, why: String(e.message || e) };
   }

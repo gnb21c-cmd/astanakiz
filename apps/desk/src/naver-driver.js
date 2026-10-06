@@ -15,7 +15,7 @@
    - 이용완료 확인 창 모양은 아직 모름: window.confirm 이면 자동 확인, 화면 안 창이면 "하시겠습니까" 글자 옆 [확인] */
 
 function installNaverDriver() {
-  if (window.__naver && window.__naver.v === 5) return true;
+  if (window.__naver && window.__naver.v === 6) return true;
 
   const norm = (s) => String(s || "").replace(/\s+/g, "");
   const vis = (el) => !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== "hidden");
@@ -194,7 +194,7 @@ function installNaverDriver() {
   window.alert = () => {};
 
   window.__naver = {
-    v: 5,
+    v: 6,
     read() {
       const page = cls(document, "Calendar__inner-contents") ? "calendar" : $$('a[class*="contents-user"]').length || cls(document, "BookingListView__root") ? "list" : "";
       const total = (document.body.innerText.match(/(\d+)\s*건\s*내려받기/) || [])[1];
@@ -280,16 +280,22 @@ function installNaverDriver() {
       window.__naver.confirm();
       return { ok: true };
     },
-    /** 확인 창이 떠 있으면 [확인] — "…하시겠습니까?" 가 든 칸의 확인 · OK · 이용완료 단추 */
+    /** 확인 창이 떠 있으면 [확인]: 창(dialog · modal · layer · popup · alert) 안의 확인 · OK · 예 · 이용완료 단추.
+        예약 카드 · 상세정보 안의 [이용완료]는 빼고 (다시 누르면 같은 창만 또 뜸) */
     confirm() {
+      const inCard = (e) => cards().some((c) => c.contains(e));
+      const boxSel = '[role=dialog], [role=alertdialog], [class*="odal"], [class*="ialog"], [class*="ayer"], [class*="opup"], [class*="lert"], [class*="onfirm"]';
       const ok = clickables().find((e) => {
-        if (!["확인", "OK", "이용완료처리", "예"].includes(textOf(e))) return false;
-        for (let p = e.parentElement, i = 0; p && i < 5; p = p.parentElement, i++) if (/하시겠습니까|처리하|완료하/.test(p.textContent)) return true;
+        if (!["확인", "OK", "예", "이용완료", "이용완료처리", "완료"].includes(textOf(e)) || inCard(e)) return false;
+        const box = e.closest(boxSel);
+        if (box && !inCard(box)) return true;
+        for (let p = e.parentElement, i = 0; p && i < 5; p = p.parentElement, i++) if (/하시겠습니까|처리하|완료하|변경하|할까요/.test(p.textContent)) return true;
         return false;
       });
       if (!ok) return { ok: true, clicked: false };
+      const label = textOf(ok);
       press(ok);
-      return { ok: true, clicked: true };
+      return { ok: true, clicked: true, label };
     },
   };
   return true;

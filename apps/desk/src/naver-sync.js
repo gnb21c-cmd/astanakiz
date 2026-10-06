@@ -27,7 +27,8 @@ class NaverSync {
     this.urls = opts.urls || null;
     this.timeout = opts.timeout || 10000;
     this.isTicket = opts.isTicket || isKidsTicket;
-    this.onStep = opts.onStep || (() => {}); // 진행 단계를 데스크에 알림 (현장에서 어디서 막히는지 보려고)
+    this.onStep = opts.onStep || (() => {});
+    this.onSnap = opts.onSnap || null; // 진단: 네이버 화면 저장 (이용완료 누른 뒤 · 안 됐을 때) // 진행 단계를 데스크에 알림 (현장에서 어디서 막히는지 보려고)
     this.days = new Map(); // 날짜 → Map("상품|시각|확정/이용완료" → { count, cards }) — 칸 숫자가 그대로면 다시 안 엶
   }
   call(expr) {
@@ -197,31 +198,59 @@ class NaverSync {
     if (!g.ok) return g;
     g = await this.goDate(b.day);
     if (!g.ok) return g;
+    // 그 칸의 확정 · 이용완료 숫자 (누르기 전) — 이용완료가 정말 됐는지는 이 숫자가 바뀌었는지로 확인 (현장 10/6: 버튼만 누르고 안 된 일이 있었음)
+    const cellOf = (s) => s.slots.find((x) => x.time === b.time && (!b.product || x.product === b.product));
+    const before = cellOf(g.state);
     let r = await this.openSlot(b.product || "", b.time, "확정");
     if (!r.ok) return r;
     // 카드가 아래에 있으면 목록을 내려 가며 찾음
     for (let i = 0; i < 30 && !(await this.read()).cards.some((c) => c.no === b.no); i++) if (!(await this.moreCards())) break;
     if (!(await this.read()).cards.some((c) => c.no === b.no)) return { ok: false, why: `네이버 예약정보에서 예약번호 ${b.no} 카드를 못 찾음` };
+    this.step("네이버 [이용완료] 누름");
     r = await this.act(`window.__naver.complete(${JSON.stringify(b.no)})`);
     if (!r.ok) return r;
-    // 확인 창이 늦게 뜰 수 있음 → 3초 동안 보이면 [확인]
-    for (let i = 0; i < 12; i++) {
+    await this.snap("이용완료 누른 뒤"); // 확인 창 모양을 남김 (바탕화면 진단 폴더)
+    // 확인 창이 늦게 뜰 수 있음 → 4초 동안 보이면 [확인]
+    let confirmed = false;
+    for (let i = 0; i < 16 && !confirmed; i++) {
       const c = await this.call("window.__naver.confirm()").catch(() => null);
       if (c && c.clicked) {
-        this.step("이용완료 확인 창 [확인]");
+        confirmed = true;
+        this.step(`네이버 확인 창 [${c.label || "확인"}]`);
         await this.act("({ ok: true })");
-        break;
-      }
-      await sleep(250);
+      } else await sleep(250);
     }
-    // 다시 확인: 확정 칸에 아직 있으면 실패
-    const s = await this.read();
-    // 상태 동그라미(확정)는 그림일 수 있어 글자 대신 [이용완료] 단추가 아직 있는지로 봄
-    const stillCard = s.cards.find((c) => c.no === b.no && (c.canComplete || c.status === "확정"));
-    const cell = s.slots.find((x) => x.time === b.time && (!b.product || x.product === b.product));
-    if (stillCard) return { ok: false, why: "네이버에서 이용완료로 바뀌지 않음" };
-    // 기억한 칸은 다음 불러오기 때 숫자가 바뀌어 다시 읽힘
-    return { ok: true, slot: cell || null };
+    // 확인: 칸 숫자(확정 − · 이용완료 +)가 바뀌었는지 — 안 바뀌면 화면을 다시 열어 한 번 더 봄
+    const changed = (s) => { const c = cellOf(s); return before && c && (c.done > before.done || c.conf < before.conf); };
+    await this.act("window.__naver.closePanel()");
+    for (let round = 0; round < 2; round++) {
+      for (let i = 0; i < 12; i++) {
+        const s = await this.read();
+        if (changed(s)) return { ok: true, slot: cellOf(s) };
+        if (!before) break;
+        await sleep(500);
+      }
+      if (round === 0 && this.urls) {
+        await this.act(`window.__naver.go(${JSON.stringify(this.urls.calendar)})`);
+        const gg = await this.goDate(b.day);
+        if (!gg.ok) break;
+        if (!before) {
+          // 칸 숫자를 못 읽었으면 카드로 확인: 확정 칸에 아직 [이용완료] 단추가 있으면 실패
+          const o = await this.openSlot(b.product || "", b.time, "확정");
+          const still = o.ok && (await this.read()).cards.some((c) => c.no === b.no && (c.canComplete || c.status === "확정"));
+          return still ? { ok: false, why: "네이버에서 이용완료로 바뀌지 않음" } : { ok: true };
+        }
+      }
+    }
+    await this.snap("이용완료 안 됨");
+    return { ok: false, why: `네이버에서 이용완료로 바뀌지 않음${confirmed ? "" : " (확인 창을 못 찾음)"} — 바탕화면 '아스타나키즈-진단' 폴더의 사진을 보내 주세요` };
+  }
+  async snap(label) {
+    try {
+      if (this.onSnap) await this.onSnap(label);
+    } catch (e) {
+      /* 진단 저장 실패는 무시 */
+    }
   }
 }
 
