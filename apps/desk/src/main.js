@@ -41,7 +41,13 @@ const timed = (p, ms, why) => {
   let t;
   return Promise.race([p, new Promise((_, rej) => (t = setTimeout(() => rej(new Error(why)), ms)))]).finally(() => clearTimeout(t));
 };
-const serial = (name, fn) => (queues[name] = (queues[name] || Promise.resolve()).then(fn, fn));
+const pending = {}; // 줄마다 기다리는 일 수 (네이버 창을 새로 고칠 때 일하는 중인지 보려고)
+const serial = (name, fn) => {
+  pending[name] = (pending[name] || 0) + 1;
+  const done = (v) => { pending[name]--; return v; };
+  const run = () => Promise.resolve().then(fn).then(done, (e) => { done(); throw e; });
+  return (queues[name] = (queues[name] || Promise.resolve()).then(run, run));
+};
 
 function loadSettings() {
   try {
@@ -636,8 +642,24 @@ app.on("second-instance", () => {
   }
 });
 
+/* 하루 종일 켜 두는 POS PC가 느려지지 않게 (수량 자동 조절 · 이용완료로 네이버 창을 자주 씀 · 현장 10/6)
+   5분마다 네이버 · 아마노 창의 메모리를 보고, 쉬는 중에 너무 커졌으면 그 창만 새로 고침 (로그인은 유지됨). 데스크 화면은 건드리지 않음 */
+const MEM_LIMIT_MB = 700;
+function memWatch() {
+  try {
+    const byPid = new Map(app.getAppMetrics().map((m) => [m.pid, m.memory ? m.memory.workingSetSize / 1024 : 0]));
+    for (const [win, q] of [[naverWin, "naver"], [amanoBgWin, "amanoBg"]]) {
+      if (!win || win.isDestroyed() || pending[q]) continue;
+      const mb = byPid.get(win.webContents.getOSProcessId()) || 0;
+      if (mb > MEM_LIMIT_MB) win.webContents.reload();
+    }
+  } catch (e) {
+    /* 확인 실패는 무시 */
+  }
+}
 app.whenReady().then(() => {
   if (!gotLock) return;
+  setInterval(memWatch, 5 * 60 * 1000);
   loadSettings();
   openAmano(); // 맨 뒤 아마노
   openNaver(); // 맨 뒤 네이버 예약관리
