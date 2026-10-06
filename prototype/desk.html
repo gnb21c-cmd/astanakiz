@@ -494,9 +494,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   bookings[TODAY].find((x) => x.name === "홍예준" && x.slot === T("14:00")).prevDone = 10;
   }
   // 다른 날 예시: 날짜마다 같은 결과가 나오게
+  const ensured = new Set(); // 이미 불러오기를 시작한 날짜
   function ensureDay(key) {
-    if (bookings[key]) return;
-    bookings[key] = [];
+    if (ensured.has(key)) return;
+    ensured.add(key);
+    if (bookings[key] && !APP) return;
+    if (!bookings[key]) bookings[key] = [];
     if (APP) { loadNaver(key); return; } // 실제: 네이버에서 읽어 옴
     let r = [...key].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
     const rnd = () => ((r = (r * 1103515245 + 12345) >>> 0) / 4294967296);
@@ -603,27 +606,44 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   }
   if (APP) setInterval(naverFlush, 2 * 60 * 1000);
 
-  // 오늘의 열쇠·입장 기록은 이 PC에 저장 (앱을 껐다 켜도 열쇠판 유지)
+  /* 오늘의 열쇠 · 입장 기록은 이 PC에 저장 → 프로그램을 껐다 켜도 · 컴퓨터를 다시 켜도 · 재설치해도 그대로 (현장 10/6)
+     - 입장한 예약은 예약 정보까지 통째로 저장 → 다시 켜면 네이버를 불러오기 전에도 열쇠판 · 명단에 바로 나옴
+     - 앱: 저장 폴더(%APPDATA%\아스타나키즈 입장 데스크\desk-state\날짜.json)에 바로 씀 (갑자기 꺼져도 남게) + 브라우저 저장소에도 한 벌
+     - 켜자마자 빈 화면으로 저장본을 덮어쓰지 않게: 저장본을 먼저 읽어 들인 뒤부터 저장 */
   const STATE_KEY = "astanakiz-desk-" + TODAY;
+  const SAVE_FIELDS = ["id", "day", "no", "slot", "name", "phone", "qty", "product", "naverProduct", "pay", "cancels", "prevDone", "visitNo", "status", "keys", "enteredAt", "outAt", "overPaid", "naverPending", "naverWhy", "useMin", "keyUse", "chainHead"];
+  let stateReady = !APP; // 저장본을 읽기 전에는 저장하지 않음
+  let pendingSaved = []; // 예전 형식(예약번호만 있는) 저장본 — 네이버에서 그 예약을 불러오면 합침
   function saveState() {
-    if (!APP) return;
-    try {
-      localStorage.setItem(STATE_KEY, JSON.stringify({
-        b: (bookings[TODAY] || []).filter((b) => b.enteredAt != null).map((b) => ({ no: b.no, keys: b.keys, enteredAt: b.enteredAt, outAt: b.outAt, visitNo: b.visitNo, overPaid: b.overPaid, naverPending: b.naverPending, status: b.status, useMin: b.useMin, keyUse: b.keyUse, chainHead: b.chainHead })),
-        w: walkins, seq, posSeq,
-      }));
-    } catch (e) { /* 저장 못 해도 화면은 동작 */ }
+    if (!APP || !stateReady) return;
+    const b = (bookings[TODAY] || []).filter((x) => x.enteredAt != null).map((x) => Object.fromEntries(SAVE_FIELDS.filter((k) => x[k] !== undefined).map((k) => [k, x[k]])));
+    const json = JSON.stringify({ v: 2, b: b.concat(pendingSaved.filter((p) => !b.some((x) => x.no === p.no))), w: walkins, seq, posSeq });
+    try { if (window.desk.state) window.desk.state.save(TODAY, json); } catch (e) { /* 파일 저장 실패 */ }
+    try { localStorage.setItem(STATE_KEY, json); } catch (e) { /* 저장 못 해도 화면은 동작 */ }
   }
-  let restored = false;
-  function restoreState() {
-    if (restored) return;
-    restored = true;
+  function loadSaved() {
+    const parse = (t) => { try { return t ? JSON.parse(t) : null; } catch (e) { return null; } };
     let st = null;
-    try { st = JSON.parse(localStorage.getItem(STATE_KEY)); } catch (e) { st = null; }
-    if (!st) return;
-    seq = Math.max(seq, st.seq || 0); posSeq = Math.max(posSeq, st.posSeq || 0);
-    for (const x of st.b || []) { const b = (bookings[TODAY] || []).find((y) => y.no === x.no); if (b) Object.assign(b, x); }
-    if (!walkins.length) walkins.push(...(st.w || []));
+    try { if (window.desk.state) st = parse(window.desk.state.load(TODAY)); } catch (e) { st = null; }
+    if (!st) try { st = parse(localStorage.getItem(STATE_KEY)); } catch (e) { st = null; }
+    return st;
+  }
+  // 켜자마자: 저장본으로 오늘 입장 기록 · 현장입장 · 열쇠를 되살림
+  if (APP) {
+    const st = loadSaved();
+    if (st) {
+      seq = Math.max(seq, st.seq || 0); posSeq = Math.max(posSeq, st.posSeq || 0);
+      walkins.push(...(st.w || []));
+      const full = (st.b || []).filter((x) => x.name && x.slot != null);
+      pendingSaved = (st.b || []).filter((x) => !(x.name && x.slot != null));
+      bookings[TODAY] = full.map((x) => Object.assign({ day: TODAY, keys: [], enteredAt: null, outAt: null }, x, { naverBusy: false }));
+    }
+    stateReady = true;
+  }
+  // 네이버에서 불러온 뒤: 예전 형식 저장본(예약번호만)을 그 예약에 합침
+  function restoreState() {
+    if (!pendingSaved.length) return;
+    pendingSaved = pendingSaved.filter((x) => { const b = (bookings[TODAY] || []).find((y) => y.no === x.no); if (b) Object.assign(b, x); return !b; });
   }
 
   // ── 연속예약 ─────────────────────────────────────

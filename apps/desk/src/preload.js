@@ -21,6 +21,11 @@ contextBridge.exposeInMainWorld("desk", {
     onStep: (cb) => ipcRenderer.on("naver:step", (_e, msg) => cb(msg)),
   },
   pos: { show: () => ipcRenderer.invoke("pos:show") },
+  // 오늘의 열쇠 · 입장 기록 저장 (파일)
+  state: {
+    load: (day) => ipcRenderer.sendSync("state:load", day),
+    save: (day, json) => ipcRenderer.send("state:save", day, json),
+  },
   print: {
     list: () => ipcRenderer.invoke("print:list"),
     html: (job) => ipcRenderer.invoke("print:html", job),

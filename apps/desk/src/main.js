@@ -261,6 +261,27 @@ ipcMain.handle("config:set", (_e, patch) => {
 });
 ipcMain.handle("pos:show", () => showPos());
 
+// 오늘의 열쇠 · 입장 기록 (날짜별 파일) — 껐다 켜도 · 다시 켜도 · 재설치해도 남음. 임시 파일에 쓰고 바꿔 끼워 반쯤 쓴 파일이 남지 않게
+const STATE_DIR = () => path.join(app.getPath("userData"), "desk-state");
+const stateFile = (day) => path.join(STATE_DIR(), `${String(day).replace(/[^0-9-]/g, "")}.json`);
+ipcMain.on("state:load", (e, day) => {
+  try {
+    e.returnValue = fs.readFileSync(stateFile(day), "utf8");
+  } catch (err) {
+    e.returnValue = null;
+  }
+});
+ipcMain.on("state:save", (_e, day, json) => {
+  try {
+    fs.mkdirSync(STATE_DIR(), { recursive: true });
+    const f = stateFile(day);
+    fs.writeFileSync(f + ".tmp", json, "utf8");
+    fs.renameSync(f + ".tmp", f);
+  } catch (err) {
+    /* 저장 실패 — 브라우저 저장소에 한 벌 더 있음 */
+  }
+});
+
 // ── 영수증 프린터 (80mm 감열지) ──
 // Windows 에 설치된 프린터 목록 (POS 프린터도 Windows 에 드라이버가 깔려 있어야 보임 — '설정 → 프린터 및 스캐너' 에 있는 것)
 ipcMain.handle("print:list", async () => {
