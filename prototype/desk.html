@@ -1004,12 +1004,19 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         <h3 id="sheet-title">운영 설정 <button class="x" data-act="close" aria-label="닫기">×</button></h3>${tabs}
         <div class="prn">
           <div class="stack">
-            <div class="field"><span class="label">연결된 프린터 <span class="help">POS PC에 연결된 프린터를 찾아 고르세요 · 80mm 감열지</span></span>
-              <div class="plist">${PRINT.found ? (PRINT.list.length ? PRINT.list.map((p) => `<button class="${PRINT.sel === p.name ? "on" : ""}" data-act="pickPrinter" data-n="${esc(p.name)}" aria-pressed="${PRINT.sel === p.name}">${esc(p.name)}${p.isDefault ? " (기본)" : ""}${PRINT.sel === p.name ? " · 사용 중" : ""}</button>`).join("") : `<span class="help" style="color:var(--red)">Windows에 설치된 프린터가 없어요 — POS 프린터 드라이버가 Windows '설정 → 프린터 및 스캐너'에 있어야 해요</span>`) : PRINT.sel ? `<span class="help">사용 중: <b>${esc(PRINT.sel)}</b> (다시 찾으려면 '프린터 찾기')</span>` : `<span class="help">아직 찾지 않았어요</span>`}</div>
-              <div class="btns"><button class="btn btn-sm" data-act="findPrinters">프린터 찾기</button><button class="btn btn-sm" data-act="testPrint" ${PRINT.sel && !PRINT.busy ? "" : "disabled"}>테스트 출력</button><button class="btn btn-sm" data-act="testPrintDlg" ${PRINT.sel && !PRINT.busy && APP ? "" : "disabled"}>인쇄 창으로 출력</button></div>
-              <label class="chk"><input type="checkbox" id="print-cut" ${PRINT.cut ? "checked" : ""}> 출력 끝나면 종이 자르기 <span class="help">(프린터 설정에서 이미 자르면 끄세요 — 두 번 잘림)</span></label>
-              ${PRINT.msg ? `<span class="help">${esc(PRINT.msg)}</span>` : ""}
-              <span class="help">안 나오면 '인쇄 창으로 출력'으로 Windows 인쇄 창에서 프린터 · 용지를 직접 골라 보세요</span></div>
+            <div class="field"><span class="label">연결 방식 <span class="help">80mm 감열지</span></span>
+              <div class="seg2"><button class="${PRINT.mode === "com" ? "on" : ""}" data-act="printMode" data-m="com" aria-pressed="${PRINT.mode === "com"}">POS 프린터 (COM 포트)</button><button class="${PRINT.mode === "win" ? "on" : ""}" data-act="printMode" data-m="win" aria-pressed="${PRINT.mode === "win"}">Windows 프린터</button></div>
+              ${PRINT.mode === "com" ? `
+              <span class="help">OKPOS OK-50 처럼 OKPOS가 COM 포트로 바로 쓰는 프린터 · OKPOS 환경설정의 프린터 <b>포트 · 속도</b>와 같게</span>
+              <div class="plist">${PRINT.portsFound ? (PRINT.ports.length ? PRINT.ports.map((p) => `<button class="${PRINT.port === p.port ? "on" : ""}" data-act="pickPort" data-p="${esc(p.port)}" aria-pressed="${PRINT.port === p.port}">${esc(p.name)}${PRINT.port === p.port ? " · 사용 중" : ""}</button>`).join("") : "") : PRINT.port ? `<span class="help">사용 중: <b>${esc(PRINT.port)}</b> (다시 찾으려면 '포트 찾기')</span>` : `<span class="help">아직 찾지 않았어요</span>`}</div>
+              <div class="btns" style="align-items:center"><button class="btn btn-sm" data-act="findPorts">포트 찾기</button>
+                <label class="help" for="com-baud">속도</label><select id="com-baud" class="cfg" style="width:110px">${[9600, 19200, 38400, 57600, 115200].map((b) => `<option ${PRINT.baud === b ? "selected" : ""}>${b}</option>`).join("")}</select>
+                <button class="btn btn-sm" data-act="testPrint" ${PRINT.port && !PRINT.busy ? "" : "disabled"}>테스트 출력</button></div>` : `
+              <span class="help">Windows '설정 → 프린터 및 스캐너'에 등록된 프린터</span>
+              <div class="plist">${PRINT.found ? (PRINT.list.length ? PRINT.list.map((p) => `<button class="${PRINT.sel === p.name ? "on" : ""}" data-act="pickPrinter" data-n="${esc(p.name)}" aria-pressed="${PRINT.sel === p.name}">${esc(p.name)}${p.isDefault ? " (기본)" : ""}${PRINT.sel === p.name ? " · 사용 중" : ""}</button>`).join("") : `<span class="help" style="color:var(--red)">Windows에 설치된 프린터가 없어요</span>`) : PRINT.sel ? `<span class="help">사용 중: <b>${esc(PRINT.sel)}</b> (다시 찾으려면 '프린터 찾기')</span>` : `<span class="help">아직 찾지 않았어요</span>`}</div>
+              <div class="btns"><button class="btn btn-sm" data-act="findPrinters">프린터 찾기</button><button class="btn btn-sm" data-act="testPrint" ${PRINT.sel && !PRINT.busy ? "" : "disabled"}>테스트 출력</button><button class="btn btn-sm" data-act="testPrintDlg" ${PRINT.sel && !PRINT.busy && APP ? "" : "disabled"}>인쇄 창으로 출력</button></div>`}
+              <label class="chk"><input type="checkbox" id="print-cut" ${PRINT.cut ? "checked" : ""}> 출력 끝나면 종이 자르기 <span class="help">(두 번 잘리면 끄세요)</span></label>
+              ${PRINT.msg ? `<span class="help">${esc(PRINT.msg)}</span>` : ""}</div>
             <div class="field"><span class="label">출력 양식</span>
               <div class="help">입장권 (네이버 · 현장) · 초과요금은 POS에서 결제하고 POS 영수증을 드려요 · <button class="btn btn-sm" data-act="resetForm">기본 양식으로</button></div>
               <label class="chk"><input type="checkbox" id="form-auto" ${f.auto ? "checked" : ""}> ${f.when}에 자동 출력</label>
@@ -1058,6 +1065,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   ].join("\n");
   const PRINT = {
     found: false, sel: null, cur: "enter", busy: false, msg: "", cut: true, // cut: 출력 끝나면 종이 자르기 (ESC/POS)
+    // 연결 방식: com = POS 영수증 프린터에 COM 포트로 바로(OKPOS OK-50 등, 기본) · win = Windows 에 등록된 프린터
+    mode: "com", port: null, baud: 115200, ports: [], portsFound: false,
     list: APP ? [] : [{ name: "POS-80C (USB001)", isDefault: false }, { name: "EPSON TM-T82 Receipt", isDefault: false }, { name: "Microsoft Print to PDF", isDefault: true }],
     forms: { enter: { name: "입장권", when: "등록 완료", auto: true, text: ENTER_FORM } },
   };
@@ -1066,6 +1075,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (c && c.printer) PRINT.sel = c.printer;
     if (c && c.printForm) Object.assign(PRINT.forms.enter, c.printForm);
     if (c && c.printCut === false) PRINT.cut = false;
+    if (c && c.printMode) PRINT.mode = c.printMode;
+    if (c && c.comPort) PRINT.port = c.comPort;
+    if (c && c.comBaud) PRINT.baud = c.comBaud;
   }).catch(() => {});
   // 성수기 기간: 설치한 앱은 이 PC 설정에, 체험판은 이 브라우저에 저장
   function savePeaks() {
@@ -1075,12 +1087,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   }
   if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c && Array.isArray(c.peaks) && c.peaks.length) { RULES.peaks = c.peaks; renderAll(); } }).catch(() => {});
   else try { const v = JSON.parse(localStorage.getItem("astanakiz-peaks")); if (Array.isArray(v) && v.length) RULES.peaks = v; } catch (e) { /* 없음 */ }
-  const savePrint = () => { if (APP && window.desk.config) window.desk.config.set({ printer: PRINT.sel, printCut: PRINT.cut, printForm: { text: PRINT.forms.enter.text, auto: PRINT.forms.enter.auto } }); };
+  const savePrint = () => { if (APP && window.desk.config) window.desk.config.set({ printer: PRINT.sel, printCut: PRINT.cut, printMode: PRINT.mode, comPort: PRINT.port, comBaud: PRINT.baud, printForm: { text: PRINT.forms.enter.text, auto: PRINT.forms.enter.auto } }); };
   // 영수증 프린터처럼 보이는 이름 (처음 찾을 때 자동으로 고름)
   const RECEIPT_RE = /pos|receipt|영수증|감열|thermal|80|srp|bixolon|빅솔론|sewoo|세우|lk-|tm-|epson|rongta|xprinter|hwasung|화성|hmk|star|citizen|okpos/i;
 
-  function paperLines(text, v) {
-    const fill = (line) => esc(line).replace(/\{([^}]+)\}/g, (m, k) => (k in v ? esc(v[k]) : m));
+  /** 양식 → 줄 목록 [{ k: "hr" | "big" | "ctr" | "txt", t: 글 }] (조건 · 빈 값 처리까지) */
+  function receiptLines(text, v) {
+    const fill = (line) => line.replace(/\{([^}]+)\}/g, (m, k) => (k in v ? String(v[k]) : m));
     const out = [];
     for (let l of text.split("\n")) {
       // [네이버] · [현장] · [사은권] 조건 (여러 개 붙여도 됨)
@@ -1089,12 +1102,29 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       if (skip) continue;
       // 값이 비어 있는 칸이 든 줄은 뺌
       if ([...l.matchAll(/\{([^}]+)\}/g)].some(([, k]) => k in v && v[k] === "")) continue;
-      if (l.trim() === "---") out.push(`<div class="pl hr"></div>`);
-      else if (l.startsWith("# ")) out.push(`<div class="pl big">${fill(l.slice(2))}</div>`);
-      else if (l.startsWith("^")) out.push(`<div class="pl ctr">${fill(l.slice(1))}</div>`);
-      else out.push(`<div class="pl">${fill(l) || "&nbsp;"}</div>`);
+      if (l.trim() === "---") out.push({ k: "hr", t: "" });
+      else if (l.startsWith("# ")) out.push({ k: "big", t: fill(l.slice(2)) });
+      else if (l.startsWith("^")) out.push({ k: "ctr", t: fill(l.slice(1)) });
+      else out.push({ k: "txt", t: fill(l) });
     }
-    return out.join("");
+    return out;
+  }
+  function paperLines(text, v) {
+    return receiptLines(text, v).map((x) => x.k === "hr" ? `<div class="pl hr"></div>` : `<div class="pl ${x.k === "big" ? "big" : x.k === "ctr" ? "ctr" : ""}">${esc(x.t) || "&nbsp;"}</div>`).join("");
+  }
+  /** POS 영수증 프린터(ESC/POS)로 바로 보낼 조각: { b: [바이트] } 명령 · { t: "글" } 한글(CP949) — 80mm 글꼴 A 48칸 */
+  function escposParts(text, v, cut) {
+    const P = [{ b: [0x1b, 0x40] }, { b: [0x1c, 0x26] }]; // 초기화 · 한글 모드
+    for (const x of receiptLines(text, v)) {
+      if (x.k === "hr") { P.push({ b: [0x1b, 0x61, 0] }, { t: "-".repeat(48) + "\n" }); continue; }
+      P.push({ b: [0x1b, 0x61, x.k === "txt" ? 0 : 1] }); // 왼쪽 · 가운데
+      if (x.k === "big") P.push({ b: [0x1b, 0x45, 1, 0x1d, 0x21, 0x11, 0x1c, 0x21, 0x0c] }); // 굵게 · 가로세로 2배 (한글도)
+      P.push({ t: x.t + "\n" });
+      if (x.k === "big") P.push({ b: [0x1b, 0x45, 0, 0x1d, 0x21, 0x00, 0x1c, 0x21, 0x00] });
+    }
+    P.push({ b: [0x1b, 0x61, 0, 0x1b, 0x64, 0x04] }); // 4줄 올림
+    if (cut) P.push({ b: [0x1d, 0x56, 0x01] }); // 부분 자르기
+    return P;
   }
   const paperHtml = paperLines;
   /** 프린터로 보낼 문서 (80mm, 인쇄 가능 폭 약 72mm, 맑은 고딕) */
@@ -1110,12 +1140,19 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     </style></head><body>${paperLines(text, v)}</body></html>`;
   }
   /** 양식대로 출력. 돌려주는 글은 알림에 붙임. 출력 결과는 따로 알림 */
+  /** 지금 설정대로 출력 → { ok, why, cutWhy } */
+  function sendPrint(text, v, opts = {}) {
+    if (PRINT.mode === "com") return window.desk.print.escpos({ port: PRINT.port, baud: PRINT.baud, parts: escposParts(text, v, PRINT.cut) });
+    return window.desk.print.html({ html: receiptDoc(text, v), deviceName: PRINT.sel, silent: !opts.dialog, cut: PRINT.cut && !opts.dialog });
+  }
+  const printerReady = () => (PRINT.mode === "com" ? !!PRINT.port : !!PRINT.sel);
+  const printerName = () => (PRINT.mode === "com" ? `${PRINT.port} · ${PRINT.baud}` : PRINT.sel || "");
   function printForm(kind, v) {
     const f = PRINT.forms[kind];
     if (!f || !f.auto) return "";
-    if (!PRINT.sel) return " · 프린터를 아직 고르지 않아 출력 못 함 (운영 설정 → 프린터)";
-    if (!APP || !window.desk.print) return ` · ${f.name} 출력 (${PRINT.sel.split(" ")[0]}, 체험)`;
-    window.desk.print.html({ html: receiptDoc(f.text, v), deviceName: PRINT.sel, cut: PRINT.cut }).then((r) => {
+    if (!printerReady()) return " · 프린터를 아직 고르지 않아 출력 못 함 (운영 설정 → 프린터)";
+    if (!APP || !window.desk.print) return ` · ${f.name} 출력 (${printerName()}, 체험)`;
+    sendPrint(f.text, v).then((r) => {
       if (!r || !r.ok) toast(`${f.name} 출력 실패: ${(r && r.why) || "응답 없음"} — 운영 설정 → 프린터에서 확인`);
       else if (r.cutWhy) toast(`출력은 됐지만 자르기 명령 실패: ${r.cutWhy}`);
     });
@@ -1342,14 +1379,28 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     },
     addPeak() { const last = RULES.peaks[RULES.peaks.length - 1]; RULES.peaks.push({ from: last ? last.to : TODAY, to: last ? last.to : TODAY }); savePeaks(); renderSheet(); },
     delPeak(btn) { RULES.peaks.splice(Number(btn.dataset.i), 1); savePeaks(); renderSheet(); renderAll(); },
+    printMode(btn) { PRINT.mode = btn.dataset.m; PRINT.msg = ""; savePrint(); renderSheet(); },
+    async findPorts() {
+      if (APP && window.desk.print && window.desk.print.ports) {
+        PRINT.msg = "COM 포트 찾는 중…"; renderSheet();
+        const r = await window.desk.print.ports();
+        if (!r || !r.ok) { PRINT.msg = `포트를 못 읽음: ${(r && r.why) || ""}`; renderSheet(); return; }
+        PRINT.ports = r.list;
+      } else PRINT.ports = [{ name: "USB Serial Port (COM3)", port: "COM3" }, { name: "통신 포트 (COM1)", port: "COM1" }];
+      PRINT.portsFound = true;
+      if (!PRINT.port && PRINT.ports.length) PRINT.port = (PRINT.ports.find((p) => /usb|serial|printer|prolific|ch34|cp210|ftdi/i.test(p.name)) || PRINT.ports[0]).port;
+      PRINT.msg = PRINT.ports.length ? `COM 포트 ${PRINT.ports.length}개 · OKPOS 프린터 설정과 같은 포트를 고르세요` : "COM 포트가 없어요 — 프린터 케이블 · 전원을 확인해 주세요";
+      savePrint(); renderSheet();
+    },
+    pickPort(btn) { PRINT.port = btn.dataset.p; PRINT.msg = ""; savePrint(); renderSheet(); },
     pickPrinter(btn) { PRINT.sel = btn.dataset.n; PRINT.msg = ""; savePrint(); renderSheet(); },
     async testPrint(btn) {
-      if (!APP || !window.desk.print) { toast(`${PRINT.sel}로 테스트 출력 보냄 (체험)`); return; }
+      if (!APP || !window.desk.print) { toast(`${printerName()}로 테스트 출력 보냄 (체험)`); return; }
       PRINT.busy = true; PRINT.msg = "출력 보내는 중…"; renderSheet();
       const dlg = !!(btn && btn.dataset.act === "testPrintDlg");
-      const r = await window.desk.print.html({ html: receiptDoc(PRINT.forms.enter.text, SAMPLE), deviceName: PRINT.sel, silent: !dlg, cut: PRINT.cut && !dlg });
+      const r = await sendPrint(PRINT.forms.enter.text, SAMPLE, { dialog: dlg });
       PRINT.busy = false;
-      PRINT.msg = r && r.ok ? `${PRINT.sel}로 보냈어요 — 종이가 나오고 ${PRINT.cut && !dlg ? "잘렸는지" : "나왔는지"} 확인해 주세요${r.cutWhy ? ` (자르기 실패: ${r.cutWhy})` : ""}` : `출력 실패: ${(r && r.why) || "응답 없음"}`;
+      PRINT.msg = r && r.ok ? `${printerName()}로 보냈어요 — 종이가 나오고 ${PRINT.cut && !dlg ? "잘렸는지" : "나왔는지"} 확인해 주세요. 글자가 깨져 나오면 속도를 바꿔 보세요${r.cutWhy ? ` (자르기 실패: ${r.cutWhy})` : ""}` : `출력 실패: ${(r && r.why) || "응답 없음"}`;
       renderSheet();
     },
     testPrintDlg(btn) { return acts.testPrint(btn); },
@@ -1392,6 +1443,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (t.id === "form-text") { PRINT.forms[PRINT.cur].text = t.value; $("paper").innerHTML = paperHtml(t.value, SAMPLE); savePrint(); }
     if (t.id === "form-auto") { PRINT.forms[PRINT.cur].auto = t.checked; savePrint(); }
     if (t.id === "print-cut") { PRINT.cut = t.checked; savePrint(); }
+    if (t.id === "com-baud") { PRINT.baud = Number(t.value); savePrint(); }
     if (t.id === "w-phone") { sheet.phone = digits(t.value).slice(0, 11); t.value = fmtPhone(sheet.phone); updateWalkButtons(); }
     const m = /^p(f|t)-(\d+)$/.exec(t.id);
     if (m && t.value) { RULES.peaks[+m[2]][m[1] === "f" ? "from" : "to"] = t.value; savePeaks(); renderAll(); }

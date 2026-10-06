@@ -302,6 +302,63 @@ function rawSend(printer, bytes) {
     });
   });
 }
+// ── POS 영수증 프린터에 ESC/POS 로 바로 (OKPOS OK-50 처럼 Windows 프린터로 등록되지 않고 COM 포트로 쓰는 프린터) ──
+// 조각 [{ b: [바이트] } | { t: "한글" }] 을 CP949 로 바꿔 COM 포트(또는 Windows 프린터 RAW)로 보냄. PowerShell · .NET 만 씀 (설치할 것 없음)
+const ESC_PS = `
+$ErrorActionPreference = "Stop"
+# 한글이 깨지지 않게 UTF-8 JSON 을 base64 로 받음
+$parts = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:ASTANA_JSON)) | ConvertFrom-Json
+$enc = [System.Text.Encoding]::GetEncoding(949)
+$ms = New-Object System.IO.MemoryStream
+foreach ($p in $parts) {
+  if ($p.t -ne $null) { $bytes = $enc.GetBytes([string]$p.t); $ms.Write($bytes, 0, $bytes.Length) }
+  elseif ($p.b -ne $null) { foreach ($x in $p.b) { $ms.WriteByte([byte]$x) } }
+}
+$data = $ms.ToArray()
+try {
+  if ($env:ASTANA_MODE -eq "com") {
+    $sp = New-Object System.IO.Ports.SerialPort $env:ASTANA_PORT, ([int]$env:ASTANA_BAUD), "None", 8, "One"
+    $sp.Handshake = "None"; $sp.DtrEnable = $true; $sp.RtsEnable = $true; $sp.WriteTimeout = 8000
+    $sp.Open(); $sp.Write($data, 0, $data.Length); Start-Sleep -Milliseconds 400; $sp.Close()
+    [Console]::Out.Write("ok")
+  } else {
+    [Console]::Out.Write("모드를 모름")
+  }
+} catch {
+  $m = $_.Exception.Message
+  if ($m -match "denied|거부|in use|사용") { [Console]::Out.Write("포트를 다른 프로그램(OKPOS)이 쓰는 중: " + $m) } else { [Console]::Out.Write($m) }
+}
+`;
+function psRun(script, env, input) {
+  return new Promise((resolve) => {
+    if (process.platform !== "win32") return resolve("Windows 에서만 됨");
+    const enc = Buffer.from(script, "utf16le").toString("base64");
+    const child = execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", enc], { env: { ...process.env, ...env }, timeout: 25000 }, (err, out) =>
+      resolve(String(out || "").trim() || (err && err.message) || ""),
+    );
+    if (input != null) {
+      child.stdin.write(input);
+      child.stdin.end();
+    }
+  });
+}
+// COM 포트 목록 (이름 포함: "USB Serial Port (COM3)" 등)
+ipcMain.handle("print:ports", async () => {
+  const out = await psRun(`
+$l = @()
+try { Get-CimInstance Win32_PnPEntity | Where-Object { $_.Name -match '\\(COM\\d+\\)' } | ForEach-Object { $l += $_.Name } } catch {}
+foreach ($n in [System.IO.Ports.SerialPort]::GetPortNames()) { if (-not ($l -match "\\($n\\)")) { $l += $n } }
+[Console]::Out.Write(($l -join "|"))
+`, {});
+  if (/Windows 에서만/.test(out)) return { ok: false, why: out };
+  const list = out.split("|").map((x) => x.trim()).filter(Boolean).map((name) => ({ name, port: (name.match(/(COM\d+)/i) || [])[1] || name }));
+  return { ok: true, list };
+});
+ipcMain.handle("print:escpos", async (_e, { port, baud, parts }) => {
+  const r = await psRun(ESC_PS, { ASTANA_MODE: "com", ASTANA_PORT: port, ASTANA_BAUD: String(baud || 115200), ASTANA_JSON: Buffer.from(JSON.stringify(parts), "utf8").toString("base64") });
+  return r === "ok" ? { ok: true } : { ok: false, why: r || "응답 없음" };
+});
+
 // 종이 자르기: 3줄 올리고(ESC d 3) 부분 자르기(GS V 1) — 대부분의 80mm 영수증 프린터(ESC/POS)
 const CUT = [0x1b, 0x64, 0x03, 0x1d, 0x56, 0x01];
 ipcMain.handle("print:cut", (_e, deviceName) => rawSend(deviceName, CUT));
