@@ -213,19 +213,43 @@ $ft = [W]::GetWindowThreadProcessId($fg, [ref]$q); $me = [W]::GetCurrentThreadId
 [void][W]::BringWindowToTop($h); [void][W]::SetForegroundWindow($h)
 [void][W]::AttachThreadInput($me, $ft, $false)
 $ok = [W]::GetForegroundWindow() -eq $h
-[Console]::Out.Write($(if ($ok) { "ok|" } else { "fg|" }) + $main.t + " (" + $hit.n + ", 창 " + $same.Count + "개)")
+[Console]::Out.Write($(if ($ok) { "ok|" } else { "fg|" }) + $h.ToInt64() + "|" + $main.t + " (" + $hit.n + ", 창 " + $same.Count + "개)")
 `;
+// POS 창이 최소화(또는 닫힘)될 때까지 기다림 → 그때 데스크를 다시 올림
+const POS_WAIT_PS = `
+Add-Type @"
+using System; using System.Runtime.InteropServices;
+public class V { [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h); [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr h); }
+"@
+$h = [IntPtr][Int64]$env:ASTANA_HWND
+for ($i = 0; $i -lt 3000; $i++) { if (-not [V]::IsWindow($h) -or [V]::IsIconic($h)) { [Console]::Out.Write("back"); exit }; Start-Sleep -Milliseconds 300 }
+[Console]::Out.Write("timeout")
+`;
+let posWatch = 0;
 async function showPos() {
   if (process.platform !== "win32") return { ok: false, why: "Windows 에서만 됨" };
+  // 최소화 단추를 누른 것처럼 데스크를 먼저 내리고 POS를 올림 (데스크가 앞에 버티고 있으면 POS가 안 보여서 · 현장 10/6)
+  if (deskWin) deskWin.minimize();
   const out = await psRun(POS_PS, { ASTANA_POS: settings.posTitle || "" });
-  if (out.startsWith("ok|")) return { ok: true, title: out.slice(3) };
-  // Windows가 앞으로 올리기를 막았으면 데스크를 내려서라도 POS가 보이게 (POS를 최소화하면 데스크가 다시 올라옴)
-  if (out.startsWith("fg|")) {
-    if (deskWin) deskWin.minimize();
-    return { ok: true, title: out.slice(3), minimized: true };
+  const m = /^(ok|fg)\|(-?\d+)\|(.*)$/s.exec(out);
+  if (!m) {
+    if (deskWin) { deskWin.restore(); deskWin.focus(); }
+    if (out.startsWith("none|")) return { ok: false, why: `POS 창을 찾지 못함 — OKPOS가 켜져 있는지 확인해 주세요 (열린 창: ${out.slice(5).slice(0, 200)})` };
+    return { ok: false, why: `POS 창으로 못 넘어감: ${out.slice(0, 200)}` };
   }
-  if (out.startsWith("none|")) return { ok: false, why: `POS 창을 찾지 못함 — OKPOS가 켜져 있는지 확인해 주세요 (열린 창: ${out.slice(5).slice(0, 200)})` };
-  return { ok: false, why: `POS 창으로 못 넘어감: ${out.slice(0, 200)}` };
+  // POS를 최소화하면 데스크가 다시 올라옴 (데스크의 focus 이벤트 → 결제 완료 단계)
+  const my = ++posWatch;
+  psRun(POS_WAIT_PS, { ASTANA_HWND: m[2] }, null, 16 * 60 * 1000).then((r) => {
+    if (my !== posWatch || !deskWin || r !== "back") return;
+    // Windows가 뒤 프로그램이 앞으로 나오는 걸 막을 수 있어 잠깐 '맨 위'로 올렸다가 풂
+    deskWin.restore();
+    deskWin.setAlwaysOnTop(true);
+    deskWin.show();
+    app.focus({ steal: true });
+    deskWin.focus();
+    setTimeout(() => deskWin && deskWin.setAlwaysOnTop(false), 300);
+  });
+  return { ok: true, title: m[3] };
 }
 
 // 데스크 화면 ↔ 이 프로그램
@@ -450,11 +474,11 @@ try {
   if ($m -match "denied|거부|in use|사용") { [Console]::Out.Write("포트를 다른 프로그램(OKPOS)이 쓰는 중: " + $m) } else { [Console]::Out.Write($m) }
 }
 `;
-function psRun(script, env, input) {
+function psRun(script, env, input, ms = 25000) {
   return new Promise((resolve) => {
     if (process.platform !== "win32") return resolve("Windows 에서만 됨");
     const enc = Buffer.from(script, "utf16le").toString("base64");
-    const child = execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", enc], { env: { ...process.env, ...env }, timeout: 25000 }, (err, out) =>
+    const child = execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", enc], { env: { ...process.env, ...env }, timeout: ms }, (err, out) =>
       resolve(String(out || "").trim() || (err && err.message) || ""),
     );
     if (input != null) {
