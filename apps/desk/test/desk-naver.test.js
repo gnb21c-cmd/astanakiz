@@ -68,6 +68,8 @@ test("데스크가 네이버 예약을 불러오고, 등록 완료 때 네이버
     assert.deepStrictEqual(await desk.$$eval('.slot[data-s="840"] .c', (e) => e.map((x) => x.textContent.trim())), ["1", "3", "6"], "입장하면 확정 → 완료, 잔여 그대로");
     assert.deepStrictEqual(await desk.$$eval(".res .name", (e) => e.map((x) => x.textContent)), ["백연화", "송다온", "허정은"], "입장해도 순서 그대로");
 
+    // 네이버 이용완료는 뒤에서 — 끝날 때까지 기다림 (카드의 '네이버 이용완료 처리 중 · 대기'가 사라짐)
+    await desk.waitForFunction(() => { const c = [...document.querySelectorAll(".res")].find((e) => /허정은/.test(e.textContent)); return c && !c.querySelector(".npend"); }, null, { timeout: 60000 });
     // 네이버 화면에서도 완료로 바뀜
     const after = await naver.loadDay("2026-10-05");
     assert.strictEqual(after.bookings.find((b) => b.no === "1368155282").status, "완료");

@@ -209,7 +209,7 @@ class NaverSync {
     this.step("네이버 [이용완료] 누름");
     r = await this.act(`window.__naver.complete(${JSON.stringify(b.no)})`);
     if (!r.ok) return r;
-    await this.snap("이용완료 누른 뒤"); // 확인 창 모양을 남김 (바탕화면 진단 폴더)
+    this.snap("이용완료 누른 뒤"); // 확인 창 모양을 남김 (바탕화면 진단 폴더) — 기다리지 않음
     // 확인 창이 늦게 뜰 수 있음 → 4초 동안 보이면 [확인]
     let confirmed = false;
     for (let i = 0; i < 16 && !confirmed; i++) {
@@ -218,17 +218,17 @@ class NaverSync {
         confirmed = true;
         this.step(`네이버 확인 창 [${c.label || "확인"}]`);
         await this.act("({ ok: true })");
-      } else await sleep(250);
+      } else await sleep(200);
     }
     // 확인: 칸 숫자(확정 − · 이용완료 +)가 바뀌었는지 — 안 바뀌면 화면을 다시 열어 한 번 더 봄
     const changed = (s) => { const c = cellOf(s); return before && c && (c.done > before.done || c.conf < before.conf); };
     await this.act("window.__naver.closePanel()");
     for (let round = 0; round < 2; round++) {
-      for (let i = 0; i < 12; i++) {
+      for (let i = 0; i < 20; i++) {
         const s = await this.read();
         if (changed(s)) return { ok: true, slot: cellOf(s) };
         if (!before) break;
-        await sleep(500);
+        await sleep(300);
       }
       if (round === 0 && this.urls) {
         await this.act(`window.__naver.go(${JSON.stringify(this.urls.calendar)})`);

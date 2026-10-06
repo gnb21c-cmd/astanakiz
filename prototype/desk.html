@@ -577,13 +577,23 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   }
   // 네이버에 아직 이용완료를 못 누른 예약(연속예약의 뒤 예약 · '네이버 없이 등록')을 차례로 처리, 실패하면 2분마다 다시
   let flushing = false;
+  /* 입장 처리는 열쇠를 바로 등록하고, 네이버 이용완료는 여기서 뒤에서 차례로 (근무자가 기다리지 않게 · 현장 10/6)
+     실패하면 카드에 '네이버 이용완료 대기'로 남고 2분마다 다시. 불러오기에서 네이버가 완료로 보이면 대기 표시도 지움 */
   async function naverFlush() {
     if (!APP || flushing) return;
     flushing = true;
+    const tried = new Set();
     try {
-      for (const x of (bookings[TODAY] || []).filter((y) => y.naverPending && y.no && y.status === "완료")) {
-        const r = await window.desk.naver.complete({ day: x.day, no: x.no, time: hm(x.slot), product: x.naverProduct || "" }).catch(() => null);
-        if (r && r.ok) { x.naverPending = false; renderAll(); }
+      for (;;) {
+        const x = (bookings[TODAY] || []).find((y) => y.naverPending && y.no && y.status === "완료" && !tried.has(y));
+        if (!x) break;
+        tried.add(x);
+        x.naverBusy = true; renderAll();
+        const r = await window.desk.naver.complete({ day: x.day, no: x.no, time: hm(x.slot), product: x.naverProduct || "" }).catch((e) => ({ ok: false, why: String(e) }));
+        x.naverBusy = false;
+        if (r && r.ok) { x.naverPending = false; x.naverWhy = ""; toast(`${x.name}님 네이버 이용완료 됨`); }
+        else { x.naverWhy = (r && r.why) || "응답 없음"; toast(`${x.name}님 네이버 이용완료 실패: ${x.naverWhy} — 2분 뒤 다시 해요`); }
+        renderAll();
       }
     } finally { flushing = false; }
   }
@@ -762,7 +772,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       } else if (b.keys.length) act = `<span class="kchips">${b.keys.map((k) => `<span class="kchip num">${k}</span>`).join("")}</span><span class="help num">${hm(b.enteredAt)} 입장</span>`;
       else if (b.outAt != null) act = `<span class="help num">${hm(b.enteredAt)} 입장 · ${hm(b.outAt)} 퇴장</span>`;
       else if (b.chainHead) act = `<span class="help num">연속예약 — ${hm(b.enteredAt)} 첫 예약으로 입장</span>`;
-      if (b.naverPending) act += `<span class="npend">네이버 이용완료 대기 (자동으로 다시 시도)</span>`;
+      if (b.naverPending) act += `<span class="npend">${b.naverBusy ? "네이버 이용완료 처리 중…" : `네이버 이용완료 대기${b.naverWhy ? ` — ${esc(b.naverWhy)}` : ""} (자동으로 다시)`}</span>`;
       return `<article class="res ${b.status === "완료" ? "done" : ""}" data-act="openRes" data-id="${b.id}" tabindex="0" role="button" aria-label="${esc(b.name)} 예약 열기">
         <div class="head"><span class="name">${esc(b.name)}</span><span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span></div>
         ${chainTag}<div class="visits num">${visitText(b)}</div>
@@ -856,6 +866,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 
   function refreshText() {
     if (naverBusy) return `네이버: ${naverStep || "불러오는 중…"}`;
+    // 뒤에서 하는 네이버 이용완료가 실패한 예약이 있으면 계속 빨간 글로 (성공하면 사라짐)
+    const fail = (bookings[TODAY] || []).filter((b) => b.naverPending && b.naverWhy);
+    if (fail.length) return `⚠ 네이버 이용완료 실패 ${fail.length}건: ${fail.map((b) => `${b.name} ${hm(b.slot)}`).join(", ")} — 2분마다 다시 · 안 되면 네이버에서 직접`;
     if (naverErr) return `⚠ ${naverErr}`;
     const nx = autoNext(now);
     return [lastRefresh == null ? "" : `${hm(lastRefresh)} 불러옴`, nx == null ? "" : `다음 ${hm(nx)}`].filter(Boolean).join(" · ");
@@ -870,7 +883,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (APP) { loadNaver(TODAY); return; }
     lastRefresh = todayAt = now; renderAll(); toast(`${hm(now)} 네이버 예약 자동 불러옴 (체험)`);
   }
-  function renderAll() { saveState(); $("now").textContent = hm(now); $("refresh-at").textContent = refreshText(); $("refresh-at").style.color = naverErr && !naverBusy ? "var(--red)" : ""; $("refresh-at").style.color = naverErr && !naverBusy ? "var(--red)" : ""; renderSlots(); renderRes(); renderKeys(); renderCars(); }
+  function renderAll() { saveState(); $("now").textContent = hm(now); $("refresh-at").textContent = refreshText(); $("refresh-at").style.color = (naverErr || (bookings[TODAY] || []).some((b) => b.naverPending && b.naverWhy)) && !naverBusy ? "var(--red)" : ""; renderSlots(); renderRes(); renderKeys(); renderCars(); }
 
   // ── 팝업 ─────────────────────────────────────────
   const sheet = { mode: null };
@@ -1322,14 +1335,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const b = findB(sheet.id);
       if (sheet.keys.length !== b.qty || sheet.busy) return;
       if (sheet.keys.some((k) => holderOf(k))) { toast("그 사이 다른 손님이 쓴 열쇠가 있어요. 다시 골라 주세요."); sheet.keys = []; renderSheet(); return; }
-      // 실제: 네이버에서 이용완료를 누르고 완료로 바뀐 것을 확인한 뒤 열쇠를 등록 ("네이버 없이 등록"은 네이버가 안 될 때만)
-      if (APP && !(btn && btn.dataset.skipNaver)) {
-        sheet.busy = true; sheet.naverErr = ""; renderSheet();
-        const r = await window.desk.naver.complete({ day: b.day, no: b.no, time: hm(b.slot), product: b.naverProduct || "" }).catch((e) => ({ ok: false, why: String(e) }));
-        sheet.busy = false;
-        if (!r || !r.ok) { sheet.naverErr = (r && r.why) || "네이버 응답 없음"; renderSheet(); return; }
-      }
-      if (btn && btn.dataset.skipNaver) b.naverPending = true; // 네이버에는 나중에 이용완료를 눌러야 함
+      // 열쇠는 바로 등록하고 네이버 이용완료는 뒤에서 (naverFlush) — 근무자가 기다리지 않음
+      if (APP) b.naverPending = true;
       const ch = chainOf(b);
       Object.assign(b, { status: "완료", keys: sheet.keys.slice(), enteredAt: now, visitNo: b.prevDone == null ? null : b.prevDone + 1 });
       const moveSlot = (x) => { const nsl = (naverSlots[x.day] || {})[x.slot]; if (nsl) { nsl.conf = Math.max(0, nsl.conf - x.qty); nsl.done += x.qty; } }; // 다음 불러오기 전까지 칸 숫자도 확정 → 완료
@@ -1346,10 +1353,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           Object.assign(x, { status: "완료", enteredAt: now, chainHead: b.id, naverPending: APP, visitNo: x.prevDone == null ? null : x.prevDone + 1 + ch.indexOf(x) });
           moveSlot(x);
         }
-        setTimeout(naverFlush, 0);
       }
       closeSheet();
-      toast(`${b.name}님 입장 · 열쇠 ${b.keys.join(", ")}번 · 네이버 이용완료${isGift(b.visitNo) ? ` · ${b.visitNo}번째 방문, ${RULES.giftName}을 드리세요` : ""}${printForm("enter", keyVals(b))}`);
+      if (APP) setTimeout(naverFlush, 0); // 네이버 이용완료는 뒤에서
+      toast(`${b.name}님 입장 · 열쇠 ${b.keys.join(", ")}번${APP ? " · 네이버 이용완료는 뒤에서 처리 중" : " · 네이버 이용완료"}${isGift(b.visitNo) ? ` · ${b.visitNo}번째 방문, ${RULES.giftName}을 드리세요` : ""}${printForm("enter", keyVals(b))}`);
       renderAll();
     },
     qty(btn) {
