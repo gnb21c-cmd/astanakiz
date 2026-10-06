@@ -58,46 +58,62 @@ function saveSettings() {
 const DESK_HTML = () =>
   app.isPackaged ? path.join(process.resourcesPath, "desk.html") : path.join(__dirname, "..", "..", "..", "prototype", "desk.html");
 
-function openAmano() {
-  if (amanoWin && !amanoWin.isDestroyed()) amanoWin.destroy();
-  // 맨 뒤 창: 보이기는 하지만 포커스를 가져가지 않는다
-  amanoWin = new BrowserWindow({ width: 1024, height: 768, show: false, skipTaskbar: true, title: "아마노 주차 (입장 데스크가 조작 중)", webPreferences: { backgroundThrottling: false } });
-  amanoWin.setMenuBarVisibility(false);
-  if (settings.amanoUrl) amanoWin.loadURL(settings.amanoUrl);
-  else amanoWin.loadURL("data:text/html;charset=utf-8," + encodeURIComponent("<p style='font:16px sans-serif;padding:24px'>운영 설정 → 아마노 탭에서 아마노 할인등록 주소를 넣어 주세요.</p>"));
+/* 아마노 창 만들기. 할인등록 화면으로 자동 이동 · 로그인이 풀리면 저장된 아이디로 자동 로그인
+   front = 근무자가 검색 · 선택하는 창(맨 뒤에 보임), back = 할인 등록만 뒤에서 하는 창(숨김, 근무자가 다음 차를 바로 검색할 수 있게 · 현장 10/6) */
+function makeAmanoWin(kind) {
+  const win = new BrowserWindow({ width: 1024, height: 768, show: false, skipTaskbar: true, title: kind === "back" ? "아마노 (뒤에서 할인 등록)" : "아마노 주차 (입장 데스크가 조작 중)", webPreferences: { backgroundThrottling: false } });
+  win.setMenuBarVisibility(false);
+  if (settings.amanoUrl) win.loadURL(settings.amanoUrl);
+  else win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent("<p style='font:16px sans-serif;padding:24px'>운영 설정 → 아마노 탭에서 아마노 할인등록 주소를 넣어 주세요.</p>"));
+  const sync = new AmanoSync((code) => timed(win.webContents.executeJavaScript(code, true), 8000, "아마노 화면이 응답하지 않음"), { selectors: settings.amanoSelectors });
   // 로그인하면 할인등록 화면으로 자동 이동 (근무자는 아침에 아이디·비밀번호만 넣으면 됨)
-  amanoWin.webContents.on("did-finish-load", async () => {
+  win.webContents.on("did-finish-load", async () => {
     if (!settings.amanoUrl) return;
     try {
       const target = new URL(settings.amanoPage, settings.amanoUrl).href;
-      const here = amanoWin.webContents.getURL();
-      const hasPassword = await amanoWin.webContents.executeJavaScript("!!document.querySelector('input[type=password]')");
+      const here = win.webContents.getURL();
+      const hasPassword = await win.webContents.executeJavaScript("!!document.querySelector('input[type=password]')");
       // 로그인이 풀렸으면 저장된 아이디·비밀번호로 자동 로그인 (한 번만 시도, 실패하면 근무자에게 맡김)
-      if (hasPassword && settings.amanoId && settings.amanoPwEnc && !amanoWin.__triedLogin) {
-        amanoWin.__triedLogin = true;
+      if (hasPassword && settings.amanoId && settings.amanoPwEnc && !win.__triedLogin) {
+        win.__triedLogin = true;
         const pw = safeStorage.decryptString(Buffer.from(settings.amanoPwEnc, "base64"));
-        await amano.login(settings.amanoId, pw);
+        await sync.login(settings.amanoId, pw);
         return;
       }
-      if (!hasPassword) amanoWin.__triedLogin = false;
-      if (!hasPassword && !here.startsWith(target)) amanoWin.loadURL(target);
-      else if (!hasPassword && deskWin) deskWin.focus(); // 할인등록 화면 준비됨 → 데스크를 앞으로
+      if (!hasPassword) win.__triedLogin = false;
+      if (!hasPassword && !here.startsWith(target)) win.loadURL(target);
+      else if (!hasPassword && kind === "front") {
+        if (deskWin) deskWin.focus(); // 할인등록 화면 준비됨 → 데스크를 앞으로
+        // 앞 창이 로그인된 뒤에 뒤 창을 엶 (같은 로그인을 같이 씀 → 두 번 로그인해서 서로 끊기는 일 없게)
+        if (!amanoBgWin || amanoBgWin.isDestroyed()) ({ win: amanoBgWin, sync: amanoBg } = makeAmanoWin("back"));
+      }
     } catch (e) {
       /* 주소가 잘못됨 등: 화면에 그대로 둠 */
     }
   });
-  amanoWin.once("ready-to-show", () => {
-    amanoWin.showInactive();
-    if (deskWin) deskWin.focus(); // 데스크가 늘 맨 앞
-  });
-  amanoWin.on("close", (e) => {
+  if (kind === "front") {
+    win.once("ready-to-show", () => {
+      win.showInactive();
+      if (deskWin) deskWin.focus(); // 데스크가 늘 맨 앞
+    });
+  }
+  win.on("close", (e) => {
     // 근무자가 아마노 창을 닫아도 꺼지지 않고 뒤로만 숨김
     if (!app.isQuitting) {
       e.preventDefault();
+      if (kind === "back") win.hide();
       if (deskWin) deskWin.focus(); // 닫지 않고 데스크 뒤로 (계속 조작해야 해서)
     }
   });
-  amano = new AmanoSync((code) => timed(amanoWin.webContents.executeJavaScript(code, true), 8000, "아마노 화면이 응답하지 않음"), { selectors: settings.amanoSelectors });
+  return { win, sync };
+}
+let amanoBgWin = null;
+let amanoBg = null;
+function openAmano() {
+  if (amanoWin && !amanoWin.isDestroyed()) amanoWin.destroy();
+  if (amanoBgWin && !amanoBgWin.isDestroyed()) amanoBgWin.destroy();
+  amanoBgWin = amanoBg = null;
+  ({ win: amanoWin, sync: amano } = makeAmanoWin("front"));
 }
 
 // 네이버 예약관리 창: 맨 뒤. 로그인(2단계 인증 포함)은 근무자가 처음 한 번 직접, 로그인 상태는 이 PC에 계속 남음(persist:naver)
@@ -201,6 +217,23 @@ ipcMain.handle("amano:select", wrap((id) => amano.select(id)));
 ipcMain.handle("amano:discount", wrap((type) => amano.discount(type)));
 ipcMain.handle("amano:remove", wrap((i) => amano.remove(i)));
 ipcMain.handle("amano:read", wrap(async () => ({ ok: true, state: await amano.read() })));
+// 뒤에서 할인 등록: 뒤 창에서 그 차를 검색 → 선택 → 할인 버튼 → '등록되었습니다' 확인까지 (근무자 화면은 기다리지 않음)
+ipcMain.handle("amano:job", async (_e, job) => {
+  try {
+    for (let i = 0; !amanoBg && i < 60; i++) await new Promise((r) => setTimeout(r, 1000)); // 켜자마자면 로그인 기다림
+    if (!amanoBg) return { ok: false, why: "아마노에 아직 로그인되지 않음" };
+    return await serial("amanoBg", () => timed((async () => {
+      let r = await amanoBg.search(job.day, job.no);
+      if (!r.ok) return r;
+      if (!r.state.rows.some((x) => x.id === job.id)) return { ok: false, why: `아마노 조회에서 ${job.carNo || job.no} 차를 못 찾음` };
+      r = await amanoBg.select(job.id);
+      if (!r.ok) return r;
+      return amanoBg.discount(job.type);
+    })(), 60000, "아마노가 1분 넘게 응답하지 않음"));
+  } catch (e) {
+    return { ok: false, why: String(e.message || e) };
+  }
+});
 ipcMain.handle("amano:show", () => {
   if (amanoWin) {
     amanoWin.show();
@@ -216,6 +249,7 @@ ipcMain.handle("amano:learn", wrap(async (key) => {
   settings.amanoSelectors = { ...settings.amanoSelectors, [key]: sel };
   saveSettings();
   amano.selectors = settings.amanoSelectors;
+  if (amanoBg) amanoBg.selectors = settings.amanoSelectors;
   deskWin.focus();
   return { ok: true, selector: sel };
 }));

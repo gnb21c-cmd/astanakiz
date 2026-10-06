@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld("desk", {
     search: (day, no) => ipcRenderer.invoke("amano:search", { day, no }),
     select: (id) => ipcRenderer.invoke("amano:select", id),
     discount: (type) => ipcRenderer.invoke("amano:discount", type),
+    job: (job) => ipcRenderer.invoke("amano:job", job), // 뒤에서 할인 등록 { day, no, id, carNo, type }
     remove: (index) => ipcRenderer.invoke("amano:remove", index),
     read: () => ipcRenderer.invoke("amano:read"),
     show: () => ipcRenderer.invoke("amano:show"),

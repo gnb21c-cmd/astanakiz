@@ -200,6 +200,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .key.pink { background: var(--pink); border: 2px solid var(--pink); color: var(--pink-fg); }
 .key.red { background: var(--red); border: 2px solid var(--red); color: #fff; }
 .key.void { visibility: hidden; }
+.key.bulk { aspect-ratio: auto; height: auto; min-height: 0; align-self: stretch; font-size: 14px; font-weight: 800; color: var(--accent); border: 2px solid var(--accent); background: var(--accent-bg); }
+.key.bulk:disabled { opacity: .45; }
+.bulklist { max-height: 300px; overflow: auto; display: grid; gap: 4px; margin: 6px 0; font-size: 13.5px; }
+.bulklist div { display: flex; justify-content: space-between; gap: 8px; padding: 4px 8px; border-radius: 6px; background: var(--surface-2); }
 .legend { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 11.5px; color: var(--muted); }
 .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: -1px; margin-right: 4px; border: 1.5px solid var(--line); background: var(--surface-2); }
 .legend .l-in { border-color: var(--ink); background: var(--surface); }
@@ -824,7 +828,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     $("key-stat").innerHTML = `사용 <b>${RULES.keys - freeKeys().length}</b>/${RULES.keys} · 현장 가능 <b>${base}</b>${all > base ? ` +유동 ${all - base}` : ""}`;
     let html = "";
     for (let k = 1; k <= 50; k++) {
-      if (k > RULES.keys) { html += `<span class="key void" aria-hidden="true"></span>`; continue; }
+      // 열쇠판 남는 칸(46~50) 자리에 '열쇠 일괄 반납처리'
+      if (k > RULES.keys) { html += `<button class="key bulk" data-act="bulkReturn" style="grid-column: span ${50 - RULES.keys}" ${holders().length ? "" : "disabled"}>열쇠 일괄 반납처리</button>`; break; }
       const h = holderOf(k);
       if (!h) { html += `<button class="key free" data-act="key" data-k="${k}" aria-label="${k}번 빈 열쇠"><b class="num">${k}</b><span>&nbsp;</span></button>`; continue; }
       html += `<button class="key ${keyColor(h, k)}" data-act="key" data-k="${k}" aria-label="${k}번 ${esc(h.name)}"><b class="num">${k}</b><span>${esc(h.walk ? "현장" : h.name)}</span></button>`;
@@ -865,6 +870,41 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   })();
   const amanoApi = REAL ? window.desk.amano : demoAmano;
   const park = { state: null, sel: null, busy: false, err: false, msg: "차량번호를 넣고 검색하면 아마노 화면에도 같은 값이 들어가요" };
+  /* 할인 등록은 뒤에서 (네이버 이용완료처럼): 누르면 바로 '등록 중'으로 보이고 근무자는 다음 차를 검색함.
+     실제 등록은 설치 앱의 숨은 아마노 창이 차례대로 하고, 실패하면 아래 줄에 빨갛게 남김 (꺼졌다 켜져도 이어서) */
+  const PJ_KEY = "astana.parkJobs";
+  park.jobs = (() => { try { return (JSON.parse(localStorage.getItem(PJ_KEY)) || []).map((j) => Object.assign(j, { run: false })); } catch (e) { return []; } })();
+  park.q = null; // 마지막 검색 { day, no }
+  function saveJobs() { try { localStorage.setItem(PJ_KEY, JSON.stringify(park.jobs)); } catch (e) {} }
+  let parkJobBusy = false;
+  async function parkFlush() {
+    if (parkJobBusy) return;
+    const j = park.jobs.find((x) => !x.why);
+    if (!j) return;
+    parkJobBusy = true; j.run = true; renderCars();
+    let r;
+    try { r = REAL ? await window.desk.amano.job(j) : await demoJob(j); } catch (e) { r = { ok: false, why: String(e && e.message || e) }; }
+    parkJobBusy = false; j.run = false;
+    if (r && r.ok) {
+      park.jobs.splice(park.jobs.indexOf(j), 1);
+      toast(`${j.carNo} ${j.type} 등록됨`);
+      const row = park.state && park.state.rows.find((x) => x.id === j.id);
+      if (row) row.count = (row.count || 0) + 1;
+      // 그 차를 보고 있으면 할인내역을 새로 읽음
+      if (park.sel === j.id && !park.busy) parkRun(`${j.carNo} 할인내역 새로 읽기`, () => amanoApi.select(j.id));
+    } else j.why = (r && r.why) || "아마노 화면이 응답하지 않음";
+    saveJobs(); renderCars();
+    setTimeout(parkFlush, 0);
+  }
+  // 체험판: 뒤 창 대신 1.5초 걸리는 척
+  async function demoJob(j) {
+    await new Promise((res) => setTimeout(res, 1500));
+    const keep = park.sel;
+    await demoAmano.select(j.id);
+    const r = await demoAmano.discount(j.type);
+    await demoAmano.select(keep);
+    return r;
+  }
   async function parkRun(msg, fn) {
     if (park.busy) return;
     park.busy = true; park.err = false; park.msg = msg + " …"; renderCars();
@@ -888,12 +928,16 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       : `<div class="empty">검색된 차량이 없어요</div>`;
     const d = st && park.sel && st.detail && st.detail.no ? st : null;
     const btn = (t) => `<button class="btn" data-act="discount" data-h="${t}" ${park.busy || (d.types.length && !d.types.includes(t)) ? "disabled" : ""}>${t.replace("할인", "")}</button>`;
+    const wait = d ? park.jobs.filter((j) => j.id === park.sel).map((j) => `<div><span class="num">${esc(j.type)} · ${j.why ? `<b style="color:var(--red)">등록 실패</b>` : "등록 중…"}</span><span></span></div>`).join("") : "";
     $("pcar").innerHTML = !d ? `<div class="empty">조회 목록에서 차량을 고르면 할인유형이 나와요</div>` : `
       <div class="no num">${esc(d.detail.no)}</div>
       <div class="tm num"><span>입차 ${esc(d.detail.at.slice(5, 16))}</span><b>${esc(d.detail.parked)}</b></div>
       <div class="dbtns">${DISC.map(btn).join("")}</div>
-      <div class="dlist">${d.history.length ? d.history.map((h, i) => `<div><span class="num">${esc(h.type)} · ${esc(String(h.at).slice(11, 16))}</span>${h.canDelete === false ? `<span class="help">${esc(h.note || "삭제 불가")}</span>` : `<button data-act="discDel" data-i="${i}" aria-label="할인 삭제" ${dis}>삭제</button>`}</div>`).join("") : `<span class="help">할인내역 없음</span>`}</div>`;
-    $("synclog").innerHTML = `아마노${REAL ? "" : "(체험)"}: <b style="color:${park.err ? "var(--red)" : "inherit"}">${esc(park.msg)}</b>`;
+      <div class="dlist">${wait}${d.history.length ? d.history.map((h, i) => `<div><span class="num">${esc(h.type)} · ${esc(String(h.at).slice(11, 16))}</span>${h.canDelete === false ? `<span class="help">${esc(h.note || "삭제 불가")}</span>` : `<button data-act="discDel" data-i="${i}" aria-label="할인 삭제" ${dis}>삭제</button>`}</div>`).join("") : wait ? "" : `<span class="help">할인내역 없음</span>`}</div>`;
+    const bad = park.jobs.filter((j) => j.why), going = park.jobs.length - bad.length;
+    $("synclog").innerHTML = bad.length
+      ? `<b style="color:var(--red)">⚠ 할인 등록 실패 ${bad.map((j) => `${esc(j.carNo)} ${esc(j.type)}`).join(", ")} — ${esc(bad[0].why)}</b> <button class="btn btn-sm" data-act="parkRetry">다시</button> <button class="btn btn-sm" data-act="parkDrop">지우기</button>`
+      : `아마노${REAL ? "" : "(체험)"}: ${going ? `<b>뒤에서 할인 등록 중 ${going}건</b> · ` : ""}<b style="color:${park.err ? "var(--red)" : "inherit"}">${esc(park.msg)}</b>`;
   }
 
   function refreshText() {
@@ -999,6 +1043,19 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           <button class="btn" data-act="pay" ${st.over || (st.flex && !sheet.flexOk) ? "disabled" : ""}>결제하기 (POS 화면으로)</button>
           <button class="btn btn-ink" id="w-done" data-act="walkDone" ${st.over || !st.phoneOk || (st.flex && !sheet.flexOk) ? "disabled" : ""}>결제 완료 · 열쇠 등록</button>
         </div>`;
+      return;
+    }
+    if (sheet.mode === "bulk") {
+      // 열쇠 일괄 반납: 지금 열쇠를 가진 손님 모두 (영업 마감 등)
+      const hs = holders().slice().sort((a, b) => Math.min(...a.keys) - Math.min(...b.keys));
+      const nKeys = hs.reduce((a, h) => a + h.keys.length, 0);
+      const owing = hs.filter((h) => overInfo(h).due > 0 && !h.overPaid);
+      el.innerHTML = `
+        <h3 id="sheet-title">열쇠 일괄 반납처리 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
+        <p class="help">지금 열쇠를 가진 손님 ${hs.length}명 · 열쇠 ${nKeys}개를 모두 반납 · 퇴장 처리합니다.</p>
+        ${owing.length ? `<div class="banner warn">초과요금이 남은 손님 ${owing.length}명: ${owing.map((h) => `${esc(h.walk ? "현장" : h.name)} ${won(overInfo(h).due)}`).join(", ")} — 결제했는지 확인하세요</div>` : ""}
+        <div class="bulklist">${hs.map((h) => `<div><span>${esc(h.walk ? "현장입장" : h.name)}</span><b class="num">${h.keys.join(", ")}번</b></div>`).join("")}</div>
+        <div class="sheet-foot"><button class="btn" data-act="close" data-autofocus>닫기</button><button class="btn btn-red" data-act="bulkDo" ${hs.length ? "" : "disabled"}>모두 반납 (${hs.length}명 · ${nKeys}개)</button></div>`;
       return;
     }
     if (sheet.mode === "key") {
@@ -1442,6 +1499,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const w = walkin(digits(sheet.phone), sheet.keys, now);
       closeSheet(); toast(`현장입장자 · 열쇠 ${w.keys.join(", ")}번 등록${printForm("enter", keyVals(w))}`); renderAll();
     },
+    bulkReturn() { openSheet({ mode: "bulk" }); },
+    bulkDo() {
+      const hs = holders().slice();
+      const n = hs.reduce((a, h) => a + h.keys.length, 0);
+      for (const h of hs) { h.keys = []; h.outAt = now; }
+      closeSheet(); renderAll(); toast(`열쇠 ${n}개 일괄 반납 · ${hs.length}명 퇴장 처리`);
+    },
     returnAll() { const h = holderById(sheet.hid); returnKeys(h, h.keys.slice()); closeSheet(); renderAll(); },
     returnKey(btn) {
       const h = holderById(sheet.hid); returnKeys(h, [Number(btn.dataset.k)]); renderAll();
@@ -1514,7 +1578,23 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const c = park.state.rows.find((x) => x.id === park.sel);
       parkRun(`${c.no} 선택`, () => amanoApi.select(park.sel));
     },
-    discount(btn) { parkRun(`'${btn.dataset.h}' 누름`, () => amanoApi.discount(btn.dataset.h)); },
+    // 할인 버튼: 기다리지 않고 '등록 중'으로 올린 뒤 바로 다음 차 검색 (등록은 뒤에서)
+    discount(btn) {
+      const c = park.state.rows.find((x) => x.id === park.sel), type = btn.dataset.h;
+      if (!c || !park.q) return;
+      if (park.jobs.some((j) => j.id === c.id && j.type === type && !j.why)) { toast(`${c.no} ${type}은 이미 등록 중이에요`); return; }
+      park.jobs.push({ day: park.q.day, no: park.q.no, id: c.id, carNo: c.no, type, at: hm(now) });
+      saveJobs();
+      park.err = false; park.msg = `${c.no} ${type} → 뒤에서 등록 중. 다음 차를 검색하세요`;
+      renderCars();
+      $("car-q").value = ""; $("car-q").focus();
+      parkFlush();
+    },
+    parkRetry() { park.jobs.forEach((j) => delete j.why); saveJobs(); renderCars(); parkFlush(); },
+    parkDrop() {
+      if (!confirm("실패한 할인 등록을 지울까요? 아마노에는 등록되지 않은 상태예요.")) return;
+      park.jobs = park.jobs.filter((j) => !j.why); saveJobs(); renderCars();
+    },
     discDel(btn) { parkRun("할인내역 삭제", () => amanoApi.remove(Number(btn.dataset.i))); },
     amanoShow() { if (REAL) window.desk.amano.show(); },
     naverShow() { if (APP) window.desk.naver.show(); },
@@ -1556,7 +1636,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     e.preventDefault();
     const day = $("car-day").value, no = digits($("car-q").value);
     if (!no) { toast("차량번호를 넣어 주세요"); return; }
-    park.sel = null;
+    park.sel = null; park.q = { day, no };
     parkRun(`입차일 ${day} · 차량번호 ${no} 검색`, () => amanoApi.search(day, no));
   });
 
@@ -1607,5 +1687,6 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   })();
   fit();
   renderAll();
+  parkFlush(); // 꺼지기 전에 남은 할인 등록 이어서
 })();
 </script>

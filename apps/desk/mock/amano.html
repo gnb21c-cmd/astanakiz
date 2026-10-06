@@ -50,7 +50,8 @@
   try { db = JSON.parse(localStorage.getItem(KEY)) || seed(); } catch (e) { db = seed(); }
   const save = () => localStorage.setItem(KEY, JSON.stringify(db));
   const $ = (id) => document.getElementById(id);
-  const ajax = (fn) => { $("modal-overlay").style.display = ""; setTimeout(() => { $("modal-overlay").style.display = "none"; fn(); }, 250); };
+  // 진짜 서버처럼: 요청마다 저장된 자료를 다시 읽음 (창 두 개가 같은 서버를 씀)
+  const ajax = (fn) => { $("modal-overlay").style.display = ""; setTimeout(() => { try { db = JSON.parse(localStorage.getItem(KEY)) || db; } catch (e) {} $("modal-overlay").style.display = "none"; fn(); }, 250); };
 
   // jquery.modal 비슷한 알림 창 (OK 를 눌러야 닫힘)
   function modal(text, buttons) {

@@ -24,11 +24,21 @@ test("데스크 주차등록 칸에서 누른 것이 아마노 화면에 그대�
     await amanoPage.goto(MOCK);
     const sync = new AmanoSync((code) => amanoPage.evaluate(code), { timeout: 6000 });
 
+    // 뒤에서 할인 등록하는 숨은 아마노 창 (main.js 의 amano:job 과 같은 순서)
+    const bgPage = await ctx.newPage();
+    await bgPage.goto(MOCK);
+    const bg = new AmanoSync((code) => bgPage.evaluate(code), { timeout: 6000 });
+    const job = async (j) => {
+      let r = await bg.search(j.day, j.no);
+      if (!r.ok) return r;
+      r = await bg.select(j.id);
+      return r.ok ? bg.discount(j.type) : r;
+    };
     const desk = await ctx.newPage();
-    await desk.exposeFunction("__bridge", (fn, args) => sync[fn](...args));
+    await desk.exposeFunction("__bridge", (fn, args) => (fn === "job" ? job(...args) : sync[fn](...args)));
     await desk.addInitScript(() => {
       const call = (fn) => (...args) => window.__bridge(fn, args);
-      window.desk = { amano: { search: call("search"), select: call("select"), discount: call("discount"), remove: call("remove") } };
+      window.desk = { amano: { search: call("search"), select: call("select"), discount: call("discount"), remove: call("remove"), job: call("job") } };
     });
     const errs = [];
     desk.on("pageerror", (e) => errs.push(e.message));
@@ -47,9 +57,14 @@ test("데스크 주차등록 칸에서 누른 것이 아마노 화면에 그대�
     assert.match(await desk.textContent("#pcar .tm"), /5시간 45분/, "아마노 주차시간을 읽어 옴");
 
     await desk.click('[data-act=discount][data-h="5시간할인"]');
-    await desk.waitForFunction(() => document.querySelectorAll("#pcar .dlist div").length === 3);
-    assert.match(await amanoPage.textContent("body"), /5시간할인/, "아마노 할인내역에 등록됨");
+    // 기다리지 않음: 바로 '등록 중'이 보이고 검색칸이 비어 다음 차를 넣을 수 있음
+    assert.match(await desk.textContent("#pcar .dlist"), /5시간할인 · 등록 중/);
+    assert.strictEqual(await desk.inputValue("#car-q"), "");
+    // 뒤 창이 등록하면 내역을 새로 읽어 3건
+    await desk.waitForFunction(() => document.querySelectorAll("#pcar .dlist div").length === 3 && !/등록 중/.test(document.querySelector("#pcar .dlist").textContent));
+    assert.match(await bgPage.textContent("body"), /5시간할인/, "아마노 할인내역에 등록됨");
     assert.match(await desk.textContent("#synclog"), /완료/);
+    assert.strictEqual(await desk.evaluate(() => localStorage.getItem("astana.parkJobs")), "[]", "남은 일 없음");
 
     await desk.click('[data-act=discDel][data-i="0"]');
     await desk.waitForFunction(() => document.querySelectorAll("#pcar .dlist div").length === 2);
