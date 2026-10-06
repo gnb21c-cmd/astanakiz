@@ -173,6 +173,7 @@ public class W {
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
   [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c);
+  [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr h);
@@ -182,29 +183,39 @@ public class W {
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint p);
 }
 "@
-$wins = New-Object System.Collections.ArrayList
-$cb = [W+EnumProc]{ param($h, $l)
-  if ([W]::IsWindowVisible($h)) { $sb = New-Object System.Text.StringBuilder 512; [void][W]::GetWindowText($h, $sb, 512); $t = $sb.ToString()
-    $p = 0; [void][W]::GetWindowThreadProcessId($h, [ref]$p); $n = ""; try { $n = (Get-Process -Id $p).ProcessName } catch {}
+function All {
+  $l = New-Object System.Collections.ArrayList
+  $cb = [W+EnumProc]{ param($h, $x)
+    $sb = New-Object System.Text.StringBuilder 512; [void][W]::GetWindowText($h, $sb, 512)
+    $p = 0; [void][W]::GetWindowThreadProcessId($h, [ref]$p)
     $r = New-Object W+RECT; [void][W]::GetWindowRect($h, [ref]$r)
-    [void]$wins.Add([pscustomobject]@{ h = $h; t = $t; n = $n; p = $p; a = [Math]::Max(0, $r.R - $r.L) * [Math]::Max(0, $r.B - $r.T); ic = [W]::IsIconic($h) }) }
-  return $true }
-[void][W]::EnumWindows($cb, [IntPtr]::Zero)
-$named = $wins | Where-Object { $_.t }
+    [void]$l.Add([pscustomobject]@{ h = $h; t = $sb.ToString(); p = $p; v = [W]::IsWindowVisible($h); ic = [W]::IsIconic($h); a = [Math]::Max(0, $r.R - $r.L) * [Math]::Max(0, $r.B - $r.T) })
+    return $true }
+  [void][W]::EnumWindows($cb, [IntPtr]::Zero)
+  return $l
+}
+$wins = All
+$named = $wins | Where-Object { $_.v -and $_.t }
+$names = @{}; foreach ($w in $named) { if (-not $names.ContainsKey($w.p)) { try { $names[$w.p] = (Get-Process -Id $w.p).ProcessName } catch { $names[$w.p] = "" } } }
 $want = $env:ASTANA_POS
 $hit = $null
 if ($want) { $hit = $named | Where-Object { $_.t -like "*$want*" } | Select-Object -First 1 }
 if (-not $hit) { $hit = $named | Where-Object { $_.t -match "OKPOS|NICE|POS" -and $_.t -notmatch "아스타나키즈|입장 데스크" } | Select-Object -First 1 }
-if (-not $hit) { $hit = $named | Where-Object { $_.n -match "okpos" } | Select-Object -First 1 }
+if (-not $hit) { $hit = $named | Where-Object { $names[$_.p] -match "okpos" } | Select-Object -First 1 }
 if (-not $hit) { [Console]::Out.Write("none|" + (($named | ForEach-Object { $_.t }) -join " / ")); exit }
-# 작업표시줄 단추만 있는 크기 0 창(델파이 프로그램 등)이 걸리면 화면이 안 바뀜 → 같은 프로그램에서 실제로 보이는 가장 큰 창을 앞으로 (현장 10/6)
-if ($hit.ic) { [void][W]::ShowWindow($hit.h, 9) }
-$same = $wins | Where-Object { $_.p -eq $hit.p }
-$main = $same | Where-Object { -not $_.ic -and $_.a -gt 40000 } | Sort-Object a -Descending | Select-Object -First 1
-if (-not $main) { $main = $same | Where-Object { $_.ic } | Select-Object -First 1 }
-if (-not $main) { $main = $hit }
+$pid0 = $hit.p
+# 그 프로그램에서 실제로 펼쳐져 보이는 큰 창 (작업표시줄 단추용 크기 0 창은 빼고)
+function Main { All | Where-Object { $_.p -eq $pid0 -and $_.v -and -not $_.ic -and $_.a -gt 40000 } | Sort-Object a -Descending | Select-Object -First 1 }
+$main = Main
+if (-not $main) {
+  # 최소화돼 있음 → 작업표시줄의 POS 아이콘을 누른 것과 같은 '복원' 신호를 그 프로그램의 창들에 보냄 (현장 10/6: ShowWindow 만으로는 OKPOS가 안 펼쳐짐)
+  foreach ($w in ($wins | Where-Object { $_.p -eq $pid0 -and $_.v })) {
+    if ($w.ic) { [void][W]::PostMessage($w.h, 0x0112, [IntPtr]0xF120, [IntPtr]::Zero); [void][W]::ShowWindow($w.h, 9) }
+  }
+  for ($i = 0; $i -lt 20 -and -not $main; $i++) { Start-Sleep -Milliseconds 100; $main = Main }
+}
+if (-not $main) { [Console]::Out.Write("shut|" + $hit.t); exit }
 $h = $main.h
-if ([W]::IsIconic($h)) { [void][W]::ShowWindow($h, 9) } else { [void][W]::ShowWindow($h, 5) }
 # 다른 프로그램을 앞으로 올릴 때 Windows가 막는 것 풀기: Alt 한 번 + 지금 앞 창의 입력에 잠깐 붙기
 $fg = [W]::GetForegroundWindow(); $q = 0
 $ft = [W]::GetWindowThreadProcessId($fg, [ref]$q); $me = [W]::GetCurrentThreadId()
@@ -212,17 +223,21 @@ $ft = [W]::GetWindowThreadProcessId($fg, [ref]$q); $me = [W]::GetCurrentThreadId
 [W]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero); [W]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
 [void][W]::BringWindowToTop($h); [void][W]::SetForegroundWindow($h)
 [void][W]::AttachThreadInput($me, $ft, $false)
-$ok = [W]::GetForegroundWindow() -eq $h
-[Console]::Out.Write($(if ($ok) { "ok|" } else { "fg|" }) + $h.ToInt64() + "|" + $main.t + " (" + $hit.n + ", 창 " + $same.Count + "개)")
+[Console]::Out.Write("ok|" + $h.ToInt64() + "|" + $main.t + " (" + $names[$pid0] + ")")
 `;
-// POS 창이 최소화(또는 닫힘)될 때까지 기다림 → 그때 데스크를 다시 올림
+// POS 창이 펼쳐진 걸 본 뒤, 다시 최소화(숨김 · 닫힘)될 때까지 기다림 → 그때 데스크를 다시 올림
 const POS_WAIT_PS = `
 Add-Type @"
 using System; using System.Runtime.InteropServices;
-public class V { [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h); [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr h); }
+public class V { [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h); [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr h); [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h); }
 "@
 $h = [IntPtr][Int64]$env:ASTANA_HWND
-for ($i = 0; $i -lt 3000; $i++) { if (-not [V]::IsWindow($h) -or [V]::IsIconic($h)) { [Console]::Out.Write("back"); exit }; Start-Sleep -Milliseconds 300 }
+$open = { [V]::IsWindow($h) -and [V]::IsWindowVisible($h) -and -not [V]::IsIconic($h) }
+$seen = $false
+for ($i = 0; $i -lt 3000; $i++) {
+  if (& $open) { $seen = $true } elseif ($seen) { [Console]::Out.Write("back"); exit } elseif ($i -gt 10) { [Console]::Out.Write("never"); exit }
+  Start-Sleep -Milliseconds 300
+}
 [Console]::Out.Write("timeout")
 `;
 let posWatch = 0;
@@ -231,15 +246,16 @@ async function showPos() {
   // 최소화 단추를 누른 것처럼 데스크를 먼저 내리고 POS를 올림 (데스크가 앞에 버티고 있으면 POS가 안 보여서 · 현장 10/6)
   if (deskWin) deskWin.minimize();
   const out = await psRun(POS_PS, { ASTANA_POS: settings.posTitle || "" });
-  const m = /^(ok|fg)\|(-?\d+)\|(.*)$/s.exec(out);
+  const m = /^ok\|(-?\d+)\|(.*)$/s.exec(out);
   if (!m) {
     if (deskWin) { deskWin.restore(); deskWin.focus(); }
+    if (out.startsWith("shut|")) return { ok: false, why: "POS가 최소화돼 있는데 펼치지 못했어요 — 작업표시줄의 POS 아이콘을 직접 눌러 주세요" };
     if (out.startsWith("none|")) return { ok: false, why: `POS 창을 찾지 못함 — OKPOS가 켜져 있는지 확인해 주세요 (열린 창: ${out.slice(5).slice(0, 200)})` };
     return { ok: false, why: `POS 창으로 못 넘어감: ${out.slice(0, 200)}` };
   }
   // POS를 최소화하면 데스크가 다시 올라옴 (데스크의 focus 이벤트 → 결제 완료 단계)
   const my = ++posWatch;
-  psRun(POS_WAIT_PS, { ASTANA_HWND: m[2] }, null, 16 * 60 * 1000).then((r) => {
+  psRun(POS_WAIT_PS, { ASTANA_HWND: m[1] }, null, 16 * 60 * 1000).then((r) => {
     if (my !== posWatch || !deskWin || r !== "back") return;
     // Windows가 뒤 프로그램이 앞으로 나오는 걸 막을 수 있어 잠깐 '맨 위'로 올렸다가 풂
     deskWin.restore();
@@ -249,7 +265,7 @@ async function showPos() {
     deskWin.focus();
     setTimeout(() => deskWin && deskWin.setAlwaysOnTop(false), 300);
   });
-  return { ok: true, title: m[3] };
+  return { ok: true, title: m[2] };
 }
 
 // 데스크 화면 ↔ 이 프로그램
