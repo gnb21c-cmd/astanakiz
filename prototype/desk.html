@@ -150,6 +150,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .paper .mid { text-align: center; font-size: 16px; font-weight: 700; }
 .paper .bd { font-weight: 700; }
 .paper .hr { border-top: 1px dashed #111; margin: 6px 0; }
+.paper .hr2 { border-top: 3px double #111; }
 .sheet.keysheet { width: min(560px, 100%); }  /* 열쇠 10개(5개 × 2줄)가 들어가는 크기 */
 .rbtns { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
 .rbtns .btn { min-height: 44px; font-size: 15px; }
@@ -1059,9 +1060,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
               <div class="help">입장권 (네이버 · 현장) · 초과요금은 POS에서 결제하고 POS 영수증을 드려요 · <button class="btn btn-sm" data-act="resetForm">기본 양식으로</button></div>
               <label class="chk"><input type="checkbox" id="form-auto" ${f.auto ? "checked" : ""}> ${f.when}에 자동 출력</label>
               <textarea id="form-text" spellcheck="false" aria-label="양식 내용">${esc(f.text)}</textarea>
-              <span class="help">넣을 수 있는 값: ${PRINT_KEYS.map((k) => `{${k}}`).join(" ")}<br>줄 앞에 <b>#</b> 2배 · <b>##</b> 3배 · <b>###</b> 4배 (가운데) · <b>^</b> 가운데 · <b>*</b> 굵게 — 붙여 씀: <b>#*</b> 2배 굵게 · <b>^*</b> 가운데 굵게 · <b>---</b> 구분선 · <b>[네이버]</b> 네이버 예약만 · <b>[현장]</b> 현장입장만 · <b>[사은권]</b> 사은권 회차만</span></div>
+              <span class="help">넣을 수 있는 값: ${PRINT_KEYS.map((k) => `{${k}}`).join(" ")}<br>줄 앞에 <b>#</b> 2배 · <b>##</b> 3배 · <b>###</b> 4배 (가운데) · <b>^</b> 가운데 · <b>*</b> 굵게 — 붙여 씀: <b>#*</b> 2배 굵게 · <b>^*</b> 가운데 굵게 · <b>---</b> 구분선 · <b>===</b> 이중선 · <b>[네이버]</b> 네이버 예약만 · <b>[현장]</b> 현장입장만 · <b>[사은권]</b> 사은권 회차만</span></div>
           </div>
-          <div class="field"><span class="label">미리보기 <span class="help">80mm 폭 (예시 값)</span></span><div class="paper" id="paper">${paperHtml(f.text, SAMPLE)}</div></div>
+          <div class="field"><span class="label">미리보기 <span class="help">80mm 폭 (예시 값)</span> <button class="btn btn-sm ${SAMPLE === SAMPLE_NAVER ? "btn-ink" : ""}" data-act="previewKind" data-k="naver">네이버</button><button class="btn btn-sm ${SAMPLE === SAMPLE_WALK ? "btn-ink" : ""}" data-act="previewKind" data-k="walk">현장</button></span><div class="paper" id="paper">${paperHtml(f.text, SAMPLE)}</div></div>
         </div>
         <div class="sheet-foot"><button class="btn btn-ink" data-act="close">닫기</button></div>`;
     }
@@ -1073,31 +1074,37 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
      체험판: 목록과 출력은 흉내만 내고, 양식과 미리보기는 그대로 동작
      양식 문법: 줄 앞 # 크게 가운데 · ^ 가운데 · --- 구분선 · [네이버] 네이버 예약만 · [현장] 현장입장만 · [사은권] 사은권 받는 회차만 */
   const PRINT_KEYS = ["구분", "고객", "전화뒤4", "열쇠", "입장시간", "퇴장시간", "누계", "기준회", "사은권", "날짜", "시각"];
-  const SAMPLE = { 구분: "네이버", 고객: "송*온", 전화뒤4: "5489", 열쇠: "3, 13", 입장시간: "오후 2시 00분", 퇴장시간: "오후 3시 50분", 누계: "10", 기준회: "10", 사은권: "2만원 사은권", 날짜: "2026-10-05", 시각: "13:55", _네이버: true, _현장: false, _사은권: true };
+  const SAMPLE_NAVER = { 구분: "네이버", 고객: "송*온", 전화뒤4: "5489", 열쇠: "3, 13", 입장시간: "오후 2시 00분", 퇴장시간: "오후 3시 50분", 누계: "8", 기준회: "10", 사은권: "2만원 사은권", 날짜: "2026-10-06", 시각: "13:55", _네이버: true, _현장: false, _사은권: false };
+  const SAMPLE_WALK = { 구분: "현장", 고객: "   ", 전화뒤4: "9013", 열쇠: "30", 입장시간: "오후 12시 40분", 퇴장시간: "오후 2시 30분", 누계: "", 기준회: "10", 사은권: "2만원 사은권", 날짜: "2026-10-06", 시각: "12:40", _네이버: false, _현장: true, _사은권: false };
+  let SAMPLE = SAMPLE_NAVER; // 미리보기 · 테스트 출력 예시 (네이버 / 현장)
+  // OK-50 한 줄 = 42칸 (한글 21자 · 2배 글씨는 한글 10자). 선 아래는 원래 쓰던 OKPOS 입장권 내용 (현장 사진 10/6)
+  const ENTER_FORM_VER = 2; // 기본 양식을 바꾸면 올림 → 예전 기본 양식으로 저장된 PC 도 새 기본 양식으로
   const ENTER_FORM = [
-    "#* 아스타나키즈 {구분} 입장권",
+    "#* 아스타나키즈",
+    "^* {구분} 입장권",
     "---",
     "고객명    {고객} ({전화뒤4})",
     "열쇠      {열쇠}번",
     "입장시간  {입장시간}",
     "퇴장시간  {퇴장시간}",
-    "---",
-    "[네이버]#* {고객}님 네이버 ID 이용완료 누계는",
-    "[네이버]#* 이번 완료까지 {누계}회 입니다",
-    "[사은권]#* ★ {사은권} 증정 ★",
-    "[네이버]^이용완료 실적 기준입니다.",
-    "[네이버]^실적 {기준회}회 마다 {사은권}을 드려요",
-    "[네이버]---",
-    "[현장]#* 네이버에서 아스타나키즈",
-    "[현장]#* 검색 후 예약하세요",
-    "[현장]^네이버 예약 이용완료 실적에 따라",
-    "[현장]^{기준회}회마다 {사은권}을 드려요",
-    "[현장]---",
-    "^이용수칙",
-    "1. 외부음식은 분유/이유식/보리차 만 허용됩니다.",
-    "2. 지연퇴장은 5000원/10분 페널티 발생합니다.",
-    "3. 신발장 미보관, 분실은 책임지지 않습니다.",
-    "4. 1명 이상의 보호자 반드시 동반 입장해주세요.",
+    "===",
+    "[네이버]^* * 아키 마일리지 *",
+    "[네이버]^고객님께서는",
+    "[네이버]#* {누계}번째 방문입니다",
+    "[사은권]#* ★ 사은권 증정 ★",
+    "[네이버]^{기준회}번째 방문시 2만원 마일리지 사은권 증정",
+    "[네이버]^(네이버 예약 이용완료 기준)",
+    "[현장]#* 네이버 예약하고",
+    "[현장]#* 마일리지 받으세요",
+    "[현장]^네이버에서 '아스타나키즈' 검색 → 예약",
+    "[현장]^예약 이용완료 {기준회}회마다 2만원 사은권 증정",
+    "^[평일 시간제한 X 이벤트 = 8/18 ~ 11/30]",
+    "===",
+    "^* 퇴장시간 지연 ▶ 10분당 5,000원",
+    "^외부 식음료 취식 적발 ▶ 수거 폐기",
+    "^아스타나키즈는 고정형 놀이시설 입니다",
+    "^보호자님은 사고/다툼 없도록 지켜봐주세요",
+    "^주차 등록은 키즈입구 직원에게 등록",
     "---",
     "^{날짜} {시각}",
   ].join("\n");
@@ -1111,7 +1118,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   // 설치한 앱: 고른 프린터 · 양식은 이 PC 설정에 저장 (껐다 켜도 그대로)
   if (APP && window.desk.config) window.desk.config.get().then((c) => {
     if (c && c.printer) PRINT.sel = c.printer;
-    if (c && c.printForm) Object.assign(PRINT.forms.enter, c.printForm);
+    if (c && c.printForm) { Object.assign(PRINT.forms.enter, c.printForm); if (c.printForm.ver !== ENTER_FORM_VER) PRINT.forms.enter.text = ENTER_FORM; }
     if (c && c.printCut === false) PRINT.cut = false;
     if (c && c.printMode) PRINT.mode = c.printMode;
     if (c && c.comPort) PRINT.port = c.comPort;
@@ -1125,7 +1132,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   }
   if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c && Array.isArray(c.peaks) && c.peaks.length) { RULES.peaks = c.peaks; renderAll(); } }).catch(() => {});
   else try { const v = JSON.parse(localStorage.getItem("astanakiz-peaks")); if (Array.isArray(v) && v.length) RULES.peaks = v; } catch (e) { /* 없음 */ }
-  const savePrint = () => { if (APP && window.desk.config) window.desk.config.set({ printer: PRINT.sel, printCut: PRINT.cut, printMode: PRINT.mode, comPort: PRINT.port, comBaud: PRINT.baud, printForm: { text: PRINT.forms.enter.text, auto: PRINT.forms.enter.auto } }); };
+  const savePrint = () => { if (APP && window.desk.config) window.desk.config.set({ printer: PRINT.sel, printCut: PRINT.cut, printMode: PRINT.mode, comPort: PRINT.port, comBaud: PRINT.baud, printForm: { text: PRINT.forms.enter.text, auto: PRINT.forms.enter.auto, ver: ENTER_FORM_VER } }); };
   // 영수증 프린터처럼 보이는 이름 (처음 찾을 때 자동으로 고름)
   const RECEIPT_RE = /pos|receipt|영수증|감열|thermal|80|srp|bixolon|빅솔론|sewoo|세우|lk-|tm-|epson|rongta|xprinter|hwasung|화성|hmk|star|citizen|okpos/i;
 
@@ -1141,6 +1148,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       // 값이 비어 있는 칸이 든 줄은 뺌
       if ([...l.matchAll(/\{([^}]+)\}/g)].some(([, k]) => k in v && v[k] === "")) continue;
       if (l.trim() === "---") { out.push({ k: "hr", t: "" }); continue; }
+      if (l.trim() === "===") { out.push({ k: "hr2", t: "" }); continue; }
       // 줄 앞 표시 (붙여 씀, 뒤에 띄어쓰기 하나는 없어도 됨):
       //   # 개수 = 크기 배수 (# 2배 · ## 3배 · ### 4배, 가운데) · ^ 가운데 · * 굵게   예) "#* 제목" = 2배 굵게, "^* 안내" = 가운데 굵게
       const m = /^([#^*]+) ?/.exec(l);
@@ -1154,13 +1162,14 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   }
   function paperLines(text, v) {
     // 크기는 실제 출력 비율대로 (보통 1배 ≈ 8.5pt, n배 ≈ 8.5pt × n)
-    return receiptLines(text, v).map((x) => x.k === "hr" ? `<div class="pl hr"></div>` : `<div class="pl ${x.k === "txt" ? "" : x.k === "big" ? "ctr" : x.k}${x.bold ? " bd" : ""}"${x.size > 1 ? ` style="font-size:${(x.size * 8.5).toFixed(1)}pt;line-height:1.2"` : ""}>${esc(x.t) || "&nbsp;"}</div>`).join("");
+    return receiptLines(text, v).map((x) => x.k === "hr" || x.k === "hr2" ? `<div class="pl ${x.k === "hr2" ? "hr hr2" : "hr"}"></div>` : `<div class="pl ${x.k === "txt" ? "" : x.k === "big" ? "ctr" : x.k}${x.bold ? " bd" : ""}"${x.size > 1 ? ` style="font-size:${(x.size * 8.5).toFixed(1)}pt;line-height:1.2"` : ""}>${esc(x.t) || "&nbsp;"}</div>`).join("");
   }
   /** POS 영수증 프린터(ESC/POS)로 바로 보낼 조각: { b: [바이트] } 명령 · { t: "글" } 한글(CP949) — 80mm 글꼴 A 48칸 */
+  const LINE_COLS = 42; // OK-50 한 줄 칸 수 (현장 출력으로 확인 10/6 — 48칸이면 넘침)
   function escposParts(text, v, cut) {
     const P = [{ b: [0x1b, 0x40] }, { b: [0x1c, 0x26] }]; // 초기화 · 한글 모드
     for (const x of receiptLines(text, v)) {
-      if (x.k === "hr") { P.push({ b: [0x1b, 0x61, 0] }, { t: "-".repeat(48) + "\n" }); continue; }
+      if (x.k === "hr" || x.k === "hr2") { P.push({ b: [0x1b, 0x61, 0] }, { t: (x.k === "hr2" ? "=" : "-").repeat(LINE_COLS) + "\n" }); continue; }
       P.push({ b: [0x1b, 0x61, x.k === "txt" ? 0 : 1] }); // 왼쪽 · 가운데
       // 크기: n배 → GS ! (가로 n-1 << 4 | 세로 n-1). 한글(FS !)은 2배까지만 → 2배 이상이면 한글도 2배 + GS ! 로 키움
       const n = x.size || 1;
@@ -1186,6 +1195,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       .mid { text-align: center; font-family: "Malgun Gothic", "맑은 고딕", sans-serif; font-size: 12pt; font-weight: 700; }
       .bd { font-weight: 700; }
       .hr { border-top: 1px dashed #000; margin: 2mm 0; }
+      .hr2 { border-top: 3px double #000; }
     </style></head><body>${paperLines(text, v)}</body></html>`;
   }
   /** 양식대로 출력. 돌려주는 글은 알림에 붙임. 출력 결과는 따로 알림 */
@@ -1219,8 +1229,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     const out = main == null ? "시간제한 없음" : krTime(h.slot + main) + (extra.length ? ` (${extra.map((e) => `${e.k}번 ${krTime(h.slot + e.m)}`).join(", ")})` : "");
     const naver = !h.walk;
     return {
-      구분: naver ? "네이버" : "현장", 고객: h.walk ? "   " : maskName(h.name), // 현장 이용자는 이름을 모름 → 빈칸 (줄은 그대로) 전화뒤4: digits(h.phone).slice(-4), 열쇠: h.keys.join(", "),
-      입장시간: krTime(h.enteredAt), 퇴장시간: out, 누계: h.visitNo ? String(h.visitNo) : "", 기준회: String(RULES.giftEvery), 사은권: RULES.giftName,
+      // 현장 이용자는 이름을 모름 → 고객명은 빈칸 (줄은 그대로)
+      구분: naver ? "네이버" : "현장", 고객: h.walk ? "   " : maskName(h.name), 전화뒤4: digits(h.phone).slice(-4), 열쇠: h.keys.join(", "),
+      // 입장시간 = 예약한 입장 시간 (현장은 입장한 시각)
+      입장시간: krTime(h.slot), 퇴장시간: out, 누계: h.visitNo ? String(h.visitNo) : "", 기준회: String(RULES.giftEvery), 사은권: RULES.giftName,
       날짜: TODAY, 시각: hm(now), _네이버: naver && !!h.visitNo, _현장: !naver, _사은권: naver && !!h.visitNo && isGift(h.visitNo),
     };
   };
@@ -1447,6 +1459,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       renderSheet();
     },
     testPrintDlg(btn) { return acts.testPrint(btn); },
+    previewKind(btn) { SAMPLE = btn.dataset.k === "walk" ? SAMPLE_WALK : SAMPLE_NAVER; renderSheet(); },
     resetForm() { PRINT.forms.enter.text = ENTER_FORM; savePrint(); renderSheet(); },
     car(btn) {
       park.sel = btn.dataset.id;
@@ -1517,6 +1530,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     document.querySelector(".top .tag").textContent = "네이버 · 아마노 · POS 연결";
     if (window.desk.config) window.desk.config.get().then((c) => { if (c && c.build) document.querySelector(".top .tag").textContent = `네이버 · 아마노 · POS 연결 ver.${c.build}`; }).catch(() => {});
   }
+
+  // 시험용: 입장권을 만드는 함수들 (자동 시험이 실제 입장 손님으로 출력 내용을 확인)
+  window.__deskTest = { keyVals, receiptLines, escposParts, form: () => PRINT.forms.enter.text, holders: () => holders(), LINE_COLS };
 
   // ── 반납안내 커튼 ─────────────────────────────────
   (function curtain() {
