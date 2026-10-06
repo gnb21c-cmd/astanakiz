@@ -219,6 +219,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .park .find label { font-size: 12px; color: var(--muted); font-weight: 600; }
 .park .find input { border: 1.5px solid var(--red); border-radius: 8px; padding: 4px 8px; font-size: 15px; background: var(--surface); min-width: 0; min-height: 34px; }
 .park .find .btn { border-color: var(--red); color: var(--red); min-height: 34px; }
+.park .find { position: relative; }
+.carpad { position: absolute; top: calc(100% + 4px); z-index: 60; width: 250px; box-sizing: border-box; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 8px; border-radius: 12px; background: var(--surface); border: 2px solid var(--red); box-shadow: 0 12px 30px rgba(0,0,0,.35); }
+.carpad[hidden] { display: none; }
+.carpad button { height: 50px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); font-size: 22px; font-weight: 700; touch-action: manipulation; }
+.carpad button:active { background: var(--accent); color: #fff; }
+.carpad button.fn { font-size: 15px; }
+.carpad button.go { grid-column: 1 / -1; background: var(--red); border-color: var(--red); color: #fff; font-size: 18px; }
 .park .body { display: grid; grid-template-columns: minmax(0, 1fr) 236px; gap: 6px; min-height: 0; }
 .cars { border: 1.5px solid var(--red); border-radius: 8px; padding: 4px; display: grid; gap: 3px; align-content: start; overflow: auto; min-height: 0; }
 .car { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 6px; align-items: center; padding: 4px 8px; border-radius: 6px; border: 1px solid transparent; background: var(--surface-2); text-align: left; width: 100%; }
@@ -349,8 +356,16 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         <form class="find" id="park-form">
           <label for="car-day">입차일</label>
           <input id="car-day" type="date" value="2026-10-04" aria-label="입차일 (전날부터 검색)">
-          <input id="car-q" inputmode="numeric" placeholder="차량번호 (예: 5514)" autocomplete="off" aria-label="차량번호">
+          <input id="car-q" inputmode="none" placeholder="차량번호 (예: 5514)" autocomplete="off" aria-label="차량번호">
           <button class="btn" type="submit">검색</button>
+          <!-- 터치 숫자패드: 차량번호 칸을 누르면 뜸 (Windows 화상 키보드 대신 · 현장 10/6) -->
+          <div class="carpad" id="carpad" hidden aria-label="차량번호 숫자패드">
+            <button type="button" data-cp="1">1</button><button type="button" data-cp="2">2</button><button type="button" data-cp="3">3</button>
+            <button type="button" data-cp="4">4</button><button type="button" data-cp="5">5</button><button type="button" data-cp="6">6</button>
+            <button type="button" data-cp="7">7</button><button type="button" data-cp="8">8</button><button type="button" data-cp="9">9</button>
+            <button type="button" class="fn" data-cp="clr">지우기</button><button type="button" data-cp="0">0</button><button type="button" class="fn" data-cp="del" aria-label="한 자리 지우기">←</button>
+            <button type="button" class="go" data-cp="go">검색</button>
+          </div>
         </form>
         <div class="body">
           <div class="cars" id="cars" aria-label="차량번호 조회 결과"></div>
@@ -1657,8 +1672,30 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     const m = /^p(f|t)-(\d+)$/.exec(t.id);
     if (m && t.value) { RULES.peaks[+m[2]][m[1] === "f" ? "from" : "to"] = t.value; savePeaks(); renderAll(); }
   });
+  // 차량번호 숫자패드: 칸을 누르거나(터치 · 마우스) 커서가 가면 뜨고, 다른 곳을 누르거나 검색하면 닫힘
+  (function carPad() {
+    const q = $("car-q"), pad = $("carpad");
+    // 왼쪽 조회 목록 칸 위에 띄움 (오른쪽 할인정보 · '등록 중'은 가리지 않게)
+    const open = () => { const c = $("cars"); pad.style.left = "0px"; pad.style.width = Math.max(220, c.offsetWidth) + "px"; pad.hidden = false; };
+    const close = () => { pad.hidden = true; };
+    q.addEventListener("focus", open);
+    q.addEventListener("pointerdown", open);
+    q.addEventListener("blur", close);
+    q.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+    pad.addEventListener("pointerdown", (e) => e.preventDefault()); // 패드를 눌러도 커서가 칸에 그대로
+    pad.addEventListener("mousedown", (e) => e.preventDefault());
+    pad.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-cp]"); if (!b) return;
+      const k = b.dataset.cp;
+      if (k === "go") { close(); $("park-form").requestSubmit(); return; }
+      q.value = k === "del" ? q.value.slice(0, -1) : k === "clr" ? "" : q.value + k;
+      q.focus();
+    });
+    window.__carPad = { open, close };
+  })();
   $("park-form").addEventListener("submit", (e) => {
     e.preventDefault();
+    $("carpad").hidden = true;
     const day = $("car-day").value, no = digits($("car-q").value);
     if (!no) { toast("차량번호를 넣어 주세요"); return; }
     park.sel = null; park.q = { day, no };
