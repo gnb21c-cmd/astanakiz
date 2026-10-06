@@ -12,10 +12,10 @@
    - 예약이 1건인 칸의 [확정]을 누르면 목록(탭 · 카드) 대신 오른쪽에 '예약 상세정보'가 바로 뜸 (현장 화면 10/6)
        상태 동그라미(확정) · 이름 · 처음 온 손님은 '완료 n' 대신 '신규예약' · 예약자/전화번호/예약번호/상품/이용일시/수량 · [예약취소] [이용완료] · 오른쪽 위 X
        → 상세정보도 카드 한 장으로 읽고, 칸의 이름표는 글자로 찾음
-   - 이용완료 확인 창 모양은 아직 모름: window.confirm 이면 자동 확인, 화면 안 창이면 "하시겠습니까" 글자 옆 [확인] */
+   - 이용완료는 두 단계 (현장 화면 10/6): 카드의 [이용완료] → 오른쪽이 '이용완료' 화면("이용완료 시 사용자에게 이용완료 알림이 발송됩니다.")으로 바뀜 → 맨 아래 초록 [이용완료]: window.confirm 이면 자동 확인, 화면 안 창이면 "하시겠습니까" 글자 옆 [확인] */
 
 function installNaverDriver() {
-  if (window.__naver && window.__naver.v === 6) return true;
+  if (window.__naver && window.__naver.v === 7) return true;
 
   const norm = (s) => String(s || "").replace(/\s+/g, "");
   const vis = (el) => !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== "hidden");
@@ -194,7 +194,7 @@ function installNaverDriver() {
   window.alert = () => {};
 
   window.__naver = {
-    v: 6,
+    v: 7,
     read() {
       const page = cls(document, "Calendar__inner-contents") ? "calendar" : $$('a[class*="contents-user"]').length || cls(document, "BookingListView__root") ? "list" : "";
       const total = (document.body.innerText.match(/(\d+)\s*건\s*내려받기/) || [])[1];
@@ -284,12 +284,14 @@ function installNaverDriver() {
         예약 카드 · 상세정보 안의 [이용완료]는 빼고 (다시 누르면 같은 창만 또 뜸) */
     confirm() {
       const inCard = (e) => cards().some((c) => c.contains(e));
+      // 카드 · 상세정보의 [이용완료]는 옆에 [예약취소]가 있음 → 빼기. 마지막 '이용완료' 화면의 초록 [이용완료]는 혼자 있음 (현장 화면 10/6)
+      const besideCancel = (e) => { for (let p = e.parentElement, i = 0; p && i < 3; p = p.parentElement, i++) if (clickables(p).some((x) => textOf(x) === "예약취소")) return true; return false; };
       const boxSel = '[role=dialog], [role=alertdialog], [class*="odal"], [class*="ialog"], [class*="ayer"], [class*="opup"], [class*="lert"], [class*="onfirm"]';
       const ok = clickables().find((e) => {
-        if (!["확인", "OK", "예", "이용완료", "이용완료처리", "완료"].includes(textOf(e)) || inCard(e)) return false;
+        if (!["확인", "OK", "예", "이용완료", "이용완료처리", "완료"].includes(textOf(e)) || inCard(e) || besideCancel(e)) return false;
         const box = e.closest(boxSel);
         if (box && !inCard(box)) return true;
-        for (let p = e.parentElement, i = 0; p && i < 5; p = p.parentElement, i++) if (/하시겠습니까|처리하|완료하|변경하|할까요/.test(p.textContent)) return true;
+        for (let p = e.parentElement, i = 0; p && i < 6; p = p.parentElement, i++) if (/하시겠습니까|처리하|완료하|변경하|할까요|알림이 발송/.test(p.textContent)) return true;
         return false;
       });
       if (!ok) return { ok: true, clicked: false };

@@ -7,7 +7,7 @@
      ?view=list      예약 목록: "이전 26. 10. 5.월 다음", 줄마다 a.contents-user(상태·예약자·전화번호·예약번호) + a.contents-booking(이용일시·상품·수량·결제상태)
      ?view=calendar  예약현황: "이전 2026. 10. 5. 월 다음", 머리 = 상품 이름, 줄 = 시간, 칸 = "오전 10:00" + 버튼(title 예약가능/잔여예약/확정/이용완료, 숫자)
                      확정·이용완료 버튼 → 오른쪽 "예약정보" 패널: 탭 확정 n / 완료 n, 카드(List__contents-box) — 이름 밑 "완료 11, 취소 2", 예약자·전화번호·예약번호·상품·이용일시·수량·결제상태
-                     확정 카드의 [이용완료] → "이용완료 처리하시겠습니까?" [확인] (실제 확인 창 모양은 아직 모름)
+                     확정 카드의 [이용완료] → 오른쪽이 '이용완료' 화면으로 바뀜 → 맨 아래 초록 [이용완료] (현장 화면 10/6)
                      오른쪽 목록은 스크롤되는 칸이고, 카드는 2장씩 보이다가 아래로 내리면 더 나옴 (실제도 내려야 다 나옴)
      &nocards=1 칸을 눌러도 카드가 안 나옴 (못 읽는 경우)
      &range=1 날짜가 기간으로 보임 (일간이 아닐 때)
@@ -150,12 +150,17 @@
       if (tab) { e.preventDefault(); setTimeout(() => go({ sel: JSON.stringify(Object.assign(sel, { s: tab.dataset.tab })) }), 150); return; }
       const c = e.target.closest("[data-complete]");
       if (c) {
-        const box = document.createElement("div");
-        box.className = "layer";
-        box.innerHTML = `<p>이용완료 처리하시겠습니까?</p><button type="button" class="ok">확인</button> <button type="button">취소</button>`;
-        box.querySelector(".ok").onclick = () => { const x = db[day].find((y) => y.no === c.dataset.complete); x.status = "완료"; x.done += 1; save(); box.remove(); setTimeout(() => go({}), 200); };
-        box.querySelectorAll("button")[1].onclick = () => box.remove();
-        document.body.appendChild(box);
+        // 실제처럼 두 단계: 오른쪽이 '이용완료' 화면으로 바뀌고 맨 아래 초록 [이용완료]를 눌러야 완료 (현장 화면 10/6)
+        const x = db[day].find((y) => y.no === c.dataset.complete);
+        const aside = document.querySelector("aside");
+        setTimeout(() => {
+          aside.innerHTML = `<div class="CompleteView__root__q1"><div><button type="button" aria-label="뒤로">‹</button> <b>이용완료</b> <button type="button" aria-label="닫기" onclick="go({sel:''})">×</button></div>
+            <div><span class="badge">확정</span> <strong>${x.name}</strong> <a href="#">완료 ${x.done}</a></div>
+            <dl><dt>예약자</dt><dd>${x.name}</dd><dt>예약번호</dt><dd>${x.no}</dd><dt>상품</dt><dd>${PRODUCTS[x.product]}</dd><dt>수량</dt><dd>4인 입장권 ${x.qty}</dd></dl>
+            <p class="notice">이용완료 시 사용자에게 이용완료 알림이 발송됩니다.</p>
+            <button type="button" class="green" id="final-complete">이용완료</button></div>`;
+          aside.querySelector("#final-complete").onclick = () => { x.status = "완료"; x.done += 1; save(); setTimeout(() => go({}), 200); };
+        }, 300);
       }
     });
   }
