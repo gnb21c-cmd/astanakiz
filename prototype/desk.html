@@ -168,7 +168,16 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .paper .bd { font-weight: 700; }
 .paper .hr { border-top: 1px dashed #111; margin: 6px 0; }
 .paper .hr2 { border-top: 3px double #111; }
-.sheet.keysheet { width: min(560px, 100%); }  /* 열쇠 10개(5개 × 2줄)가 들어가는 크기 */
+.sheet.keysheet { width: min(560px, 100%); }
+.sheet.keysheet.extsheet { width: min(900px, 100%); }
+.extgrid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 14px; align-items: start; }
+.extbox { border: 2px solid var(--red); border-radius: 12px; padding: 10px; display: grid; gap: 8px; background: var(--surface-2); }
+.extbox .exthead { font-weight: 800; color: var(--red); font-size: 16px; }
+.extbox .extinfo { font-size: 14px; line-height: 1.5; }
+.extopts { display: grid; gap: 6px; }
+.extopt { text-align: left; min-height: 52px; font-size: 13.5px; line-height: 1.35; }
+.extopt b { font-size: 16px; }
+.extok { min-height: 48px; font-size: 15px; font-weight: 800; }  /* 열쇠 10개(5개 × 2줄)가 들어가는 크기 */
 .rbtns { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
 .rbtns .btn { min-height: 44px; font-size: 15px; }
 .rall { min-height: 48px; font-size: 16px; width: 100%; }
@@ -590,6 +599,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   // 현장입장자
   let posSeq = 31;
   const walkins = [];
+  const extIgnored = new Set(); // 추가 예약을 '그대로 두기'로 한 예약번호 — 다시 묻지 않음 (네이버 이용완료도 안 함)
   const testOut = new Set(); // 오늘 '기록 삭제'한 네이버 예약번호 — 판매수 · 수량 조절 통계에서 뺌 (네이버 기록은 그대로)
   /* 현장입장의 입장시간 = 접수한 시각 직전의 30분 칸 (10:12 접수 → 10:00 입장, 늦게 들어가고 싶으면 10:31 이후에 접수).
      이용시간 · 반납 · 초과요금 · 입장권의 입장시간 모두 이 시각 기준 */
@@ -628,6 +638,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     applyNaver(day, r, only);
     if (day === TODAY) setTimeout(naverFlush, 3000); // 네이버에 이용완료가 안 된 입장이 있으면 다시
     if (day === TODAY) restoreState();
+    if (day === TODAY) setTimeout(extScan, 0); // 이용 중 손님의 추가 예약 (사장님 10/7)
     if (!only) { lastRefresh = now; if (day === TODAY) todayAt = now; }
     renderAll();
     if (loud) toast(only ? `${only} 예약 ${r.bookings.filter((b) => b.time === only).length}건 다시 불러옴` : `네이버 예약 ${r.bookings.length}건 불러옴`);
@@ -704,7 +715,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   function saveState() {
     if (!APP || !stateReady) return;
     const b = (bookings[TODAY] || []).filter((x) => x.enteredAt != null).map((x) => Object.fromEntries(SAVE_FIELDS.filter((k) => x[k] !== undefined).map((k) => [k, x[k]])));
-    const json = JSON.stringify({ v: 2, b: b.concat(pendingSaved.filter((p) => !b.some((x) => x.no === p.no))), w: walkins, x: [...testOut], seq, posSeq });
+    const json = JSON.stringify({ v: 2, b: b.concat(pendingSaved.filter((p) => !b.some((x) => x.no === p.no))), w: walkins, x: [...testOut], ig: [...extIgnored], seq, posSeq });
     try { if (window.desk.state) window.desk.state.save(TODAY, json); } catch (e) { /* 파일 저장 실패 */ }
     try { localStorage.setItem(STATE_KEY, json); } catch (e) { /* 저장 못 해도 화면은 동작 */ }
   }
@@ -722,6 +733,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       seq = Math.max(seq, st.seq || 0); posSeq = Math.max(posSeq, st.posSeq || 0);
       walkins.push(...(st.w || []));
       for (const no of st.x || []) testOut.add(no);
+      for (const no of st.ig || []) extIgnored.add(no);
       const full = (st.b || []).filter((x) => x.name && x.slot != null);
       pendingSaved = (st.b || []).filter((x) => !(x.name && x.slot != null));
       bookings[TODAY] = full.map((x) => Object.assign({ day: TODAY, keys: [], enteredAt: null, outAt: null }, x, { naverBusy: false }));
@@ -757,6 +769,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     for (const x of samePerson(b)) {
       const last = group[group.length - 1];
       if (last && x.slot === last.slot) { if (x === b) return [b]; continue; } // 같은 시간 나눠 한 예약은 대표 하나로 (함께 처리)
+      // 이미 입장한(이용완료) 예약 뒤에 새로 생긴 예약(확정)은 묶지 않음 — '추가 예약' 알림에서 처리하거나 따로 입장 (10/7 충돌 검토)
+      if (last && last.status === "완료" && x.status === "확정" && !x.chainHead) { if (group.includes(b)) break; group = [x]; continue; }
       // 2시간 이내 간격(겹쳐도)이면 이어서 씀, 2시간보다 길면 연속이용 아님
       if (last && x.slot > last.slot && x.slot - last.slot <= CHAIN_STEP && slotQty(x) <= slotQty(last)) group.push(x); // 뒤 타임에 사람이 늘면 거기서 끊음 (늘어난 사람은 따로 입장)
       else { if (group.includes(b)) break; group = [x]; }
@@ -799,6 +813,61 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (h.keyUse && k == null) { const v = h.keys.map((x) => h.keyUse[x]).filter((x) => x !== undefined); if (v.length) return v.includes(null) ? null : Math.min(...v); }
     return h.useMin !== undefined ? h.useMin : minutesFor(TODAY, h.slot);
   };
+
+  // ── 추가 예약 (이용 중인 손님이 뒤 타임을 또 예약 · 사장님 10/7) ─────────────────────
+  /* 네이버를 불러올 때마다(매시 20 · 50분 + 새로고침) 열쇠를 가진 손님과 같은 사람(이름 + 전화번호, 현장손님은 전화번호)의
+     아직 입장 안 한 뒤 타임 예약을 찾음. L = 지금 열쇠가 덮는 마지막 예약 타임(반납 시각 − 1시간 50분)
+     - 딱 2시간 뒤(L + 2:00)        → 열쇠 반납 시각을 자동 연장 + 알림 → [확인] 하면 네이버 이용완료
+     - 2시간보다 가까움(1:30 이하)   → 알림: '그 예약 시간부터 1시간 50분' / '처음부터 이어서(L + 3:50, 2타임이면 3시간 50분)' 중 선택 → 네이버 이용완료
+     - 2시간 30분 이상 떨어짐        → 알림: '당겨서 이어서(L + 3:50)' + 이용완료 / '그대로 두기'(이용완료 안 함 · 따로 입장)
+     - 이미 지금 반납 시각 안        → 알림: [확인] 하면 네이버 이용완료 (다시 켰을 때 등)
+     알림은 그 손님 열쇠 창 옆에 띄움 (지금 열쇠 정보와 같이 보고 결정) */
+  const extEnd = (h) => { const v = h.keys.map((k) => useOf(h, k)); return v.includes(null) || !v.length ? null : h.slot + Math.max(...v); };
+  const samePhone = (a, b) => digits(a.phone) && digits(a.phone) === digits(b.phone);
+  function extFor(h) {
+    if (!h || !h.keys.length) return null;
+    const end = extEnd(h);
+    if (end == null) return null; // 무제한 손님
+    const L = end - RULES.useMinutes;
+    const x = (bookings[TODAY] || []).filter((y) => y.status === "확정" && !y.chainHead && y.enteredAt == null && !extIgnored.has(y.no) && y.slot > h.slot && samePhone(y, h) && (h.walk || y.name === h.name))
+      .sort((p, q) => p.slot - q.slot)[0];
+    if (!x) return null;
+    const d = x.slot - L;
+    const type = x.extAuto ? "auto" : d <= 0 ? "covered" : d === 2 * 60 ? "auto" : d < 2 * 60 ? "short" : "far";
+    const xm = minutesFor(TODAY, x.slot);
+    return { h, x, L, end, d, type, endBooking: xm == null ? null : x.slot + RULES.useMinutes, endChain: xm == null ? null : L + 2 * 60 + RULES.useMinutes };
+  }
+  /** 열쇠 반납 시각을 newEnd 로 (예약 인원만큼의 열쇠 · 늘리기만) */
+  function extApply(e, newEnd) {
+    const { h, x } = e;
+    h.keyUse = h.keyUse || Object.fromEntries(h.keys.map((k) => [k, useOf(h, k)]));
+    for (const k of h.keys.slice(0, Math.max(1, x.qty))) {
+      const cur = useOf(h, k);
+      if (newEnd == null) h.keyUse[k] = null;
+      else if (cur != null && h.slot + cur < newEnd) h.keyUse[k] = newEnd - h.slot;
+    }
+  }
+  function extComplete(e) {
+    const { h, x } = e;
+    Object.assign(x, { status: "완료", enteredAt: now, chainHead: h.id, naverPending: APP, visitNo: x.prevDone == null ? null : x.prevDone + 1 });
+    const nsl = (naverSlots[x.day] || {})[x.slot]; if (nsl) { nsl.conf = Math.max(0, nsl.conf - x.qty); nsl.done += x.qty; }
+    if (APP) setTimeout(naverFlush, 0);
+  }
+  const extSeen = new Set(); // 이번에 알린 예약번호 (같은 걸 계속 띄우지 않게)
+  /** 네이버를 불러온 뒤: 추가 예약 찾기 → 딱 2시간이면 자동 연장 → 알림 (다른 창이 열려 있으면 닫힐 때) */
+  function extScan() {
+    const found = holders().map(extFor).filter(Boolean);
+    for (const e of found) if (e.type === "auto" && !e.x.extAuto) { extApply(e, e.endBooking); e.x.extAuto = true; saveState(); }
+    const fresh = found.filter((e) => !extSeen.has(e.x.no));
+    fresh.forEach((e) => extSeen.add(e.x.no));
+    if (fresh.length) { toast(`추가 예약 ${fresh.length}건 — ${fresh.map((e) => `${e.h.walk ? "현장" : e.h.name} 열쇠 ${e.h.keys.join(",")}번`).join(" · ")}`); extShowNext(); }
+    renderAll();
+  }
+  function extShowNext() {
+    if (sheet.mode) return; // 다른 창이 끝나면 (closeSheet 에서 다시)
+    const e = holders().map(extFor).filter(Boolean)[0];
+    if (e && extSeen.has(e.x.no)) openSheet({ mode: "key", hid: e.h.id });
+  }
 
   // ── 열쇠 계산 ─────────────────────────────────────
   const holders = () => bookings[TODAY].concat(walkins).filter((x) => x.keys.length);
@@ -1253,7 +1322,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   const sheet = { mode: null };
   function openSheet(s) { for (const k of Object.keys(sheet)) delete sheet[k]; Object.assign(sheet, s); $("overlay").hidden = false; renderSheet(); focusFirst(); }
   function focusFirst() { setTimeout(() => { const f = $("sheet").querySelector("[data-autofocus]"); if (f) f.focus(); }, 30); }
-  function closeSheet() { sheet.mode = null; $("overlay").hidden = true; }
+  function closeSheet() { sheet.mode = null; $("overlay").hidden = true; setTimeout(() => { if (typeof extShowNext === "function") extShowNext(); }, 300); }
 
   function walkState() {
     const { base, all } = projection();
@@ -1394,8 +1463,27 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const over = overInfo(h);
       const many = h.keys.length > 1;
       const lock = over.due > 0 && !h.overPaid; // 초과요금이 있으면 결제 뒤에 반납
+      const e = extFor(h);
+      el.classList.toggle("extsheet", !!e);
+      const extHtml = !e ? "" : (() => {
+        const { x } = e, t = (v) => (v == null ? "무제한" : hm(v));
+        const opt = (k, label, v) => `<button class="btn extopt ${sheet.extPick === k ? "btn-ink" : ""}" data-act="extPick" data-k="${k}" aria-pressed="${sheet.extPick === k}">${label}<br><b class="num">${v}</b></button>`;
+        const head = `<div class="exthead">⚠ 추가 예약 발견</div>
+          <div class="extinfo">네이버 <b>${esc(x.name)}</b> · <b class="num">${hm(x.slot)}</b> 예약 ${x.qty}장<br><span class="help num">${x.extAuto ? `자동 연장 뒤 반납 ${t(e.end)}` : `지금 반납 ${t(e.end)} (마지막 타임 ${hm(e.L)}) → 새 예약 ${hm(x.slot)}`}</span></div>
+          ${x.qty > h.keys.length ? `<div class="banner bad">예약 ${x.qty}장 — 지금 열쇠(${h.keys.length}개)보다 많아요. 늘어난 인원은 열쇠를 더 드려야 해요</div>` : ""}`;
+        if (e.type === "auto") return head + `<div class="banner">딱 2시간 뒤 예약이라 열쇠 반납 시각을 <b class="num">${t(x.extAuto ? e.end : e.endBooking)}</b>으로 <b>자동 연장</b>했어요</div>
+          <button class="btn btn-ink extok" data-act="extOk">확인 · 이 예약 네이버 이용완료</button>`;
+        if (e.type === "covered") return head + `<div class="banner">이미 지금 반납 시각 안에 있는 예약이에요</div><button class="btn btn-ink extok" data-act="extOk">확인 · 이 예약 네이버 이용완료</button>`;
+        if (e.type === "short") return head + `<div class="help">2시간보다 가까운 간격(${Math.round(e.d)}분)이에요. 현장을 보고 고르세요</div>
+          <div class="extopts">${opt("booking", `이 예약 시간부터 1시간 50분`, `${t(e.endBooking)} 반납`)}${opt("chain", `처음부터 이어서 (${dur(e.endChain - h.slot)})`, `${t(e.endChain)} 반납`)}</div>
+          <button class="btn btn-ink extok" data-act="extOk" ${sheet.extPick ? "" : "disabled"}>확인 · 적용하고 네이버 이용완료</button>`;
+        return head + `<div class="help">2시간 30분 이상 떨어진 예약이에요 (${Math.floor(e.d / 60)}시간 ${e.d % 60 ? `${e.d % 60}분 ` : ""}뒤)</div>
+          <div class="extopts">${opt("pull", `당겨서 이어서 (${dur(e.endChain - h.slot)}) + 이용완료`, `${t(e.endChain)} 반납`)}${opt("ignore", "그대로 두기 (이용완료 안 함)", `${hm(x.slot)}에 따로 입장`)}</div>
+          <button class="btn btn-ink extok" data-act="extOk" ${sheet.extPick ? "" : "disabled"}>확인</button>`;
+      })();
       el.innerHTML = `
         <h3 id="sheet-title">${h.keys.join(", ")}번 열쇠 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
+        <div class="${e ? "extgrid" : ""}"><div>
         <dl class="facts">
           <dt>${h.walk ? "고객명" : "예약자"}</dt><dd>${esc(h.name)}${h.walk ? ` · ${h.posNo}` : ""}</dd>
           <dt>전화번호</dt><dd class="num">${fmtPhone(h.phone)}</dd>
@@ -1407,7 +1495,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         <div class="field"><span class="label">반납 ${lock ? `<span class="help">초과요금을 결제한 뒤 반납하세요</span>` : ""}</span>
           ${many ? `<div class="rbtns">${h.keys.map((k) => `<button class="btn" data-act="returnKey" data-k="${k}" ${lock ? "disabled" : ""}>${k}번만</button>`).join("")}</div>` : ""}
           <button class="btn btn-ink rall" data-act="returnAll" ${lock ? "disabled" : ""}>${many ? `모두 반납 (${h.keys.length}개)` : `${h.keys[0]}번 반납 · 퇴장`}</button>
-        </div>`;
+        </div></div>${e ? `<div class="extbox">${extHtml}</div>` : ""}</div>`;
       return;
     }
     if (sheet.mode === "settings") {
@@ -1897,6 +1985,23 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       closeSheet(); toast(`현장입장자 · 열쇠 ${w.keys.join(", ")}번 등록${printForm("enter", keyVals(w))}`); renderAll();
     },
     bulkReturn() { openSheet({ mode: "bulk" }); },
+    extPick(btn) { sheet.extPick = btn.dataset.k; renderSheet(); },
+    // 추가 예약 알림 [확인]: 고른 대로 열쇠 반납 시각을 바꾸고 네이버 이용완료 (그대로 두기면 아무것도 안 함)
+    extOk() {
+      const h = holderById(sheet.hid), e = extFor(h); if (!e) return;
+      const pick = e.type === "auto" || e.type === "covered" ? "keep" : sheet.extPick;
+      if (!pick) return;
+      if (pick === "ignore") { extIgnored.add(e.x.no); toast(`${hm(e.x.slot)} 예약은 그대로 둬요 — 그 시간에 따로 입장 처리`); }
+      else {
+        if (pick === "booking") extApply(e, e.endBooking);
+        if (pick === "chain" || pick === "pull") extApply(e, e.endChain);
+        extComplete(e);
+        toast(`${e.h.walk ? "현장" : e.h.name} 열쇠 ${h.keys.join(", ")}번 반납 ${extEnd(h) == null ? "무제한" : hm(extEnd(h))} · ${hm(e.x.slot)} 예약 네이버 이용완료${APP ? "는 뒤에서" : ""}`);
+      }
+      sheet.extPick = null;
+      saveState(); renderAll();
+      if (extFor(h)) renderSheet(); else closeSheet();
+    },
     soldList() { openSheet({ mode: "sold" }); },
     soldDel(btn) {
       if (btn.dataset.k === "w") {
@@ -2114,7 +2219,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 
   // 시험용: 입장권을 만드는 함수들 (자동 시험이 실제 입장 손님으로 출력 내용을 확인)
   document.addEventListener("change", (e) => { if (/^cap-(target|max|ceil)$/.test(e.target.id)) renderSheet(); }); // 숫자를 다 넣으면 계획 다시
-  window.__deskTest = { planCaps, capPlan, capRun, capLog, capDemo, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => PRINT.forms.enter.text, holders: () => holders(), LINE_COLS };
+  window.__deskTest = { extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capPlan, capRun, capLog, capDemo, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => PRINT.forms.enter.text, holders: () => holders(), LINE_COLS };
 
   // ── 반납안내 커튼 ─────────────────────────────────
   (function curtain() {
