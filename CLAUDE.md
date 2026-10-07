@@ -18,11 +18,14 @@
 - 시험 설치본은 main 에 올리면 GitHub 가 만들어 Releases '시험판(최신)'에 올린다. 화면 맨 위에 버전을 표시하고 설치본을 만들 때마다 1씩 늘린다: 현장 시험판 ver.0.1~0.9 → 정식 **ver.1.0** 부터 ver.1.X. 작은 수정판은 커밋 메시지에 `[ver 1.24.1]` 처럼 적으면 그 번호로 만듦 (사용자 지시 10/7)
 - 직원 메뉴얼: `docs/manual/manual.html` → `staff-manual.pdf` (화면이 바뀌면 사진 · PDF 다시). 설치본과 같이 Releases 에 올라감
 
+- 다른 프로젝트와 공유하는 정리: `docs/SHARE.md` — 기능 · 저장 데이터 모양 · 연동 · 규칙이 바뀌면 같이 고친다 (사용자 지시 10/7)
+
 ## 명령
 - 데스크 앱 시험: `cd apps/desk && npm test` (가짜 아마노 화면으로 동기화 시험)
 - 데스크 앱 실행: `cd apps/desk && npm install && npm start` · Windows 설치파일: `npm run dist:win`
 
 ## 문서
+- 다른 프로젝트 공유용 정리: `docs/SHARE.md`
 - 최종 설치본 직전 할 일(직원용 메뉴얼 PDF 포함): `docs/RELEASE.md`
 - 운영 방식: `docs/OPERATION.md`
 - 화면·연동 계획: `docs/INTEGRATION.md`
