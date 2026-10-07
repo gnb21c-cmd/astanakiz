@@ -221,6 +221,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .key.bulk:not(:disabled) { background: var(--surface); border: 2px solid var(--ink); color: var(--ink); } /* 열쇠 2개 이상 나가면 지급된 열쇠처럼 */
 .bulklist { max-height: 300px; overflow: auto; display: grid; gap: 4px; margin: 6px 0; font-size: 13.5px; }
 .bulklist div { display: flex; justify-content: space-between; gap: 8px; padding: 4px 8px; border-radius: 6px; background: var(--surface-2); }
+.keyfoot { display: grid; grid-template-columns: minmax(0, 1fr) calc(30% - 1px); gap: 8px; align-items: start; }
+.keyfoot .bulk { aspect-ratio: auto; height: 46px; width: 100%; }
 .legend { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 11.5px; color: var(--muted); }
 .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: -1px; margin-right: 4px; border: 1.5px solid var(--line); background: var(--surface-2); }
 .legend .l-in { border-color: var(--ink); background: var(--surface); }
@@ -283,9 +285,24 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .stepper button { width: 42px; height: 42px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); font-size: 22px; font-weight: 700; line-height: 1; }
 .stepper output { min-width: 28px; text-align: center; font-size: 20px; font-weight: 700; }
 /* 현장입장: 왼쪽 정보 · 오른쪽 터치 키패드 (현장 10/6) */
-.sheet.walksheet { width: min(600px, 100%); }
-.walktop { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 14px; align-items: start; }
-.stepnote { flex-basis: 100%; }
+.sheet.walksheet { width: min(860px, 100%); }
+.walkgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 14px; align-items: start; }
+.wguide { margin: 0; padding: 10px 12px; list-style: none; display: grid; gap: 10px; background: var(--surface-2); border-radius: 10px; font-size: 13px; line-height: 1.45; color: var(--muted); }
+.wguide li { padding: 6px 8px; border-radius: 8px; border: 1.5px solid transparent; }
+.wguide li.now { color: var(--fg); border-color: var(--accent); background: var(--accent-bg); }
+.wguide li.done { color: var(--ok); }
+.wguide .g { color: var(--ok); font-weight: 700; } .wguide .r { color: var(--red); font-weight: 700; }
+.wmain { display: grid; gap: 9px; }
+.wmain .banner { font-size: 14px; padding: 10px 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.banner.bad { background: var(--red); color: #fff; }
+.wn { display: inline-grid; place-items: center; min-width: 22px; height: 22px; border-radius: 50%; font-size: 13px; font-weight: 800; color: var(--muted); }
+.wn.now { background: var(--accent); color: #fff; } .wn.done { color: var(--ok); }
+.wmain .wpay, .wmain .wdone { min-height: 50px; font-size: 17px; font-weight: 800; }
+.wrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.wrow .wl { font-size: 13px; color: var(--muted); font-weight: 600; }
+.wrow .wtime { font-size: 19px; min-width: 96px; text-align: center; }
+.wphone { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 10px; align-items: start; }
+.wphone .keypad button { height: 44px; }
 .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .keypad button { height: 50px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); font-size: 22px; font-weight: 700; touch-action: manipulation; }
 .keypad button:active { background: var(--accent); color: #fff; }
@@ -363,12 +380,16 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         <span class="stat num" id="key-stat"></span>
       </div>
       <div class="keys" id="keys"></div>
-      <div class="legend">
-        <span><i></i>빈 열쇠</span>
-        <span><i class="l-in"></i>입장 ~ 1시간 50분</span>
-        <span><i class="l-pink"></i>1시간 50분 ~ 2시간</span>
-        <span><i class="l-red"></i>2시간 넘음</span>
-        <span>· 빈 열쇠를 누르면 현장입장</span>
+      <div class="keyfoot">
+        <div class="legend">
+          <span><i></i>빈 열쇠</span>
+          <span><i class="l-in"></i>입장 ~ 1시간 50분</span>
+          <span><i class="l-pink"></i>1시간 50분 ~ 2시간</span>
+          <span><i class="l-red"></i>2시간 넘음</span>
+          <span>· 빈 열쇠를 누르면 현장입장</span>
+        </div>
+        <!-- 열쇠판 아래 오른쪽 · 열쇠 3칸 너비 (45번과 떨어져 있게 — 잘못 누르지 않게 · 사장님 10/7) -->
+        <button class="key bulk" id="bulk-btn" data-act="bulkReturn" disabled>열쇠 일괄 반납처리</button>
       </div>
       <div class="park">
         <h3>주차등록 <small><i></i>뒤에 열린 아마노 화면과 동기화</small></h3>
@@ -573,8 +594,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   /* 현장입장의 입장시간 = 접수한 시각 직전의 30분 칸 (10:12 접수 → 10:00 입장, 늦게 들어가고 싶으면 10:31 이후에 접수).
      이용시간 · 반납 · 초과요금 · 입장권의 입장시간 모두 이 시각 기준 */
   const walkSlot = (m) => Math.floor(m / 30) * 30;
-  function walkin(phone, keys, at) {
-    const w = { id: "w" + seq++, name: "현장입장자", phone, keys: keys.slice(), qty: keys.length, enteredAt: at, slot: walkSlot(at), posNo: "POS-" + String(posSeq++).padStart(4, "0"), outAt: null, walk: true };
+  function walkin(phone, keys, at, slot) {
+    const w = { id: "w" + seq++, name: "현장입장자", phone, keys: keys.slice(), qty: keys.length, enteredAt: at, slot: slot ?? walkSlot(at), posNo: "POS-" + String(posSeq++).padStart(4, "0"), outAt: null, walk: true };
     walkins.push(w);
     return w;
   }
@@ -899,13 +920,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     $("key-stat").innerHTML = `사용 <b>${RULES.keys - freeKeys().length}</b>/${RULES.keys} · 현장 가능 <b>${base}</b>${all > base ? ` +유동 ${all - base}` : ""}`;
     let html = "";
     for (let k = 1; k <= 50; k++) {
-      // 열쇠판 남는 칸(46~50) 자리에 '열쇠 일괄 반납처리'
-      if (k > RULES.keys) { html += `<button class="key bulk" data-act="bulkReturn" style="grid-column: span ${50 - RULES.keys}" ${holders().reduce((a, h) => a + h.keys.length, 0) >= 2 ? "" : "disabled"}>열쇠 일괄 반납처리</button>`; break; }
+      if (k > RULES.keys) break; // 남는 칸(46~50)은 비워 둠
       const h = holderOf(k);
       if (!h) { html += `<button class="key free" data-act="key" data-k="${k}" aria-label="${k}번 빈 열쇠"><b class="num">${k}</b><span>&nbsp;</span></button>`; continue; }
       html += `<button class="key ${keyColor(h, k)}" data-act="key" data-k="${k}" aria-label="${k}번 ${esc(h.name)}"><b class="num">${k}</b><span>${esc(h.walk ? "현장" : h.name)}</span></button>`;
     }
     $("keys").innerHTML = html;
+    $("bulk-btn").disabled = holders().reduce((a, h) => a + h.keys.length, 0) < 2; // 열쇠 2개 이상 나가면 켜짐
   }
 
   // ── 주차 (아마노 화면 동기화) ───────────────────
@@ -1292,28 +1313,48 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       return;
     }
     if (sheet.mode === "walk") {
+      /* 현장입장 (사장님 10/7): 손님 응대 순서대로 위에서 아래로 — 왼쪽 1/3 = 할 일 안내, 오른쪽 2/3 = 버튼 · 입력
+         ① 판매 가능? (초록 = 가능 · 빨강 = 불가) → ② POS로 이동해 결제 (매수별 인원 안내) → ③ 결제한 입장권 수 · 입장 타임(◀ ▶)
+         → ④ 열쇠 미반납 때 연락할 전화번호 → ⑤ 결제 완료 · 열쇠 등록 */
       const st = walkState();
-      const ws = walkSlot(now);
+      if (sheet.slot == null) sheet.slot = walkSlot(now);
+      const ws = sheet.slot;
       const m = minutesFor(TODAY, ws);
+      const okSell = !st.over && (!st.flex || sheet.flexOk);
+      const done = [okSell, !!sheet.paid, !!sheet.paid, st.phoneOk, false];
+      const cur = done.indexOf(false);
+      const step = (i, t) => `<li class="${done[i] ? "done" : i === cur ? "now" : ""}"><b>${"①②③④⑤"[i]}</b> ${t}</li>`;
+      const tag = (i) => `<span class="wn ${done[i] ? "done" : i === cur ? "now" : ""}">${"①②③④⑤"[i]}</span>`;
       el.innerHTML = `
         <h3 id="sheet-title">현장입장 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
-        <div class="banner ${st.over || st.flex ? "warn" : ""}">${st.over ? `지금은 열쇠 <b class="num">${st.all}</b>개까지만 내줄 수 있어요. 예약 손님이 오실 자리라서 팔지 않습니다.`
-          : st.flex ? `기본 열쇠 ${RULES.baseKeys}개를 넘어 <b>유동 열쇠</b>를 씁니다. 안에 빈 좌석이 있는지 보고 판매하세요.`
-          : `현장 판매 가능 <b class="num">${st.base}</b>개 · 예약 손님 자리를 먼저 남겨 두고 계산했어요`}</div>
-        <div class="walktop"><dl class="facts">
-          <dt>고객명</dt><dd><span class="fixed">현장입장자</span></dd>
-          <dt>열쇠</dt><dd><div class="bigkeys">${sheet.keys.map((k) => `<span class="bigkey num">${k}</span>`).join("")}</div></dd>
-          <dt>수량</dt><dd><div class="stepper"><button data-act="qty" data-d="-1" aria-label="수량 줄이기">−</button><output class="num">${st.need}</output><button data-act="qty" data-d="1" aria-label="수량 늘리기">+</button><span class="help stepnote">수량만큼 열쇠를 이어서 드려요</span></div></dd>
-          <dt>이용</dt><dd class="num">${hm(ws)} 입장${ws !== now ? ` (접수 ${hm(now)})` : ""} ${m == null ? "· 무제한" : `~ ${hm(ws + m)} (1시간 50분)`}</dd>
-        </dl>
-        <div class="keypad" aria-label="전화번호 키패드">${["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((n) => `<button data-act="kp" data-k="${n}">${n}</button>`).join("")}<button class="fn" data-act="kp" data-k="clr">지우기</button><button data-act="kp" data-k="0">0</button><button class="fn" data-act="kp" data-k="del" aria-label="한 자리 지우기">←</button></div></div>
-        <div class="field"><label for="w-phone">전화번호 <span class="help">010 뒤 8자리</span></label>
-          <input id="w-phone" inputmode="numeric" autocomplete="off" value="${esc(walkFmt(sheet.phone))}" placeholder="010-0000-0000" data-autofocus></div>
-        ${st.flex ? `<button class="btn ${sheet.flexOk ? "btn-ink" : ""}" data-act="flexOk" aria-pressed="${!!sheet.flexOk}">${sheet.flexOk ? "빈 좌석 확인함" : "빈 좌석 확인했어요"}</button>` : ""}
-        <ol class="steps"><li class="${sheet.paid ? "done" : ""}">결제하기 → POS 화면에서 결제 → POS를 최소화하면 이 팝업으로 돌아옴${sheet.paid ? " ✓" : ""}</li><li>결제 완료 → 열쇠판에 등록</li></ol>
-        <div class="stack-btns">
-          <button class="btn" data-act="pay" ${st.over || (st.flex && !sheet.flexOk) ? "disabled" : ""}>결제하기 (POS 화면으로)</button>
-          <button class="btn btn-ink" id="w-done" data-act="walkDone" ${st.over || !st.phoneOk || (st.flex && !sheet.flexOk) ? "disabled" : ""}>결제 완료 · 열쇠 등록</button>
+        <div class="walkgrid">
+          <ol class="wguide">
+            ${step(0, `<b>판매 가능한지</b> 오른쪽 맨 위 색을 봐요. <span class="g">초록 = 판매 가능</span> · <span class="r">빨강 = 지금은 판매 불가</span> (예약 손님 자리를 남겨 둔 계산)`)}
+            ${step(1, `<b>[POS로 이동]</b>을 눌러 POS에서 결제해요. 입장권 매수별 인원을 안내하고 필요한 만큼 결제 → 끝나면 POS를 최소화하면 이 창으로 돌아와요`)}
+            ${step(2, `결제한 만큼 <b>입장권 수</b>를 맞춰요 (열쇠가 이어서 붙어요). <b>입장 타임</b>은 바로 앞 타임이 기본 — 앞뒤로 바꿀 땐 ◀ ▶`)}
+            ${step(3, `열쇠를 드리기 전에 <b>전화번호</b>를 받아요 (열쇠 미반납 때 연락). 010 뒤 8자리를 키패드로`)}
+            ${step(4, `<b>[결제 완료 · 열쇠 등록]</b> → 입장권이 나오면 열쇠와 함께 드려요`)}
+          </ol>
+          <div class="wmain">
+            <div class="banner ${okSell ? "" : "bad"}">${tag(0)} ${st.over ? `<b>지금은 판매 불가</b> — 열쇠 <b class="num">${st.all}</b>개까지만 내줄 수 있어요 (예약 손님이 오실 자리)`
+              : st.flex ? `기본 ${RULES.baseKeys}개를 넘어 <b>유동 열쇠</b> — 안에 빈 좌석이 있는지 보고 판매 <button class="btn btn-sm ${sheet.flexOk ? "btn-ink" : ""}" data-act="flexOk" aria-pressed="${!!sheet.flexOk}">${sheet.flexOk ? "빈 좌석 확인함" : "빈 좌석 확인했어요"}</button>`
+              : `<b>판매 가능</b> · 현장 판매 가능 <b class="num">${st.base}</b>개`}</div>
+            <button class="btn wpay" data-act="pay" ${okSell ? "" : "disabled"}>${tag(1)} POS로 이동해서 결제하기${sheet.paid ? " ✓" : ""}</button>
+            <div class="wrow">${tag(2)} <span class="wl">입장권 수</span>
+              <div class="stepper"><button data-act="qty" data-d="-1" aria-label="수량 줄이기">−</button><output class="num">${st.need}</output><button data-act="qty" data-d="1" aria-label="수량 늘리기">+</button></div>
+              <span class="wl">열쇠</span><div class="bigkeys">${sheet.keys.map((k) => `<span class="bigkey num">${k}</span>`).join("")}</div></div>
+            <div class="wrow"><span class="wn"></span> <span class="wl">입장 타임</span>
+              <button class="btn btn-sm" data-act="wslot" data-d="-30" aria-label="앞 타임" ${ws <= SLOTS[0] ? "disabled" : ""}>◀</button>
+              <b class="num wtime">${hm(ws)} 입장</b>
+              <button class="btn btn-sm" data-act="wslot" data-d="30" aria-label="뒤 타임" ${ws >= SLOTS[SLOTS.length - 1] ? "disabled" : ""}>▶</button>
+              <span class="help num">${m == null ? "무제한" : `~ ${hm(ws + m)} 퇴장`} · 접수 ${hm(now)}${ws !== walkSlot(now) ? " · 바꾼 타임" : ""}</span></div>
+            <div class="wphone">
+              <div class="field"><label for="w-phone">${tag(3)} 전화번호 <span class="help">010 뒤 8자리</span></label>
+                <input id="w-phone" inputmode="numeric" autocomplete="off" value="${esc(walkFmt(sheet.phone))}" placeholder="010-0000-0000" data-autofocus></div>
+              <div class="keypad" aria-label="전화번호 키패드">${["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((n) => `<button data-act="kp" data-k="${n}">${n}</button>`).join("")}<button class="fn" data-act="kp" data-k="clr">지우기</button><button data-act="kp" data-k="0">0</button><button class="fn" data-act="kp" data-k="del" aria-label="한 자리 지우기">←</button></div>
+            </div>
+            <button class="btn btn-ink wdone" id="w-done" data-act="walkDone" ${st.over || !st.phoneOk || (st.flex && !sheet.flexOk) ? "disabled" : ""}>${tag(4)} 결제 완료 · 열쇠 등록</button>
+          </div>
         </div>`;
       return;
     }
@@ -1837,6 +1878,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       }
       $("pos-amt").textContent = "POS 화면"; $("pos").hidden = false; // 체험판: 가짜 POS 화면
     },
+    // 현장입장 입장 타임 ◀ ▶ (기본 = 바로 앞 타임, 근무자가 최종 결정)
+    wslot(btn) { sheet.slot = Math.max(SLOTS[0], Math.min(SLOTS[SLOTS.length - 1], (sheet.slot ?? walkSlot(now)) + Number(btn.dataset.d))); renderSheet(); const p = $("w-phone"); if (p) p.focus(); },
     pay() { sheet.paid = true; $("pos-amt").textContent = `현장입장 ${sheet.keys.length}장`; goPos(); },
     payOver() {
       const h = holderById(sheet.hid); const o = overInfo(h); if (!o.due) return;
@@ -1850,7 +1893,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     },
     walkDone() {
       if (sheet.keys.some((k) => holderOf(k))) { toast("그 사이 다른 손님이 쓴 열쇠가 있어요"); closeSheet(); renderAll(); return; }
-      const w = walkin(digits(sheet.phone), sheet.keys, now);
+      const w = walkin(digits(sheet.phone), sheet.keys, now, sheet.slot);
       closeSheet(); toast(`현장입장자 · 열쇠 ${w.keys.join(", ")}번 등록${printForm("enter", keyVals(w))}`); renderAll();
     },
     bulkReturn() { openSheet({ mode: "bulk" }); },
