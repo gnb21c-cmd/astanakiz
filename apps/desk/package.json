@@ -17,8 +17,26 @@
   "build": {
     "appId": "kr.astanakiz.desk",
     "productName": "아스타나키즈 입장 데스크",
-    "files": ["src/**/*"],
-    "extraResources": [{ "from": "../../prototype/desk.html", "to": "desk.html" }],
-    "win": { "target": "nsis" }
+    "files": [
+      "src/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../../prototype/desk.html",
+        "to": "desk.html"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico"
+    },
+    "directories": {
+      "buildResources": "build"
+    }
   }
 }

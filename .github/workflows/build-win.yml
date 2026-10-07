@@ -29,10 +29,14 @@ jobs:
         id: ver
         shell: bash
         run: |
-          v="1.$(( ${{ github.run_number }} - 14 ))"
+          v="1.$(( ${{ github.run_number }} - 15 ))" # 1.24.1 을 한 번 끼워 넣어서 -15 (다음 일반 빌드 = 1.25)
+          # 커밋 메시지에 [ver 1.24.1] 처럼 적으면 그 번호로 (작은 수정판 · 사장님 10/7)
+          o=$(git log -1 --format=%B | grep -oE '\[ver [0-9]+(\.[0-9]+){1,2}\]' | grep -oE '[0-9]+(\.[0-9]+){1,2}' | head -1)
+          [ -n "$o" ] && v="$o"
           echo "v=$v" >> "$GITHUB_OUTPUT"
           echo "{\"build\":\"$v\",\"sha\":\"$(git log -1 --format=%h)\"}" > apps/desk/src/build.json
-          cd apps/desk && npm pkg set version=$v.0
+          if [ "$(echo "$v" | tr -cd . | wc -c)" -ge 2 ]; then sv="$v"; else sv="$v.0"; fi
+          cd apps/desk && npm pkg set version=$sv
       - name: 설치 파일 만들기
         working-directory: apps/desk
         env:

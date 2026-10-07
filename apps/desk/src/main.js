@@ -151,6 +151,7 @@ function createDesk() {
     width: 1024,
     height: 768,
     title: "아스타나키즈 입장 데스크",
+    icon: path.join(__dirname, "icon.png"), // 작업표시줄 · 창 아이콘 = 브랜드 로고 (설치 아이콘은 build/icon.ico)
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true },
   });
   deskWin.setMenuBarVisibility(false);

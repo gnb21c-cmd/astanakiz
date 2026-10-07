@@ -120,7 +120,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .slot .c { text-align: center; font-weight: 700; font-size: 15px; }
 .slot .c.full, .slot-sum .full { color: var(--red); }
 .slot .c.dn { color: var(--muted); }
-.slot .c.cf, .slot-sum .cf { color: var(--accent); }
+.slot .c.cf, .slot-sum .cf { color: #3ddc6b; } /* 확정 = 예전 커튼 손잡이 연두색 (사장님 10/7) */
 .slot .c.lf, .slot-sum .lf { color: var(--fg); }
 .slot.now .t { border-color: var(--accent); color: var(--accent); }
 .slot.on { background: var(--accent-bg); border-color: var(--accent); }
@@ -193,7 +193,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .npend { font-size: 11.5px; color: var(--red); font-weight: 700; }
 .gift { display: inline-block; font-size: 11px; font-weight: 700; color: #fff; background: var(--red); border-radius: 5px; padding: 0 6px; margin-left: 2px; }
 .badge { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
-.badge.conf { background: var(--accent-bg); color: var(--accent); }
+.badge.conf { background: var(--red); color: #fff; } /* 미입장 = 빨강 스티커 */
 .badge.done { background: var(--naver-bg); color: var(--ok); }
 .badge.paid { background: var(--surface-2); color: var(--fg); border: 1px solid var(--line); }
 .kv { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 0 6px; font-size: 12.5px; margin: 0; }
@@ -217,8 +217,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .key.pink { background: var(--pink); border: 2px solid var(--pink); color: var(--pink-fg); }
 .key.red { background: var(--red); border: 2px solid var(--red); color: #fff; }
 .key.void { visibility: hidden; }
-.key.bulk { aspect-ratio: auto; height: auto; min-height: 0; align-self: stretch; font-size: 14px; font-weight: 800; color: var(--accent); border: 2px solid var(--accent); background: var(--accent-bg); }
-.key.bulk:disabled { opacity: .45; }
+.key.bulk { aspect-ratio: auto; height: auto; min-height: 0; align-self: stretch; font-size: 14px; font-weight: 800; }
+.key.bulk:not(:disabled) { background: var(--surface); border: 2px solid var(--ink); color: var(--ink); } /* 열쇠 2개 이상 나가면 지급된 열쇠처럼 */
 .bulklist { max-height: 300px; overflow: auto; display: grid; gap: 4px; margin: 6px 0; font-size: 13.5px; }
 .bulklist div { display: flex; justify-content: space-between; gap: 8px; padding: 4px 8px; border-radius: 6px; background: var(--surface-2); }
 .legend { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 11.5px; color: var(--muted); }
@@ -229,29 +229,29 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 
 /* 주차등록: 뒤에 열어 둔 아마노 화면과 같은 항목 */
 .park { border-top: 1px solid var(--line); padding-top: 6px; display: grid; gap: 5px; grid-template-rows: auto auto minmax(0, 1fr) auto; flex: 1; min-height: 0; }
-.park h3 { margin: 0; font-size: 14px; color: var(--red); display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.park h3 { margin: 0; font-size: 14px; color: var(--ink); display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .park h3 small { color: var(--muted); font-weight: 500; font-size: 11.5px; }
 .park h3 small i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); margin-right: 4px; font-style: normal; }
 .park .find { display: grid; grid-template-columns: auto 128px minmax(0, 1fr) auto; gap: 6px; margin: 0; align-items: center; }
 .park .find label { font-size: 12px; color: var(--muted); font-weight: 600; }
-.park .find input { border: 1.5px solid var(--red); border-radius: 8px; padding: 4px 8px; font-size: 15px; background: var(--surface); min-width: 0; min-height: 34px; }
-.park .find .btn { border-color: var(--red); color: var(--red); min-height: 34px; }
+.park .find input { border: 1.5px solid var(--ink); border-radius: 8px; padding: 4px 8px; font-size: 15px; background: var(--surface); min-width: 0; min-height: 34px; }
+.park .find .btn { border-color: var(--ink); color: var(--ink); min-height: 34px; }
 .park .find { position: relative; }
-.carpad { position: absolute; top: calc(100% + 4px); z-index: 60; width: 250px; box-sizing: border-box; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 8px; border-radius: 12px; background: var(--surface); border: 2px solid var(--red); box-shadow: 0 12px 30px rgba(0,0,0,.35); }
+.carpad { position: absolute; top: calc(100% + 4px); z-index: 60; width: 250px; box-sizing: border-box; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 8px; border-radius: 12px; background: var(--surface); border: 2px solid var(--ink); box-shadow: 0 12px 30px rgba(0,0,0,.35); }
 .carpad[hidden] { display: none; }
 .carpad button { height: 50px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); font-size: 22px; font-weight: 700; touch-action: manipulation; }
 .carpad button:active { background: var(--accent); color: #fff; }
 .carpad button.fn { font-size: 15px; }
-.carpad button.go { grid-column: 1 / -1; background: var(--red); border-color: var(--red); color: #fff; font-size: 18px; }
+.carpad button.go { grid-column: 1 / -1; background: var(--ink); border-color: var(--ink); color: var(--on-ink); font-size: 18px; }
 .park .body { display: grid; grid-template-columns: minmax(0, 1fr) 236px; gap: 6px; min-height: 0; }
-.cars { border: 1.5px solid var(--red); border-radius: 8px; padding: 4px; display: grid; gap: 3px; align-content: start; overflow: auto; min-height: 0; }
+.cars { border: 1.5px solid var(--ink); border-radius: 8px; padding: 4px; display: grid; gap: 3px; align-content: start; overflow: auto; min-height: 0; }
 .car { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 6px; align-items: center; padding: 4px 8px; border-radius: 6px; border: 1px solid transparent; background: var(--surface-2); text-align: left; width: 100%; }
-.car.on { border-color: var(--red); background: var(--warn-bg); }
+.car.on { border-color: var(--ink); background: var(--accent-bg); }
 .car b { font-size: 14px; }
 .car small { color: var(--muted); font-size: 11px; }
 .car .st { font-size: 11px; font-weight: 700; color: var(--ok); text-align: right; }
 .cnt { font-size: 10.5px; font-weight: 700; background: var(--muted); color: var(--surface); border-radius: 4px; padding: 0 4px; margin-left: 2px; }
-.pcar { border: 1.5px solid var(--red); border-radius: 8px; padding: 6px; display: grid; gap: 4px; align-content: start; overflow: auto; min-height: 0; }
+.pcar { border: 1.5px solid var(--ink); border-radius: 8px; padding: 6px; display: grid; gap: 4px; align-content: start; overflow: auto; min-height: 0; }
 .pcar .no { font-size: 18px; font-weight: 700; text-align: center; background: var(--ink); color: var(--on-ink); border-radius: 6px; padding: 2px 0; }
 .pcar .tm { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
 .pcar .tm b { color: var(--red); font-size: 14px; }
@@ -312,7 +312,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 
 /* 반납안내 커튼: 위 가운데 손잡이를 아래로 끌면 화면 전체를 덮는 안내 그림이 내려옴 (열쇠 반납 독려 · 고객정보 가림)
    내려온 뒤 아래 손잡이를 누르면 바로 사라짐 · 그림 왼쪽 아래 빨간 별을 누르면 위로 빨리 걷힘 */
-.curtain-tab { position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000; padding: 3px 26px 5px; border: 3px solid #1fa84a; border-top: 0; border-radius: 0 0 16px 16px; background: rgba(12, 20, 16, .88); color: #3ddc6b; font-weight: 800; font-size: 14px; letter-spacing: .5px; cursor: grab; touch-action: none; user-select: none; white-space: nowrap; }
+.curtain-tab { position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000; padding: 3px 26px 5px; border: 1.5px solid #3D7BF0; border-top: 0; border-radius: 0 0 16px 16px; background: rgba(12, 18, 32, .9); color: #7FB0FF; font-weight: 800; font-size: 14px; letter-spacing: .5px; cursor: grab; touch-action: none; user-select: none; white-space: nowrap; }
 .curtain-tab[hidden] { display: none; }
 .curtain { position: fixed; inset: 0; z-index: 9500; background: #f3efe8; transform: translateY(-100%); display: flex; align-items: center; justify-content: center; padding-bottom: 40px; box-sizing: border-box; touch-action: none; user-select: none; }
 .curtain.anim { transition: transform .45s cubic-bezier(.2, .8, .2, 1); }
@@ -320,7 +320,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .curtain .cimg { position: relative; width: min(100vw, calc((100vh - 46px) * 986 / 728)); aspect-ratio: 986 / 728; }
 .curtain .cimg img { width: 100%; height: 100%; display: block; pointer-events: none; -webkit-user-drag: none; }
 .curtain .star { position: absolute; left: 0; top: 84%; width: 12%; height: 16%; border: 0; background: transparent; cursor: pointer; }
-.curtain .cbottom { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); padding: 6px 30px 4px; border: 3px solid #1fa84a; border-bottom: 0; border-radius: 16px 16px 0 0; background: rgba(12, 20, 16, .88); color: #3ddc6b; font-weight: 800; font-size: 14px; white-space: nowrap; cursor: pointer; }
+.curtain .cbottom { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); padding: 6px 30px 4px; border: 1.5px solid #3D7BF0; border-bottom: 0; border-radius: 16px 16px 0 0; background: rgba(12, 18, 32, .9); color: #7FB0FF; font-weight: 800; font-size: 14px; white-space: nowrap; cursor: pointer; }
 </style>
 
 <div id="stage">
@@ -900,7 +900,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     let html = "";
     for (let k = 1; k <= 50; k++) {
       // 열쇠판 남는 칸(46~50) 자리에 '열쇠 일괄 반납처리'
-      if (k > RULES.keys) { html += `<button class="key bulk" data-act="bulkReturn" style="grid-column: span ${50 - RULES.keys}" ${holders().length ? "" : "disabled"}>열쇠 일괄 반납처리</button>`; break; }
+      if (k > RULES.keys) { html += `<button class="key bulk" data-act="bulkReturn" style="grid-column: span ${50 - RULES.keys}" ${holders().reduce((a, h) => a + h.keys.length, 0) >= 2 ? "" : "disabled"}>열쇠 일괄 반납처리</button>`; break; }
       const h = holderOf(k);
       if (!h) { html += `<button class="key free" data-act="key" data-k="${k}" aria-label="${k}번 빈 열쇠"><b class="num">${k}</b><span>&nbsp;</span></button>`; continue; }
       html += `<button class="key ${keyColor(h, k)}" data-act="key" data-k="${k}" aria-label="${k}번 ${esc(h.name)}"><b class="num">${k}</b><span>${esc(h.walk ? "현장" : h.name)}</span></button>`;
