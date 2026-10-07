@@ -52,7 +52,7 @@ test("데스크가 네이버 예약을 불러오고, 등록 완료 때 네이버
     await desk.click('.slot[data-s="840"]');
     const names = await desk.$$eval(".res .name", (e) => e.map((x) => x.textContent));
     assert.deepStrictEqual(names, ["백연화", "송다온", "허정은"], "이름 가나다순");
-    assert.match(await desk.textContent('.res:has-text("허정은")'), /완료 8 · 취소 2 → 이번 9번째 방문/);
+    assert.match(await desk.textContent('.res:has-text("허정은")'), /완료 8 · 취소 2 → 9번 완료 예정/);
 
     // 일찍 입장: 13:56 에 18:00 예약도 열쇠를 고를 수 있음 (5분 전은 손님 안내 기준일 뿐)
     await desk.click('.slot[data-s="1080"]');
@@ -68,7 +68,7 @@ test("데스크가 네이버 예약을 불러오고, 등록 완료 때 네이버
     await desk.click("#enter-done");
     await desk.waitForFunction(() => document.getElementById("overlay").hidden, null, { timeout: 30000 });
     assert.match(await desk.textContent('.res:has-text("허정은")'), /이용완료/);
-    assert.match(await desk.textContent('.res:has-text("허정은")'), /9번째 방문/);
+    assert.match(await desk.textContent('.res:has-text("허정은")'), /9번째 예약완료/);
     assert.deepStrictEqual(await desk.$$eval('.slot[data-s="840"] .c', (e) => e.map((x) => x.textContent.trim())), ["1", "3", "6"], "입장하면 확정 → 완료, 잔여 그대로");
     assert.deepStrictEqual(await desk.$$eval(".res .name", (e) => e.map((x) => x.textContent)), ["백연화", "송다온", "허정은"], "입장해도 순서 그대로");
 

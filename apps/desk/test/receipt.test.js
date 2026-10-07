@@ -58,7 +58,7 @@ test("입장권: 빈칸이 다 채워지고 · 입장시간은 예약 시간 · 
     const walkTimes = await page.evaluate(() => window.__deskTest.holders().filter((x) => x.walk).map((w) => window.__deskTest.keyVals(w).입장시간));
     assert.deepStrictEqual(walkTimes, ["오후 12시 30분", "오후 1시 00분"]);
     assert.ok(walk.some((l) => /네이버 예약하고/.test(l.t)), "현장 손님에게 네이버 예약 안내");
-    assert.ok(!walk.some((l) => /번째 방문입니다/.test(l.t)), "현장 손님은 방문 횟수 없음");
+    assert.ok(!walk.some((l) => /네이버 예약 \d+번/.test(l.t)), "현장 손님은 이용완료 횟수 없음");
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();
