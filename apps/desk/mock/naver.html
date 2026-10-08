@@ -43,14 +43,14 @@
     "2026-10-05": [
       { no: "1367156204", name: "송나라", phone: "010-6687-3285", time: "10:00", product: 0, qty: 1, status: "완료", done: 11, cancel: 2 },
       { no: "1368411002", name: "엄효정", phone: "010-5358-6288", time: "10:00", product: 0, qty: 2, status: "완료", done: 11, cancel: 0 },
-      { no: "1368102888", name: "백연화", phone: "010-7515-4623", time: "14:00", product: 0, qty: 1, status: "확정", done: 1, cancel: 1 },
+      { no: "1368102888", name: "백연화", phone: "010-7515-4623", time: "14:00", product: 0, qty: 1, status: "확정", done: 0, cancel: 3 }, // 완료 없이 취소만 → "취소 3"
       { no: "1368155282", name: "허정은", phone: "010-4674-0736", time: "14:00", product: 0, qty: 1, status: "확정", done: 8, cancel: 2 },
       { no: "1368177001", name: "송다온", phone: "010-2024-5489", time: "14:00", product: 0, qty: 2, status: "확정", done: 9, cancel: 0 },
       { no: "1368188002", name: "취소손님", phone: "010-5555-6666", time: "14:00", product: 0, qty: 1, status: "취소", done: 2, cancel: 3 },
       { no: "1370988026", name: "홍길동", phone: "010-1111-2222", time: "18:00", product: 1, qty: 1, status: "확정", done: 0, cancel: 0 },
       { no: "1370988777", name: "단체손님", phone: "010-3333-4444", time: "10:00", product: 2, qty: 1, status: "확정", done: 0, cancel: 0 },
       { no: "1372961203", name: "양용수", phone: "010-8612-2915", time: "16:00", product: 0, qty: 1, status: "확정", done: 1, cancel: 1, visitor: "박소희(010-2785-4295)" },
-      { no: "1373000111", name: "입금대기손님", phone: "010-7777-8888", time: "15:30", product: 0, qty: 1, status: "확정", done: 0, cancel: 0, unpaid: true },
+      { no: "1373000111", name: "입금대기손님", phone: "010-7777-8888", time: "15:30", product: 0, qty: 1, status: "확정", done: 0, cancel: 2, unpaid: true },
     ],
   });
   let db;
@@ -61,6 +61,8 @@
   const day = P.get("day") || "2026-10-05";
   const shift = (k, n) => { const d = new Date(k + "T12:00:00"); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
   const D = new Date(day + "T12:00:00");
+  // 이름 밑 이용 실적: 완료가 있으면 "완료 n, 취소 n" · 완료 없이 취소만 "취소 n" (신규예약 글자 없음) · 처음이면 "신규예약"
+  const visitText = (b) => (b.done ? `완료 ${b.done}${b.cancel ? `, 취소 ${b.cancel}` : ""}` : b.cancel ? `취소 ${b.cancel}` : "신규예약");
   const ampm = (t) => { let [h, m] = t.split(":").map(Number); return [h < 12 ? "오전" : "오후", `${h > 12 ? h - 12 : h}:${String(m).padStart(2, "0")}`]; };
   const list = db[day] || [];
   db.caps = db.caps || {}; // "날짜|상품|시각" → 회차당 수량 (없으면 10)
@@ -135,7 +137,7 @@
       if (shown.length === 1) {
         const b = shown[0]; const [ap, hm] = ampm(b.time);
         panel = `<section class="BookingDetail__root__x9"><div class="BookingDetail__head"><h2>예약 상세정보</h2><button type="button" class="btn_close" onclick="go({sel:''})"><svg width="10" height="10"></svg></button></div>
-          <div class="BookingDetail__user"><span class="badge">${b.status}</span><strong>${b.name}</strong>${b.visitor ? `<span class="tag">대리예약</span>` : ""}<a href="#">${b.done ? `완료 ${b.done}${b.cancel ? `, 취소 ${b.cancel}` : ""}` : "신규예약"}<svg width="6" height="10" aria-hidden="true"></svg></a></div>
+          <div class="BookingDetail__user"><span class="badge">${b.status}</span><strong>${b.name}</strong>${b.visitor ? `<span class="tag">대리예약</span>` : ""}<a href="#">${visitText(b)}<svg width="6" height="10" aria-hidden="true"></svg></a></div>
           <dl><dt>예약자</dt><dd>${b.name}${b.visitor ? ` <span class="tag">대리예약</span>` : ""}</dd><dt>전화번호</dt><dd>${b.phone}</dd>${b.visitor ? `<dt>방문자</dt><dd>${b.visitor}</dd>` : ""}<dt>예약번호</dt><dd>${b.no}</dd><dt>예약유형</dt><dd>일반</dd></dl>
           <h3>예약내역</h3><dl><dt>상품</dt><dd>${PRODUCTS[b.product]}</dd><dt>이용일시</dt><dd>${D.getFullYear()}. ${D.getMonth() + 1}. ${D.getDate()}.(${DOW[D.getDay()]}) ${ap} ${hm}</dd><dt>수량</dt><dd>[평일할인] 4인 입장권 ${b.qty}</dd><dt>결제상태</dt><dd>${b.unpaid ? "입금대기" : "결제완료"}</dd><dt>유입경로</dt><dd>네이버 지도</dd></dl>
           ${b.status === "확정" ? (b.unpaid ? `<button type="button" class="wide" data-cancel="${b.no}">예약취소</button>` : `<button type="button" data-cancel="${b.no}">예약취소</button><button type="button" data-complete="${b.no}">이용완료</button>`) : ""}</section>`;
@@ -144,7 +146,7 @@
         <ul>${["확정", "완료"].map((s) => `<li class="BookingListTab__item__WvfHs ${s === sel.s ? "BookingListTab__active__rhhuS" : ""}"><a href="#" class="BookingListTab__anchor__CNbqG" data-tab="${s}">${s}${n(s)}</a></li>`).join("")}</ul>
         <div class="List__list-wrap__k2Lq9">${shown.map((b, i) => { const [ap, hm] = ampm(b.time); return `<div class="List__contents-box__aIuHh" ${i >= 2 ? "hidden" : ""}><div class="Summary__root__J7Cxm"><div class="Summary__profile__65ECc">
           <a href="#" class="Summary__user-area__d8i5K" data-tst_click_link="${b.no}"><span class="Summary__user-state__-w1Zi"><span class="label label-round" data-tst_booking_status="0">${b.status}</span></span>
-          <span class="Summary__user-info__5U4rs"><span class="Summary__user-name__gnk40"><span class="Summary__name__MDiZ7">${b.name}</span>${b.visitor ? `<span class="label">대리예약</span>` : ""}</span><div class="Summary__user-state-label__uvLuO"><div><div class="text-info-sub"> 완료 ${b.done}${b.cancel ? `, 취소 ${b.cancel}` : ""}</div></div></div></span></a></div>
+          <span class="Summary__user-info__5U4rs"><span class="Summary__user-name__gnk40"><span class="Summary__name__MDiZ7">${b.name}</span>${b.visitor ? `<span class="label">대리예약</span>` : ""}</span><div class="Summary__user-state-label__uvLuO"><div><div class="text-info-sub"> ${visitText(b)}</div></div></div></span></a></div>
           <div class="Summary__list-cont__MA7Mv">
             <div class="Summary__item__mKdi8"><span class="Summary__item-title__Z-wa7">예약자</span><span class="Summary__item-dsc__Y4wms">${b.name}</span></div>
             <div class="Summary__item__mKdi8"><span class="Summary__item-title__Z-wa7">전화번호</span><a href="tel:${b.phone}" class="Summary__item-dsc__Y4wms">${b.phone}</a></div>${b.visitor ? `

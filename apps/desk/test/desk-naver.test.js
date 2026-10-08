@@ -53,6 +53,7 @@ test("데스크가 네이버 예약을 불러오고, 등록 완료 때 네이버
     const names = await desk.$$eval(".res .name", (e) => e.map((x) => x.textContent));
     assert.deepStrictEqual(names, ["백연화", "송다온", "허정은"], "이름 가나다순");
     assert.match(await desk.textContent('.res:has-text("허정은")'), /완료 8 · 취소 2 → 9번 완료 예정/);
+    assert.match(await desk.textContent('.res:has-text("백연화")'), /완료 0 · 취소 3 → 1번 완료 예정/, "취소만 있는 손님도 신규(완료 0)로");
 
     // 일찍 입장: 13:56 에 18:00 예약도 열쇠를 고를 수 있음 (5분 전은 손님 안내 기준일 뿐)
     await desk.click('.slot[data-s="1080"]');
@@ -70,7 +71,7 @@ test("데스크가 네이버 예약을 불러오고, 등록 완료 때 네이버
     assert.match(await desk.textContent('.res:has-text("허정은")'), /이용완료/);
     assert.match(await desk.textContent('.res:has-text("허정은")'), /9번째 예약완료/);
     assert.deepStrictEqual(await desk.$$eval('.slot[data-s="840"] .c', (e) => e.map((x) => x.textContent.trim())), ["1", "3", "6"], "입장하면 확정 → 완료, 잔여 그대로");
-    assert.deepStrictEqual(await desk.$$eval(".res .name", (e) => e.map((x) => x.textContent)), ["백연화", "송다온", "허정은"], "입장해도 순서 그대로");
+    assert.deepStrictEqual(await desk.$$eval(".res .name", (e) => e.map((x) => x.textContent)), ["백연화", "송다온", "허정은"], "입장완료는 밑으로 (허정은은 원래 맨 밑)");
 
     // 네이버 이용완료는 뒤에서 — 끝날 때까지 기다림 (카드의 '네이버 이용완료 처리 중 · 대기'가 사라짐)
     await desk.waitForFunction(() => { const c = [...document.querySelectorAll(".res")].find((e) => /허정은/.test(e.textContent)); return c && !c.querySelector(".npend"); }, null, { timeout: 60000 });

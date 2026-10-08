@@ -42,6 +42,9 @@ test("하루 예약 읽기: 예약 목록 + 예약현황 카드 (입장권만, �
     assert.strictEqual(by["1370988026"].time, "18:00");
     assert.strictEqual(by["1370988026"].doneCount, 0, "1건인 칸은 상세정보가 바로 뜸 · 처음 온 손님은 '신규예약' → 0");
     assert.strictEqual(by["1370988026"].name, "홍길동");
+    // 완료 실적 없이 취소만 있는 손님: '신규예약'도 '완료 n'도 없이 "취소 n"만 → 완료 0 (확인 중으로 남지 않게, 사용자 지시 10/8)
+    assert.deepStrictEqual([by["1368102888"].doneCount, by["1368102888"].cancelCount], [0, 3], "목록 카드 '취소 3'");
+    assert.deepStrictEqual([by["1373000111"].doneCount, by["1373000111"].cancelCount], [0, 2], "상세정보 '취소 2 >'");
     assert.strictEqual(by["1370988026"].phone, "010-1111-2222");
     const s14 = r.slots.find((s) => s.time === "14:00" && /1시간 50분/.test(s.product));
     assert.deepStrictEqual({ cap: s14.cap, conf: s14.conf }, { cap: 10, conf: 4 });

@@ -19,7 +19,7 @@
    - 이용완료는 두 단계 (현장 화면 10/6): 카드의 [이용완료] → 오른쪽이 '이용완료' 화면("이용완료 시 사용자에게 이용완료 알림이 발송됩니다.")으로 바뀜 → 맨 아래 초록 [이용완료]: window.confirm 이면 자동 확인, 화면 안 창이면 "하시겠습니까" 글자 옆 [확인] */
 
 function installNaverDriver() {
-  if (window.__naver && window.__naver.v === 10) return true;
+  if (window.__naver && window.__naver.v === 11) return true;
 
   const norm = (s) => String(s || "").replace(/\s+/g, "");
   const vis = (el) => !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== "hidden");
@@ -157,19 +157,26 @@ function installNaverDriver() {
     const v = l.nextElementSibling || (l.parentElement && l.parentElement.nextElementSibling);
     return v ? txt(v).replace(/,\s*$/, "") : "";
   };
-  // 방문 횟수: "완료 11, 취소 2" · 처음 온 손님은 "신규예약" → 0 · 못 찾으면 null (데스크에 '확인 중')
+  // 방문 횟수: "완료 11, 취소 2" · 처음 온 손님은 "신규예약" → 0
+  // 완료 실적 없이 취소(노쇼)만 한 손님은 '신규예약'도 '완료 n'도 없이 "취소 3"만 뜸 → 완료 0 (사용자 지시 10/8: 그동안 '확인 중'으로 남아 입장 뒤에야 채워졌음)
+  // 못 찾으면 null (데스크에 '확인 중')
+  const visitsIn = (t) => {
+    if (/^신규예약/.test(norm(t))) return [0, 0];
+    if (!/^(완료|취소|노쇼)\s*\d+/.test(t)) return null;
+    const d = t.match(/^완료\s*(\d+)/), x = t.match(/취소\s*(\d+)/);
+    return [d ? +d[1] : 0, x ? +x[1] : 0];
+  };
   const visitsOf = (c) => {
-    const m = txt(c.querySelector(".text-info-sub")).match(/완료\s*(\d+)(?:\s*,\s*취소\s*(\d+))?/);
-    if (m) return [+m[1], m[2] ? +m[2] : 0];
+    const m = visitsIn(txt(c.querySelector(".text-info-sub")));
+    if (m) return m;
     // 상세정보는 "완료 2 >" · "신규예약 >" 처럼 글자 옆에 화살표 그림이 붙은 링크 → 그 요소의 자기 글자만 봄 (현장 10/6: 못 읽어 방문 횟수가 빠졌음)
     const own = (e) => [...e.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join("").trim().replace(/\s+/g, " ");
     for (const e of [...c.querySelectorAll("*")].filter(vis)) {
       if (e.closest("button")) continue;
       const t = own(e) || (!e.children.length ? txt(e) : "");
       if (!t) continue;
-      const k = t.match(/^완료\s*(\d+)(?:\s*[,·]\s*취소\s*(\d+))?/);
-      if (k) return [+k[1], k[2] ? +k[2] : 0];
-      if (/^신규예약/.test(norm(t))) return [0, 0];
+      const k = visitsIn(t);
+      if (k) return k;
     }
     return [null, 0];
   };
@@ -228,7 +235,7 @@ function installNaverDriver() {
   window.alert = () => {};
 
   window.__naver = {
-    v: 10,
+    v: 11,
     read() {
       const page = cls(document, "Calendar__inner-contents") ? "calendar" : $$('a[class*="contents-user"]').length || cls(document, "BookingListView__root") ? "list" : "";
       const total = (document.body.innerText.match(/(\d+)\s*건\s*내려받기/) || [])[1];
