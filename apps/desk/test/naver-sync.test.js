@@ -28,7 +28,7 @@ test("하루 예약 읽기: 예약 목록 + 예약현황 카드 (입장권만, �
     const r = await sync.loadDay("2026-10-05");
     assert.ok(r.ok, r.why);
     const by = Object.fromEntries(r.bookings.map((b) => [b.no, b]));
-    assert.strictEqual(r.bookings.length, 6, "입장권만 · 취소 뺌");
+    assert.strictEqual(r.bookings.length, 8, "입장권만 · 취소 뺌 (대리예약 · 입금대기 포함)");
     assert.ok(!r.bookings.some((b) => /단체/.test(b.product) || b.status === "취소"));
     const h = by["1368155282"];
     assert.deepStrictEqual(
@@ -58,7 +58,7 @@ test("날짜 이동: 다른 날로 갔다가 돌아옴 · 두 번째 읽기는 �
     assert.ok(r.ok, r.why);
     assert.strictEqual(r.bookings.length, 0);
     r = await sync.loadDay("2026-10-05");
-    assert.strictEqual(r.bookings.length, 6);
+    assert.strictEqual(r.bookings.length, 8);
     const t0 = Date.now();
     r = await sync.loadDay("2026-10-05");
     assert.ok(r.ok);

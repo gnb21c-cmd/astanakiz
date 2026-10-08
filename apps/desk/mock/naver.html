@@ -13,6 +13,8 @@
      &range=1 날짜가 기간으로 보임 (일간이 아닐 때)
      &compact=1 칸이 좁을 때처럼 시각에 오전·오후가 없음 ("1:00" = 13:00)
      ?login=need 로그인 화면
+     대리예약(예약자 옆 '대리예약' 스티커 + '방문자 박소희(010-…)') · 입금대기(결제상태 '입금대기', [예약취소]만 길게 — 이용완료 없음)
+       [예약취소] → "예약을 취소하시겠습니까?" [확인] → 취소 (현장 화면 10/8)
      예약가능 · 잔여예약 버튼 → 오른쪽 "예약정보 / 예약가능 n / 예약가능 설정": 상품 · 적용날짜 · 적용회차 · 수량(회차당 수량 입력칸) · 예약현황 n / n
                      · [변경취소] [설정변경] → "변경하시겠습니까?" 창 [확인] → 그 칸의 판매 수량이 바뀜 (현장 화면 10/6) -->
 <style>
@@ -47,6 +49,8 @@
       { no: "1368188002", name: "취소손님", phone: "010-5555-6666", time: "14:00", product: 0, qty: 1, status: "취소", done: 2, cancel: 3 },
       { no: "1370988026", name: "홍길동", phone: "010-1111-2222", time: "18:00", product: 1, qty: 1, status: "확정", done: 0, cancel: 0 },
       { no: "1370988777", name: "단체손님", phone: "010-3333-4444", time: "10:00", product: 2, qty: 1, status: "확정", done: 0, cancel: 0 },
+      { no: "1372961203", name: "양용수", phone: "010-8612-2915", time: "16:00", product: 0, qty: 1, status: "확정", done: 1, cancel: 1, visitor: "박소희(010-2785-4295)" },
+      { no: "1373000111", name: "입금대기손님", phone: "010-7777-8888", time: "15:30", product: 0, qty: 1, status: "확정", done: 0, cancel: 0, unpaid: true },
     ],
   });
   let db;
@@ -131,25 +135,26 @@
       if (shown.length === 1) {
         const b = shown[0]; const [ap, hm] = ampm(b.time);
         panel = `<section class="BookingDetail__root__x9"><div class="BookingDetail__head"><h2>예약 상세정보</h2><button type="button" class="btn_close" onclick="go({sel:''})"><svg width="10" height="10"></svg></button></div>
-          <div class="BookingDetail__user"><span class="badge">${b.status}</span><strong>${b.name}</strong><a href="#">${b.done ? `완료 ${b.done}${b.cancel ? `, 취소 ${b.cancel}` : ""}` : "신규예약"}<svg width="6" height="10" aria-hidden="true"></svg></a></div>
-          <dl><dt>예약자</dt><dd>${b.name}</dd><dt>전화번호</dt><dd>${b.phone}</dd><dt>예약번호</dt><dd>${b.no}</dd><dt>예약유형</dt><dd>일반</dd></dl>
-          <h3>예약내역</h3><dl><dt>상품</dt><dd>${PRODUCTS[b.product]}</dd><dt>이용일시</dt><dd>${D.getFullYear()}. ${D.getMonth() + 1}. ${D.getDate()}.(${DOW[D.getDay()]}) ${ap} ${hm}</dd><dt>수량</dt><dd>[평일할인] 4인 입장권 ${b.qty}</dd><dt>유입경로</dt><dd>네이버 지도</dd></dl>
-          ${b.status === "확정" ? `<button type="button">예약취소</button><button type="button" data-complete="${b.no}">이용완료</button>` : ""}</section>`;
+          <div class="BookingDetail__user"><span class="badge">${b.status}</span><strong>${b.name}</strong>${b.visitor ? `<span class="tag">대리예약</span>` : ""}<a href="#">${b.done ? `완료 ${b.done}${b.cancel ? `, 취소 ${b.cancel}` : ""}` : "신규예약"}<svg width="6" height="10" aria-hidden="true"></svg></a></div>
+          <dl><dt>예약자</dt><dd>${b.name}${b.visitor ? ` <span class="tag">대리예약</span>` : ""}</dd><dt>전화번호</dt><dd>${b.phone}</dd>${b.visitor ? `<dt>방문자</dt><dd>${b.visitor}</dd>` : ""}<dt>예약번호</dt><dd>${b.no}</dd><dt>예약유형</dt><dd>일반</dd></dl>
+          <h3>예약내역</h3><dl><dt>상품</dt><dd>${PRODUCTS[b.product]}</dd><dt>이용일시</dt><dd>${D.getFullYear()}. ${D.getMonth() + 1}. ${D.getDate()}.(${DOW[D.getDay()]}) ${ap} ${hm}</dd><dt>수량</dt><dd>[평일할인] 4인 입장권 ${b.qty}</dd><dt>결제상태</dt><dd>${b.unpaid ? "입금대기" : "결제완료"}</dd><dt>유입경로</dt><dd>네이버 지도</dd></dl>
+          ${b.status === "확정" ? (b.unpaid ? `<button type="button" class="wide" data-cancel="${b.no}">예약취소</button>` : `<button type="button" data-cancel="${b.no}">예약취소</button><button type="button" data-complete="${b.no}">이용완료</button>`) : ""}</section>`;
       } else
       panel = `<div><b>예약정보</b> <button type="button" onclick="go({sel:''})">닫기</button></div>
         <ul>${["확정", "완료"].map((s) => `<li class="BookingListTab__item__WvfHs ${s === sel.s ? "BookingListTab__active__rhhuS" : ""}"><a href="#" class="BookingListTab__anchor__CNbqG" data-tab="${s}">${s}${n(s)}</a></li>`).join("")}</ul>
         <div class="List__list-wrap__k2Lq9">${shown.map((b, i) => { const [ap, hm] = ampm(b.time); return `<div class="List__contents-box__aIuHh" ${i >= 2 ? "hidden" : ""}><div class="Summary__root__J7Cxm"><div class="Summary__profile__65ECc">
           <a href="#" class="Summary__user-area__d8i5K" data-tst_click_link="${b.no}"><span class="Summary__user-state__-w1Zi"><span class="label label-round" data-tst_booking_status="0">${b.status}</span></span>
-          <span class="Summary__user-info__5U4rs"><span class="Summary__user-name__gnk40"><span class="Summary__name__MDiZ7">${b.name}</span></span><div class="Summary__user-state-label__uvLuO"><div><div class="text-info-sub"> 완료 ${b.done}${b.cancel ? `, 취소 ${b.cancel}` : ""}</div></div></div></span></a></div>
+          <span class="Summary__user-info__5U4rs"><span class="Summary__user-name__gnk40"><span class="Summary__name__MDiZ7">${b.name}</span>${b.visitor ? `<span class="label">대리예약</span>` : ""}</span><div class="Summary__user-state-label__uvLuO"><div><div class="text-info-sub"> 완료 ${b.done}${b.cancel ? `, 취소 ${b.cancel}` : ""}</div></div></div></span></a></div>
           <div class="Summary__list-cont__MA7Mv">
             <div class="Summary__item__mKdi8"><span class="Summary__item-title__Z-wa7">예약자</span><span class="Summary__item-dsc__Y4wms">${b.name}</span></div>
-            <div class="Summary__item__mKdi8"><span class="Summary__item-title__Z-wa7">전화번호</span><a href="tel:${b.phone}" class="Summary__item-dsc__Y4wms">${b.phone}</a></div>
+            <div class="Summary__item__mKdi8"><span class="Summary__item-title__Z-wa7">전화번호</span><a href="tel:${b.phone}" class="Summary__item-dsc__Y4wms">${b.phone}</a></div>${b.visitor ? `
+            <div class="Summary__item__mKdi8"><span class="Summary__item-title__Z-wa7">방문자</span><span class="Summary__item-dsc__Y4wms">${b.visitor}</span></div>` : ""}
             <div class="Summary__item__mKdi8"><span class="Summary__item-title__Z-wa7">예약번호</span><span class="Summary__item-dsc__Y4wms"><span>${b.no}</span></span></div>
             <div class="Summary__item__stsVC"><span class="Summary__item-title__bzqwu">상품</span><span class="Summary__item-dsc__5aGv2">${PRODUCTS[b.product]}</span></div>
             <div class="Summary__item__stsVC"><span class="Summary__item-title__bzqwu">이용일시</span><span class="Summary__item-dsc__5aGv2">${D.getFullYear()}. ${D.getMonth() + 1}. ${D.getDate()}.(${DOW[D.getDay()]}) ${ap} ${hm}</span></div>
             <div class="Summary__item__stsVC"><span class="Summary__item-title__bzqwu">수량</span><span class="Summary__item-dsc__5aGv2"><span>4인 입장권 <span class="text-info">${b.qty}</span><span>, </span></span></span></div>
-            <div class="Summary__item__stsVC"><span class="Summary__item-title__bzqwu">결제상태</span><span class="Summary__item-dsc__5aGv2"><span class="label">결제완료</span></span></div>
-          </div>${b.status === "확정" ? `<div class="Summary__btn-area"><button type="button" class="btn">예약취소</button><button type="button" class="btn btn-dark" data-complete="${b.no}">이용완료</button></div>` : ""}</div></div>`; }).join("")}</div>`;
+            <div class="Summary__item__stsVC"><span class="Summary__item-title__bzqwu">결제상태</span><span class="Summary__item-dsc__5aGv2"><span class="label">${b.unpaid ? "입금대기" : "결제완료"}</span></span></div>
+          </div>${b.status === "확정" ? `<div class="Summary__btn-area">${b.unpaid ? `<button type="button" class="btn wide" data-cancel="${b.no}">예약취소</button>` : `<button type="button" class="btn" data-cancel="${b.no}">예약취소</button><button type="button" class="btn btn-dark" data-complete="${b.no}">이용완료</button>`}</div>` : ""}</div></div>`; }).join("")}</div>`;
     }
     document.body.innerHTML = `<div class="bar">${dateNav(label)}</div><div class="wrap"><div class="Calendar__inner-contents__px333">
       <div class="Calendar__inner-header__y3esS"><div class="d-flex Calendar__week-row__JWB4z">${PRODUCTS.map((x) => `<div class="Calendar__week-cell__ntFou"><span class="Calendar__day-header__6caUi">${x}</span></div>`).join("")}</div></div>
@@ -176,6 +181,17 @@
       if (b && (b.dataset.act === "확정" || b.dataset.act === "이용완료")) { const c = b.closest("[data-p]"); setTimeout(() => go({ sel: JSON.stringify({ p: +c.dataset.p, t: c.dataset.t, s: b.dataset.act === "확정" ? "확정" : "완료" }) }), 150); return; }
       const tab = e.target.closest("[data-tab]");
       if (tab) { e.preventDefault(); setTimeout(() => go({ sel: JSON.stringify(Object.assign(sel, { s: tab.dataset.tab })) }), 150); return; }
+      const cx = e.target.closest("[data-cancel]");
+      if (cx) {
+        const x = db[day].find((y) => y.no === cx.dataset.cancel);
+        const layer = document.createElement("div");
+        layer.className = "layer";
+        layer.innerHTML = `<p>예약을 취소하시겠습니까?</p><button type="button" id="cx-no">닫기</button><button type="button" id="cx-ok">확인</button>`;
+        document.body.appendChild(layer);
+        layer.querySelector("#cx-no").onclick = () => layer.remove();
+        layer.querySelector("#cx-ok").onclick = () => { x.status = "취소"; x.cancel += 1; save(); layer.remove(); setTimeout(() => go({ sel: "" }), 200); };
+        return;
+      }
       const c = e.target.closest("[data-complete]");
       if (c) {
         // 실제처럼 두 단계: 오른쪽이 '이용완료' 화면으로 바뀌고 맨 아래 초록 [이용완료]를 눌러야 완료 (현장 화면 10/6)

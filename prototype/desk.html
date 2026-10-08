@@ -101,7 +101,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .panel { height: 100%; }
 /* 가운데 칸: 위에 새로고침 버튼, 그 아래로 예약자 명단 상자를 내림 */
 .midcol { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 6px; min-height: 0; min-width: 0; }
-.refresh { min-height: 38px; width: 100%; font-size: 14px; border-color: var(--accent); color: var(--accent); background: var(--surface); }
+.refresh { min-height: 38px; width: 100%; font-size: 14px; border-color: var(--ink); color: var(--accent); background: var(--surface); }
 .refresh small { font-size: 11px; color: var(--muted); font-weight: 500; margin-left: 4px; }
 .scroll { min-height: 0; display: grid; gap: 5px; align-content: start; overflow: auto; flex: 1; }
 
@@ -123,8 +123,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .slot .c.cf, .slot-sum .cf { color: #3ddc6b; } /* 확정 = 예전 커튼 손잡이 연두색 (사장님 10/7) */
 .slot .c.lf, .slot-sum .lf { color: var(--fg); }
 .slot.now .t { border-color: var(--accent); color: var(--accent); }
-.slot.on { background: var(--accent-bg); border-color: var(--accent); }
-.slot.on .t { background: var(--accent); color: #fff; border-color: var(--accent); }
+.slot.on { background: var(--accent-bg); border-color: var(--ink); } /* 고른 시간 줄: 테두리 흰색 · 배경 그대로 (사장님 10/8) */
+.slot.on .t { background: var(--ink); color: var(--on-ink); border-color: var(--ink); } /* 시간 칸: 흰 바탕 · 검정 글씨 */
 .slot:hover { background: var(--surface-2); }
 .slot.on:hover { background: var(--accent-bg); }
 
@@ -203,6 +203,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .gift { display: inline-block; font-size: 11px; font-weight: 700; color: #fff; background: var(--red); border-radius: 5px; padding: 0 6px; margin-left: 2px; }
 .badge { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
 .badge.conf { background: var(--red); color: #fff; } /* 미입장 = 빨강 스티커 */
+.badge.proxy { background: var(--surface-2); color: var(--fg); border: 1px solid var(--line); font-size: 11px; vertical-align: 2px; }
+.badge.unpaid { background: #E8A33D; color: #1b1200; } /* 입금대기 (결제 안 함 · 자동 취소 대상이 될 수 있음) */
+.res dd.visitor { font-weight: 700; }
 .badge.done { background: var(--naver-bg); color: var(--ok); }
 .badge.paid { background: var(--surface-2); color: var(--fg); border: 1px solid var(--line); }
 .kv { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 0 6px; font-size: 12.5px; margin: 0; }
@@ -218,10 +221,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .keyhead { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
 .keyhead .stat { font-size: 12.5px; color: var(--muted); }
 .keyhead .stat b { color: var(--fg); font-size: 15px; }
-.keys { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; }
+.keys { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); grid-template-rows: repeat(5, minmax(0, 1fr)); gap: 4px; flex: 1 1 0; min-height: 0; } /* 열쇠판이 남는 높이를 다 채움 · 5줄 같은 높이 (사장님 10/8) */
+.keys .key { aspect-ratio: auto; height: auto; min-height: 0; }
 .key { aspect-ratio: 1 / .98; max-width: 100%; border-radius: 8px; border: 1.5px solid var(--line); background: var(--surface-2); color: var(--faint); display: grid; align-content: center; justify-items: center; padding: 1px; line-height: 1.1; min-width: 0; overflow: hidden; }
 .key b { font-size: 17px; font-weight: 700; }
-.key span { font-size: 10.5px; font-weight: 600; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.key span { font-size: 11px; font-weight: 400; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .key.in { background: var(--surface); border: 2px solid var(--ink); color: var(--ink); }
 .key.pink { background: var(--pink); border: 2px solid var(--pink); color: var(--pink-fg); }
 .key.red { background: var(--red); border: 2px solid var(--red); color: #fff; }
@@ -239,7 +243,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .legend .l-red { border-color: var(--red); background: var(--red); }
 
 /* 주차등록: 뒤에 열어 둔 아마노 화면과 같은 항목 */
-.park { border-top: 1px solid var(--line); padding-top: 6px; display: grid; gap: 5px; grid-template-rows: auto auto minmax(0, 1fr) auto; flex: 1; min-height: 0; }
+.park { border-top: 1px solid var(--line); padding-top: 6px; display: grid; gap: 5px; grid-template-rows: auto auto minmax(0, 1fr) auto; flex: 0 0 236px; min-height: 0; } /* 주차등록은 아래에 고정 높이, 남는 높이는 열쇠판으로 */
 .park h3 { margin: 0; font-size: 14px; color: var(--ink); display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .park h3 small { color: var(--muted); font-weight: 500; font-size: 11.5px; }
 .park h3 small i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); margin-right: 4px; font-style: normal; }
@@ -248,9 +252,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .park .find input { border: 1.5px solid var(--ink); border-radius: 8px; padding: 4px 8px; font-size: 15px; background: var(--surface); min-width: 0; min-height: 34px; }
 .park .find .btn { border-color: var(--ink); color: var(--ink); min-height: 34px; }
 .park .find { position: relative; }
-.carpad { position: absolute; top: calc(100% + 4px); z-index: 60; width: 250px; box-sizing: border-box; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 8px; border-radius: 12px; background: var(--surface); border: 2px solid var(--ink); box-shadow: 0 12px 30px rgba(0,0,0,.35); }
+.carpad { position: absolute; bottom: calc(100% + 4px); left: 0; right: 0; /* 차량번호 칸 위로 (열쇠판 위에 뜸 → 아래 할인정보 · 삭제는 그대로 보임) */ z-index: 60; box-sizing: border-box; display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; padding: 6px; border-radius: 12px; background: var(--surface); border: 2px solid var(--ink); box-shadow: 0 12px 30px rgba(0,0,0,.35); }
 .carpad[hidden] { display: none; }
-.carpad button { height: 50px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); font-size: 22px; font-weight: 700; touch-action: manipulation; }
+.carpad button { height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); font-size: 22px; font-weight: 700; touch-action: manipulation; }
 .carpad button:active { background: var(--accent); color: #fff; }
 .carpad button.fn { font-size: 15px; }
 .carpad button.go { grid-column: 1 / -1; background: var(--ink); border-color: var(--ink); color: var(--on-ink); font-size: 18px; }
@@ -409,10 +413,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           <button class="btn" type="submit">검색</button>
           <!-- 터치 숫자패드: 차량번호 칸을 누르면 뜸 (Windows 화상 키보드 대신 · 현장 10/6) -->
           <div class="carpad" id="carpad" hidden aria-label="차량번호 숫자패드">
-            <button type="button" data-cp="1">1</button><button type="button" data-cp="2">2</button><button type="button" data-cp="3">3</button>
-            <button type="button" data-cp="4">4</button><button type="button" data-cp="5">5</button><button type="button" data-cp="6">6</button>
-            <button type="button" data-cp="7">7</button><button type="button" data-cp="8">8</button><button type="button" data-cp="9">9</button>
-            <button type="button" class="fn" data-cp="clr">지우기</button><button type="button" data-cp="0">0</button><button type="button" class="fn" data-cp="del" aria-label="한 자리 지우기">←</button>
+            <!-- 가로 6칸 × 2줄 + 검색 (주차등록 칸 높이 안에 들게 · 10/8) -->
+            <button type="button" data-cp="1">1</button><button type="button" data-cp="2">2</button><button type="button" data-cp="3">3</button><button type="button" data-cp="4">4</button><button type="button" data-cp="5">5</button><button type="button" data-cp="6">6</button>
+            <button type="button" data-cp="7">7</button><button type="button" data-cp="8">8</button><button type="button" data-cp="9">9</button><button type="button" data-cp="0">0</button><button type="button" class="fn" data-cp="del" aria-label="한 자리 지우기">←</button><button type="button" class="fn" data-cp="clr">지우기</button>
             <button type="button" class="go" data-cp="go">검색</button>
           </div>
         </form>
@@ -460,6 +463,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     // 네이버 예약 자동 불러오기: 09:50부터 매시 20분 · 50분 (마지막 입장 19:30 전 19:20까지)
     //   그 사이에 들어온 예약(예: 09:58에 10:00 예약)은 근무자가 [새로고침]으로 바로 불러옴
     naverAuto: { from: "09:50", until: "19:20", at: [20, 50] },
+    // 입금대기 예약 자동 취소 (사장님 10/8): 네이버를 불러올 때마다(30분마다) 결제를 안 한 예약([이용완료] 없이 [예약취소]만)이
+    //   지금부터 2시간 안 타임(이미 시작한 지금 타임 포함)에 있으면 [예약취소]. 결제한 예약은 절대 누르지 않음 (취소 직전에 카드를 다시 읽어 확인)
+    unpaidCancel: { on: true, within: 120 },
     peaks: [{ from: "2026-07-20", to: "2026-08-23" }, { from: "2026-12-28", to: "2027-02-28" }], // 성수기 기간 (운영 설정에서 고치고 더함)
     /* 네이버 판매 수량 자동 조절 (시간제인 날 · 시간제 타임만): 2시간(4타임) 안의 손님(네이버 예약 + 현장)이 target 에 가깝게
        10분마다 지금 · 앞 3타임의 네이버 '회차당 수량'을 바꿈. 한 타임 최대 max (현장으로 갑자기 오는 손님 · 10분 사이 예약을 생각해서) */
@@ -520,7 +526,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       status: o.done ? "완료" : "확정", keys: [], enteredAt: null, outAt: null,
       // 네이버 예약자 이름 밑 "완료 n · 취소 n" (미입장일 때 읽은 값 = 이번 방문 전까지 완료 횟수)
       prevDone: o.prevDone ?? (seq * 7) % 13, cancels: (seq * 3) % 4 === 0 ? 1 : 0, visitNo: null,
+      proxy: !!o.proxy, visitor: o.visitor || "", unpaid: !!o.unpaid,
     };
+    if (o.unpaid) b.pay = "입금대기";
     if (b.status === "완료") b.visitNo = b.prevDone + 1;
     (bookings[day] = bookings[day] || []).push(b);
     return b;
@@ -547,6 +555,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   // 14:30 2장 + 16:30 1장 → 열쇠 1개 3시간 50분 · 1개 1시간 50분
   booking(TODAY, "14:30", "나연속", "01055501234", 2, { prevDone: 3 });
   booking(TODAY, "16:30", "나연속", "01055501234", 1, { prevDone: 3 });
+  // 예시: 대리예약(방문자 따로) · 입금대기 (10/8)
+  booking(TODAY, "16:00", "양용수", "01086122915", 1, { prevDone: 1, proxy: true, visitor: "박소희(010-2785-4295)" });
+  booking(TODAY, "15:30", "입금대기", "01077778888", 1, { prevDone: 0, unpaid: true });
   // 예시: 같은 시간에 나눠 예약한 손님 (15:00 1장 + 1장 → 한 번에 입장, 완료 8 → 9 · 10번 = 사은권)
   booking(TODAY, "15:00", "나분할", "01066601234", 1, { prevDone: 8 });
   booking(TODAY, "15:00", "나분할", "01066601234", 1, { prevDone: 8 });
@@ -639,6 +650,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (day === TODAY) setTimeout(naverFlush, 3000); // 네이버에 이용완료가 안 된 입장이 있으면 다시
     if (day === TODAY) restoreState();
     if (day === TODAY) setTimeout(extScan, 0); // 이용 중 손님의 추가 예약 (사장님 10/7)
+    if (day === TODAY) setTimeout(unpaidSweep, 500); // 입금대기 예약 자동 취소 (사장님 10/8)
     if (!only) { lastRefresh = now; if (day === TODAY) todayAt = now; }
     renderAll();
     if (loud) toast(only ? `${only} 예약 ${r.bookings.filter((b) => b.time === only).length}건 다시 불러옴` : `네이버 예약 ${r.bookings.length}건 불러옴`);
@@ -658,6 +670,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         day, no: n.no, slot: toMin(n.time), name: n.name, phone: n.phone, qty: n.qty,
         product: (n.qtyText || "").replace(/\s*\d+\s*$/, "") || "입장권", naverProduct: n.product, pay: n.pay || "",
         cancels: n.cancelCount,
+        proxy: !!n.proxy, visitor: n.visitor || "", unpaid: !!n.unpaid, // 대리예약 · 방문자 · 입금대기 (10/8)
       });
       // 네이버 카드의 '완료 n': 미입장이면 이번 방문 전까지, 이용완료면 이번 방문까지 센 수 (못 읽었으면 null)
       if (!done) {
@@ -709,7 +722,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
      - 앱: 저장 폴더(%APPDATA%\아스타나키즈 입장 데스크\desk-state\날짜.json)에 바로 씀 (갑자기 꺼져도 남게) + 브라우저 저장소에도 한 벌
      - 켜자마자 빈 화면으로 저장본을 덮어쓰지 않게: 저장본을 먼저 읽어 들인 뒤부터 저장 */
   const STATE_KEY = "astanakiz-desk-" + TODAY;
-  const SAVE_FIELDS = ["id", "day", "no", "slot", "name", "phone", "qty", "product", "naverProduct", "pay", "cancels", "prevDone", "visitNo", "visitEnd", "status", "keys", "enteredAt", "outAt", "overPaid", "naverPending", "naverWhy", "useMin", "keyUse", "chainHead"];
+  const SAVE_FIELDS = ["id", "day", "no", "slot", "name", "phone", "qty", "product", "naverProduct", "pay", "cancels", "prevDone", "visitNo", "visitEnd", "proxy", "visitor", "status", "keys", "enteredAt", "outAt", "overPaid", "naverPending", "naverWhy", "useMin", "keyUse", "chainHead"];
   let stateReady = !APP; // 저장본을 읽기 전에는 저장하지 않음
   let pendingSaved = []; // 예전 형식(예약번호만 있는) 저장본 — 네이버에서 그 예약을 불러오면 합침
   function saveState() {
@@ -813,6 +826,32 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (h.keyUse && k == null) { const v = h.keys.map((x) => h.keyUse[x]).filter((x) => x !== undefined); if (v.length) return v.includes(null) ? null : Math.min(...v); }
     return h.useMin !== undefined ? h.useMin : minutesFor(TODAY, h.slot);
   };
+
+  // ── 입금대기 예약 자동 취소 (사장님 10/8) ─────────────────────
+  let unpaidBusy = false;
+  const unpaidLog = (() => { try { return JSON.parse(localStorage.getItem("astanakiz-unpaid-" + TODAY)) || []; } catch (e) { return []; } })();
+  /** 지금 취소 대상: 오늘 · 확정 · 입금대기 · 아직 입장 안 함 · 지금 타임 ~ 2시간 뒤 */
+  const unpaidDue = () => (bookings[TODAY] || []).filter((b) => b.status === "확정" && b.unpaid && b.enteredAt == null && b.slot >= Math.floor(now / 30) * 30 && b.slot <= now + RULES.unpaidCancel.within);
+  async function unpaidSweep() {
+    if (!APP || !RULES.unpaidCancel.on || unpaidBusy || !window.desk.naver.cancel) return;
+    const list = unpaidDue();
+    if (!list.length) return;
+    unpaidBusy = true;
+    try {
+      for (const b of list) {
+        const r = await window.desk.naver.cancel({ day: b.day, time: hm(b.slot), product: b.naverProduct || "", no: b.no, qty: b.qty }).catch((e) => ({ ok: false, why: String(e) }));
+        unpaidLog.unshift({ at: hm(now), name: b.name, time: hm(b.slot), qty: b.qty, ok: !!(r && r.ok), why: r && !r.ok ? r.why : "" });
+        if (r && r.ok) {
+          const arr = bookings[TODAY]; arr.splice(arr.indexOf(b), 1);
+          const ns = (naverSlots[TODAY] || {})[b.slot]; if (ns) ns.conf = Math.max(0, ns.conf - b.qty);
+          toast(`입금대기 예약 자동 취소: ${b.name} ${hm(b.slot)} ${b.qty}장`);
+        } else if (r && r.paid) b.unpaid = false; // 그 사이 결제함 → 대상에서 뺌
+        else toast(`입금대기 예약 취소 실패: ${b.name} ${hm(b.slot)} — ${(r && r.why) || "응답 없음"}`);
+      }
+      unpaidLog.length = Math.min(unpaidLog.length, 40);
+      try { localStorage.setItem("astanakiz-unpaid-" + TODAY, JSON.stringify(unpaidLog)); } catch (e) { /* 저장 못 해도 동작 */ }
+    } finally { unpaidBusy = false; renderAll(); }
+  }
 
   // ── 추가 예약 (이용 중인 손님이 뒤 타임을 또 예약 · 사장님 10/7) ─────────────────────
   /* 네이버를 불러올 때마다(매시 20 · 50분 + 새로고침) 열쇠를 가진 손님과 같은 사람(이름 + 전화번호, 현장손님은 전화번호)의
@@ -944,6 +983,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   }
   /** 이번 입장으로 함께 이용완료되는 예약들 중 사은권 회차가 있는지 (예: 8 → 같은 시간 2건이면 9, 10) */
   const giftIn = (h) => { const a = h.visitNo, z = h.visitEnd || h.visitNo; if (!a) return 0; for (let n = a; n <= z; n++) if (isGift(n)) return n; return 0; };
+  /** 대리예약: 예약자 정보와 함께 방문자 이름 · 전화번호도 (네이버 '방문자' 줄 "박소희(010-2785-4295)") */
+  function visitorRow(b) {
+    if (!b.visitor) return "";
+    const m = /^(.*?)\s*\(([\d-]+)\)\s*$/.exec(b.visitor);
+    return `<dt>방문자</dt><dd class="num visitor">${esc(m ? m[1] : b.visitor)}${m ? ` ${fmtPhone(m[2])}` : ""}</dd>`;
+  }
   function renderRes() {
     // 이름 가나다순 (네이버 목록 순서와 상관없이 · 입장해도 자리 그대로, 색으로만 미입장/입장완료 구분)
     const list = bookings[viewDay].filter((b) => b.slot === selSlot).sort((a, b) => a.name.localeCompare(b.name, "ko") || String(a.no || a.id).localeCompare(String(b.no || b.id)));
@@ -971,10 +1016,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       else if (b.chainHead) act = `<span class="help num">연속예약 — ${hm(b.enteredAt)} 첫 예약으로 입장</span>`;
       if (b.naverPending) act += `<span class="npend">${b.naverBusy ? "네이버 이용완료 처리 중…" : `네이버 이용완료 대기${b.naverWhy ? ` — ${esc(b.naverWhy)}` : ""} (자동으로 다시)`}</span>`;
       return `<article class="res ${b.status === "완료" ? "done" : ""}" data-act="openRes" data-id="${b.id}" tabindex="0" role="button" aria-label="${esc(b.name)} 예약 열기">
-        <div class="head"><span class="name">${esc(b.name)}</span><span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span></div>
+        <div class="head"><span class="name">${esc(b.name)}${b.proxy ? ` <span class="badge proxy">대리예약</span>` : ""}</span>${b.unpaid && b.status === "확정" ? `<span class="badge unpaid">입금대기</span>` : `<span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span>`}</div>
         ${partyTag}${chainTag}<div class="visits num">${visitText(b)}</div>
         <dl class="kv">
-          <dt>전화번호</dt><dd class="phone num">${fmtPhone(b.phone)}</dd>
+          <dt>전화번호</dt><dd class="phone num">${fmtPhone(b.phone)}</dd>${visitorRow(b)}
           <dt>이용일시</dt><dd class="num">${when}</dd>
           <dt>수량</dt><dd>${b.product} ${b.qty}</dd>
           <dt>결제상태</dt><dd><span class="badge paid">${b.pay}</span></dd>
@@ -1368,7 +1413,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         <dl class="facts">
           <dt>예약자</dt><dd style="font-size:18px">${esc(b.name)} <span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span></dd>
           <dt>이용완료</dt><dd class="num visits big">${visitText(b)}</dd>
-          <dt>전화번호</dt><dd class="num">${fmtPhone(b.phone)}</dd>
+          <dt>전화번호</dt><dd class="num">${fmtPhone(b.phone)}</dd>${visitorRow(b)}
           <dt>이용일시</dt><dd class="num">${hm(b.slot)} ${m == null ? "· 무제한" : `~ ${hm(b.slot + m)} (${dur(m)})`}</dd>
           <dt>수량</dt><dd>${b.product} ${b.qty}</dd>
           <dt>결제상태</dt><dd>${b.pay}</dd>
@@ -1516,6 +1561,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
             <li>초과요금: 1:50:01부터 카운트, 2:00:00 정각 5,000원 · 10분이 꽉 찰 때마다 5,000원 × 열쇠 수</li>
             <li>네이버 예약 자동 불러오기: ${RULES.naverAuto.from}부터 매시 ${RULES.naverAuto.at.join("분 · ")}분 (${RULES.naverAuto.until}까지) · 그 사이에 들어온 예약은 [새로고침]</li>
           </ul>
+          <div class="field"><label class="chk"><input type="checkbox" id="unpaid-on" ${RULES.unpaidCancel.on ? "checked" : ""}> <b>입금대기 예약 자동 취소</b> <span class="help">네이버를 불러올 때마다 · 지금 ~ 2시간 안 타임에 결제 안 한 예약([이용완료] 없이 [예약취소]만)이 있으면 취소 · 결제한 예약은 안 누름</span></label>
+            <div class="help">지금 대상: ${(() => { const d = unpaidDue(); return d.length ? d.map((b) => `${esc(b.name)} ${hm(b.slot)} ${b.qty}장`).join(", ") : "없음"; })()}</div>
+            <div class="caplog">${unpaidLog.slice(0, 8).map((x) => `<div class="${x.ok ? "" : "bad"}"><span class="num">${esc(x.at)}</span> ${esc(x.name)} ${esc(x.time)} ${x.qty}장 ${x.ok ? "취소함" : `실패: ${esc(x.why || "")}`}</div>`).join("")}</div></div>
           <div class="sheet-foot"><button class="btn btn-ink" data-act="close" data-autofocus>닫기</button></div>`;
         return;
       }
@@ -1674,7 +1722,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (APP && window.desk.config) window.desk.config.set({ peaks: v });
     else try { localStorage.setItem("astanakiz-peaks", JSON.stringify(v)); } catch (e) { /* 저장 못 해도 동작 */ }
   }
-  if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c && Array.isArray(c.peaks) && c.peaks.length) { RULES.peaks = c.peaks; renderAll(); } if (c && c.capAuto) Object.assign(RULES.capAuto, c.capAuto); }).catch(() => {});
+  if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c && Array.isArray(c.peaks) && c.peaks.length) { RULES.peaks = c.peaks; renderAll(); } if (c && c.capAuto) Object.assign(RULES.capAuto, c.capAuto); if (c && c.unpaidCancel) Object.assign(RULES.unpaidCancel, c.unpaidCancel); }).catch(() => {});
   else try { const v = JSON.parse(localStorage.getItem("astanakiz-peaks")); if (Array.isArray(v) && v.length) RULES.peaks = v; } catch (e) { /* 없음 */ }
   if (!APP) try { const v = JSON.parse(localStorage.getItem("astanakiz-capauto")); if (v) Object.assign(RULES.capAuto, v); } catch (e) { /* 없음 */ }
   const savePrint = () => { if (APP && window.desk.config) window.desk.config.set({ printer: PRINT.sel, printCut: PRINT.cut, printMode: PRINT.mode, comPort: PRINT.port, comBaud: PRINT.baud, printForm: { text: PRINT.forms.enter.text, auto: PRINT.forms.enter.auto, ver: ENTER_FORM_VER } }); };
@@ -2160,6 +2208,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (t.id === "cap-t-day" && t.value) capTry.day = t.value;
     if (t.id === "cap-t-time") capTry.time = t.value;
     if (t.id === "cap-t-n" && t.value !== "") capTry.n = Math.max(0, Number(t.value) || 0);
+    if (t.id === "unpaid-on") { RULES.unpaidCancel.on = t.checked; if (APP && window.desk.config) window.desk.config.set({ unpaidCancel: { on: t.checked } }); toast(t.checked ? "입금대기 예약 자동 취소를 켰어요" : "입금대기 예약 자동 취소를 껐어요"); }
     if (t.id === "cap-on") { RULES.capAuto.on = t.checked; capMark = null; saveCapAuto(); renderAll(); toast(t.checked ? "네이버 판매 수량 자동 조절을 켰어요 (10분마다)" : "자동 조절을 껐어요"); }
     if ((t.id === "cap-target" || t.id === "cap-max" || t.id === "cap-ceil") && t.value) { RULES.capAuto[{ "cap-target": "target", "cap-max": "max", "cap-ceil": "ceiling" }[t.id]] = Math.max(1, Math.min(60, Number(t.value) || 0)); saveCapAuto(); }
     if (t.id === "com-baud") { PRINT.baud = Number(t.value); savePrint(); }
@@ -2170,8 +2219,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   // 차량번호 숫자패드: 칸을 누르거나(터치 · 마우스) 커서가 가면 뜨고, 다른 곳을 누르거나 검색하면 닫힘
   (function carPad() {
     const q = $("car-q"), pad = $("carpad");
-    // 왼쪽 조회 목록 칸 위에 띄움 (오른쪽 할인정보 · '등록 중'은 가리지 않게)
-    const open = () => { const c = $("cars"); pad.style.left = "0px"; pad.style.width = Math.max(220, c.offsetWidth) + "px"; pad.hidden = false; };
+    // 차량번호 칸 바로 위에 가로로 띄움 (화면 밖으로 안 나가고 · 아래 할인정보를 가리지 않게 · 10/8)
+    const open = () => { pad.hidden = false; }; // 주차등록 칸 너비 전체 (가로 6칸)
     const close = () => { pad.hidden = true; };
     q.addEventListener("focus", open);
     q.addEventListener("pointerdown", open);

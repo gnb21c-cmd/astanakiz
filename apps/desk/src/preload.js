@@ -16,7 +16,8 @@ contextBridge.exposeInMainWorld("desk", {
   naver: {
     load: (day, only) => ipcRenderer.invoke("naver:load", day, only), // only = "14:00" 이면 그 시간 칸만
     complete: (b) => ipcRenderer.invoke("naver:complete", b),
-    setCap: (c) => ipcRenderer.invoke("naver:setCap", c), // 판매 수량 바꾸기 { day, product, time, n }
+    setCap: (c) => ipcRenderer.invoke("naver:setCap", c),
+    cancel: (b) => ipcRenderer.invoke("naver:cancel", b), // 입금대기 예약 취소 // 판매 수량 바꾸기 { day, product, time, n }
     show: () => ipcRenderer.invoke("naver:show"),
     setHome: () => ipcRenderer.invoke("naver:setHome"),
     dump: () => ipcRenderer.invoke("naver:dump"),

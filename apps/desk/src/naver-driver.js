@@ -14,10 +14,12 @@
        → 상세정보도 카드 한 장으로 읽고, 칸의 이름표는 글자로 찾음
    - 판매 수량 바꾸기 (현장 화면 10/6): 칸의 하늘색 [예약가능 n](예약이 있으면 [잔여예약 n]) → 오른쪽 '예약정보 · 예약가능 n · 예약가능 설정'
        상품 · 적용날짜 · 적용회차(오전 10:00) · 수량(입력칸 '회차당 수량', 지금 수량이 들어 있음) · 예약현황 0 / 10 · [변경취소] [설정변경]
+   - 대리예약 (현장 화면 10/8): 예약자 옆 '대리예약' 스티커 + '방문자' 줄에 "박소희(010-2785-4295)"
+   - 입금대기 (현장 화면 10/8): 결제를 안 한 예약은 [이용완료] 없이 [예약취소]만 길게 있음 → 자동 취소 대상(데스크가 정함)
    - 이용완료는 두 단계 (현장 화면 10/6): 카드의 [이용완료] → 오른쪽이 '이용완료' 화면("이용완료 시 사용자에게 이용완료 알림이 발송됩니다.")으로 바뀜 → 맨 아래 초록 [이용완료]: window.confirm 이면 자동 확인, 화면 안 창이면 "하시겠습니까" 글자 옆 [확인] */
 
 function installNaverDriver() {
-  if (window.__naver && window.__naver.v === 9) return true;
+  if (window.__naver && window.__naver.v === 10) return true;
 
   const norm = (s) => String(s || "").replace(/\s+/g, "");
   const vis = (el) => !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== "hidden");
@@ -193,6 +195,9 @@ function installNaverDriver() {
       doneCount,
       cancelCount,
       canComplete: clickables(c).some((b) => textOf(b) === "이용완료"),
+      canCancel: clickables(c).some((b) => textOf(b) === "예약취소"),
+      proxy: leafs(c).some((e) => norm(e.textContent) === "대리예약"), // 대리예약 스티커
+      visitor: field(c, "방문자"), // "박소희(010-2785-4295)"
     };
   };
 
@@ -223,7 +228,7 @@ function installNaverDriver() {
   window.alert = () => {};
 
   window.__naver = {
-    v: 9,
+    v: 10,
     read() {
       const page = cls(document, "Calendar__inner-contents") ? "calendar" : $$('a[class*="contents-user"]').length || cls(document, "BookingListView__root") ? "list" : "";
       const total = (document.body.innerText.match(/(\d+)\s*건\s*내려받기/) || [])[1];
@@ -334,6 +339,33 @@ function installNaverDriver() {
       if (b) press(b);
       else document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
       return { ok: true, had: true };
+    },
+    /** 예약번호 카드의 [예약취소] (입금대기 자동 취소) — 결제한 예약([이용완료]가 있는 카드)은 누르지 않음 */
+    cancel(no) {
+      const card = cards().find((c) => field(c, "예약번호") === String(no));
+      if (!card) return { ok: false, why: `예약번호 ${no} 카드를 못 찾음` };
+      if (clickables(card).some((e) => textOf(e) === "이용완료")) return { ok: false, paid: true, why: "결제한 예약([이용완료] 있음) — 취소 안 함" };
+      const b = clickables(card).find((e) => textOf(e) === "예약취소");
+      if (!b) return { ok: false, why: "[예약취소] 버튼이 없음" };
+      b.setAttribute("data-astana-cancel", "1");
+      press(b);
+      return { ok: true };
+    },
+    /** 예약취소 뒤 확인 단계: 창 안의 [확인] · [예] · [예약취소] · [취소하기] (처음 누른 카드의 [예약취소]는 빼고) */
+    cancelConfirm() {
+      const boxSel = '[role=dialog], [role=alertdialog], [class*="odal"], [class*="ialog"], [class*="ayer"], [class*="opup"], [class*="lert"], [class*="onfirm"]';
+      const ok = clickables().find((e) => {
+        if (!["확인", "OK", "예", "예약취소", "취소하기", "예약취소하기"].includes(textOf(e)) || e.hasAttribute("data-astana-cancel")) return false;
+        if (cards().some((c) => c.contains(e))) return false;
+        const box = e.closest(boxSel);
+        if (box) return true;
+        for (let p = e.parentElement, i = 0; p && i < 6; p = p.parentElement, i++) if (/취소하시겠습니까|취소하면|취소 사유|취소사유|취소 시/.test(p.textContent)) return true;
+        return false;
+      });
+      if (!ok) return { ok: true, clicked: false };
+      const label = textOf(ok);
+      press(ok);
+      return { ok: true, clicked: true, label };
     },
     /** 예약정보 탭: "확정" | "완료" */
     openTab(kind) {

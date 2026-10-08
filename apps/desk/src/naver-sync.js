@@ -188,7 +188,8 @@ class NaverSync {
       for (const x of c.cards) {
         if (seen.has(x.no)) continue;
         seen.add(x.no);
-        bookings.push({ no: x.no, status: c.status, name: x.name, phone: x.phone, time: c.time, product: c.product, qty: x.qty, qtyText: x.qtyText, pay: x.pay, doneCount: x.doneCount, cancelCount: x.cancelCount });
+        bookings.push({ no: x.no, status: c.status, name: x.name, phone: x.phone, time: c.time, product: c.product, qty: x.qty, qtyText: x.qtyText, pay: x.pay, doneCount: x.doneCount, cancelCount: x.cancelCount,
+          proxy: !!x.proxy, visitor: x.visitor || "", unpaid: c.status === "확정" && !x.canComplete && !!x.canCancel && !/결제완료/.test(x.pay || "") }); // 대리예약 · 입금대기
       }
     return { ok: true, day, warn: warn.length ? `카드를 못 읽은 칸: ${warn.join(", ")}` : "", slots: slots.map((s) => ({ time: s.time, product: s.product, cap: s.avail + s.conf + s.done + s.apply, conf: s.conf + s.apply, done: s.done })), bookings };
   }
@@ -315,6 +316,55 @@ class NaverSync {
     }
     await this.snap("수량 안 바뀜");
     return { ok: false, why: `네이버 ${c.time} 판매 수량이 ${c.n}으로 안 바뀜 — 바탕화면 '아스타나키즈-진단' 폴더의 사진을 보내 주세요` };
+  }
+  /** 입금대기 예약 취소: 그 칸의 [확정] → 카드를 지금 다시 읽어 아직 입금대기([이용완료] 없음 · 결제완료 아님)인지 확인 → [예약취소] → 확인 창 → 칸 숫자로 확인
+      b = { day, time, product, no, qty } · 결제했으면 누르지 않음 */
+  async cancel(b) {
+    let g = await this.goView("calendar");
+    if (!g.ok) return g;
+    g = await this.goDate(b.day);
+    if (!g.ok) return g;
+    const cellOf = (s) => s.slots.find((x) => x.time === b.time && (!b.product || x.product === b.product));
+    const before = cellOf(g.state);
+    let r = await this.openSlot(b.product || "", b.time, "확정");
+    if (!r.ok) return r;
+    for (let i = 0; i < 30 && !(await this.read()).cards.some((c) => c.no === b.no); i++) if (!(await this.moreCards())) break;
+    const card = (await this.read()).cards.find((c) => c.no === b.no);
+    if (!card) return { ok: false, why: `네이버에서 예약번호 ${b.no} 카드를 못 찾음` };
+    if (card.canComplete || /결제완료/.test(card.pay || "")) return { ok: false, paid: true, why: "결제한 예약 — 취소 안 함" };
+    if (!card.canCancel) return { ok: false, why: "[예약취소] 버튼이 없음" };
+    this.step(`네이버 입금대기 ${b.time} 예약 취소`);
+    r = await this.act(`window.__naver.cancel(${JSON.stringify(b.no)})`);
+    if (!r.ok) return r;
+    this.snap("예약취소 누른 뒤");
+    for (let i = 0; i < 20; i++) {
+      const c = await this.call("window.__naver.cancelConfirm()").catch(() => null);
+      if (c && c.clicked) {
+        this.step(`네이버 취소 확인 [${c.label}]`);
+        await this.act("({ ok: true })");
+      } else if (i > 4) break;
+      await sleep(250);
+    }
+    // 확인: 칸의 확정 숫자가 줄었는지 — 안 보이면 예약현황을 다시 열어 그 카드가 없어졌는지
+    await this.act("window.__naver.closePanel()");
+    for (let i = 0; i < 20; i++) {
+      const c = cellOf(await this.read());
+      if (before && c && c.conf < before.conf) return { ok: true };
+      if (before && !c) return { ok: true };
+      await sleep(300);
+    }
+    if (this.urls) {
+      await this.act(`window.__naver.go(${JSON.stringify(this.urls.calendar)})`);
+      const gg = await this.goDate(b.day);
+      if (gg.ok) {
+        const c = cellOf(gg.state);
+        if (!c || !c.conf) return { ok: true };
+        const o = await this.openSlot(b.product || "", b.time, "확정");
+        if (o.ok && !(await this.read()).cards.some((x) => x.no === b.no)) return { ok: true };
+      }
+    }
+    await this.snap("예약취소 안 됨");
+    return { ok: false, why: "네이버에서 취소로 바뀌지 않음 — 바탕화면 '아스타나키즈-진단' 폴더의 사진을 보내 주세요" };
   }
   async snap(label) {
     try {
