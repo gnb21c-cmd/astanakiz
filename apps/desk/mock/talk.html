@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>톡톡 파트너센터 (시험용 가짜 화면)</title>
+<!-- 네이버 톡톡 파트너센터 상담관리 화면을 흉내 낸 시험용 화면 (현장 사진 10/8 모양)
+     ?u=2,0,3   목록 줄마다 안 읽은 메시지 수 (0 = 붉은 원 없음)
+     ?plain=1   붉은 원의 이름표(class)가 알 수 없는 글자일 때 (색으로만 찾는지 시험)
+     ?login=1   로그인 화면
+     줄을 누르면 그 대화를 읽은 것 → 붉은 원이 사라짐 -->
+<style>
+  body { margin: 0; font: 14px sans-serif; display: grid; grid-template-columns: 200px 290px 1fr; height: 100vh; }
+  .lnb { background: #3d4a5c; color: #fff; padding: 12px 0; }
+  .lnb a { display: block; padding: 14px 18px; color: #fff; text-decoration: none; }
+  .x91 { display: inline-block; min-width: 18px; padding: 0 6px; border-radius: 10px; background: #f0464f; color: #fff; font-size: 12px; }
+  .list { border-right: 1px solid #ddd; overflow: auto; }
+  .tabs { display: flex; gap: 18px; padding: 14px; }
+  .banner { margin: 8px 12px; padding: 10px; border: 1px solid #cde; border-radius: 6px; color: #3a7bd5; text-align: center; }
+  .item { display: grid; grid-template-columns: 50px 1fr 50px; gap: 8px; padding: 14px 12px; border-bottom: 1px solid #eee; cursor: pointer; height: 64px; }
+  .thumb { width: 44px; height: 44px; border-radius: 50%; background: #cfe9f6; }
+  .side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .q7 { display: inline-block; width: 20px; height: 20px; line-height: 20px; border-radius: 50%; background: rgb(255, 72, 72); color: #fff; text-align: center; font-size: 12px; font-weight: 700; }
+  .room { padding: 16px; }
+  .msg { margin: 10px 0; }
+  .login { grid-column: 1 / -1; padding: 40px; }
+</style>
+</head>
+<body>
+<script>
+  const P = new URLSearchParams(location.search);
+  if (P.get("login")) {
+    document.body.innerHTML = `<div class="login"><h1>NAVER</h1><input id="id" placeholder="아이디"><input type="password" id="pw" placeholder="비밀번호"><button>로그인</button></div>`;
+  } else {
+    const names = [["잉꼬", "10월 6일", "즐거운 시간 되시길 바래요~~^^"], ["moz", "10월 1일", "아 감사합니다"], ["l22y****", "오후 07:39", "10.9(금) 예매가 확정되었습니다."], ["은빈", "오후 07:30", "방문해주셔서 감사합니다."]];
+    const unread = (P.get("u") || "2,0,3").split(",").map(Number);
+    const badge = P.get("plain") ? "q7" : "q7 ChatList__unread-count";
+    const row = (i) => {
+      const [nm, t, last] = names[i];
+      return `<div class="item" data-i="${i}"><div class="thumb"></div><div><strong>${nm}</strong><p>${last}</p></div>
+        <div class="side"><span>${t}</span>${unread[i] ? `<span class="${badge}">${unread[i]}</span>` : ""}<i class="ico_popup"></i></div></div>`;
+    };
+    document.body.innerHTML = `
+      <nav class="lnb"><a href="#">프로필 관리</a><a href="#">상담관리 <em class="x91">111</em></a><a href="#">요청서 관리</a><a href="#">마케팅관리</a></nav>
+      <section class="list">
+        <div class="tabs"><a href="#">전체 <b>364</b></a><a href="#">대기<b>0</b></a><a href="#">진행중 <b>7</b></a></div>
+        <div class="tabs"><span>최근 1주일</span><span>읽음여부</span><span>최근 대화순</span></div>
+        <a class="banner" href="#">안읽은 메시지 111개 전체 보기</a>
+        <div id="items">${unread.map((_, i) => (names[i] ? row(i) : "")).join("")}</div>
+      </section>
+      <section class="room"><h3>대화</h3>
+        <div class="msg">아스타나키즈를 네이버에서 검색하시면 … <small>읽음 오후 4:07</small></div>
+        <div class="msg">자세한 설명 감사합니다^^ <small>오후 4:52</small></div>
+        <div class="msg">즐거운 시간 되시길 바래요~~^^* <small>읽음 오후 6:42</small></div>
+      </section>`;
+    // 줄을 누르면 그 대화를 읽음 → 붉은 원이 사라짐 (실제처럼)
+    document.getElementById("items").addEventListener("click", (e) => {
+      const it = e.target.closest(".item");
+      if (it) { const b = it.querySelector(".q7"); if (b) b.remove(); }
+    });
+  }
+</script>
+</body>
+</html>

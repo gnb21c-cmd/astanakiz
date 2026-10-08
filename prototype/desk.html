@@ -234,9 +234,19 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .key.bulk:not(:disabled) { background: var(--surface); border: 2px solid var(--ink); color: var(--ink); } /* 열쇠 2개 이상 나가면 지급된 열쇠처럼 */
 .bulklist { max-height: 300px; overflow: auto; display: grid; gap: 4px; margin: 6px 0; font-size: 13.5px; }
 .bulklist div { display: flex; justify-content: space-between; gap: 8px; padding: 4px 8px; border-radius: 6px; background: var(--surface-2); }
-.keyfoot { display: grid; grid-template-columns: minmax(0, 1fr) calc(30% - 1px); gap: 8px; align-items: start; }
-.keyfoot .bulk { aspect-ratio: auto; height: 46px; width: 100%; }
-.legend { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 11.5px; color: var(--muted); }
+/* 열쇠판 아래: 왼쪽 키즈상담 · 카페상담(열쇠 2칸 너비), 오른쪽 열쇠 일괄 반납처리(3칸) — 열쇠판과 같은 10칸 (사장님 10/8) */
+.keyfoot { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); column-gap: 4px; align-items: center; }
+.keyfoot .bulk { aspect-ratio: auto; height: 46px; width: 100%; grid-column: 8 / span 3; }
+.talk { position: relative; height: 38px; min-width: 0; padding: 0 4px; border-radius: 10px; border: 2px solid var(--ink); background: var(--surface); color: var(--ink); font-size: 14px; font-weight: 800; white-space: nowrap; }
+.talk[data-k="kids"] { grid-column: 1 / span 2; }
+.talk[data-k="cafe"] { grid-column: 3 / span 2; margin-left: 10px; }
+/* 새 상담 메시지 수: 붉은 원 (0이면 숨김) · 로그인 풀림 등은 주황 '!' */
+.tbadge { position: absolute; top: -9px; right: -9px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: #E5484D; color: #fff; font-size: 12px; font-weight: 800; line-height: 20px; text-align: center; }
+.tbadge.warn { background: #E8A33D; color: #1b1200; }
+/* 설명(범례): 45번 오른쪽 빈 칸에 세 줄 */
+.legend { display: flex; flex-wrap: wrap; align-content: center; gap: 3px 10px; font-size: 11px; color: var(--muted); }
+.keys .legend { grid-row: 5; padding-left: 8px; min-width: 0; }
+.legend .row { display: flex; gap: 10px; width: 100%; white-space: nowrap; }
 .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: -1px; margin-right: 4px; border: 1.5px solid var(--line); background: var(--surface-2); }
 .legend .l-in { border-color: var(--ink); background: var(--surface); }
 .legend .l-pink { border-color: var(--pink); background: var(--pink); }
@@ -394,13 +404,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       </div>
       <div class="keys" id="keys"></div>
       <div class="keyfoot">
-        <div class="legend">
-          <span><i></i>빈 열쇠</span>
-          <span><i class="l-in"></i>입장 ~ 1시간 50분</span>
-          <span><i class="l-pink"></i>1시간 50분 ~ 2시간</span>
-          <span><i class="l-red"></i>2시간 넘음</span>
-          <span>· 빈 열쇠를 누르면 현장입장</span>
-        </div>
+        <!-- 네이버 톡톡 상담: 누르면 상담 창이 열리고, 창을 닫으면(X) 데스크로 돌아옴 · 붉은 원 = 새 상담 메시지 수 (사장님 10/8) -->
+        <button class="talk" id="talk-kids" data-act="talkOpen" data-k="kids">키즈상담<span class="tbadge" hidden></span></button>
+        <button class="talk" id="talk-cafe" data-act="talkOpen" data-k="cafe">카페상담<span class="tbadge" hidden></span></button>
         <!-- 열쇠판 아래 오른쪽 · 열쇠 3칸 너비 (45번과 떨어져 있게 — 잘못 누르지 않게 · 사장님 10/7) -->
         <button class="key bulk" id="bulk-btn" data-act="bulkReturn" disabled>열쇠 일괄 반납처리</button>
       </div>
@@ -633,6 +639,30 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   let naverErr = "";
   let naverStep = ""; // 네이버에서 지금 하는 단계 (불러오는 동안 버튼에 보임)
   if (APP && window.desk.naver.onStep) window.desk.naver.onStep((m) => { naverStep = m; if (naverBusy) $("refresh-at").textContent = refreshText(); }); // 마지막 불러오기가 실패한 까닭 (다음에 성공할 때까지 버튼에 보임)
+  // ── 네이버 톡톡 상담 (키즈 · 카페) ─────────────────
+  /* 같은 네이버 아이디로 톡톡 파트너센터 상담 목록을 뒤에 열어 두고, 목록 줄마다 붙는 붉은 원(손님이 보낸 안 읽은 말풍선 수)을 더해 버튼에 붉은 원으로.
+     근무자가 버튼 → 상담 창에서 상담 → 창을 닫으면(X) 데스크로 돌아오고, 읽은 만큼 숫자가 줄어듦.
+     왼쪽 메뉴 '상담관리 111' · '안읽은 메시지 111개' 숫자는 쓰지 않음 (상담완료를 잘 안 눌러 쌓인 수 · 사장님 10/8) */
+  const TALK_NAME = { kids: "키즈상담", cafe: "카페상담" };
+  const TALK_API = window.desk && window.desk.talk;
+  const TALK = TALK_API ? { kids: { n: 0 }, cafe: { n: 0 } } : { kids: { n: 0 }, cafe: { n: 1 } }; // 체험판은 예시 숫자
+  function renderTalk() {
+    for (const k of Object.keys(TALK_NAME)) {
+      const btn = $("talk-" + k);
+      if (!btn) continue;
+      const t = TALK[k] || {}, b = btn.querySelector(".tbadge");
+      const warn = !(t.n > 0) && t.warn; // 숫자를 못 읽는 중 (로그인 풀림 · 화면을 아직 안 정함 등)
+      b.hidden = !(t.n > 0 || warn);
+      b.className = "tbadge num" + (warn ? " warn" : "");
+      b.textContent = warn ? "!" : t.n > 99 ? "99+" : String(t.n || "");
+      btn.title = warn ? `${TALK_NAME[k]}: ${t.warn}` : t.n > 0 ? `${TALK_NAME[k]} 새 메시지 ${t.n}개` : TALK_NAME[k];
+      btn.setAttribute("aria-label", btn.title);
+    }
+  }
+  if (TALK_API) {
+    TALK_API.onCounts((c) => { Object.assign(TALK, c); renderTalk(); });
+    TALK_API.counts().then((c) => { if (c) Object.assign(TALK, c); renderTalk(); }).catch(() => {});
+  }
   let naverNext = null; // 불러오는 중에 다른 날짜를 부탁받으면 끝난 뒤 이어서 (날짜를 바꿔도 따라가게)
   /** 네이버에서 불러오기. only = "14:00" 이면 그 시간 칸만 (근무자가 시간 칸을 누를 때), 없으면 하루 전체 (새로고침 · 자동) */
   async function loadNaver(day, loud, only) {
@@ -1039,6 +1069,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       if (!h) { html += `<button class="key free" data-act="key" data-k="${k}" aria-label="${k}번 빈 열쇠"><b class="num">${k}</b><span>&nbsp;</span></button>`; continue; }
       html += `<button class="key ${keyColor(h, k)}" data-act="key" data-k="${k}" aria-label="${k}번 ${esc(h.name)}"><b class="num">${k}</b><span>${esc(h.walk ? "현장" : h.name)}</span></button>`;
     }
+    // 설명은 45번 오른쪽 빈 칸에 (사장님이 정한 순서 10/8)
+    if (RULES.keys > 40 && RULES.keys <= 45) html += `<div class="legend" style="grid-column: ${RULES.keys - 39} / -1">
+      <span class="row"><span><i></i>빈 열쇠</span><span>· 빈 열쇠를 누르면 현장입장</span></span>
+      <span class="row"><span><i class="l-in"></i>입장 ~ 1시간 50분</span><span><i class="l-pink"></i>1시간 50분 ~ 2시간</span></span>
+      <span class="row"><span><i class="l-red"></i>2시간 넘음</span></span></div>`;
     $("keys").innerHTML = html;
     $("bulk-btn").disabled = holders().reduce((a, h) => a + h.keys.length, 0) < 2; // 열쇠 2개 이상 나가면 켜짐
   }
@@ -1616,6 +1651,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           <div class="field"><span class="label">네이버 예약관리 <span class="help">처음 한 번: '네이버 화면 보기'로 로그인(<b>'로그인 상태 유지' 꼭 체크</b> — 안 하면 앱을 껐다 켤 때 풀림) → 예약현황 화면까지 들어간 뒤 '지금 화면을 시작 화면으로'</span></span>
             <div class="btns"><button class="btn" data-act="naverShow" ${dis}>네이버 화면 보기 (로그인)</button><button class="btn" data-act="naverHome" ${dis}>지금 화면을 시작 화면으로</button><button class="btn" data-act="naverDump" ${dis}>네이버 화면 저장 (문제 확인용)</button></div>
             ${c.naverUrl ? `<span class="help">시작 화면: ${esc(c.naverUrl)}</span>` : ""}</div>
+          <div class="field"><span class="label">네이버 톡톡 상담 (키즈상담 · 카페상담 버튼) <span class="help">예약과 같은 네이버 아이디 · 처음 한 번: '톡톡 화면 보기' → 그 계정(아스타나키즈 / 카페아스타나)의 <b>상담관리</b> 목록 화면까지 들어간 뒤 창을 닫고 '지금 화면을 …으로'</span></span>
+            ${Object.entries(TALK_NAME).map(([k, t]) => `<div class="btns"><b style="min-width:64px">${t}</b><button class="btn btn-sm" data-act="talkSetup" data-k="${k}" ${dis}>톡톡 화면 보기</button><button class="btn btn-sm" data-act="talkHome" data-k="${k}" ${dis}>지금 화면을 ${t}으로</button><button class="btn btn-sm" data-act="talkDump" data-k="${k}" ${dis}>화면 저장 (문제 확인용)</button></div>
+            <span class="help">${(c.talkUrls || {})[k] ? `${t} 화면: ${esc(c.talkUrls[k])}` : `${t}: 아직 안 정함`}</span>`).join("")}</div>
           <p class="help">창은 한 화면에 겹쳐 둡니다: 맨 뒤 아마노·네이버 → 가운데 POS → 맨 앞 입장 데스크. 아마노 창이 가려져 있어도 입력·클릭이 됩니다.</p>
           <div class="sheet-foot"><button class="btn btn-ink" data-act="close">닫기</button></div>`;
         return;
@@ -2176,6 +2214,25 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     discDel(btn) { parkRun("할인내역 삭제", () => amanoApi.remove(Number(btn.dataset.i))); },
     amanoShow() { if (REAL) window.desk.amano.show(); },
     naverShow() { if (APP) window.desk.naver.show(); },
+    // 키즈상담 · 카페상담: 상담 창을 앞으로 (닫으면 데스크로 돌아옴)
+    async talkOpen(btn) {
+      const k = btn.dataset.k;
+      if (!TALK_API) { toast(`체험판: 설치한 앱에서는 네이버 톡톡 ${TALK_NAME[k]} 창이 열려요 (창을 닫으면 데스크로 돌아옴)`); return; }
+      const r = await TALK_API.open(k);
+      if (!r || !r.ok) toast((r && r.why) || "상담 창을 열지 못했어요");
+    },
+    // 운영 설정: 톡톡 화면 보기(로그인 · 계정 고르기) → 상담 목록 화면에서 '지금 화면을 …으로'
+    talkSetup(btn) { if (TALK_API) TALK_API.setup(btn.dataset.k); },
+    async talkHome(btn) {
+      const k = btn.dataset.k;
+      const r = await TALK_API.setHome(k);
+      CFG = await window.desk.config.get();
+      toast(r && r.ok ? `${TALK_NAME[k]} 상담 화면을 기억했어요` : (r && r.why) || "기억하지 못했어요"); renderSheet();
+    },
+    async talkDump(btn) {
+      const r = await TALK_API.dump(btn.dataset.k);
+      toast(r && r.ok ? "바탕화면 '아스타나키즈-진단' 폴더에 저장했어요" : `저장 못 함: ${(r && r.why) || ""}`);
+    },
     // 문제 확인용: 지금 네이버 창 화면을 바탕화면 '아스타나키즈-진단' 폴더에 저장
     async naverDump() {
       if (!APP || !window.desk.naver.dump) return;
@@ -2295,6 +2352,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   })();
   fit();
   renderAll();
+  renderTalk();
   parkFlush(); // 꺼지기 전에 남은 할인 등록 이어서
 })();
 </script>

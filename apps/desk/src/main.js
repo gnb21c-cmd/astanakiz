@@ -9,6 +9,7 @@ const fs = require("fs");
 const { execFile, spawn } = require("child_process");
 const { AmanoSync } = require("./amano-sync");
 const { NaverSync, naverUrls } = require("./naver-sync");
+const { TALK_COUNT_JS } = require("./talk-driver");
 
 const SETTINGS_FILE = () => path.join(app.getPath("userData"), "settings.json");
 const DEFAULTS = {
@@ -19,6 +20,7 @@ const DEFAULTS = {
   naverUrl: "https://partner.booking.naver.com/", // 네이버 예약관리 시작 화면 (예약현황). 처음 로그인 뒤 '지금 화면을 시작 화면으로'
   amanoId: "", // 아마노 아이디
   amanoPwEnc: "", // 아마노 비밀번호: Windows 암호화로 이 PC 계정만 풀 수 있게 저장 (저장소·설치파일에 넣지 않음)
+  talkUrls: { kids: "", cafe: "" }, // 네이버 톡톡 상담 목록 주소 (계정마다). 저장소에 적지 않고 운영 설정 '지금 화면을 …으로'로 기억
 };
 let settings = { ...DEFAULTS };
 let deskWin = null;
@@ -52,6 +54,7 @@ const serial = (name, fn) => {
 function loadSettings() {
   try {
     settings = { ...DEFAULTS, ...JSON.parse(fs.readFileSync(SETTINGS_FILE(), "utf8")) };
+    settings.talkUrls = { ...DEFAULTS.talkUrls, ...(settings.talkUrls || {}) };
   } catch (e) {
     settings = { ...DEFAULTS };
   }
@@ -422,22 +425,27 @@ ipcMain.handle("naver:show", () => {
 // (예약자 이름 · 전화번호가 들어 있으니 개발 확인용으로만)
 async function dumpNaver(name) {
   if (!naverWin) throw new Error("네이버 창이 없음");
+  return dumpWin(naverWin, name);
+}
+async function dumpWin(win, name) {
   const dir = path.join(app.getPath("desktop"), "아스타나키즈-진단");
   fs.mkdirSync(dir, { recursive: true });
-  const wc = naverWin.webContents;
+  const wc = win.webContents;
   const frames = (wc.mainFrame ? wc.mainFrame.framesInSubtree : []).map((f) => f.url);
-  const html = await timed(wc.executeJavaScript("document.documentElement.outerHTML", true), 8000, "네이버 화면이 응답하지 않음");
+  const html = await timed(wc.executeJavaScript("document.documentElement.outerHTML", true), 8000, "화면이 응답하지 않음");
   const head = `<!-- 주소: ${wc.getURL()}\n액자: ${frames.join(" | ")}\n버전: ver.${BUILD} ${SHA} · ${new Date().toLocaleString("ko-KR")} -->\n`;
   fs.writeFileSync(path.join(dir, `${name}.html`), head + html);
   const img = await wc.capturePage();
   fs.writeFileSync(path.join(dir, `${name}.png`), img.toPNG());
   return path.join(dir, `${name}.html`);
 }
+const stampNow = () => {
+  const d = new Date();
+  return `${d.getMonth() + 1}${String(d.getDate()).padStart(2, "0")}-${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}${String(d.getSeconds()).padStart(2, "0")}`;
+};
 ipcMain.handle("naver:dump", async () => {
   try {
-    const d = new Date();
-    const stamp = `${d.getMonth() + 1}${String(d.getDate()).padStart(2, "0")}-${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}${String(d.getSeconds()).padStart(2, "0")}`;
-    const file = await dumpNaver(`naver-${stamp}`);
+    const file = await dumpNaver(`naver-${stampNow()}`);
     shell.showItemInFolder(file);
     return { ok: true, dir: path.dirname(file) };
   } catch (e) {
@@ -453,6 +461,141 @@ ipcMain.handle("naver:setHome", () => {
   if (!naver || !naver.urls) return { ok: false, why: "네이버 예약관리(파트너센터) 화면에서 눌러 주세요" };
   if (deskWin) deskWin.focus();
   return { ok: true, url: settings.naverUrl };
+});
+
+/* 네이버 톡톡 상담 (데스크의 키즈상담 · 카페상담 버튼 · 사장님 10/8)
+   - 예약과 같은 네이버 로그인(persist:naver)으로 톡톡 파트너센터 상담 목록을 계정마다 숨은 창에 열어 둠
+   - 20초마다 목록 줄의 붉은 원(손님이 보낸 안 읽은 말풍선 수)을 더해 데스크로 보냄 (talk-driver.js) · 숨어 있는 동안 10분마다 새로 고침
+   - 버튼 → 그 창을 크게 앞으로 · 근무자가 상담 · 창의 X → 닫지 않고 숨긴 뒤 데스크로 돌아옴 → 바로 다시 셈 (읽은 만큼 숫자가 줄어듦)
+   - 주소(계정 번호)는 저장소에 넣지 않고 운영 설정의 '지금 화면을 …으로'로 이 PC 에만 기억 */
+const TALK_KINDS = { kids: "키즈상담", cafe: "카페상담" };
+const TALK_HOME = "https://partner.talk.naver.com/";
+const TALK_RELOAD_MS = 10 * 60 * 1000;
+const talk = {}; // kind → { win, loadedAt, setup, setupAt, fails, counting, state: { n, warn } }
+const talkUrl = (k) => (settings.talkUrls || {})[k] || "";
+function talkStates() {
+  const o = {};
+  for (const k of Object.keys(TALK_KINDS)) o[k] = talkUrl(k) ? (talk[k] ? talk[k].state : { n: 0, warn: "" }) : { n: 0, warn: `운영 설정에서 ${TALK_KINDS[k]} 화면을 먼저 정해 주세요` };
+  return o;
+}
+const talkPush = () => deskWin && !deskWin.isDestroyed() && deskWin.webContents.send("talk:counts", talkStates());
+function openTalk(k) {
+  const t = (talk[k] = talk[k] || { state: { n: 0, warn: "" }, fails: 0 });
+  if (t.win && !t.win.isDestroyed()) return t;
+  const win = new BrowserWindow({ width: 1100, height: 760, show: false, skipTaskbar: true, title: `네이버 톡톡 ${TALK_KINDS[k]}`, icon: path.join(__dirname, "icon.png"), webPreferences: { partition: "persist:naver", backgroundThrottling: false } });
+  win.setMenuBarVisibility(false);
+  win.on("page-title-updated", (e) => e.preventDefault()); // 작업표시줄에 '네이버 톡톡 키즈상담'으로 (어느 계정인지 보이게)
+  win.webContents.on("did-finish-load", () => { setTimeout(() => talkCount(k), 3000); setTimeout(() => talkCount(k), 10000); });
+  win.on("close", (e) => {
+    if (app.isQuitting) return;
+    e.preventDefault(); // 닫지 않고 숨김 (계속 숫자를 읽어야 해서) → 데스크로
+    hideTalk(k);
+  });
+  t.win = win;
+  t.loadedAt = Date.now();
+  win.loadURL(talkUrl(k) || TALK_HOME);
+  return t;
+}
+function showTalk(k, setup) {
+  const t = openTalk(k);
+  t.setup = !!setup;
+  t.setupAt = Date.now();
+  t.win.setSkipTaskbar(false);
+  t.win.maximize();
+  t.win.show();
+  t.win.focus();
+}
+function hideTalk(k) {
+  const t = talk[k];
+  if (!t || !t.win || t.win.isDestroyed()) return;
+  t.win.hide();
+  t.win.setSkipTaskbar(true);
+  if (deskWin && !deskWin.isDestroyed()) {
+    if (deskWin.isMinimized()) deskWin.restore();
+    deskWin.show();
+    deskWin.focus();
+  }
+  // 상담하다 다른 메뉴로 갔으면 상담 목록으로 되돌림 (설정 중이면 그대로 — '지금 화면을 …으로'를 누를 수 있게)
+  const url = talkUrl(k);
+  if (url && !t.setup && !t.win.webContents.getURL().startsWith(url)) {
+    t.loadedAt = Date.now();
+    t.win.loadURL(url);
+  } else {
+    setTimeout(() => talkCount(k), 1000);
+    setTimeout(() => talkCount(k), 5000);
+  }
+}
+async function talkCount(k) {
+  const t = talk[k];
+  if (!t || !t.win || t.win.isDestroyed() || !talkUrl(k) || t.counting || t.win.webContents.isLoading()) return;
+  t.counting = true;
+  try {
+    const r = await timed(t.win.webContents.executeJavaScript(TALK_COUNT_JS, true), 5000, "톡톡 화면이 응답하지 않음");
+    if (r && r.ok && !r.rows && !/\/chat/.test(r.path || "")) throw new Error("상담 목록 화면이 아님 — 운영 설정에서 다시 정해 주세요");
+    if (r && r.ok) {
+      t.fails = 0;
+      t.state = { n: r.n, warn: "" };
+    } else if (r && r.needLogin) t.state = { n: 0, warn: "네이버 로그인이 필요해요 (운영 설정 → 톡톡 화면 보기)" };
+    else throw new Error((r && r.why) || "톡톡 화면을 읽지 못함");
+  } catch (e) {
+    if (++t.fails >= 3) t.state = { n: 0, warn: String(e.message || e) }; // 잠깐 못 읽은 것은 넘어감
+  } finally {
+    t.counting = false;
+  }
+  talkPush();
+}
+function talkTick() {
+  for (const k of Object.keys(TALK_KINDS)) {
+    if (!talkUrl(k)) continue;
+    const t = openTalk(k);
+    if (t.win.isVisible()) continue; // 근무자가 상담 중 — 화면에서 바로 숫자가 바뀌므로 닫을 때 셈
+    if (t.setup && Date.now() - t.setupAt > TALK_RELOAD_MS) t.setup = false;
+    if (!t.setup && Date.now() - t.loadedAt > TALK_RELOAD_MS) {
+      t.loadedAt = Date.now();
+      t.win.loadURL(talkUrl(k)); // 오래 켜 두면 새 메시지 알림이 끊길 수 있어 가끔 새로 고침 (로그인은 유지)
+    } else talkCount(k);
+  }
+}
+ipcMain.handle("talk:counts", () => talkStates());
+ipcMain.handle("talk:open", (_e, k) => {
+  if (!TALK_KINDS[k]) return { ok: false, why: "모르는 상담" };
+  if (!talkUrl(k)) return { ok: false, why: `운영 설정 → 아마노 · POS → 네이버 톡톡에서 ${TALK_KINDS[k]} 화면을 먼저 정해 주세요` };
+  showTalk(k, false);
+  return { ok: true };
+});
+// 운영 설정: 로그인 · 계정 고르기용으로 앞으로 (아직 주소를 안 정했으면 톡톡 파트너센터 첫 화면)
+ipcMain.handle("talk:setup", (_e, k) => {
+  if (!TALK_KINDS[k]) return { ok: false, why: "모르는 상담" };
+  showTalk(k, true);
+  return { ok: true };
+});
+// 근무자가 그 계정의 상담관리(상담 목록)까지 들어간 뒤 누르면 그 주소를 기억
+ipcMain.handle("talk:setHome", (_e, k) => {
+  const t = talk[k];
+  if (!t || !t.win || t.win.isDestroyed()) return { ok: false, why: "먼저 '톡톡 화면 보기'로 상담 목록 화면까지 들어가 주세요" };
+  const m = t.win.webContents.getURL().match(/^https:\/\/[^/]*talk\.naver\.com\/web\/accounts\/[^/?#]+\/chat/);
+  if (!m) return { ok: false, why: "톡톡 파트너센터의 상담관리(상담 목록) 화면에서 눌러 주세요" };
+  settings.talkUrls = { ...settings.talkUrls, [k]: m[0] };
+  saveSettings();
+  t.setup = false;
+  t.fails = 0;
+  t.state = { n: 0, warn: "" };
+  talkPush();
+  setTimeout(() => talkCount(k), 500);
+  if (deskWin) deskWin.focus();
+  return { ok: true, url: m[0] };
+});
+// 진단: 톡톡 화면(HTML · 사진)을 바탕화면 '아스타나키즈-진단' 폴더에 (손님 대화가 들어 있으니 개발 확인용으로만)
+ipcMain.handle("talk:dump", async (_e, k) => {
+  try {
+    const t = talk[k];
+    if (!t || !t.win || t.win.isDestroyed()) throw new Error("톡톡 창이 없음 — 먼저 '톡톡 화면 보기'");
+    const file = await dumpWin(t.win, `talk-${k}-${stampNow()}`);
+    shell.showItemInFolder(file);
+    return { ok: true, dir: path.dirname(file) };
+  } catch (e) {
+    return { ok: false, why: String(e.message || e) };
+  }
 });
 
 ipcMain.handle("config:get", () => {
@@ -655,6 +798,14 @@ function memWatch() {
       const mb = byPid.get(win.webContents.getOSProcessId()) || 0;
       if (mb > MEM_LIMIT_MB) win.webContents.reload();
     }
+    for (const k of Object.keys(talk)) {
+      const w = talk[k].win;
+      if (!w || w.isDestroyed() || w.isVisible() || talk[k].setup) continue; // 상담 중 · 설정 중이면 건드리지 않음
+      if ((byPid.get(w.webContents.getOSProcessId()) || 0) > MEM_LIMIT_MB) {
+        talk[k].loadedAt = Date.now();
+        w.loadURL(talkUrl(k) || TALK_HOME);
+      }
+    }
   } catch (e) {
     /* 확인 실패는 무시 */
   }
@@ -667,6 +818,8 @@ app.whenReady().then(() => {
   openNaver(); // 맨 뒤 네이버 예약관리
   createDesk(); // 맨 앞 데스크 (POS 는 원래대로 따로 켜져 있음)
   startPosAgent(); // POS로 넘어가는 도우미를 미리 켜 둠
+  setTimeout(talkTick, 8000); // 톡톡 상담 목록 (네이버 예약 창이 먼저 뜬 뒤)
+  setInterval(talkTick, 20 * 1000);
 });
 app.on("before-quit", () => {
   app.isQuitting = true;

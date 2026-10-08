@@ -23,6 +23,15 @@ contextBridge.exposeInMainWorld("desk", {
     dump: () => ipcRenderer.invoke("naver:dump"),
     onStep: (cb) => ipcRenderer.on("naver:step", (_e, msg) => cb(msg)),
   },
+  // 네이버 톡톡 상담 (키즈상담 · 카페상담): 새 메시지 수 · 상담 창 열기 (닫으면 데스크로)
+  talk: {
+    counts: () => ipcRenderer.invoke("talk:counts"),
+    onCounts: (cb) => ipcRenderer.on("talk:counts", (_e, c) => cb(c)),
+    open: (kind) => ipcRenderer.invoke("talk:open", kind),
+    setup: (kind) => ipcRenderer.invoke("talk:setup", kind),
+    setHome: (kind) => ipcRenderer.invoke("talk:setHome", kind),
+    dump: (kind) => ipcRenderer.invoke("talk:dump", kind),
+  },
   pos: { show: () => ipcRenderer.invoke("pos:show") },
   // 오늘의 열쇠 · 입장 기록 저장 (파일)
   state: {
