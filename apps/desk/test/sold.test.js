@@ -47,8 +47,9 @@ test("입장권 목록: 네이버 이용완료 · 현장구매자 · 기록 삭�
 
     await desk.$eval("#sold", (e) => e.click());
     const rows = await desk.$$eval(".soldlist > div", (e) => e.map((x) => [...x.children].map((c) => c.textContent.trim()).join(" ")));
-    assert.ok(rows.some((r) => /송나라 10:00 입장 1장/.test(r)), rows.join(" | "));
-    assert.ok(rows.some((r) => /현장구매자 12:30 입장 2장/.test(r)), rows.join(" | "));
+    assert.ok(rows.some((r) => /송나라 — 10:00 입장 1장/.test(r)), rows.join(" | ")); // 네이버에서 바로 이용완료(데스크 열쇠 없음) = 예약 시각
+    assert.ok(rows.some((r) => /현장구매자 20, 21번 12:40 입장 2장/.test(r)), rows.join(" | ")); // 열쇠 번호 · 열쇠를 받은 시각 (10/8)
+    assert.ok(rows.findIndex((r) => /현장구매자/.test(r)) < rows.findIndex((r) => /송나라/.test(r)), "최근 입장이 위");
 
     // 시험으로 잡힌 손님: 엄효정(네이버 2장) · 현장구매자 2장 삭제
     await desk.click('.soldlist > div:has-text("엄효정") [data-act=soldDel]');

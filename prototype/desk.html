@@ -87,9 +87,16 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .top .sold { font-size: 14px; font-weight: 700; white-space: nowrap; flex-shrink: 0; color: var(--fg); background: var(--surface-2); border: 1.5px solid var(--line); border-radius: 10px; padding: 2px 10px; cursor: pointer; }
 .top .sold:hover { border-color: var(--accent); }
 .soldlist { max-height: 420px; overflow: auto; display: grid; gap: 4px; margin: 6px 0; }
-.soldlist div { display: grid; grid-template-columns: minmax(0, 1fr) 78px 46px 92px; gap: 8px; align-items: center; padding: 5px 10px; border-radius: 8px; background: var(--surface-2); font-size: 14.5px; }
-.soldlist div.out { opacity: .5; text-decoration: line-through; }
-.soldlist div.out button { text-decoration: none; }
+.soldlist .srow { display: grid; grid-template-columns: minmax(0, 1fr) 118px 112px 40px 92px; gap: 8px; align-items: center; padding: 5px 10px; border-radius: 8px; background: var(--surface-2); font-size: 14.5px; cursor: pointer; }
+.soldlist.bykey .srow { grid-template-columns: minmax(0, 1fr) 118px 150px 40px; } /* 열쇠 번호로 찾기: 날짜까지 · 삭제 버튼 없음 */
+.soldlist .srow:hover { outline: 1.5px solid var(--line); }
+.soldlist .srow.out { opacity: .5; text-decoration: line-through; }
+.soldlist .srow.out button { text-decoration: none; }
+.soldlist .sk { font-weight: 700; }
+.soldlist .sk small, .reckeys small { color: #E8A33D; font-weight: 700; margin-left: 4px; font-size: 11.5px; } /* 일괄 반납 = 열쇠를 하나씩 확인하지 않음 */
+.soldnav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.soldnav select { min-height: 34px; border-radius: 8px; border: 1.5px solid var(--line); background: var(--surface-2); color: var(--fg); font-size: 14px; padding: 0 8px; }
+.reccard dd.phone { font-size: 22px; font-weight: 800; }
 .top .btn { white-space: nowrap; flex-shrink: 0; }
 .top .sold b { font-size: 19px; color: var(--accent); }
 
@@ -243,6 +250,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 /* 새 상담 메시지 수: 붉은 원 (0이면 숨김) · 로그인 풀림 등은 주황 '!' */
 .tbadge { position: absolute; top: -9px; right: -9px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: #E5484D; color: #fff; font-size: 12px; font-weight: 800; line-height: 20px; text-align: center; }
 .tbadge.warn { background: #E8A33D; color: #1b1200; }
+/* 일괄 반납 버튼 왼쪽 빈 곳: 굵은 두 줄 경고 (반납 안 된 열쇠를 확인하지 않고 누르면 마지막에 누가 썼는지 모름 · 사장님 10/8) */
+.bulkwarn { grid-column: 5 / span 3; font-size: 12.5px; font-weight: 800; line-height: 1.35; text-align: center; color: var(--ink); }
 /* 설명(범례): 45번 오른쪽 빈 칸에 세 줄 */
 .legend { display: flex; flex-wrap: wrap; align-content: center; gap: 3px 10px; font-size: 11px; color: var(--muted); }
 .keys .legend { grid-row: 5; padding-left: 8px; min-width: 0; }
@@ -407,6 +416,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         <!-- 네이버 톡톡 상담: 누르면 상담 창이 열리고, 창을 닫으면(X) 데스크로 돌아옴 · 붉은 원 = 새 상담 메시지 수 (사장님 10/8) -->
         <button class="talk" id="talk-kids" data-act="talkOpen" data-k="kids">키즈상담<span class="tbadge" hidden></span></button>
         <button class="talk" id="talk-cafe" data-act="talkOpen" data-k="cafe">카페상담<span class="tbadge" hidden></span></button>
+        <div class="bulkwarn">모든 키 반납 확인 후<br>한번에 종료 처리 하세요</div>
         <!-- 열쇠판 아래 오른쪽 · 열쇠 3칸 너비 (45번과 떨어져 있게 — 잘못 누르지 않게 · 사장님 10/7) -->
         <button class="key bulk" id="bulk-btn" data-act="bulkReturn" disabled>열쇠 일괄 반납처리</button>
       </div>
@@ -586,7 +596,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     ["권이준", "13:30", [8], "13:27", null], ["황수아", "13:30", [9, 10], "13:28", null],
   ].forEach(([name, slot, keys, at, out]) => {
     const b = bookings[TODAY].find((x) => x.name === name && x.slot === T(slot));
-    b.enteredAt = T(at);
+    b.enteredAt = T(at); b.keysTaken = keys.slice();
     if (out == null) b.keys = keys.slice(); else b.outAt = T(out);
   });
   // 예시: 14:00 전시윤 = 이번이 10번째 방문(사은권), 홍예준 = 11번째(영수증은 1번째)
@@ -752,10 +762,14 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
      - 앱: 저장 폴더(%APPDATA%\아스타나키즈 입장 데스크\desk-state\날짜.json)에 바로 씀 (갑자기 꺼져도 남게) + 브라우저 저장소에도 한 벌
      - 켜자마자 빈 화면으로 저장본을 덮어쓰지 않게: 저장본을 먼저 읽어 들인 뒤부터 저장 */
   const STATE_KEY = "astanakiz-desk-" + TODAY;
-  const SAVE_FIELDS = ["id", "day", "no", "slot", "name", "phone", "qty", "product", "naverProduct", "pay", "cancels", "prevDone", "visitNo", "visitEnd", "proxy", "visitor", "status", "keys", "enteredAt", "outAt", "overPaid", "naverPending", "naverWhy", "useMin", "keyUse", "chainHead"];
+  const SAVE_FIELDS = ["id", "day", "no", "slot", "name", "phone", "qty", "product", "naverProduct", "pay", "cancels", "prevDone", "visitNo", "visitEnd", "proxy", "visitor", "status", "keys", "enteredAt", "outAt", "overPaid", "naverPending", "naverWhy", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut"];
   let stateReady = !APP; // 저장본을 읽기 전에는 저장하지 않음
   let pendingSaved = []; // 예전 형식(예약번호만 있는) 저장본 — 네이버에서 그 예약을 불러오면 합침
+  /* 열쇠 기록: 그 손님이 받은 열쇠 번호는 반납해도 남김(keysTaken) — 다음날 아침 없는 열쇠를 마지막에 누가 썼는지 찾아 연락 (사장님 10/8)
+     일괄 반납으로 돌려받은 열쇠는 bulkOut (하나씩 확인하지 않은 열쇠) */
+  const noteKeys = (h) => { if (h.keys && h.keys.length) h.keysTaken = [...new Set([...(h.keysTaken || []), ...h.keys])]; };
   function saveState() {
+    for (const h of (bookings[TODAY] || []).concat(walkins)) noteKeys(h);
     if (!APP || !stateReady) return;
     const b = (bookings[TODAY] || []).filter((x) => x.enteredAt != null).map((x) => Object.fromEntries(SAVE_FIELDS.filter((k) => x[k] !== undefined).map((k) => [k, x[k]])));
     const json = JSON.stringify({ v: 2, b: b.concat(pendingSaved.filter((p) => !b.some((x) => x.no === p.no))), w: walkins, x: [...testOut], ig: [...extIgnored], seq, posSeq });
@@ -1184,15 +1198,26 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   /* 맨 위 '입장권 총 판매수' = 고른 날의 네이버 이용완료 장수(시간표 완료 합) + 현장입장 장수 (현장 10/6)
      현장입장 장수는 열쇠를 받은 개수(qty) — 반납해도 줄지 않음. 다른 날은 그날 저장 파일에서 읽음 */
   const dayFiles = {};
-  /** 그날 저장 파일 { w: 현장입장, x: 통계에서 뺀 예약번호 } — 오늘은 화면의 것, 지난날은 파일에서 한 번만 읽음 */
+  /** 그날 저장 파일 { b: 입장한 예약, w: 현장입장, x: 통계에서 뺀 예약번호 } — 오늘은 화면의 것, 지난날은 파일에서 한 번만 읽음
+      저장 파일은 지우지 않음 (입장권 목록에서 2주 전까지 보고 찾음) */
   function dayFile(day) {
-    if (day === TODAY) return { w: walkins, x: testOut };
+    if (day === TODAY) return { b: [], w: walkins, x: testOut };
     if (!dayFiles[day]) {
       let f = {};
       try { const t = APP && window.desk.state ? window.desk.state.load(day) : null; if (t) f = JSON.parse(t); } catch (e) { f = {}; }
-      dayFiles[day] = { w: f.w || [], x: new Set(f.x || []) };
+      dayFiles[day] = { b: f.b || [], w: f.w || [], x: new Set(f.x || []) };
     }
     return dayFiles[day];
+  }
+  const KEEP_DAYS = 14; // 입장권 목록 · 열쇠 찾기: 오늘 포함 2주
+  /** 입장권 목록 줄 (네이버 이용완료 + 현장구매) — 열쇠를 가져간 순서, 최근이 위 (사장님 10/8)
+      지난날은 저장 파일의 입장 기록(열쇠 · 전화번호)을 먼저, 네이버에서 불러온 예약은 없는 것만 */
+  function entryRows(day) {
+    const f = dayFile(day), seen = new Set();
+    const nb = f.b.concat(bookings[day] || []).filter((b) => b.status === "완료" && b.no && !seen.has(b.no) && seen.add(b.no));
+    return nb.map((b) => ({ k: "n", id: b.no, day, name: b.name, phone: b.phone, src: b, keys: b.keysTaken || b.keys || [], at: b.enteredAt != null ? b.enteredAt : b.slot, qty: b.qty, out: f.x.has(b.no) }))
+      .concat(f.w.map((w) => ({ k: "w", id: w.id, day, name: "현장구매자", phone: w.phone, src: w, keys: w.keysTaken || w.keys || [], at: w.enteredAt != null ? w.enteredAt : w.slot, qty: walkQty(w), out: false })))
+      .sort((a, b) => b.at - a.at || a.name.localeCompare(b.name, "ko"));
   }
   const walkQty = (w) => w.qty || Math.max(1, (w.keys || []).length);
   function walkTickets(day) { return dayFile(day).w.reduce((a, w) => a + walkQty(w), 0); }
@@ -1413,7 +1438,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 
   function renderSheet() {
     const el = $("sheet");
-    el.classList.toggle("wide", sheet.mode === "enter");
+    el.classList.toggle("wide", sheet.mode === "enter" || sheet.mode === "sold" || sheet.mode === "rec");
     el.classList.toggle("walksheet", sheet.mode === "walk");
     el.classList.toggle("keysheet", sheet.mode === "key");
     el.classList.toggle("setsheet", sheet.mode === "settings");
@@ -1508,18 +1533,44 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       return;
     }
     if (sheet.mode === "sold") {
-      // 입장권 목록: 네이버 이용완료 + 현장구매 · 이름 · 입장시간 · 장수 · [기록 삭제] (시험으로 잡힌 손님을 통계에서 뺌 · 사용자 지시 10/7)
-      const day = viewDay, f = dayFile(day), edit = day === TODAY;
-      const rows = (bookings[day] || []).filter((b) => b.status === "완료").map((b) => ({ k: "n", id: b.no, name: b.name, slot: b.slot, qty: b.qty, out: f.x.has(b.no) }))
-        .concat(f.w.map((w) => ({ k: "w", id: w.id, name: "현장구매자", slot: w.slot != null ? w.slot : walkSlot(w.enteredAt), qty: walkQty(w), out: false })))
-        .sort((a, b) => a.slot - b.slot || a.name.localeCompare(b.name, "ko"));
+      /* 입장권 목록: 네이버 이용완료 + 현장구매 · 이름 · 열쇠 번호 · 입장시간 · 장수 · [기록 삭제] (시험으로 잡힌 손님을 통계에서 뺌 · 사용자 지시 10/7)
+         열쇠를 가져간 순서(최근 입장이 위) · ◀ ▶ 로 2주 전까지 · 열쇠 번호로 찾기 · 줄을 누르면 고객 카드(전화번호) (사장님 10/8) */
+      const first = shiftDay(TODAY, -(KEEP_DAYS - 1));
+      const day = sheet.day || viewDay, key = Number(sheet.key) || 0, edit = day === TODAY && !key;
+      const days = key ? Array.from({ length: KEEP_DAYS }, (_, i) => shiftDay(TODAY, -i)) : [day];
+      const rows = days.flatMap((d) => entryRows(d).filter((r) => !key || r.keys.includes(key)));
       const total = rows.filter((r) => !r.out).reduce((a, r) => a + r.qty, 0);
+      const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8))}`;
+      const keysCell = (r) => (r.keys.length ? `${r.keys.join(", ")}번` : "—") + (r.src.bulkOut && r.keys.length ? `<small>일괄</small>` : "");
       el.innerHTML = `
-        <h3 id="sheet-title">${day === TODAY ? "오늘" : esc(dateLabel(day))} 입장권 목록 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
-        <div class="help">네이버 이용완료 + 현장구매 · 합계 <b class="num">${total}</b>장 · <b>기록 삭제</b> = 시험으로 잡힌 손님을 판매수 · 통계에서 뺌 (네이버 예약 기록은 그대로)</div>
-        <div class="soldlist">${rows.length ? rows.map((r) => `<div class="${r.out ? "out" : ""}"><span>${esc(r.name)}</span><span class="num">${hm(r.slot)} 입장</span><span class="num">${r.qty}장</span>${edit ? (r.out ? `<button class="btn btn-sm" data-act="soldBack" data-k="${r.k}" data-id="${esc(r.id)}">되살리기</button>` : `<button class="btn btn-sm btn-red" data-act="soldDel" data-k="${r.k}" data-id="${esc(r.id)}">기록 삭제</button>`) : "<span></span>"}</div>`).join("") : `<span class="help">아직 없어요</span>`}</div>
-        ${edit ? "" : `<div class="help">지난날 기록은 보기만 해요</div>`}
+        <h3 id="sheet-title">${key ? `${key}번 열쇠 — 최근 2주 가져간 사람` : `${day === TODAY ? "오늘" : esc(dateLabel(day))} 입장권 목록`} <button class="x" data-act="close" aria-label="닫기">×</button></h3>
+        <div class="soldnav">
+          ${key ? "" : `<button class="btn btn-sm" data-act="soldDay" data-d="-1" aria-label="전날" ${day <= first ? "disabled" : ""}>◀</button><b class="num">${esc(dateLabel(day))}</b><button class="btn btn-sm" data-act="soldDay" data-d="1" aria-label="다음날" ${day >= TODAY ? "disabled" : ""}>▶</button>`}
+          <select id="sold-key" aria-label="열쇠 번호로 찾기"><option value="">열쇠 번호로 찾기 (전체)</option>${Array.from({ length: RULES.keys }, (_, i) => `<option value="${i + 1}" ${key === i + 1 ? "selected" : ""}>${i + 1}번 열쇠</option>`).join("")}</select>
+        </div>
+        <div class="help">${key ? "최근에 가져간 사람이 위 · 줄을 누르면 고객 카드(전화번호)" : `열쇠를 가져간 순서(최근 입장이 위) · 합계 <b class="num">${total}</b>장 · 줄을 누르면 고객 카드(전화번호) · <b>기록 삭제</b> = 시험으로 잡힌 손님을 판매수 · 통계에서 뺌 (네이버 예약 기록은 그대로)`}</div>
+        <div class="soldlist ${key ? "bykey" : ""}">${rows.length ? rows.map((r) => `<div class="srow ${r.out ? "out" : ""}" data-act="soldOpen" data-day="${r.day}" data-k="${r.k}" data-id="${esc(r.id)}" role="button" tabindex="0"><span class="sn">${esc(r.name)}</span><span class="sk num">${keysCell(r)}</span><span class="st num">${key ? md(r.day) + " " : ""}${hm(r.at)} 입장</span><span class="num">${r.qty}장</span>${edit ? (r.out ? `<button class="btn btn-sm" data-act="soldBack" data-k="${r.k}" data-id="${esc(r.id)}">되살리기</button>` : `<button class="btn btn-sm btn-red" data-act="soldDel" data-k="${r.k}" data-id="${esc(r.id)}">기록 삭제</button>`) : key ? "" : "<span></span>"}</div>`).join("") : `<span class="help">${key ? "최근 2주 동안 이 열쇠를 가져간 기록이 없어요" : "아직 없어요"}</span>`}</div>
+        ${edit || key ? "" : `<div class="help">지난날 기록은 보기만 해요 · 입장 기록은 이 PC에 남아 있어 2주 전까지 볼 수 있어요</div>`}
         <div class="sheet-foot"><button class="btn btn-ink" data-act="close" data-autofocus>닫기</button></div>`;
+      return;
+    }
+    if (sheet.mode === "rec") {
+      // 고객 카드 (입장권 목록에서 누름): 전화번호 · 받은 열쇠 · 입장 · 반납 — 없는 열쇠를 찾아 연락할 때 (사장님 10/8)
+      const r = entryRows(sheet.day).find((x) => x.k === sheet.k && x.id === sheet.id);
+      if (!r) { el.innerHTML = `<h3 id="sheet-title">고객 카드</h3><p class="help">기록을 찾지 못했어요</p><div class="sheet-foot"><button class="btn" data-act="soldList">목록으로</button></div>`; return; }
+      const s = r.src, holding = r.day === TODAY && s.keys && s.keys.length;
+      el.innerHTML = `
+        <h3 id="sheet-title">고객 카드 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
+        <div class="res reccard"><div class="head"><span class="name">${esc(r.name)}${s.proxy ? ` <span class="badge proxy">대리예약</span>` : ""}</span><span class="badge ${holding ? "conf" : "done"}">${holding ? "이용 중" : "퇴장"}</span></div>
+        <dl class="kv">
+          <dt>전화번호</dt><dd class="phone num">${s.phone ? fmtPhone(s.phone) : "—"}</dd>${r.k === "n" ? visitorRow(s) : ""}
+          <dt>날짜</dt><dd class="num">${esc(dateLabel(r.day))}</dd>
+          <dt>입장</dt><dd class="num">${hm(r.at)}${r.k === "n" && s.slot != null ? ` · 예약 ${hm(s.slot)}` : s.slot != null ? ` · 입장 타임 ${hm(s.slot)}` : ""}</dd>
+          <dt>열쇠</dt><dd class="num reckeys">${r.keys.length ? r.keys.map((k) => `<span class="kchip num">${k}</span>`).join(" ") : "—"}${holding ? " 지금 가지고 있음" : s.outAt != null ? ` ${hm(s.outAt)} 반납${s.bulkOut ? "<small>일괄 반납 — 열쇠를 하나씩 확인하지 않음</small>" : ""}` : ""}</dd>
+          <dt>수량</dt><dd class="num">${r.qty}장</dd>
+          <dt>${r.k === "n" ? "예약번호" : "POS 번호"}</dt><dd class="num">${esc(r.k === "n" ? r.id : s.posNo || "—")}</dd>
+        </dl></div>
+        <div class="sheet-foot"><button class="btn" data-act="soldList">목록으로</button><button class="btn btn-ink" data-act="close" data-autofocus>닫기</button></div>`;
       return;
     }
     if (sheet.mode === "bulk") {
@@ -1942,6 +1993,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     return free.filter((k) => k >= from).concat(free.filter((k) => k < from))[0];
   }
   function returnKeys(h, ks) {
+    noteKeys(h);
     h.keys = h.keys.filter((k) => !ks.includes(k));
     if (!h.keys.length) h.outAt = now;
     toast(`${ks.join(", ")}번 반납${h.keys.length ? "" : ` · ${h.walk ? "현장입장자" : h.name + "님"} 퇴장`}`);
@@ -2088,7 +2140,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       saveState(); renderAll();
       if (extFor(h)) renderSheet(); else closeSheet();
     },
-    soldList() { openSheet({ mode: "sold" }); },
+    // 입장권 목록 (고객 카드에서 '목록으로' 누르면 보던 날짜 · 열쇠 그대로)
+    soldList() { const back = sheet.mode === "rec" ? { day: sheet.listDay, key: sheet.listKey } : {}; openSheet({ mode: "sold", day: back.day || viewDay, key: back.key || "" }); },
+    soldDay(btn) { sheet.day = shiftDay(sheet.day || viewDay, Number(btn.dataset.d)); renderSheet(); },
+    soldOpen(el) { openSheet({ mode: "rec", day: el.dataset.day, k: el.dataset.k, id: el.dataset.id, listDay: sheet.day, listKey: sheet.key }); },
     soldDel(btn) {
       if (btn.dataset.k === "w") {
         const i = walkins.findIndex((w) => w.id === btn.dataset.id); if (i < 0) return;
@@ -2106,7 +2161,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     bulkDo() {
       const hs = holders().slice();
       const n = hs.reduce((a, h) => a + h.keys.length, 0);
-      for (const h of hs) { h.keys = []; h.outAt = now; }
+      for (const h of hs) { noteKeys(h); h.keys = []; h.outAt = now; h.bulkOut = true; }
       closeSheet(); renderAll(); toast(`열쇠 ${n}개 일괄 반납 · ${hs.length}명 퇴장 처리`);
     },
     returnAll() { const h = holderById(sheet.hid); returnKeys(h, h.keys.slice()); closeSheet(); renderAll(); },
@@ -2265,6 +2320,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (t.id === "cap-t-day" && t.value) capTry.day = t.value;
     if (t.id === "cap-t-time") capTry.time = t.value;
     if (t.id === "cap-t-n" && t.value !== "") capTry.n = Math.max(0, Number(t.value) || 0);
+    if (t.id === "sold-key") { sheet.key = t.value; renderSheet(); } // 입장권 목록: 열쇠 번호로 찾기 (최근 2주)
     if (t.id === "unpaid-on") { RULES.unpaidCancel.on = t.checked; if (APP && window.desk.config) window.desk.config.set({ unpaidCancel: { on: t.checked } }); toast(t.checked ? "입금대기 예약 자동 취소를 켰어요" : "입금대기 예약 자동 취소를 껐어요"); }
     if (t.id === "cap-on") { RULES.capAuto.on = t.checked; capMark = null; saveCapAuto(); renderAll(); toast(t.checked ? "네이버 판매 수량 자동 조절을 켰어요 (10분마다)" : "자동 조절을 껐어요"); }
     if ((t.id === "cap-target" || t.id === "cap-max" || t.id === "cap-ceil") && t.value) { RULES.capAuto[{ "cap-target": "target", "cap-max": "max", "cap-ceil": "ceiling" }[t.id]] = Math.max(1, Math.min(60, Number(t.value) || 0)); saveCapAuto(); }
