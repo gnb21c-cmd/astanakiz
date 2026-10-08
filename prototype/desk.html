@@ -101,7 +101,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .panel { height: 100%; }
 /* 가운데 칸: 위에 새로고침 버튼, 그 아래로 예약자 명단 상자를 내림 */
 .midcol { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 6px; min-height: 0; min-width: 0; }
-.refresh { min-height: 38px; width: 100%; font-size: 14px; border-color: var(--ink); color: var(--accent); background: var(--surface); }
+.refresh { min-height: 38px; width: 100%; font-size: 14px; border-color: var(--ink); color: var(--ink); background: var(--surface); } /* 테두리 · 글씨 흰색 */
 .refresh small { font-size: 11px; color: var(--muted); font-weight: 500; margin-left: 4px; }
 .scroll { min-height: 0; display: grid; gap: 5px; align-content: start; overflow: auto; flex: 1; }
 
@@ -222,7 +222,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .keyhead .stat { font-size: 12.5px; color: var(--muted); }
 .keyhead .stat b { color: var(--fg); font-size: 15px; }
 .keys { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); grid-template-rows: repeat(5, minmax(0, 1fr)); gap: 4px; flex: 1 1 0; min-height: 0; } /* 열쇠판이 남는 높이를 다 채움 · 5줄 같은 높이 (사장님 10/8) */
-.keys .key { aspect-ratio: auto; height: auto; min-height: 0; }
+.keys .key { aspect-ratio: auto; height: auto; min-height: 0; row-gap: 7px; } /* 번호와 이름 사이 띄움 (사장님 10/8) */
 .key { aspect-ratio: 1 / .98; max-width: 100%; border-radius: 8px; border: 1.5px solid var(--line); background: var(--surface-2); color: var(--faint); display: grid; align-content: center; justify-items: center; padding: 1px; line-height: 1.1; min-width: 0; overflow: hidden; }
 .key b { font-size: 17px; font-weight: 700; }
 .key span { font-size: 11px; font-weight: 400; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
