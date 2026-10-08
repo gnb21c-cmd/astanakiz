@@ -990,8 +990,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     return `<dt>방문자</dt><dd class="num visitor">${esc(m ? m[1] : b.visitor)}${m ? ` ${fmtPhone(m[2])}` : ""}</dd>`;
   }
   function renderRes() {
-    // 이름 가나다순 (네이버 목록 순서와 상관없이 · 입장해도 자리 그대로, 색으로만 미입장/입장완료 구분)
-    const list = bookings[viewDay].filter((b) => b.slot === selSlot).sort((a, b) => a.name.localeCompare(b.name, "ko") || String(a.no || a.id).localeCompare(String(b.no || b.id)));
+    // 미입장 카드를 위에 이름 가나다순, 입장 완료(이용완료) 카드는 밑으로 내려 다시 가나다순 (사장님 10/8)
+    const list = bookings[viewDay].filter((b) => b.slot === selSlot).sort((a, b) => (a.status === "완료") - (b.status === "완료") || a.name.localeCompare(b.name, "ko") || String(a.no || a.id).localeCompare(String(b.no || b.id)));
     const q = list.reduce((a, b) => a + b.qty, 0);
     $("res-title").textContent = `${hm(selSlot)} 예약자`;
     $("res-sub").textContent = `${list.length}명 · 수량 ${q}`;
