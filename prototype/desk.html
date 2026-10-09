@@ -1248,7 +1248,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     const f = dayFile(day), seen = new Set();
     const nb = f.b.concat(bookings[day] || []).filter((b) => b.status === "완료" && b.no && !seen.has(b.no) && seen.add(b.no));
     return nb.map((b) => ({ k: "n", id: b.no, day, name: b.name, phone: b.phone, src: b, keys: b.keysTaken || b.keys || [], at: b.enteredAt != null ? b.enteredAt : b.slot, qty: b.qty, out: f.x.has(b.no) }))
-      .concat(f.w.map((w) => ({ k: "w", id: w.id, day, name: "현장구매자", phone: w.phone, src: w, keys: w.keysTaken || w.keys || [], at: w.enteredAt != null ? w.enteredAt : w.slot, qty: walkQty(w), out: false })))
+      .concat(f.w.map((w) => ({ k: "w", id: w.id, day, name: w.extra ? `추가 1타임 · ${w.of}` : "현장구매자", phone: w.phone, src: w, keys: w.keysTaken || w.keys || [], at: w.enteredAt != null ? w.enteredAt : w.slot, qty: walkQty(w), out: false })))
       .sort((a, b) => b.at - a.at || a.name.localeCompare(b.name, "ko"));
   }
   const walkQty = (w) => w.qty || Math.max(1, (w.keys || []).length);
@@ -1398,7 +1398,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const out = list.filter((b) => b.slot === t && testOut.has(b.no) && (b.status === "확정" || b.status === "완료")).reduce((a, b) => a + b.qty, 0); // 시험으로 잡힌 손님은 통계에서 뺌
       const used = Math.max(0, (ns ? ns.conf + ns.done : list.filter((b) => b.slot === t && (b.status === "확정" || b.status === "완료")).reduce((a, b) => a + b.qty, 0)) - (day === TODAY ? out : 0));
       const raw = (naverRaw[day] || []).find((x) => toMin(x.time) === t && capMain(x.product));
-      const walk = day === TODAY ? walkins.filter((w) => w.slot === t).reduce((a, w) => a + (w.qty || Math.max(1, w.keys.length)), 0) : 0;
+      const walk = day === TODAY ? walkins.filter((w) => w.slot === t && !w.extra).reduce((a, w) => a + (w.qty || Math.max(1, w.keys.length)), 0) : 0; // +1타임은 연장된 열쇠로 이미 셈
       return { t, used, mainUsed: raw ? raw.conf + raw.done : used, cap: raw ? raw.cap : capDemo[t] ?? (ns ? ns.cap : RULES.slotCap), product: raw ? raw.product : "", walk, started: day === TODAY && t <= now };
     });
   }
@@ -1729,7 +1729,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           <dt>${h.walk ? "고객명" : "예약자"}</dt><dd>${esc(h.name)}${h.walk ? ` · ${h.posNo}` : ""}</dd>
           <dt>전화번호</dt><dd class="num">${fmtPhone(h.phone)}</dd>
           <dt>입장</dt><dd class="num">${hm(h.enteredAt)}${h.walk ? "" : ` (예약 ${hm(h.slot)})`}</dd>
-          <dt>이용</dt><dd class="num">${m == null ? "무제한" : `${used < 0 ? `예약 ${hm(h.slot)}부터 셈` : `${Math.floor(used / 60)}시간 ${used % 60}분째`} · ${h.keyUse && new Set(h.keys.map((k) => useOf(h, k))).size > 1 ? h.keys.map((k) => { const mk = useOf(h, k); return `${k}번 ${mk == null ? "무제한" : hm(h.slot + mk)}`; }).join(" · ") + " 반납" : `${hm(h.slot + m)} 반납`}`}</dd>
+          <dt>이용</dt><dd class="num">${m == null ? "무제한" : `${used < 0 ? `예약 ${hm(h.slot)}부터 셈` : `${Math.floor(used / 60)}시간 ${used % 60}분째`} · ${h.keyUse && new Set(h.keys.map((k) => useOf(h, k))).size > 1 ? h.keys.map((k) => { const mk = useOf(h, k); return `${k}번 ${mk == null ? "무제한" : hm(h.slot + mk)}`; }).join(" · ") + " 반납" : `${hm(h.slot + m)} 반납`}`}${(() => {
+            const cur = holderEnd(h); if (cur == null) return "";
+            const v = sheet.end ?? cur;
+            return `<span class="mvrow" aria-label="반납 시각 바꾸기">→ <button class="btn btn-sm" data-act="endSlot" data-d="-10" aria-label="10분 앞" ${v - 10 <= h.slot ? "disabled" : ""}>◀</button><b class="num">${hm(v)}</b><button class="btn btn-sm" data-act="endSlot" data-d="10" aria-label="10분 뒤">▶</button><button class="btn btn-sm btn-ink" data-act="endDo" ${v === cur ? "disabled" : ""}>변경</button><button class="btn btn-sm" data-act="plusSlot" title="다음 타임 1시간 50분 · 입장권 ${h.keys.length}장 더 (판매수 · 인원에 넣음)">+1타임</button></span>`;
+          })()}</dd>
           <dt>열쇠</dt><dd class="num">${h.keys.length}개</dd>
         </dl>
         <div id="meter">${meterHtml(h)}</div>
@@ -2070,6 +2074,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       <button class="btn btn-red" data-act="payOver" ${o.due ? "" : "disabled"}>POS로 결제 · ${won(o.due)}</button>
     </div>`;
   }
+  /** 그 손님 열쇠의 가장 늦은 반납 시각 (무제한이면 null) */
+  const holderEnd = (h) => { const ms = h.keys.map((k) => useOf(h, k)); return ms.includes(null) ? null : h.slot + Math.max(...ms); };
+  /** 열쇠 모두 반납 시각을 to 로 */
+  const setEnd = (h, to) => { h.keyUse = Object.fromEntries(h.keys.map((k) => [k, to - h.slot])); };
   const holderById = (id) => bookings[TODAY].concat(walkins).find((x) => x.id === id && x.keys.length);
   let sec = 0; // 체험 시계의 초
   setInterval(() => {
@@ -2226,6 +2234,23 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       toast(`${b.name}님 카드를 ${hm(from)} → ${hm(to)}로 옮겼어요${b.naverSlot !== to ? ` (네이버 예약은 ${hm(b.naverSlot)} 그대로 · 이용완료도 그 칸에서)` : " (네이버 원래 시간)"}`);
     },
     goldenOk() { $("golden").hidden = true; },
+    /* 열쇠 창 반납 시각 (사장님 10/9): 현장 손님이 네이버로 이어 예약하거나 현장에서 다시 사면 이름 · 전화로 이어 붙일 수 없어 근무자가 직접
+       ◀ ▶ 10분씩 → [변경] = 반납 시각만 (판매수 · 인원 그대로) · [+1타임] = 다음 타임 1시간 50분(연속예약처럼 +2시간) + 입장권을 열쇠 수만큼 더 산 것으로 */
+    endSlot(btn) { const h = holderById(sheet.hid); const cur = h && holderEnd(h); if (cur == null) return; sheet.end = Math.max(h.slot + 10, (sheet.end ?? cur) + Number(btn.dataset.d)); renderSheet(); },
+    endDo() {
+      const h = holderById(sheet.hid); const cur = h && holderEnd(h); if (cur == null || sheet.end == null) return;
+      const to = sheet.end; setEnd(h, to); sheet.end = null;
+      saveState(); renderAll(); renderSheet(); toast(`${h.keys.join(", ")}번 반납 ${hm(cur)} → ${hm(to)} (판매수 그대로)`);
+    },
+    plusSlot() {
+      const h = holderById(sheet.hid); const cur = h && holderEnd(h); if (cur == null) return;
+      const to = cur + RULES.useMinutes + 10, n = h.keys.length;
+      setEnd(h, to); sheet.end = null;
+      // 입장권 n장 더 산 것: 판매수 · 시간표 인원에 (열쇠는 그대로 · 안에 있는 손님은 연장된 열쇠로 셈)
+      walkins.push({ id: "w" + seq++, name: "추가 1타임", extra: true, of: `${h.walk ? "현장" : h.name} ${h.keys.join(", ")}번`, phone: h.phone, keys: [], qty: n, enteredAt: now, slot: cur + 10, posNo: "POS-" + String(posSeq++).padStart(4, "0"), outAt: now, walk: true });
+      saveState(); renderAll(); renderSheet();
+      toast(`+1타임: 반납 ${hm(cur)} → ${hm(to)} · 입장권 ${n}장 더 (판매수에 넣음) — POS에서 결제해 주세요`);
+    },
     // 맨 위 '포스 전환': 결제와 상관없이 POS 화면으로 (POS를 최소화하면 데스크로 돌아옴)
     async posGo() {
       if (window.desk && window.desk.pos) {
