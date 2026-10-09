@@ -125,9 +125,13 @@ test("좌석 기준: 일찍 나간 자리는 다시 팖 · 비인기 먼 타임�
     assert.ok(sum(quiet) > sum(busy), `비인기 먼 타임 몫을 앞 타임에: 비인기 ${sum(quiet)} > 인기 ${sum(busy)}`);
     assert.strictEqual(sum(busy), sum(worst), "인기 먼 타임은 예전처럼 다 팔린다고");
     assert.ok(quiet.inside.every((v) => v <= 43), quiet.inside.join(" "));
-    // 과거 실적이 없으면(fc = null) 예상이 낮아도 다 팔린다고 (안전)
+    // 예상을 모르는 칸(fc = null)은 열린 수량이 다 팔린다고 (계산 함수의 기본)
     const none = await run(far(null).map((x, i) => (i >= 3 ? { ...x, demand: 3 } : x)), [660, 690, 720], { ...O, forecast: true });
-    assert.strictEqual(sum(none), sum(worst), "과거 실적 없음 → 예전처럼");
+    assert.strictEqual(sum(none), sum(worst), "예상 없음 → 열린 수량 다");
+    // 과거 같은 요일 실적이 없을 때 예상 (사장님 10/9): 지금 열쇠(예약) 수준 90% · 오늘 추세 10% — 무조건 다 팔린다고 보지 않음
+    const nh = await page.evaluate(() => ({ f: window.__deskTest.capNoHist(10, 20), c: window.__deskTest.capForecast({ t: 900, used: 5 }, 1) }));
+    assert.ok(Math.abs(nh.f - 11) < 1e-9, "0.9 × 10 + 0.1 × 20 = 11");
+    assert.deepStrictEqual([nh.c.past, nh.c.demand, nh.c.fc, nh.c.expWalk], [0, 5, 5, 1], "과거 없음 · 속도 0 → 지금 예약 5 그대로, 먼 타임도 예상(5)만큼");
 
     // 예상 비율: 같은 요일 지난주 70% · 최근 3주 평균 10% · 추세 10% · 오늘 10%
     const mix = await page.evaluate(() => [window.__deskTest.capMix([10, 6, 4], 8), window.__deskTest.capMix([], 5), window.__deskTest.capMix([10], null)]);
@@ -196,10 +200,7 @@ test("데스크 [지금 한 번 조절] → 네이버 칸의 회차당 수량이
     for (const x of log) assert.strictEqual(capAt(x.t), x.to, `${x.t} 기록대로`);
     assert.ok(log.some((x) => x.to > x.from), "앞 타임을 더 엶");
     assert.strictEqual(capAt("13:30"), 10, "이미 시작한 타임은 그대로");
-    // 좌석 기준(10/9): 이미 시작한 13:30 은 안에 있는 손님(열쇠)으로 셈 → 아직 안 시작한 타임끼리 4타임 수량 합은 상한 이하
-    // (과거 같은 요일 실적이 없으니 먼 타임도 열린 수량이 다 팔린다고 봄)
-    const times = ["14:00", "14:30", "15:00", "15:30", "16:00", "16:30"];
-    for (let i = 0; i + 4 <= times.length; i++) { const w = times.slice(i, i + 4).reduce((a, t) => a + Math.max(capAt(t), 0), 0); assert.ok(w <= 43, `${times[i]}부터 2시간 ${w}`); }
+    // 좌석 기준 · 예상(10/9): 어느 타임 시작 때도 안에 있을 손님(지금 안 + 아직 안 온 예약 + 팔릴 수 + 예상 현장)이 상한 이하
     const inside = await desk.evaluate(() => { const p = window.__deskTest.capPlan(); return p.slots.filter((x) => !x.started).map((x) => p.win(x.t)); });
     assert.ok(inside.every((v) => v <= 43), "어느 타임 시작 때도 안에 있을 손님 ≤ 43: " + inside.join(" "));
     // 데스크 시간표 잔여도 바로 반영 (14:00: 수량 − 확정 4)

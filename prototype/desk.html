@@ -1253,7 +1253,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           - 바꿀 타임: 예약 + 더 연 수 (다 팔린다고)
           - 먼 타임: 예상(F)이 열린 수량보다 적으면(비인기) 예상만큼, 아니면(인기) 열린 수량이 다 팔린다고 (o.forecast · 사장님 10/9 — 비인기 몫을 인기 타임에)
             F = 같은 요일(월~금 각각 · 토 · 일 · 공휴일)의 지난주 70% · 최근 3주 평균 10% · 추세 10% · 오늘 예약 속도 10% (capMix)
-            과거 같은 요일 실적이 하나도 없으면 검증된 숫자가 없으니 예전처럼 열린 수량이 다 팔린다고 봄 (안전)
+            과거 같은 요일 실적이 없으면: 지금 열쇠(예약) 수준 90% · 오늘 추세(예약 속도로 늘린 수) 10% (사장님 10/9 — 무조건 다 팔린다고 보지 않음)
      - 한 장씩 줄 때 예상이 큰(인기) 타임 먼저 · 한 타임 최대 max · 이미 예약된 것보다 적게는 안 함 (자리가 없으면 예약 수로 닫음)
      - 그래도 상한을 넘는 시각이 있으면: 더 연 수 → 먼 타임의 안 팔린 수량 순서로 줄임
      - 10분마다 다시 계산 (반납 · 새 예약 · 예상이 바뀌면 바로 따라감)
@@ -1354,17 +1354,19 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     const w = parts.reduce((a, [k]) => a + k, 0);
     return w ? parts.reduce((a, [k, v]) => a + k * v, 0) / w : 0;
   }
-  /** 예상 판매(그 타임 입장권 전부) · 예상 현장: capMix (과거가 없으면 오늘 속도만) */
+  /** 과거 같은 요일 실적이 없을 때 예상 (사장님 10/9): 지금 열쇠(예약) 수준 90% · 오늘 추세 10% */
+  const capNoHist = (used, byPace) => 0.9 * used + 0.1 * byPace;
+  /** 예상 판매(그 타임 입장권 전부) · 예상 현장: capMix (과거가 없으면 capNoHist · 현장은 오늘 추세) */
   function capForecast(x, walkAvg) {
     const seen = capSeen[x.t] || [];
     const old = seen.filter((r) => r.m <= now - 30).pop() || seen[0];
     const pace = old && now > old.m ? Math.max(0, (x.used - old.used) / (now - old.m)) : 0; // 분당
     const byPace = x.used + pace * Math.max(0, x.t - now);
     const past = capPast(x.t);
-    const demand = Math.max(x.used, capMix(past.map((r) => r.used), byPace));
+    const demand = Math.max(x.used, past.length ? capMix(past.map((r) => r.used), byPace) : capNoHist(x.used, byPace));
     const expWalk = capMix(past.map((r) => r.walk || 0), walkAvg);
     const r = { demand: Math.round(demand * 10) / 10, expWalk: Math.round(expWalk * 10) / 10, pace: Math.round(pace * 300) / 10, past: past.length }; // pace: 30분당
-    r.fc = past.length ? r.demand : null; // 먼 타임을 예상만큼만 팔린다고 보는 것은 과거 실적이 있을 때만
+    r.fc = r.demand; // 먼 타임은 예상만큼 (예상이 열린 수량 이상이면 인기 = 다 팔린다고)
     return r;
   }
   /** 오늘 시간제 타임마다 { t, used(네이버 확정+완료 · 입장권 전부), mainUsed(조절할 상품), cap(조절할 상품의 회차당 수량), walk(현장), started } */
@@ -1734,8 +1736,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         const rows = p.skip ? "" : p.slots.filter((x) => x.t >= Math.floor(now / 30) * 30 - 90 && x.t <= Math.floor(now / 30) * 30 + 30 * A.ahead).map((x) => {
           const c = p.plan.find((y) => y.t === x.t);
           const w = p.win(x.t);
-          const pop = !x.started && (x.fc == null || x.demand >= x.cap); // 인기(또는 과거 실적 없음): 열린 수량이 다 팔린다고 봄
-          return `<tr class="${c && !c.far ? "adj" : ""}"><td class="num">${hm(x.t)}${x.started ? "" : c && !c.far ? " ●" : ""}</td><td class="num">${x.used}${x.started ? "" : `<small> (예상 ${x.demand}${x.fc == null ? " · 과거 없음" : pop ? " · 인기" : ""})</small>`}</td><td class="num">${x.walk}${x.started ? "" : `<small> +${x.expWalk}</small>`}</td><td class="num">${x.cap}</td><td class="num">${c ? `<b>${c.to}</b>${c.to !== c.from ? ` <span class="${c.to > c.from ? "up" : "down"}">${c.to > c.from ? "▲" : "▼"}${Math.abs(c.to - c.from)}</span>` : ""}` : x.started ? "시작함" : "—"}</td><td class="num ${w > A.ceiling ? "over" : ""}">${x.started ? "—" : w}</td></tr>`;
+          const pop = !x.started && (x.fc == null || x.demand >= x.cap); // 인기: 열린 수량이 다 팔린다고 봄
+          return `<tr class="${c && !c.far ? "adj" : ""}"><td class="num">${hm(x.t)}${x.started ? "" : c && !c.far ? " ●" : ""}</td><td class="num">${x.used}${x.started ? "" : `<small> (예상 ${x.demand}${pop ? " · 인기" : ""}${x.past ? "" : " · 지금 수준"})</small>`}</td><td class="num">${x.walk}${x.started ? "" : `<small> +${x.expWalk}</small>`}</td><td class="num">${x.cap}</td><td class="num">${c ? `<b>${c.to}</b>${c.to !== c.from ? ` <span class="${c.to > c.from ? "up" : "down"}">${c.to > c.from ? "▲" : "▼"}${Math.abs(c.to - c.from)}</span>` : ""}` : x.started ? "시작함" : "—"}</td><td class="num ${w > A.ceiling ? "over" : ""}">${x.started ? "—" : w}</td></tr>`;
         }).join("");
         el.innerHTML = `
           <h3 id="sheet-title">운영 설정 <button class="x" data-act="close" aria-label="닫기">×</button></h3>${tabs}
@@ -1746,7 +1748,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
               <label class="help" for="cap-max">한 타임 최대</label><input id="cap-max" type="number" min="5" max="20" value="${A.max}" class="cfg" style="width:76px">
               <button class="btn btn-sm btn-ink" data-act="capNow" ${capBusy ? "disabled" : ""}>${capBusy ? "조절 중…" : "지금 한 번 조절"}</button></div></div>
           ${p.skip ? `<div class="banner">${esc(p.skip)}</div>` : `
-          <div class="help">지금 ${hm(now)} · 안에 있는 손님(열쇠) <b class="num">${p.inside}</b> · ● = 이번에 바꿀 타임 · 예상 = 같은 요일 지난주 70% · 3주 평균 10% · 추세 10% · 오늘 예약 속도 10% (예상이 열린 수량 이상이면 <b>인기</b> = 다 팔린다고) · 현장 +예상 · <b>그때 안</b> = 그 타임 시작 때 안에 있을 손님 — 상한 ${A.ceiling}을 넘지 않게 계산해요</div>
+          <div class="help">지금 ${hm(now)} · 안에 있는 손님(열쇠) <b class="num">${p.inside}</b> · ● = 이번에 바꿀 타임 · 예상 = 같은 요일 지난주 70% · 3주 평균 10% · 추세 10% · 오늘 예약 속도 10% (같은 요일 기록이 없으면 <b>지금 수준</b> = 지금 예약 90% · 오늘 추세 10%) · 예상이 열린 수량 이상이면 <b>인기</b> = 다 팔린다고 · 현장 +예상 · <b>그때 안</b> = 그 타임 시작 때 안에 있을 손님 — 상한 ${A.ceiling}을 넘지 않게 계산해요</div>
           <table class="captable"><tr><th>타임</th><th>네이버 예약</th><th>현장</th><th>지금 수량</th><th>계획</th><th>그때 안</th></tr>${rows}</table>`}
           <div class="field"><span class="label">한 칸 시험 <span class="help">네이버 수량을 실제로 바꿀 수 있는지 — 손님 영향이 없는 먼 날짜로 해 보고, 끝나면 원래 수량으로 되돌리세요</span></span>
             <div class="btns" style="align-items:center"><input type="date" id="cap-t-day" value="${esc(capTry.day)}" class="date-in">
@@ -2484,7 +2486,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 
   // 시험용: 입장권을 만드는 함수들 (자동 시험이 실제 입장 손님으로 출력 내용을 확인)
   document.addEventListener("change", (e) => { if (/^cap-(target|max|ceil)$/.test(e.target.id)) renderSheet(); }); // 숫자를 다 넣으면 계획 다시
-  window.__deskTest = { extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capPlan, capRun, capLog, capDemo, capMix, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => PRINT.forms.enter.text, holders: () => holders(), LINE_COLS };
+  window.__deskTest = { extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capPlan, capRun, capLog, capDemo, capMix, capNoHist, capForecast, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => PRINT.forms.enter.text, holders: () => holders(), LINE_COLS };
 
   // ── 반납안내 커튼 ─────────────────────────────────
   (function curtain() {
