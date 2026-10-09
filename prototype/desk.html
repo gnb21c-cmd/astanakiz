@@ -211,6 +211,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .badge { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
 .badge.conf { background: var(--red); color: #fff; } /* 미입장 = 빨강 스티커 */
 .qmany { color: var(--red); font-weight: 800; } /* 예약 수량 2장 이상 */
+.golden { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; background: rgba(0, 0, 0, .55); }
+.golden[hidden] { display: none; }
+.golden .gbox { width: min(560px, 92%); background: var(--surface); border: 3px solid #F2C94C; border-radius: 18px; padding: 24px 26px; text-align: center; display: grid; gap: 12px; box-shadow: 0 24px 70px rgba(0,0,0,.5); }
+.golden .gtitle { font-size: 30px; font-weight: 900; color: #F2C94C; letter-spacing: 2px; }
+.golden .gmsg { margin: 0; font-size: 21px; font-weight: 800; line-height: 1.5; color: var(--ink); }
+.golden .gsub { margin: 0; font-size: 13px; color: var(--muted); }
+.golden .btn { justify-self: center; min-width: 160px; min-height: 48px; font-size: 17px; }
 .moved { display: inline-block; font-size: 11.5px; font-weight: 700; color: #1b1200; background: #E8A33D; border-radius: 6px; padding: 0 6px; } /* 데스크에서 시간을 옮긴 예약 (네이버 원래 시간) */
 .mvrow { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; }
 .mvrow b { min-width: 46px; text-align: center; }
@@ -457,6 +464,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   <div class="foot"><button data-act="posDone">결제 끝 · POS 최소화</button></div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<!-- 골든벨 알림창: 다른 창(입장 · 열쇠)을 하던 중이어도 그 위에 뜸 -->
+<div class="golden" id="golden" role="alertdialog" aria-labelledby="golden-msg" hidden>
+  <div class="gbox"><div class="gtitle">골든벨</div>
+    <p class="gmsg" id="golden-msg">골든벨 울려주세요~!!<br>지금 시간부터 모든 고객 시간제한 없는 무제한 이용임을 알려주세요~~!!</p>
+    <p class="gsub num" id="golden-sub"></p>
+    <button class="btn btn-ink" data-act="goldenOk">확인</button></div>
+</div>
 </div>
 <!-- 반납안내 커튼 (화면 전체 · 1024×768 판 밖에 둠) -->
 <div class="curtain-tab" id="curtain-tab" role="button" tabindex="0" aria-label="반납안내 커튼 내려놓기">▼ 반납안내 커튼 내려놓기 ▼</div>
@@ -479,6 +493,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     overUnitMin: 10,        // 초과요금: 반납 시각이 지나고 10분마다
     overFee: 5000,          //           열쇠 1개당 5,000원 (열쇠 수만큼 곱함)
     unlimitedFrom: "18:00", // 이 시각 입장부터 무제한
+    // 골든벨 (사장님 10/9): 1시간 50분 제한이 있는 날 16:00 이후 안에 있는 열쇠가 20개 이하이면 → 알림창 · 그때부터 모든 손님 무제한
+    golden: { on: true, from: "16:00", keys: 20 },
     earlyMinutes: 5,        // 손님 안내 기준: 예약 5분 전 입장 — 막지는 않음. 예약 당일이면 근무자 판단으로 더 일찍도 입장 (네이버도 일찍 이용완료 가능)
     slotCap: 10,            // 네이버 시간대별 판매 수량 (체험용 — 실제는 네이버 값)
     // 네이버 예약 자동 불러오기: 09:50부터 매시 20분 · 50분 (마지막 입장 19:30 전 19:20까지)
@@ -515,8 +531,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   const peakOf = (key) => RULES.peaks.find((p) => p.from <= key && key <= p.to) || null;
   const timedDay = (key) => !!peakOf(key) || isHoliday(key);
   /** 이 날 이 시각 입장의 이용시간(분). 무제한이면 null */
-  const minutesFor = (key, entry) => (timedDay(key) && entry < toMin(RULES.unlimitedFrom) ? RULES.useMinutes : null);
-  const dayKind = (key) => (peakOf(key) ? "성수기" : "비수기") + " " + (isHoliday(key) ? "휴일" : "평일") + (timedDay(key) ? " · 시간제" : " · 무제한");
+  let golden = null; // 골든벨 { at } — 오늘 이 시각부터 모든 손님 무제한 (아래 goldenCheck)
+  const baseMinutes = (key, entry) => (timedDay(key) && entry < toMin(RULES.unlimitedFrom) ? RULES.useMinutes : null); // 골든벨과 상관없는 원래 이용시간
+  const minutesFor = (key, entry) => (key === TODAY && golden ? null : baseMinutes(key, entry));
+  const dayKind = (key) => (peakOf(key) ? "성수기" : "비수기") + " " + (isHoliday(key) ? "휴일" : "평일") + (key === TODAY && golden ? ` · 골든벨 무제한 ${hm(golden.at)}~` : timedDay(key) ? " · 시간제" : " · 무제한");
 
   let now = APP ? _d0.getHours() * 60 + _d0.getMinutes() : toMin("13:50");
   let lastRefresh = APP ? null : toMin("13:50");
@@ -781,7 +799,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     for (const h of (bookings[TODAY] || []).concat(walkins)) noteKeys(h);
     if (!APP || !stateReady) return;
     const b = (bookings[TODAY] || []).filter((x) => x.enteredAt != null).map((x) => Object.fromEntries(SAVE_FIELDS.filter((k) => x[k] !== undefined).map((k) => [k, x[k]])));
-    const json = JSON.stringify({ v: 2, b: b.concat(pendingSaved.filter((p) => !b.some((x) => x.no === p.no))), w: walkins, x: [...testOut], ig: [...extIgnored], mv: [...moved], seq, posSeq });
+    const json = JSON.stringify({ v: 2, b: b.concat(pendingSaved.filter((p) => !b.some((x) => x.no === p.no))), w: walkins, x: [...testOut], ig: [...extIgnored], mv: [...moved], g: golden, seq, posSeq });
     try { if (window.desk.state) window.desk.state.save(TODAY, json); } catch (e) { /* 파일 저장 실패 */ }
     try { localStorage.setItem(STATE_KEY, json); } catch (e) { /* 저장 못 해도 화면은 동작 */ }
   }
@@ -801,6 +819,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       for (const no of st.x || []) testOut.add(no);
       for (const no of st.ig || []) extIgnored.add(no);
       for (const [no, s] of st.mv || []) moved.set(no, s);
+      if (st.g) golden = st.g;
       const full = (st.b || []).filter((x) => x.name && x.slot != null);
       pendingSaved = (st.b || []).filter((x) => !(x.name && x.slot != null));
       bookings[TODAY] = full.map((x) => Object.assign({ day: TODAY, keys: [], enteredAt: null, outAt: null }, x, { naverBusy: false }));
@@ -876,6 +895,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   const dur = (m) => `${Math.floor(m / 60)}시간${m % 60 ? ` ${m % 60}분` : ""}`;
   /** 열쇠를 가진 손님의 이용시간(분, 예약 시간부터). 연속예약이면 입장 때 열쇠마다 정해 둔 값, 무제한이면 null */
   const useOf = (h, k) => {
+    if (golden) return null; // 골든벨: 지금 안에 있는 손님도 모두 무제한
     if (h.keyUse && k != null && h.keyUse[k] !== undefined) return h.keyUse[k];
     if (h.keyUse && k == null) { const v = h.keys.map((x) => h.keyUse[x]).filter((x) => x !== undefined); if (v.length) return v.includes(null) ? null : Math.min(...v); }
     return h.useMin !== undefined ? h.useMin : minutesFor(TODAY, h.slot);
@@ -984,7 +1004,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       for (const h of holders()) for (const k of h.keys) { const m = useOf(h, k); if (m == null || h.slot + m > x || x < now + 10) used++; }
       for (const b of bookings[TODAY]) {
         if (b.status !== "확정") continue;
-        const m = minutesFor(TODAY, b.slot);
+        const m = baseMinutes(TODAY, b.slot); // 아직 안 온 예약은 골든벨이어도 원래 시간 안에만 올 수 있다고 (안 온 지난 예약이 계속 자리를 막지 않게)
         if (b.slot - RULES.earlyMinutes <= x && (m == null || x < b.slot + m)) used += b.qty;
       }
       worst = Math.min(worst, RULES.keys - used);
@@ -1498,7 +1518,19 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (APP) { loadNaver(TODAY); return; }
     lastRefresh = todayAt = now; renderAll(); toast(`${hm(now)} 네이버 예약 자동 불러옴 (체험)`);
   }
-  function renderAll() { saveState(); $("now").textContent = hm(now); $("refresh-at").textContent = refreshText(); $("refresh-at").style.color = (naverErr || (bookings[TODAY] || []).some((b) => b.naverPending && b.naverWhy)) && !naverBusy ? "var(--red)" : ""; renderSlots(); renderRes(); renderKeys(); renderCars(); }
+  /* 골든벨 (사장님 10/9): 1시간 50분 제한이 있는 날, 16:00 이후 안에 있는 열쇠가 20개 이하가 되면 한 번
+     → 근무자 알림창 + 그때부터 모든 손님 무제한 (지금 열쇠 · 새로 들어오는 손님 — 시간 색 · 초과요금 · 반납 알림 없음) · 다시 켜도 그대로 */
+  function goldenCheck() {
+    const G = RULES.golden;
+    if (golden || !G.on || !timedDay(TODAY) || now < toMin(G.from)) return;
+    const n = holders().reduce((a, h) => a + h.keys.length, 0);
+    if (n > G.keys) return;
+    golden = { at: now, keys: n };
+    $("golden-sub").textContent = `${hm(now)} · 안에 있는 열쇠 ${n}개 → 지금 열쇠와 앞으로 들어오는 손님 모두 무제한으로 바꿨어요`;
+    $("golden").hidden = false;
+    renderAll();
+  }
+  function renderAll() { saveState(); $("now").textContent = hm(now); $("refresh-at").textContent = refreshText(); $("refresh-at").style.color = (naverErr || (bookings[TODAY] || []).some((b) => b.naverPending && b.naverWhy)) && !naverBusy ? "var(--red)" : ""; renderSlots(); renderRes(); renderKeys(); renderCars(); goldenCheck(); }
 
   // ── 팝업 ─────────────────────────────────────────
   const sheet = { mode: null };
@@ -1723,6 +1755,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
             <li>열쇠 ${RULES.keys}개 = 기본 ${RULES.baseKeys}개 + 유동 ${RULES.keys - RULES.baseKeys}개 · 좌석 ${RULES.seats}석</li>
             <li>열쇠 색: 예약 입장시간부터 1시간 50분까지 검정 → 2시간까지 분홍 → 그 뒤 빨강</li>
             <li>초과요금: 1:50:01부터 카운트, 2:00:00 정각 5,000원 · 10분이 꽉 찰 때마다 5,000원 × 열쇠 수</li>
+            <li>골든벨: 1시간 50분 제한이 있는 날 ${RULES.golden.from} 이후 안에 있는 열쇠가 ${RULES.golden.keys}개 이하가 되면 알림창 · 그때부터 모든 손님 무제한${golden ? ` (오늘 ${hm(golden.at)} 울림)` : ""}</li>
             <li>네이버 예약 자동 불러오기: ${RULES.naverAuto.from}부터 매시 ${RULES.naverAuto.at.join("분 · ")}분 (${RULES.naverAuto.until}까지) · 그 사이에 들어온 예약은 [새로고침]</li>
           </ul>
           <div class="field"><label class="chk"><input type="checkbox" id="unpaid-on" ${RULES.unpaidCancel.on ? "checked" : ""}> <b>입금대기 예약 자동 취소</b> <span class="help">네이버를 불러올 때마다 · 지금 ~ 2시간 안 타임에 결제 안 한 예약([이용완료] 없이 [예약취소]만)이 있으면 취소 · 결제한 예약은 안 누름</span></label>
@@ -2192,6 +2225,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       saveState(); renderAll(); renderSheet();
       toast(`${b.name}님 카드를 ${hm(from)} → ${hm(to)}로 옮겼어요${b.naverSlot !== to ? ` (네이버 예약은 ${hm(b.naverSlot)} 그대로 · 이용완료도 그 칸에서)` : " (네이버 원래 시간)"}`);
     },
+    goldenOk() { $("golden").hidden = true; },
     // 맨 위 '포스 전환': 결제와 상관없이 POS 화면으로 (POS를 최소화하면 데스크로 돌아옴)
     async posGo() {
       if (window.desk && window.desk.pos) {
