@@ -210,6 +210,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .gift { display: inline-block; font-size: 11px; font-weight: 700; color: #fff; background: var(--red); border-radius: 5px; padding: 0 6px; margin-left: 2px; }
 .badge { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
 .badge.conf { background: var(--red); color: #fff; } /* 미입장 = 빨강 스티커 */
+.qmany { color: var(--red); font-weight: 800; } /* 예약 수량 2장 이상 */
 .badge.proxy { background: var(--surface-2); color: var(--fg); border: 1px solid var(--line); font-size: 11px; vertical-align: 2px; }
 .badge.unpaid { background: #E8A33D; color: #1b1200; } /* 입금대기 (결제 안 함 · 자동 취소 대상이 될 수 있음) */
 .res dd.visitor { font-weight: 700; }
@@ -238,13 +239,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .key.red { background: var(--red); border: 2px solid var(--red); color: #fff; }
 .key.void { visibility: hidden; }
 .key.bulk { aspect-ratio: auto; height: auto; min-height: 0; align-self: stretch; font-size: 14px; font-weight: 800; }
-.key.bulk:not(:disabled) { background: var(--surface); border: 2px solid var(--ink); color: var(--ink); } /* 열쇠 2개 이상 나가면 지급된 열쇠처럼 */
+.key.bulk:not(:disabled) { background: var(--surface); border: 1.5px solid var(--ink); color: var(--ink); } /* 선은 주차등록 칸과 같은 굵기 (10/9) */ /* 열쇠 2개 이상 나가면 지급된 열쇠처럼 */
 .bulklist { max-height: 300px; overflow: auto; display: grid; gap: 4px; margin: 6px 0; font-size: 13.5px; }
 .bulklist div { display: flex; justify-content: space-between; gap: 8px; padding: 4px 8px; border-radius: 6px; background: var(--surface-2); }
 /* 열쇠판 아래: 왼쪽 키즈상담 · 카페상담(열쇠 2칸 너비), 오른쪽 열쇠 일괄 반납처리(3칸) — 열쇠판과 같은 10칸 (사장님 10/8) */
 .keyfoot { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); column-gap: 4px; align-items: center; }
 .keyfoot .bulk { aspect-ratio: auto; height: 46px; width: 100%; grid-column: 8 / span 3; }
-.talk { position: relative; height: 38px; min-width: 0; padding: 0 4px; border-radius: 10px; border: 2px solid var(--ink); background: var(--surface); color: var(--ink); font-size: 14px; font-weight: 800; white-space: nowrap; }
+.talk { position: relative; height: 38px; min-width: 0; padding: 0 4px; border-radius: 10px; border: 1.5px solid var(--ink); background: var(--surface); color: var(--ink); font-size: 14px; font-weight: 800; white-space: nowrap; }
 .talk[data-k="kids"] { grid-column: 1 / span 2; }
 .talk[data-k="cafe"] { grid-column: 3 / span 2; margin-left: 10px; }
 /* 새 상담 메시지 수: 붉은 원 (0이면 숨김) · 로그인 풀림 등은 주황 '!' */
@@ -375,9 +376,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 <div id="stage">
 <div class="app">
   <header class="top">
-    <h1>아스타나키즈 입장 데스크</h1>
+    <h1>통합 데스크</h1>
     <span class="tag" title="체험판 · 예시 데이터 · 네이버·POS·아마노는 실제로 연결되지 않음">체험판</span>
-    <button class="btn btn-sm posgo" data-act="posGo">POS로 이동</button>
+    <button class="btn btn-sm posgo" data-act="posGo" title="POS 화면으로 (POS를 작업표시줄로 내리면 데스크로 돌아옴)">포스 전환</button>
+    <button class="btn btn-sm posgo" data-act="drawer" title="POS와 연결된 현금통을 엶 (POS가 꺼져 있어도)">환전 오픈</button>
     <span class="spacer"></span>
     <button class="sold" id="sold" data-act="soldList" aria-live="polite" title="누르면 오늘 입장권 목록"></button>
     <span class="now num" id="now">13:50</span>
@@ -1028,6 +1030,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   /** 이번 입장으로 함께 이용완료되는 예약들 중 사은권 회차가 있는지 (예: 8 → 같은 시간 2건이면 9, 10) */
   const giftIn = (h) => { const a = h.visitNo, z = h.visitEnd || h.visitNo; if (!a) return 0; for (let n = a; n <= z; n++) if (isGift(n)) return n; return 0; };
   /** 대리예약: 예약자 정보와 함께 방문자 이름 · 전화번호도 (네이버 '방문자' 줄 "박소희(010-2785-4295)") */
+  /** 예약 수량: 2장 이상이면 숫자만 빨강 (열쇠를 여러 개 줘야 함 · 사장님 10/9) */
+  const qtyNum = (q) => (q >= 2 ? `<b class="qmany num">${q}</b>` : String(q));
   function visitorRow(b) {
     if (!b.visitor) return "";
     const m = /^(.*?)\s*\(([\d-]+)\)\s*$/.exec(b.visitor);
@@ -1065,7 +1069,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         <dl class="kv">
           <dt>전화번호</dt><dd class="phone num">${fmtPhone(b.phone)}</dd>${visitorRow(b)}
           <dt>이용일시</dt><dd class="num">${when}</dd>
-          <dt>수량</dt><dd>${b.product} ${b.qty}</dd>
+          <dt>수량</dt><dd>${b.product} ${qtyNum(b.qty)}</dd>
           <dt>결제상태</dt><dd><span class="badge paid">${b.pay}</span></dd>
         </dl>
         <div class="act">${act}</div>
@@ -1475,7 +1479,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           <dt>이용완료</dt><dd class="num visits big">${visitText(b)}</dd>
           <dt>전화번호</dt><dd class="num">${fmtPhone(b.phone)}</dd>${visitorRow(b)}
           <dt>이용일시</dt><dd class="num">${hm(b.slot)} ${m == null ? "· 무제한" : `~ ${hm(b.slot + m)} (${dur(m)})`}</dd>
-          <dt>수량</dt><dd>${b.product} ${b.qty}</dd>
+          <dt>수량</dt><dd>${b.product} ${qtyNum(b.qty)}</dd>
           <dt>결제상태</dt><dd>${b.pay}</dd>
           ${b.status === "완료" ? `<dt>열쇠</dt><dd>${b.keys.length ? `<div class="bigkeys">${b.keys.map((k) => `<span class="bigkey num">${k}</span>`).join("")}</div>` : b.outAt != null ? `<span class="num">${b.enteredAt != null ? hm(b.enteredAt) + " 입장 · " : ""}${hm(b.outAt)} 퇴장 (반납함)</span>` : "-"}</dd>` : ""}
         </dl>
@@ -2095,7 +2099,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const p = $("w-phone"); if (p) p.value = walkFmt(sheet.phone);
       updateWalkButtons();
     },
-    // 맨 위 'POS로 이동': 결제와 상관없이 POS 화면으로 (POS를 최소화하면 데스크로 돌아옴)
+    // 맨 위 '포스 전환': 결제와 상관없이 POS 화면으로 (POS를 최소화하면 데스크로 돌아옴)
     async posGo() {
       if (window.desk && window.desk.pos) {
         const r = await window.desk.pos.show();
@@ -2103,6 +2107,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         return;
       }
       $("pos-amt").textContent = "POS 화면"; $("pos").hidden = false; // 체험판: 가짜 POS 화면
+    },
+    // 맨 위 '환전 오픈': POS 와 연결된 현금통을 엶 — 영수증 프린터의 돈통 단자로 열기 명령 (POS 프로그램이 꺼져 있어도 · 사장님 10/9)
+    async drawer() {
+      if (!APP || !window.desk.print || !window.desk.print.drawer) { toast("체험판: 설치한 앱에서는 현금통이 열려요"); return; }
+      if (!printerReady()) { toast("운영 설정 → 프린터에서 영수증 프린터(포트)를 먼저 정해 주세요"); return; }
+      const r = await window.desk.print.drawer({ mode: PRINT.mode, port: PRINT.port, baud: PRINT.baud, deviceName: PRINT.sel }).catch((e) => ({ ok: false, why: String(e) }));
+      toast(r && r.ok ? "현금통을 열었어요" : `현금통을 못 열었어요: ${(r && r.why) || "응답 없음"}`);
     },
     // 현장입장 입장 타임 ◀ ▶ (기본 = 바로 앞 타임, 근무자가 최종 결정)
     wslot(btn) { sheet.slot = Math.max(SLOTS[0], Math.min(SLOTS[SLOTS.length - 1], (sheet.slot ?? walkSlot(now)) + Number(btn.dataset.d))); renderSheet(); const p = $("w-phone"); if (p) p.focus(); },

@@ -5,7 +5,7 @@
 const test = require("node:test");
 const assert = require("node:assert");
 const path = require("path");
-const { TALK_COUNT_JS } = require("../src/talk-driver");
+const { TALK_COUNT_JS, talkMerge } = require("../src/talk-driver");
 let chromium;
 try {
   ({ chromium } = require("playwright"));
@@ -38,6 +38,32 @@ test("톡톡 상담 목록: 줄마다 붉은 원 숫자만 더함 · 읽으면 �
     await page.goto(TALK + "?login=1");
     r = await count();
     assert.deepStrictEqual([r.ok, r.needLogin], [false, true]);
+  } finally {
+    await browser.close();
+  }
+});
+
+// 10/9 현장: 처음 방식이 실제 화면에서 숫자를 못 찾음 → 숫자 먼저 찾고 그 줄의 시각으로 확인, 액자 안까지
+test("톡톡 v2: 붉은 원을 ::before 로 그린 숫자 · 숨은 시각 글자 · 대화 안 '1'은 안 셈 · 액자 안 목록", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1100, height: 760 } });
+    const countAll = async () => talkMerge(await Promise.all(page.frames().map((f) => f.evaluate(TALK_COUNT_JS).catch(() => null))));
+    await page.goto(TALK + "?u=1,0,2,0&v=2");
+    let r = await countAll();
+    assert.strictEqual(r.n, 3, "1 + 2 (대화 안 안읽음 '1' · 메뉴 111 은 안 셈) " + JSON.stringify(r));
+    assert.ok(r.probe.some((p) => p.red && p.row), "찾은 후보를 남김 " + JSON.stringify(r.probe));
+    await page.click('.item[data-i="2"]');
+    assert.strictEqual((await countAll()).n, 1, "읽으면 줄어듦");
+    await page.goto(TALK + "?u=0,0,0,0&v=2");
+    r = await countAll();
+    assert.deepStrictEqual([r.ok, r.n], [true, 0], "새 메시지가 없으면 0 (대화 안 '1'을 세지 않음)");
+    assert.ok(r.rows >= 4, "목록 줄(시각)은 찾음");
+
+    await page.goto(TALK + "?u=2,1&frame=1");
+    await page.frameLocator("#f").locator(".item").first().waitFor();
+    r = await countAll();
+    assert.strictEqual(r.n, 3, "액자 안 목록도 셈 " + JSON.stringify(r));
   } finally {
     await browser.close();
   }

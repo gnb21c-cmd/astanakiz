@@ -44,6 +44,7 @@ contextBridge.exposeInMainWorld("desk", {
     cut: (name) => ipcRenderer.invoke("print:cut", name),
     ports: () => ipcRenderer.invoke("print:ports"),
     escpos: (job) => ipcRenderer.invoke("print:escpos", job),
+    drawer: (job) => ipcRenderer.invoke("print:drawer", job), // 현금통 열기 (환전 오픈) { mode, port, baud, deviceName }
   },
   config: {
     get: () => ipcRenderer.invoke("config:get"),

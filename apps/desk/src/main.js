@@ -9,7 +9,7 @@ const fs = require("fs");
 const { execFile, spawn } = require("child_process");
 const { AmanoSync } = require("./amano-sync");
 const { NaverSync, naverUrls } = require("./naver-sync");
-const { TALK_COUNT_JS } = require("./talk-driver");
+const { TALK_COUNT_JS, talkMerge } = require("./talk-driver");
 
 const SETTINGS_FILE = () => path.join(app.getPath("userData"), "settings.json");
 const DEFAULTS = {
@@ -427,7 +427,7 @@ async function dumpNaver(name) {
   if (!naverWin) throw new Error("네이버 창이 없음");
   return dumpWin(naverWin, name);
 }
-async function dumpWin(win, name) {
+async function dumpWin(win, name, extra) {
   const dir = path.join(app.getPath("desktop"), "아스타나키즈-진단");
   fs.mkdirSync(dir, { recursive: true });
   const wc = win.webContents;
@@ -435,6 +435,17 @@ async function dumpWin(win, name) {
   const html = await timed(wc.executeJavaScript("document.documentElement.outerHTML", true), 8000, "화면이 응답하지 않음");
   const head = `<!-- 주소: ${wc.getURL()}\n액자: ${frames.join(" | ")}\n버전: ver.${BUILD} ${SHA} · ${new Date().toLocaleString("ko-KR")} -->\n`;
   fs.writeFileSync(path.join(dir, `${name}.html`), head + html);
+  // 액자(iframe) 안 화면도 따로 (상담 목록이 액자 안에 있을 수 있음)
+  const subs = wc.mainFrame ? wc.mainFrame.framesInSubtree.filter((f) => f !== wc.mainFrame) : [];
+  for (const [i, f] of subs.entries()) {
+    try {
+      const h = await timed(f.executeJavaScript("document.documentElement.outerHTML", true), 5000, "액자 응답 없음");
+      fs.writeFileSync(path.join(dir, `${name}-frame${i + 1}.html`), `<!-- 액자 주소: ${f.url} -->\n` + h);
+    } catch (e) {
+      /* 못 읽는 액자는 넘어감 */
+    }
+  }
+  if (extra) fs.writeFileSync(path.join(dir, `${name}.json`), JSON.stringify(extra, null, 2));
   const img = await wc.capturePage();
   fs.writeFileSync(path.join(dir, `${name}.png`), img.toPNG());
   return path.join(dir, `${name}.html`);
@@ -527,16 +538,25 @@ function hideTalk(k) {
 }
 async function talkCount(k) {
   const t = talk[k];
-  if (!t || !t.win || t.win.isDestroyed() || !talkUrl(k) || t.counting || t.win.webContents.isLoading()) return;
+  // 주 화면이 불러오는 중일 때만 쉼 (isLoading 은 끝나지 않는 연결 때문에 계속 '불러오는 중'일 수 있음 · 10/9)
+  if (!t || !t.win || t.win.isDestroyed() || !talkUrl(k) || t.counting || t.win.webContents.isLoadingMainFrame()) return;
   t.counting = true;
   try {
-    const r = await timed(t.win.webContents.executeJavaScript(TALK_COUNT_JS, true), 5000, "톡톡 화면이 응답하지 않음");
-    if (r && r.ok && !r.rows && !/\/chat/.test(r.path || "")) throw new Error("상담 목록 화면이 아님 — 운영 설정에서 다시 정해 주세요");
-    if (r && r.ok) {
+    // 상담 목록이 액자(iframe) 안에 있어도 셈: 액자마다 읽어 합침
+    const wc = t.win.webContents;
+    const frames = wc.mainFrame ? wc.mainFrame.framesInSubtree : [];
+    const rs = frames.length
+      ? await Promise.all(frames.map((f) => timed(f.executeJavaScript(TALK_COUNT_JS, true), 5000, "톡톡 화면이 응답하지 않음").catch(() => null)))
+      : [await timed(wc.executeJavaScript(TALK_COUNT_JS, true), 5000, "톡톡 화면이 응답하지 않음")];
+    const r = talkMerge(rs);
+    t.last = { at: new Date().toLocaleString("ko-KR"), url: wc.getURL(), result: r }; // 진단 저장 때 같이 남김
+    if (r.ok && !r.rows) throw new Error(/\/chat/.test(r.path || "") ? "상담 목록을 찾지 못함 — 운영 설정 '화면 저장'으로 알려 주세요" : "상담 목록 화면이 아님 — 운영 설정에서 다시 정해 주세요");
+    if (r.ok) {
       t.fails = 0;
+      t.okAt = Date.now();
       t.state = { n: r.n, warn: "" };
-    } else if (r && r.needLogin) t.state = { n: 0, warn: "네이버 로그인이 필요해요 (운영 설정 → 톡톡 화면 보기)" };
-    else throw new Error((r && r.why) || "톡톡 화면을 읽지 못함");
+    } else if (r.needLogin) t.state = { n: 0, warn: "네이버 로그인이 필요해요 (운영 설정 → 톡톡 화면 보기)" };
+    else throw new Error(r.why || "톡톡 화면을 읽지 못함");
   } catch (e) {
     if (++t.fails >= 3) t.state = { n: 0, warn: String(e.message || e) }; // 잠깐 못 읽은 것은 넘어감
   } finally {
@@ -550,6 +570,11 @@ function talkTick() {
     const t = openTalk(k);
     if (t.win.isVisible()) continue; // 근무자가 상담 중 — 화면에서 바로 숫자가 바뀌므로 닫을 때 셈
     if (t.setup && Date.now() - t.setupAt > TALK_RELOAD_MS) t.setup = false;
+    // 3분 넘게 한 번도 못 읽었으면 숫자 대신 주황 '!' (조용히 0으로 보이지 않게 · 10/9)
+    if (!t.setup && Date.now() - (t.okAt || t.loadedAt) > 3 * 60 * 1000 && !(t.state && t.state.warn)) {
+      t.state = { n: 0, warn: "톡톡 새 메시지 수를 3분 넘게 못 읽음 — 운영 설정 '화면 저장'으로 알려 주세요" };
+      talkPush();
+    }
     if (!t.setup && Date.now() - t.loadedAt > TALK_RELOAD_MS) {
       t.loadedAt = Date.now();
       t.win.loadURL(talkUrl(k)); // 오래 켜 두면 새 메시지 알림이 끊길 수 있어 가끔 새로 고침 (로그인은 유지)
@@ -590,7 +615,7 @@ ipcMain.handle("talk:dump", async (_e, k) => {
   try {
     const t = talk[k];
     if (!t || !t.win || t.win.isDestroyed()) throw new Error("톡톡 창이 없음 — 먼저 '톡톡 화면 보기'");
-    const file = await dumpWin(t.win, `talk-${k}-${stampNow()}`);
+    const file = await dumpWin(t.win, `talk-${k}-${stampNow()}`, t.last || null); // + 마지막으로 셈한 결과(찾은 후보 숫자 · 색 · 크기)
     shell.showItemInFolder(file);
     return { ok: true, dir: path.dirname(file) };
   } catch (e) {
@@ -682,7 +707,7 @@ function rawSend(printer, bytes) {
     const enc = Buffer.from(RAW_PS, "utf16le").toString("base64");
     execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", enc], { env: { ...process.env, ASTANA_PRN: printer, ASTANA_DATA: Buffer.from(bytes).toString("base64") }, timeout: 20000 }, (err, out) => {
       const r = String(out || "").trim();
-      resolve(r === "ok" ? { ok: true } : { ok: false, why: r || (err && err.message) || "자르기 명령 실패" });
+      resolve(r === "ok" ? { ok: true } : { ok: false, why: r || (err && err.message) || "프린터 명령 실패" });
     });
   });
 }
@@ -741,6 +766,20 @@ foreach ($n in [System.IO.Ports.SerialPort]::GetPortNames()) { if (-not ($l -mat
 ipcMain.handle("print:escpos", async (_e, { port, baud, parts }) => {
   const r = await psRun(ESC_PS, { ASTANA_MODE: "com", ASTANA_PORT: port, ASTANA_BAUD: String(baud || 115200), ASTANA_JSON: Buffer.from(JSON.stringify(parts), "utf8").toString("base64") });
   return r === "ok" ? { ok: true } : { ok: false, why: r || "응답 없음" };
+});
+
+/* 현금통(돈통) 열기 — 데스크 맨 위 '환전 오픈' (사장님 10/9)
+   현금통은 보통 영수증 프린터 뒤의 돈통 단자(DK · RJ11)에 꽂혀 있고, POS 도 프린터에 이 명령을 보내 엶 → POS 프로그램이 꺼져 있어도 열림
+   ESC p m t1 t2: 핀 2(m=0) · 핀 5(m=1) 둘 다 50ms 펄스 (현금통이 어느 핀이어도 열리게) */
+const DRAWER = [0x1b, 0x70, 0x00, 0x19, 0xfa, 0x1b, 0x70, 0x01, 0x19, 0xfa];
+ipcMain.handle("print:drawer", async (_e, { mode, port, baud, deviceName }) => {
+  if (mode === "com") {
+    if (!port) return { ok: false, why: "영수증 프린터 COM 포트를 먼저 정해 주세요" };
+    const r = await psRun(ESC_PS, { ASTANA_MODE: "com", ASTANA_PORT: port, ASTANA_BAUD: String(baud || 115200), ASTANA_JSON: Buffer.from(JSON.stringify([{ b: DRAWER }]), "utf8").toString("base64") });
+    return r === "ok" ? { ok: true } : { ok: false, why: r || "응답 없음" };
+  }
+  if (deviceName) return rawSend(deviceName, DRAWER);
+  return { ok: false, why: "운영 설정 → 프린터에서 영수증 프린터를 먼저 정해 주세요" };
 });
 
 // 종이 자르기: 3줄 올리고(ESC d 3) 부분 자르기(GS V 1) — 대부분의 80mm 영수증 프린터(ESC/POS)

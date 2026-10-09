@@ -7,6 +7,10 @@
      ?u=2,0,3   목록 줄마다 안 읽은 메시지 수 (0 = 붉은 원 없음)
      ?plain=1   붉은 원의 이름표(class)가 알 수 없는 글자일 때 (색으로만 찾는지 시험)
      ?login=1   로그인 화면
+     ?v=2       어려운 모양 (10/9 현장: 처음 방식이 실제 화면에서 숫자를 못 찾음):
+                붉은 원을 ::before 로 그리고 숫자는 투명 바탕 'cnt' 글자 · 시각을 화면 읽기용으로 한 번 더(1px) ·
+                열린 대화 안에 둥글지 않은 '1'(안 읽음 표시, class unread) — 세면 안 됨
+     ?frame=1   상담 목록 전체가 액자(iframe) 안
      줄을 누르면 그 대화를 읽은 것 → 붉은 원이 사라짐 -->
 <style>
   body { margin: 0; font: 14px sans-serif; display: grid; grid-template-columns: 200px 290px 1fr; height: 100vh; }
@@ -20,6 +24,11 @@
   .thumb { width: 44px; height: 44px; border-radius: 50%; background: #cfe9f6; }
   .side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
   .q7 { display: inline-block; width: 20px; height: 20px; line-height: 20px; border-radius: 50%; background: rgb(255, 72, 72); color: #fff; text-align: center; font-size: 12px; font-weight: 700; }
+  .w7 { position: relative; display: inline-block; min-width: 20px; height: 20px; line-height: 20px; text-align: center; color: #fff; font-size: 12px; font-weight: 700; }
+  .w7::before { content: ""; position: absolute; inset: 0; border-radius: 10px; background: #ff4f4f; z-index: -1; }
+  .w7 .cnt { position: relative; background: transparent; }
+  .blind { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .rd { color: #f5c400; font-size: 11px; }
   .room { padding: 16px; }
   .msg { margin: 10px 0; }
   .login { grid-column: 1 / -1; padding: 40px; }
@@ -28,16 +37,22 @@
 <body>
 <script>
   const P = new URLSearchParams(location.search);
-  if (P.get("login")) {
+  if (P.get("frame")) {
+    // 상담 목록이 액자 안 (같은 화면을 액자로 다시 엶)
+    const q = new URLSearchParams(location.search); q.delete("frame");
+    document.body.innerHTML = `<div style="grid-column: 1 / -1; padding: 8px">톡톡 파트너센터</div><iframe id="f" style="grid-column: 1 / -1; width: 100%; height: 700px; border: 0" src="${location.pathname}?${q}"></iframe>`;
+  } else if (P.get("login")) {
     document.body.innerHTML = `<div class="login"><h1>NAVER</h1><input id="id" placeholder="아이디"><input type="password" id="pw" placeholder="비밀번호"><button>로그인</button></div>`;
   } else {
     const names = [["잉꼬", "10월 6일", "즐거운 시간 되시길 바래요~~^^"], ["moz", "10월 1일", "아 감사합니다"], ["l22y****", "오후 07:39", "10.9(금) 예매가 확정되었습니다."], ["은빈", "오후 07:30", "방문해주셔서 감사합니다."]];
     const unread = (P.get("u") || "2,0,3").split(",").map(Number);
     const badge = P.get("plain") ? "q7" : "q7 ChatList__unread-count";
+    const v2 = P.get("v") === "2";
+    const mark = (n) => (v2 ? `<em class="w7 q7x"><span class="cnt">${n}</span></em>` : `<span class="${badge}">${n}</span>`);
     const row = (i) => {
       const [nm, t, last] = names[i];
-      return `<div class="item" data-i="${i}"><div class="thumb"></div><div><strong>${nm}</strong><p>${last}</p></div>
-        <div class="side"><span>${t}</span>${unread[i] ? `<span class="${badge}">${unread[i]}</span>` : ""}<i class="ico_popup"></i></div></div>`;
+      return `<div class="item" data-i="${i}"><div class="thumb"></div><div><strong>${nm}</strong><p>${last}</p>${v2 ? `<span class="blind">${t}</span>` : ""}</div>
+        <div class="side"><span>${t}</span>${unread[i] ? mark(unread[i]) : ""}<i class="ico_popup"></i></div></div>`;
     };
     document.body.innerHTML = `
       <nav class="lnb"><a href="#">프로필 관리</a><a href="#">상담관리 <em class="x91">111</em></a><a href="#">요청서 관리</a><a href="#">마케팅관리</a></nav>
@@ -51,11 +66,12 @@
         <div class="msg">아스타나키즈를 네이버에서 검색하시면 … <small>읽음 오후 4:07</small></div>
         <div class="msg">자세한 설명 감사합니다^^ <small>오후 4:52</small></div>
         <div class="msg">즐거운 시간 되시길 바래요~~^^* <small>읽음 오후 6:42</small></div>
+        ${v2 ? `<div class="msg">사진 보내드릴게요 <span class="rd unread">1</span> <small>오후 7:01</small></div>` : ""}
       </section>`;
     // 줄을 누르면 그 대화를 읽음 → 붉은 원이 사라짐 (실제처럼)
     document.getElementById("items").addEventListener("click", (e) => {
       const it = e.target.closest(".item");
-      if (it) { const b = it.querySelector(".q7"); if (b) b.remove(); }
+      if (it) { const b = it.querySelector(".q7, .q7x"); if (b) b.remove(); }
     });
   }
 </script>
