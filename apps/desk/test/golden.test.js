@@ -1,4 +1,4 @@
-/* 골든벨 (사용자 지시 10/9): 1시간 50분 제한이 있는 날 16:00 이후 안에 있는 열쇠가 20개 이하이면
+/* 골든벨 (사용자 지시 10/9): 1시간 50분 제한이 있는 날 16:00 이후 ① 안에 있는 열쇠 20개 이하 ② 남은 예약 5장 이하 — 둘 다이면
    근무자에게 알림창 + 그때부터 모든 손님 무제한 (지금 열쇠 · 새로 들어오는 손님 · 시간 색 · 초과요금 없음) */
 const test = require("node:test");
 const assert = require("node:assert");
@@ -27,8 +27,11 @@ test("골든벨: 16:00 이후 열쇠 20개 이하 → 알림창 · 모든 열쇠
     assert.ok(await page.isHidden("#golden"), "16:00 전에는 안 뜸");
     assert.ok((await colors()) > 0, "반납 시간 지난 열쇠는 아직 분홍 · 빨강");
 
-    await page.evaluate(() => window.__deskTest.setNow(960)); // 16:00
+    await page.evaluate(() => window.__deskTest.setNow(960)); // 16:00 — 열쇠 19개지만 남은 예약(15:30~) 9장 > 5
+    assert.ok(await page.isHidden("#golden"), "남은 예약이 5장보다 많으면 아직");
+    await page.evaluate(() => window.__deskTest.setNow(1050)); // 17:30 — 남은 예약 18:00 · 18:30 2장
     assert.ok(await page.isVisible("#golden"), "알림창");
+    assert.match(await page.textContent("#golden-sub"), /열쇠 19개 · 남은 예약 2장/);
     assert.strictEqual((await page.innerText("#golden .gmsg")).replace(/\s+/g, " ").trim(), MSG);
     assert.strictEqual(await colors(), 0, "모든 열쇠 무제한 → 시간 색 없음");
     const uses = await page.evaluate(() => window.__deskTest.holders().map((h) => window.__deskTest.useOf(h)));
@@ -42,7 +45,7 @@ test("골든벨: 16:00 이후 열쇠 20개 이하 → 알림창 · 모든 열쇠
     await page.click('.key[data-k="4"]');
     assert.doesNotMatch(await page.textContent("#sheet"), /초과/);
     await page.click("#sheet [data-act=close] >> nth=0");
-    await page.evaluate(() => window.__deskTest.setNow(990));
+    await page.evaluate(() => window.__deskTest.setNow(1080));
     assert.ok(await page.isHidden("#golden"), "한 번만");
     assert.deepStrictEqual(errs, []);
   } finally {
@@ -55,7 +58,7 @@ test("골든벨: 열쇠가 20개보다 많으면 기다렸다가 반납으로 20
   try {
     const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
     await page.goto(DESK);
-    await page.evaluate(() => { window.__deskTest.walkin("01011112222", [40, 41], 950); window.__deskTest.setNow(960); }); // 21개
+    await page.evaluate(() => { window.__deskTest.walkin("01011112222", [40, 41], 1040); window.__deskTest.setNow(1050); }); // 17:30 · 남은 예약 2장 · 열쇠 21개
     assert.ok(await page.isHidden("#golden"), "21개 → 아직");
     assert.ok(await page.$("#keys .key.red"), "아직 시간제");
     await page.click('.key[data-k="41"]');

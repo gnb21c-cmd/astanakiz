@@ -642,6 +642,13 @@ ipcMain.handle("config:set", (_e, patch) => {
   return { ok: true };
 });
 ipcMain.handle("pos:show", () => showPos());
+// 데스크 맨 위 '바탕화면' (사장님 10/9): 데스크를 바로 내리고, 다른 창(POS 등)도 모두 내려 바탕화면을 보여 줌 (Windows '모든 창 최소화')
+ipcMain.handle("win:desktop", async () => {
+  if (deskWin) deskWin.minimize();
+  if (process.platform !== "win32") return { ok: true };
+  const r = await psRun(`(New-Object -ComObject Shell.Application).MinimizeAll(); [Console]::Out.Write("ok")`, {}, null, 8000);
+  return r === "ok" ? { ok: true } : { ok: false, why: r || "응답 없음" };
+});
 
 // 오늘의 열쇠 · 입장 기록 (날짜별 파일) — 껐다 켜도 · 다시 켜도 · 재설치해도 남음. 임시 파일에 쓰고 바꿔 끼워 반쯤 쓴 파일이 남지 않게
 const STATE_DIR = () => path.join(app.getPath("userData"), "desk-state");

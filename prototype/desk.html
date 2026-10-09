@@ -84,7 +84,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .top .posgo { border: 2px solid var(--accent); color: var(--accent); font-weight: 800; padding: 4px 14px; }
 .top .spacer { flex: 1; }
 .top .now { font-size: 22px; font-weight: 700; }
-.top .sold { font-size: 14px; font-weight: 700; white-space: nowrap; flex-shrink: 0; color: var(--fg); background: var(--surface-2); border: 1.5px solid var(--line); border-radius: 10px; padding: 2px 10px; cursor: pointer; }
+.top .sold { font-size: 13px; font-weight: 700; white-space: nowrap; flex-shrink: 0; color: var(--fg); background: var(--surface-2); border: 1.5px solid var(--line); border-radius: 10px; padding: 2px 8px; cursor: pointer; } /* 바탕화면 · 총 판매수 (글씨 줄임 · 커튼 손잡이에 안 가리게 · 10/9) */
 .top .sold:hover { border-color: var(--accent); }
 .soldlist { max-height: 420px; overflow: auto; display: grid; gap: 4px; margin: 6px 0; }
 .soldlist .srow { display: grid; grid-template-columns: minmax(0, 1fr) 118px 112px 40px 92px; gap: 8px; align-items: center; padding: 5px 10px; border-radius: 8px; background: var(--surface-2); font-size: 14.5px; cursor: pointer; }
@@ -125,6 +125,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .slot-sum .lb { font-size: 12.5px; border: 1.5px solid var(--line); border-radius: 8px; padding: 1px 0; }
 .slot-sum .dn { color: var(--muted); }
 .slot .c { text-align: center; font-weight: 700; font-size: 15px; }
+.slot.unl { position: relative; }
+.slot.unl::before { content: ""; position: absolute; left: 4px; right: 4px; top: -2px; height: 2px; border-radius: 1px; background: var(--red); pointer-events: none; } /* 17:30 과 18:00 사이: 18:00부터 무제한 */
 .slot .c.full, .slot-sum .full { color: var(--red); }
 .slot .c.dn { color: var(--muted); }
 .slot .c.cf, .slot-sum .cf { color: #3ddc6b; } /* 확정 = 예전 커튼 손잡이 연두색 (사장님 10/7) */
@@ -391,6 +393,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     <button class="btn btn-sm posgo" data-act="posGo" title="POS 화면으로 (POS를 작업표시줄로 내리면 데스크로 돌아옴)">포스 전환</button>
     <button class="btn btn-sm posgo" data-act="drawer" title="POS와 연결된 현금통을 엶 (POS가 꺼져 있어도)">환전 오픈</button>
     <span class="spacer"></span>
+    <button class="sold" id="desktop-btn" data-act="desktop" title="모든 창을 내리고 PC 바탕화면으로 (데스크는 작업표시줄에서 다시)">바탕화면</button>
     <button class="sold" id="sold" data-act="soldList" aria-live="polite" title="누르면 오늘 입장권 목록"></button>
     <span class="now num" id="now">13:50</span>
     <button class="btn btn-sm" data-act="time" data-min="5">+5분</button>
@@ -493,8 +496,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     overUnitMin: 10,        // 초과요금: 반납 시각이 지나고 10분마다
     overFee: 5000,          //           열쇠 1개당 5,000원 (열쇠 수만큼 곱함)
     unlimitedFrom: "18:00", // 이 시각 입장부터 무제한
-    // 골든벨 (사장님 10/9): 1시간 50분 제한이 있는 날 16:00 이후 안에 있는 열쇠가 20개 이하이면 → 알림창 · 그때부터 모든 손님 무제한
-    golden: { on: true, from: "16:00", keys: 20 },
+    // 골든벨 (사장님 10/9): 1시간 50분 제한이 있는 날 16:00 이후 ① 안에 있는 열쇠 20개 이하 ② 남은 예약 5장 이하 — 둘 다 → 알림창 · 그때부터 모든 손님 무제한
+    golden: { on: true, from: "16:00", keys: 20, rest: 5 },
     earlyMinutes: 5,        // 손님 안내 기준: 예약 5분 전 입장 — 막지는 않음. 예약 당일이면 근무자 판단으로 더 일찍도 입장 (네이버도 일찍 이용완료 가능)
     slotCap: 10,            // 네이버 시간대별 판매 수량 (체험용 — 실제는 네이버 값)
     // 네이버 예약 자동 불러오기: 09:50부터 매시 20분 · 50분 (마지막 입장 19:30 전 19:20까지)
@@ -1033,7 +1036,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const left = Math.max(0, cap - conf - done);
       tot.done += done; tot.conf += conf; tot.left += left;
       const isNow = viewDay === TODAY && now >= s - RULES.earlyMinutes && now < s + 25;
-      return `<button class="slot ${s === selSlot ? "on" : ""} ${isNow ? "now" : ""}" data-act="slot" data-s="${s}" aria-pressed="${s === selSlot}">
+      const unl = timedDay(viewDay) && s === toMin(RULES.unlimitedFrom); // 이 줄부터 무제한 → 위에 빨간 선 (사장님 10/9)
+      return `<button class="slot ${s === selSlot ? "on" : ""} ${isNow ? "now" : ""} ${unl ? "unl" : ""}" data-act="slot" data-s="${s}" aria-pressed="${s === selSlot}"${unl ? ` title="${RULES.unlimitedFrom}부터 무제한"` : ""}>
         <span class="t num">${hm(s)}</span>
         <span class="c num dn">${done}</span><span class="c num ${conf ? "cf" : "lf"}">${conf}</span><span class="c num ${left ? "lf" : "full"}" title="기준 ${cap}">${left}</span></button>`;
     }).join("");
@@ -1259,7 +1263,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     const naverDone = Math.max(0, naverDoneAll - testQty(viewDay));
     const walk = walkTickets(viewDay), all = naverDone + walk;
     const el = $("sold");
-    el.innerHTML = `${viewDay === TODAY ? "오늘" : `${Number(viewDay.slice(5, 7))}/${Number(viewDay.slice(8))}`} 입장권 총 판매수 = <b class="num">${all}</b>장`;
+    el.innerHTML = `${viewDay === TODAY ? "" : `${Number(viewDay.slice(5, 7))}/${Number(viewDay.slice(8))} `}총 판매수 = <b class="num">${all}</b>`; // 글씨를 줄임 (사장님 10/9)
     el.title = `네이버 이용완료 ${naverDone}장 + 현장입장 ${walk}장`;
   }
 
@@ -1530,15 +1534,19 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (APP) { loadNaver(TODAY); return; }
     lastRefresh = todayAt = now; renderAll(); toast(`${hm(now)} 네이버 예약 자동 불러옴 (체험)`);
   }
-  /* 골든벨 (사장님 10/9): 1시간 50분 제한이 있는 날, 16:00 이후 안에 있는 열쇠가 20개 이하가 되면 한 번
+  /** 남은 예약: 아직 안 온(확정) 오늘 예약 장수 — 예약 시각이 30분 전 이후인 것 (그보다 오래된 안 온 예약은 노쇼로 봄) */
+  const restBooked = () => (bookings[TODAY] || []).filter((b) => b.status === "확정" && b.enteredAt == null && !testOut.has(b.no) && b.slot >= now - 30).reduce((a, b) => a + b.qty, 0);
+  /* 골든벨 (사장님 10/9): 1시간 50분 제한이 있는 날, 16:00 이후 ① 안에 있는 열쇠 20개 이하 ② 남은 예약 5장 이하 — 둘 다 되면 한 번
      → 근무자 알림창 + 그때부터 모든 손님 무제한 (지금 열쇠 · 새로 들어오는 손님 — 시간 색 · 초과요금 · 반납 알림 없음) · 다시 켜도 그대로 */
   function goldenCheck() {
     const G = RULES.golden;
     if (golden || !G.on || !timedDay(TODAY) || now < toMin(G.from)) return;
     const n = holders().reduce((a, h) => a + h.keys.length, 0);
     if (n > G.keys) return;
-    golden = { at: now, keys: n };
-    $("golden-sub").textContent = `${hm(now)} · 안에 있는 열쇠 ${n}개 → 지금 열쇠와 앞으로 들어오는 손님 모두 무제한으로 바꿨어요`;
+    const rest = restBooked();
+    if (rest > G.rest) return;
+    golden = { at: now, keys: n, rest };
+    $("golden-sub").textContent = `${hm(now)} · 안에 있는 열쇠 ${n}개 · 남은 예약 ${rest}장 → 지금 열쇠와 앞으로 들어오는 손님 모두 무제한으로 바꿨어요`;
     $("golden").hidden = false;
     renderAll();
   }
@@ -1771,7 +1779,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
             <li>열쇠 ${RULES.keys}개 = 기본 ${RULES.baseKeys}개 + 유동 ${RULES.keys - RULES.baseKeys}개 · 좌석 ${RULES.seats}석</li>
             <li>열쇠 색: 예약 입장시간부터 1시간 50분까지 검정 → 2시간까지 분홍 → 그 뒤 빨강</li>
             <li>초과요금: 1:50:01부터 카운트, 2:00:00 정각 5,000원 · 10분이 꽉 찰 때마다 5,000원 × 열쇠 수</li>
-            <li>골든벨: 1시간 50분 제한이 있는 날 ${RULES.golden.from} 이후 안에 있는 열쇠가 ${RULES.golden.keys}개 이하가 되면 알림창 · 그때부터 모든 손님 무제한${golden ? ` (오늘 ${hm(golden.at)} 울림)` : ""}</li>
+            <li>골든벨: 1시간 50분 제한이 있는 날 ${RULES.golden.from} 이후 안에 있는 열쇠 ${RULES.golden.keys}개 이하 · 남은 예약 ${RULES.golden.rest}장 이하 — 둘 다 되면 알림창 · 그때부터 모든 손님 무제한${golden ? ` (오늘 ${hm(golden.at)} 울림)` : ` (지금 열쇠 ${holders().reduce((a, h) => a + h.keys.length, 0)}개 · 남은 예약 ${restBooked()}장)`}</li>
             <li>네이버 예약 자동 불러오기: ${RULES.naverAuto.from}부터 매시 ${RULES.naverAuto.at.join("분 · ")}분 (${RULES.naverAuto.until}까지) · 그 사이에 들어온 예약은 [새로고침]</li>
           </ul>
           <div class="field"><label class="chk"><input type="checkbox" id="unpaid-on" ${RULES.unpaidCancel.on ? "checked" : ""}> <b>입금대기 예약 자동 취소</b> <span class="help">네이버를 불러올 때마다 · 지금 ~ 2시간 안 타임에 결제 안 한 예약([이용완료] 없이 [예약취소]만)이 있으면 취소 · 결제한 예약은 안 누름</span></label>
@@ -2247,6 +2255,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       toast(`${b.name}님 카드를 ${hm(from)} → ${hm(to)}로 옮겼어요${b.naverSlot !== to ? ` (네이버 예약은 ${hm(b.naverSlot)} 그대로 · 이용완료도 그 칸에서)` : " (네이버 원래 시간)"}`);
     },
     goldenOk() { $("golden").hidden = true; },
+    // 맨 위 '바탕화면': 모든 창을 내리고 PC 바탕화면으로 (사장님 10/9) — 데스크는 작업표시줄에서 다시 올림
+    async desktop() {
+      if (!(window.desk && window.desk.win)) { toast("체험판: 설치한 앱에서는 모든 창을 내리고 바탕화면으로 가요"); return; }
+      const r = await window.desk.win.desktop().catch((e) => ({ ok: false, why: String(e) }));
+      if (!r || !r.ok) toast(`바탕화면으로 못 갔어요: ${(r && r.why) || ""}`);
+    },
     /* 열쇠 창 반납 시각 (사장님 10/9): 현장 손님이 네이버로 이어 예약하거나 현장에서 다시 사면 이름 · 전화로 이어 붙일 수 없어 근무자가 직접
        ◀ ▶ 10분씩 → [변경] = 반납 시각만 (판매수 · 인원 그대로) · [+1타임] = 다음 타임 1시간 50분(연속예약처럼 +2시간) + 입장권을 열쇠 수만큼 더 산 것으로 */
     endSlot(btn) { const h = holderById(sheet.hid); const cur = h && holderEnd(h); if (cur == null) return; sheet.end = Math.max(h.slot + 10, (sheet.end ?? cur) + Number(btn.dataset.d)); renderSheet(); },

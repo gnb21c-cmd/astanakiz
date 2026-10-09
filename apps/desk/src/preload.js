@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld("desk", {
     dump: (kind) => ipcRenderer.invoke("talk:dump", kind),
   },
   pos: { show: () => ipcRenderer.invoke("pos:show") },
+  win: { desktop: () => ipcRenderer.invoke("win:desktop") }, // 바탕화면으로 (모든 창 최소화)
   // 오늘의 열쇠 · 입장 기록 저장 (파일)
   state: {
     load: (day) => ipcRenderer.sendSync("state:load", day),
