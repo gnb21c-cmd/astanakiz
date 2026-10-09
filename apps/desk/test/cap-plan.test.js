@@ -146,6 +146,32 @@ test("좌석 기준: 일찍 나간 자리는 다시 팖 · 비인기 먼 타임�
   }
 });
 
+// 사장님 10/9: 고객에게 보이는 잔여(회차당 수량 − 예약)는 10장을 넘지 않게 — 목표 13이어도 한 번에 열지 않고 예약이 늘수록 천천히
+test("네이버에 보이는 잔여는 10장 이하: 목표 13이면 10 → 예약 2명 때 잔여 9 → … → 13 · 이미 13 열린 먼 타임은 예약 + 10으로", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK); // 체험판 10/5(휴일) 13:50
+    const v = await page.evaluate(() => [[13, 0], [13, 1], [13, 2], [13, 6], [13, 12], [13, 13], [8, 0], [10, 3], [13, 15]].map(([p, b]) => window.__deskTest.capVisible(p, b)));
+    assert.deepStrictEqual(v, [10, 11, 11, 12, 13, 13, 8, 10, 15], "회차당 수량 = 예약 + ⌈10 × (목표 − 예약) ÷ 목표⌉, 10 이하 목표는 그대로");
+    const left = [[13, 0], [13, 2], [13, 6], [13, 12]].map(([p, b], i) => v[[0, 2, 3, 4][i]] - b);
+    assert.deepStrictEqual(left, [10, 9, 6, 1], "보이는 잔여가 천천히 줄어듦");
+    // 먼 타임(17:30)에 이미 13장 · 예약 0 → 잔여 13이 보임 → 예약 + 10 = 10으로 줄임
+    const p = await page.evaluate(() => { window.__deskTest.capDemo[1050] = 13; const r = window.__deskTest.capPlan(); return { plan: r.plan.map((c) => ({ ...c })), slots: r.slots.map((x) => ({ t: x.t, mainUsed: x.mainUsed, started: x.started })) }; });
+    const fix = p.plan.find((c) => c.t === 1050);
+    assert.ok(fix && fix.to === 10, "17:30 → 10 " + JSON.stringify(fix));
+    for (const c of p.plan) {
+      const x = p.slots.find((s) => s.t === c.t);
+      assert.ok(c.to - x.mainUsed <= 10 || c.to <= c.from, `${c.t}: 보이는 잔여 ${c.to - x.mainUsed} ≤ 10`);
+    }
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
 test("데스크: 열쇠를 일찍 반납하면 앞 타임 '그때 안' 손님이 줄어듦 (좌석 기준)", async () => {
   const browser = await launch();
   try {

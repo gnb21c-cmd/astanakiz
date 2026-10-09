@@ -507,7 +507,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     /* 네이버 판매 수량 자동 조절 (시간제인 날 · 시간제 타임만): 2시간(4타임) 안의 손님(네이버 예약 + 현장)이 target 에 가깝게
        10분마다 지금 · 앞 3타임의 네이버 '회차당 수량'을 바꿈. 한 타임 최대 max (현장으로 갑자기 오는 손님 · 10분 사이 예약을 생각해서) */
     // target = 맞추려는 2시간 손님 수, ceiling = 절대 넘지 않는 상한 (40~43 · 사용자 지시 10/6)
-    capAuto: { on: false, target: 42, ceiling: 43, max: 13, ahead: 3, every: 10, product: "1시간 50분" },
+    capAuto: { on: false, target: 42, ceiling: 43, max: 13, visible: 10, ahead: 3, every: 10, product: "1시간 50분" }, // visible: 고객에게 보이는 잔여 최대 (안내 '최대 10팀')
   };
   /* 이용시간: 성수기 — 평일·휴일 모두 17:30 입장까지 1시간 50분, 18:00 입장부터 무제한
               비수기 — 평일은 무제한, 휴일은 성수기와 같음 */
@@ -1402,6 +1402,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       return { t, used, mainUsed: raw ? raw.conf + raw.done : used, cap: raw ? raw.cap : capDemo[t] ?? (ns ? ns.cap : RULES.slotCap), product: raw ? raw.product : "", walk, started: day === TODAY && t <= now };
     });
   }
+  /** 네이버에 넣을 회차당 수량 (사장님 10/9): 고객에게 보이는 잔여(회차당 수량 − 예약)는 10장을 넘지 않게 — 안내 '최대 10팀'과 맞게.
+      목표 P(최대 13)를 한 번에 열지 않고 예약 b 가 늘수록 천천히: b + ⌈10 × (P − b) ÷ P⌉ (P 13: 10 → 예약 2명 11(잔여 9) → 6명 12 → 12명 13)
+      10 이하 목표는 그대로 · 예약이 목표보다 많으면 예약 수 */
+  const capVisible = (P, b, lim = RULES.capAuto.visible) => (P <= b ? Math.max(P, b) : P <= lim ? P : b + Math.min(lim, Math.ceil((lim * (P - b)) / P - 1e-9)));
   /** 지금 안에 있는 손님 (좌석 · 열쇠 기준 · 사장님 10/9) — [{ from, to, n }]
       - 열쇠를 가진 손님: 열쇠마다 반납 시각까지 (일찍 나간 사람은 이미 빠짐 · 옮긴 시간 · 연장 반영 · 반납 시간이 지났으면 10분 안에 나간다고)
       - 시작한 타임인데 아직 안 온 예약 · 데스크 없이 네이버에서만 이용완료한 예약: 끝 시간까지 (늦게라도 올 수 있어서)
@@ -1445,6 +1449,14 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     });
     const plan = planCaps(pslots, adj, { target: Math.min(A.target, A.ceiling), ceiling: A.ceiling, max: A.max, walkAvg, present: capPresent(), forecast: true });
     const win = (t) => plan.inside(t); // 그 타임 시작 때 안에 있을 손님 (지금 안 · 아직 안 온 예약 · 계획대로 팔릴 수 · 예상 현장)
+    // 고객에게 보이는 잔여 10장 이하: 계획(목표)은 그대로 두고 네이버에 넣는 수량만 천천히 · 먼 타임에 이미 10장 넘게 보이면 예약 + 10 으로
+    const mainOf = (t) => (slots.find((x) => x.t === t) || {}).mainUsed || 0;
+    for (const c of plan) { c.target = c.to; c.to = Math.min(c.to, capVisible(c.to, mainOf(c.t))); }
+    for (const x of slots) {
+      if (x.started || !x.product && APP || plan.some((c) => c.t === x.t)) continue;
+      if (x.cap - x.mainUsed > RULES.capAuto.visible) plan.push({ t: x.t, product: x.product, from: x.cap, to: x.mainUsed + RULES.capAuto.visible, target: x.mainUsed + RULES.capAuto.visible, used: x.used, walk: x.walk, open: RULES.capAuto.visible, far: true, visible: true });
+    }
+    plan.sort((p, q) => p.t - q.t);
     return { slots, adj, walkAvg: Math.round(walkAvg * 10) / 10, plan, win, inside: capPresent().reduce((a, p) => a + p.n, 0), changes: plan.filter((c) => c.to !== c.from) };
   }
   const capTry = { day: shiftDay(TODAY, 7), time: "10:00", n: 11 }; // 한 칸 시험 (기본: 다음 주 같은 요일 10:00)
@@ -1774,7 +1786,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           const c = p.plan.find((y) => y.t === x.t);
           const w = p.win(x.t);
           const pop = !x.started && (x.fc == null || x.demand >= x.cap); // 인기: 열린 수량이 다 팔린다고 봄
-          return `<tr class="${c && !c.far ? "adj" : ""}"><td class="num">${hm(x.t)}${x.started ? "" : c && !c.far ? " ●" : ""}</td><td class="num">${x.used}${x.started ? "" : `<small> (예상 ${x.demand}${pop ? " · 인기" : ""}${x.past ? "" : " · 지금 수준"})</small>`}</td><td class="num">${x.walk}${x.started ? "" : `<small> +${x.expWalk}</small>`}</td><td class="num">${x.cap}</td><td class="num">${c ? `<b>${c.to}</b>${c.to !== c.from ? ` <span class="${c.to > c.from ? "up" : "down"}">${c.to > c.from ? "▲" : "▼"}${Math.abs(c.to - c.from)}</span>` : ""}` : x.started ? "시작함" : "—"}</td><td class="num ${w > A.ceiling ? "over" : ""}">${x.started ? "—" : w}</td></tr>`;
+          return `<tr class="${c && !c.far ? "adj" : ""}"><td class="num">${hm(x.t)}${x.started ? "" : c && !c.far ? " ●" : ""}</td><td class="num">${x.used}${x.started ? "" : `<small> (예상 ${x.demand}${pop ? " · 인기" : ""}${x.past ? "" : " · 지금 수준"})</small>`}</td><td class="num">${x.walk}${x.started ? "" : `<small> +${x.expWalk}</small>`}</td><td class="num">${x.cap}</td><td class="num">${c ? `<b>${c.to}</b>${c.to !== c.from ? ` <span class="${c.to > c.from ? "up" : "down"}">${c.to > c.from ? "▲" : "▼"}${Math.abs(c.to - c.from)}</span>` : ""}${c.target > c.to ? `<small> (목표 ${c.target})</small>` : ""}` : x.started ? "시작함" : "—"}</td><td class="num ${w > A.ceiling ? "over" : ""}">${x.started ? "—" : w}</td></tr>`;
         }).join("");
         el.innerHTML = `
           <h3 id="sheet-title">운영 설정 <button class="x" data-act="close" aria-label="닫기">×</button></h3>${tabs}
@@ -1783,6 +1795,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
             <div class="btns" style="align-items:center"><label class="help" for="cap-target">4타임 목표</label><input id="cap-target" type="number" min="30" max="50" value="${A.target}" class="cfg" style="width:76px">
               <label class="help" for="cap-ceil">상한</label><input id="cap-ceil" type="number" min="30" max="50" value="${A.ceiling}" class="cfg" style="width:76px">
               <label class="help" for="cap-max">한 타임 최대</label><input id="cap-max" type="number" min="5" max="20" value="${A.max}" class="cfg" style="width:76px">
+              <label class="help" for="cap-vis">보이는 잔여 최대</label><input id="cap-vis" type="number" min="1" max="20" value="${A.visible}" class="cfg" style="width:76px">
               <button class="btn btn-sm btn-ink" data-act="capNow" ${capBusy ? "disabled" : ""}>${capBusy ? "조절 중…" : "지금 한 번 조절"}</button></div></div>
           ${p.skip ? `<div class="banner">${esc(p.skip)}</div>` : `
           <div class="help">지금 ${hm(now)} · 안에 있는 손님(열쇠) <b class="num">${p.inside}</b> · ● = 이번에 바꿀 타임 · 예상 = 같은 요일 지난주 70% · 3주 평균 10% · 추세 10% · 오늘 예약 속도 10% (같은 요일 기록이 없으면 <b>지금 수준</b> = 지금 예약 90% · 오늘 추세 10%) · 예상이 열린 수량 이상이면 <b>인기</b> = 다 팔린다고 · 현장 +예상 · <b>그때 안</b> = 그 타임 시작 때 안에 있을 손님 — 상한 ${A.ceiling}을 넘지 않게 계산해요</div>
@@ -2487,7 +2500,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (t.id === "sold-key") { sheet.key = t.value; renderSheet(); } // 입장권 목록: 열쇠 번호로 찾기 (최근 2주)
     if (t.id === "unpaid-on") { RULES.unpaidCancel.on = t.checked; if (APP && window.desk.config) window.desk.config.set({ unpaidCancel: { on: t.checked } }); toast(t.checked ? "입금대기 예약 자동 취소를 켰어요" : "입금대기 예약 자동 취소를 껐어요"); }
     if (t.id === "cap-on") { RULES.capAuto.on = t.checked; capMark = null; saveCapAuto(); renderAll(); toast(t.checked ? "네이버 판매 수량 자동 조절을 켰어요 (10분마다)" : "자동 조절을 껐어요"); }
-    if ((t.id === "cap-target" || t.id === "cap-max" || t.id === "cap-ceil") && t.value) { RULES.capAuto[{ "cap-target": "target", "cap-max": "max", "cap-ceil": "ceiling" }[t.id]] = Math.max(1, Math.min(60, Number(t.value) || 0)); saveCapAuto(); }
+    if ((t.id === "cap-target" || t.id === "cap-max" || t.id === "cap-ceil" || t.id === "cap-vis") && t.value) { RULES.capAuto[{ "cap-target": "target", "cap-max": "max", "cap-ceil": "ceiling", "cap-vis": "visible" }[t.id]] = Math.max(1, Math.min(60, Number(t.value) || 0)); saveCapAuto(); }
     if (t.id === "com-baud") { PRINT.baud = Number(t.value); savePrint(); }
     if (t.id === "w-phone") { sheet.phone = walkPhone(t.value); t.value = walkFmt(sheet.phone); updateWalkButtons(); }
     const m = /^p(f|t)-(\d+)$/.exec(t.id);
@@ -2545,7 +2558,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 
   // 시험용: 입장권을 만드는 함수들 (자동 시험이 실제 입장 손님으로 출력 내용을 확인)
   document.addEventListener("change", (e) => { if (/^cap-(target|max|ceil)$/.test(e.target.id)) renderSheet(); }); // 숫자를 다 넣으면 계획 다시
-  window.__deskTest = { extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capPlan, capRun, capLog, capDemo, capMix, capNoHist, capForecast, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => PRINT.forms.enter.text, holders: () => holders(), LINE_COLS };
+  window.__deskTest = { extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capPlan, capRun, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => PRINT.forms.enter.text, holders: () => holders(), LINE_COLS };
 
   // ── 반납안내 커튼 ─────────────────────────────────
   (function curtain() {
