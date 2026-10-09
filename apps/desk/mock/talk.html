@@ -11,6 +11,7 @@
                 붉은 원을 ::before 로 그리고 숫자는 투명 바탕 'cnt' 글자 · 시각을 화면 읽기용으로 한 번 더(1px) ·
                 열린 대화 안에 둥글지 않은 '1'(안 읽음 표시, class unread) — 세면 안 됨
      ?frame=1   상담 목록 전체가 액자(iframe) 안
+     ?t0=방금   첫 줄 시각 글자를 바꿈 (10/9 현장: 새 메시지가 오면 시각이 '방금'으로 바뀜 — 처음 v2 는 이 줄을 못 찾았음)
      줄을 누르면 그 대화를 읽은 것 → 붉은 원이 사라짐 -->
 <style>
   body { margin: 0; font: 14px sans-serif; display: grid; grid-template-columns: 200px 290px 1fr; height: 100vh; }
@@ -46,6 +47,7 @@
   } else {
     const names = [["잉꼬", "10월 6일", "즐거운 시간 되시길 바래요~~^^"], ["moz", "10월 1일", "아 감사합니다"], ["l22y****", "오후 07:39", "10.9(금) 예매가 확정되었습니다."], ["은빈", "오후 07:30", "방문해주셔서 감사합니다."]];
     const unread = (P.get("u") || "2,0,3").split(",").map(Number);
+    if (P.get("t0")) names[0][1] = P.get("t0");
     const badge = P.get("plain") ? "q7" : "q7 ChatList__unread-count";
     const v2 = P.get("v") === "2";
     const mark = (n) => (v2 ? `<em class="w7 q7x"><span class="cnt">${n}</span></em>` : `<span class="${badge}">${n}</span>`);

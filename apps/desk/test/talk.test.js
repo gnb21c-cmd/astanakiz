@@ -60,6 +60,12 @@ test("톡톡 v2: 붉은 원을 ::before 로 그린 숫자 · 숨은 시각 글�
     assert.deepStrictEqual([r.ok, r.n], [true, 0], "새 메시지가 없으면 0 (대화 안 '1'을 세지 않음)");
     assert.ok(r.rows >= 4, "목록 줄(시각)은 찾음");
 
+    // 10/9 현장: 새 메시지가 오면 그 줄 시각이 '방금'으로 바뀜 → 그 줄 숫자가 빠져 '1'이 사라졌음
+    for (const t0 of ["방금", "방금 전", "5분 전", "1시간 전", "2일 전"]) {
+      await page.goto(TALK + "?u=2,0,1&v=2&t0=" + encodeURIComponent(t0));
+      assert.strictEqual((await countAll()).n, 3, `시각 '${t0}' 인 줄도 셈`);
+    }
+
     await page.goto(TALK + "?u=2,1&frame=1");
     await page.frameLocator("#f").locator(".item").first().waitFor();
     r = await countAll();

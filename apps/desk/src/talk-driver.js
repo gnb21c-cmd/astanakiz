@@ -27,7 +27,8 @@ function talkUnread() {
     return s.visibility !== "hidden" && s.display !== "none" && Number(s.opacity) !== 0;
   };
   const cls = (e) => (e.getAttribute && e.getAttribute("class")) || "";
-  const TIME = /^(?:(?:오전|오후)\s*\d{1,2}:\d{2}|\d{1,2}:\d{2}|\d{1,2}월\s*\d{1,2}일|어제|그제|\d{2,4}[./-]\s*\d{1,2}[./-]\s*\d{1,2}\.?)$/;
+  // 줄 시각: 오후 01:06 · 10월 6일 · 2025. 12. 1. · 어제 — 새 메시지가 막 오면 '방금' · 'n분 전' (현장 10/9: '방금' 인 줄을 못 찾아 숫자가 사라졌음)
+  const TIME = /^(?:(?:오전|오후)\s*\d{1,2}:\d{2}|\d{1,2}:\d{2}|\d{1,2}월\s*\d{1,2}일|어제|그제|방금(?:\s*전)?|\d{1,2}\s*(?:초|분|시간|일)\s*전|\d{2,4}[./-]\s*\d{1,2}[./-]\s*\d{1,2}\.?)$/;
   const all = [...document.body.querySelectorAll("*")];
   const times = all.filter((e) => TIME.test(textOf(e)) && shown(e));
   const hasTime = (p) => times.some((t) => p.contains(t));
