@@ -223,6 +223,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .moved { display: inline-block; font-size: 11.5px; font-weight: 700; color: #1b1200; background: #E8A33D; border-radius: 6px; padding: 0 6px; } /* 데스크에서 시간을 옮긴 예약 (네이버 원래 시간) */
 .mvrow { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; }
 .mvrow b { min-width: 46px; text-align: center; }
+.mvrow.off b { color: var(--muted); }
+.mvwhy { margin-top: 2px; font-weight: 400; }
 .badge.proxy { background: var(--surface-2); color: var(--fg); border: 1px solid var(--line); font-size: 11px; vertical-align: 2px; }
 .badge.unpaid { background: #E8A33D; color: #1b1200; } /* 입금대기 (결제 안 함 · 자동 취소 대상이 될 수 있음) */
 .res dd.visitor { font-weight: 700; }
@@ -1750,7 +1752,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           <dt>전화번호</dt><dd class="num">${fmtPhone(h.phone)}</dd>
           <dt>입장</dt><dd class="num">${hm(h.enteredAt)}${h.walk ? "" : ` (예약 ${hm(h.slot)})`}</dd>
           <dt>이용</dt><dd class="num">${m == null ? "무제한" : `${used < 0 ? `예약 ${hm(h.slot)}부터 셈` : `${Math.floor(used / 60)}시간 ${used % 60}분째`} · ${h.keyUse && new Set(h.keys.map((k) => useOf(h, k))).size > 1 ? h.keys.map((k) => { const mk = useOf(h, k); return `${k}번 ${mk == null ? "무제한" : hm(h.slot + mk)}`; }).join(" · ") + " 반납" : `${hm(h.slot + m)} 반납`}`}${(() => {
-            const cur = holderEnd(h); if (cur == null) return "";
+            const cur = holderEnd(h);
+            // 무제한(골든벨 · 18:00 이후 입장 · 무제한인 날)이면 바꿀 반납 시각이 없음 → 줄은 보이고 버튼만 잠금 + 까닭 (10/9 현장: 줄이 없어 '없다'고 보였음)
+            if (cur == null) return `<span class="mvrow off" aria-label="반납 시각 바꾸기">→ <button class="btn btn-sm" data-act="endSlot" data-d="-10" aria-label="10분 앞" disabled>◀</button><b class="num">무제한</b><button class="btn btn-sm" data-act="endSlot" data-d="10" aria-label="10분 뒤" disabled>▶</button><button class="btn btn-sm btn-ink" data-act="endDo" disabled>변경</button><button class="btn btn-sm" data-act="plusSlot" disabled>+1타임</button></span><div class="help mvwhy">${golden ? `골든벨 무제한(${hm(golden.at)}~)` : "무제한 이용"}이라 바꿀 반납 시각이 없어요 · 판매수 그대로</div>`;
             const v = sheet.end ?? cur;
             return `<span class="mvrow" aria-label="반납 시각 바꾸기">→ <button class="btn btn-sm" data-act="endSlot" data-d="-10" aria-label="10분 앞" ${v - 10 <= h.slot ? "disabled" : ""}>◀</button><b class="num">${hm(v)}</b><button class="btn btn-sm" data-act="endSlot" data-d="10" aria-label="10분 뒤">▶</button><button class="btn btn-sm btn-ink" data-act="endDo" ${v === cur ? "disabled" : ""}>변경</button><button class="btn btn-sm" data-act="plusSlot" title="반납 1시간 50분 연장 · 입장권 ${h.keys.length}장 더 (판매수 · 인원에 넣음)">+1타임</button></span>`;
           })()}</dd>
