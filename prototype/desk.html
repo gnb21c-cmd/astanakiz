@@ -1752,7 +1752,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           <dt>이용</dt><dd class="num">${m == null ? "무제한" : `${used < 0 ? `예약 ${hm(h.slot)}부터 셈` : `${Math.floor(used / 60)}시간 ${used % 60}분째`} · ${h.keyUse && new Set(h.keys.map((k) => useOf(h, k))).size > 1 ? h.keys.map((k) => { const mk = useOf(h, k); return `${k}번 ${mk == null ? "무제한" : hm(h.slot + mk)}`; }).join(" · ") + " 반납" : `${hm(h.slot + m)} 반납`}`}${(() => {
             const cur = holderEnd(h); if (cur == null) return "";
             const v = sheet.end ?? cur;
-            return `<span class="mvrow" aria-label="반납 시각 바꾸기">→ <button class="btn btn-sm" data-act="endSlot" data-d="-10" aria-label="10분 앞" ${v - 10 <= h.slot ? "disabled" : ""}>◀</button><b class="num">${hm(v)}</b><button class="btn btn-sm" data-act="endSlot" data-d="10" aria-label="10분 뒤">▶</button><button class="btn btn-sm btn-ink" data-act="endDo" ${v === cur ? "disabled" : ""}>변경</button><button class="btn btn-sm" data-act="plusSlot" title="다음 타임 1시간 50분 · 입장권 ${h.keys.length}장 더 (판매수 · 인원에 넣음)">+1타임</button></span>`;
+            return `<span class="mvrow" aria-label="반납 시각 바꾸기">→ <button class="btn btn-sm" data-act="endSlot" data-d="-10" aria-label="10분 앞" ${v - 10 <= h.slot ? "disabled" : ""}>◀</button><b class="num">${hm(v)}</b><button class="btn btn-sm" data-act="endSlot" data-d="10" aria-label="10분 뒤">▶</button><button class="btn btn-sm btn-ink" data-act="endDo" ${v === cur ? "disabled" : ""}>변경</button><button class="btn btn-sm" data-act="plusSlot" title="반납 1시간 50분 연장 · 입장권 ${h.keys.length}장 더 (판매수 · 인원에 넣음)">+1타임</button></span>`;
           })()}</dd>
           <dt>열쇠</dt><dd class="num">${h.keys.length}개</dd>
         </dl>
@@ -2262,7 +2262,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       if (!r || !r.ok) toast(`바탕화면으로 못 갔어요: ${(r && r.why) || ""}`);
     },
     /* 열쇠 창 반납 시각 (사장님 10/9): 현장 손님이 네이버로 이어 예약하거나 현장에서 다시 사면 이름 · 전화로 이어 붙일 수 없어 근무자가 직접
-       ◀ ▶ 10분씩 → [변경] = 반납 시각만 (판매수 · 인원 그대로) · [+1타임] = 다음 타임 1시간 50분(연속예약처럼 +2시간) + 입장권을 열쇠 수만큼 더 산 것으로 */
+       ◀ ▶ 10분씩 → [변경] = 반납 시각만 (판매수 · 인원 그대로) · [+1타임] = 반납을 1시간 50분(1타임) 늘림 + 입장권을 열쇠 수만큼 더 산 것으로
+       (1.36 은 연속예약처럼 +2시간 → 10/9 사장님 '자동으로 1시간 50분 (1타임이) 연장' 으로 고침) */
     endSlot(btn) { const h = holderById(sheet.hid); const cur = h && holderEnd(h); if (cur == null) return; sheet.end = Math.max(h.slot + 10, (sheet.end ?? cur) + Number(btn.dataset.d)); renderSheet(); },
     endDo() {
       const h = holderById(sheet.hid); const cur = h && holderEnd(h); if (cur == null || sheet.end == null) return;
@@ -2271,7 +2272,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     },
     plusSlot() {
       const h = holderById(sheet.hid); const cur = h && holderEnd(h); if (cur == null) return;
-      const to = cur + RULES.useMinutes + 10, n = h.keys.length;
+      const to = cur + RULES.useMinutes, n = h.keys.length;
       setEnd(h, to); sheet.end = null;
       // 입장권 n장 더 산 것: 판매수 · 시간표 인원에 (열쇠는 그대로 · 안에 있는 손님은 연장된 열쇠로 셈)
       walkins.push({ id: "w" + seq++, name: "추가 1타임", extra: true, of: `${h.walk ? "현장" : h.name} ${h.keys.join(", ")}번`, phone: h.phone, keys: [], qty: n, enteredAt: now, slot: cur + 10, posNo: "POS-" + String(posSeq++).padStart(4, "0"), outAt: now, walk: true });
