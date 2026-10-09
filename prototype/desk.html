@@ -211,6 +211,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .badge { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
 .badge.conf { background: var(--red); color: #fff; } /* 미입장 = 빨강 스티커 */
 .qmany { color: var(--red); font-weight: 800; } /* 예약 수량 2장 이상 */
+.moved { display: inline-block; font-size: 11.5px; font-weight: 700; color: #1b1200; background: #E8A33D; border-radius: 6px; padding: 0 6px; } /* 데스크에서 시간을 옮긴 예약 (네이버 원래 시간) */
+.mvrow { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; }
+.mvrow b { min-width: 46px; text-align: center; }
 .badge.proxy { background: var(--surface-2); color: var(--fg); border: 1px solid var(--line); font-size: 11px; vertical-align: 2px; }
 .badge.unpaid { background: #E8A33D; color: #1b1200; } /* 입금대기 (결제 안 함 · 자동 취소 대상이 될 수 있음) */
 .res dd.visitor { font-weight: 700; }
@@ -539,7 +542,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   function booking(day, slot, name, phone, qty, o = {}) {
     const s = toMin(slot);
     const b = {
-      id: "b" + seq++, day, slot: s, name, phone, qty, no: String(1370988026 + seq * 7313),
+      id: "b" + seq++, day, slot: s, naverSlot: s, name, phone, qty, no: String(1370988026 + seq * 7313),
       product: s >= toMin(RULES.unlimitedFrom) ? "야간자유 입장권" : "4인 입장권", pay: "결제완료",
       status: o.done ? "완료" : "확정", keys: [], enteredAt: null, outAt: null,
       // 네이버 예약자 이름 밑 "완료 n · 취소 n" (미입장일 때 읽은 값 = 이번 방문 전까지 완료 횟수)
@@ -629,6 +632,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   let posSeq = 31;
   const walkins = [];
   const extIgnored = new Set(); // 추가 예약을 '그대로 두기'로 한 예약번호 — 다시 묻지 않음 (네이버 이용완료도 안 함)
+  /* 예약시간 변경 (사장님 10/9): 네이버 예약 시간은 바꿀 수 없어 데스크에서만 카드를 다른 시간으로 옮김
+     naverSlot = 네이버의 원래 시간(이용완료 · 취소는 이 시간 칸에서 누름), slot = 데스크 시간(명단 · 이용시간 · 반납은 이 시간부터)
+     예약번호 → 옮긴 시간(분)으로 저장 → 새로고침 · 다시 켜도 옮긴 시간에 */
+  const moved = new Map();
   const testOut = new Set(); // 오늘 '기록 삭제'한 네이버 예약번호 — 판매수 · 수량 조절 통계에서 뺌 (네이버 기록은 그대로)
   /* 현장입장의 입장시간 = 접수한 시각 직전의 30분 칸 (10:12 접수 → 10:00 입장, 늦게 들어가고 싶으면 10:31 이후에 접수).
      이용시간 · 반납 · 초과요금 · 입장권의 입장시간 모두 이 시각 기준 */
@@ -709,7 +716,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const done = n.status === "완료";
       const b = old.get(n.no) || { id: "b" + seq++, keys: [], enteredAt: null, outAt: null, visitNo: null };
       Object.assign(b, {
-        day, no: n.no, slot: toMin(n.time), name: n.name, phone: n.phone, qty: n.qty,
+        day, no: n.no, naverSlot: toMin(n.time), slot: day === TODAY && moved.has(n.no) ? moved.get(n.no) : toMin(n.time), name: n.name, phone: n.phone, qty: n.qty,
         product: (n.qtyText || "").replace(/\s*\d+\s*$/, "") || "입장권", naverProduct: n.product, pay: n.pay || "",
         cancels: n.cancelCount,
         proxy: !!n.proxy, visitor: n.visitor || "", unpaid: !!n.unpaid, // 대리예약 · 방문자 · 입금대기 (10/8)
@@ -724,7 +731,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       list.push(b);
     }
     // 네이버에서 사라진 예약(취소)은 열쇠를 받지 않았을 때만 뺌
-    for (const b of old.values()) if (!list.includes(b) && (b.keys.length || (only && b.slot !== toMin(only)))) list.push(b); // 한 시간만 불러왔으면 다른 시간 예약은 그대로
+    for (const b of old.values()) if (!list.includes(b) && (b.keys.length || (only && (b.naverSlot ?? b.slot) !== toMin(only)))) list.push(b); // 한 시간만 불러왔으면 다른 시간 예약은 그대로
     bookings[day] = list;
   }
   // 네이버에 아직 이용완료를 못 누른 예약(연속예약의 뒤 예약 · '네이버 없이 등록')을 차례로 처리, 실패하면 2분마다 다시
@@ -741,7 +748,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         if (!x) break;
         tried.add(x);
         x.naverBusy = true; renderAll();
-        const r = await window.desk.naver.complete({ day: x.day, no: x.no, time: hm(x.slot), product: x.naverProduct || "" }).catch((e) => ({ ok: false, why: String(e) }));
+        const r = await window.desk.naver.complete({ day: x.day, no: x.no, time: hm(x.naverSlot ?? x.slot), product: x.naverProduct || "" }).catch((e) => ({ ok: false, why: String(e) }));
         x.naverBusy = false;
         if (r && r.ok) {
           x.naverPending = false; x.naverWhy = "";
@@ -764,7 +771,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
      - 앱: 저장 폴더(%APPDATA%\아스타나키즈 입장 데스크\desk-state\날짜.json)에 바로 씀 (갑자기 꺼져도 남게) + 브라우저 저장소에도 한 벌
      - 켜자마자 빈 화면으로 저장본을 덮어쓰지 않게: 저장본을 먼저 읽어 들인 뒤부터 저장 */
   const STATE_KEY = "astanakiz-desk-" + TODAY;
-  const SAVE_FIELDS = ["id", "day", "no", "slot", "name", "phone", "qty", "product", "naverProduct", "pay", "cancels", "prevDone", "visitNo", "visitEnd", "proxy", "visitor", "status", "keys", "enteredAt", "outAt", "overPaid", "naverPending", "naverWhy", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut"];
+  const SAVE_FIELDS = ["id", "day", "no", "slot", "name", "phone", "qty", "product", "naverProduct", "pay", "cancels", "prevDone", "visitNo", "visitEnd", "proxy", "visitor", "status", "keys", "enteredAt", "outAt", "overPaid", "naverPending", "naverWhy", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut", "naverSlot"];
   let stateReady = !APP; // 저장본을 읽기 전에는 저장하지 않음
   let pendingSaved = []; // 예전 형식(예약번호만 있는) 저장본 — 네이버에서 그 예약을 불러오면 합침
   /* 열쇠 기록: 그 손님이 받은 열쇠 번호는 반납해도 남김(keysTaken) — 다음날 아침 없는 열쇠를 마지막에 누가 썼는지 찾아 연락 (사장님 10/8)
@@ -774,7 +781,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     for (const h of (bookings[TODAY] || []).concat(walkins)) noteKeys(h);
     if (!APP || !stateReady) return;
     const b = (bookings[TODAY] || []).filter((x) => x.enteredAt != null).map((x) => Object.fromEntries(SAVE_FIELDS.filter((k) => x[k] !== undefined).map((k) => [k, x[k]])));
-    const json = JSON.stringify({ v: 2, b: b.concat(pendingSaved.filter((p) => !b.some((x) => x.no === p.no))), w: walkins, x: [...testOut], ig: [...extIgnored], seq, posSeq });
+    const json = JSON.stringify({ v: 2, b: b.concat(pendingSaved.filter((p) => !b.some((x) => x.no === p.no))), w: walkins, x: [...testOut], ig: [...extIgnored], mv: [...moved], seq, posSeq });
     try { if (window.desk.state) window.desk.state.save(TODAY, json); } catch (e) { /* 파일 저장 실패 */ }
     try { localStorage.setItem(STATE_KEY, json); } catch (e) { /* 저장 못 해도 화면은 동작 */ }
   }
@@ -793,6 +800,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       walkins.push(...(st.w || []));
       for (const no of st.x || []) testOut.add(no);
       for (const no of st.ig || []) extIgnored.add(no);
+      for (const [no, s] of st.mv || []) moved.set(no, s);
       const full = (st.b || []).filter((x) => x.name && x.slot != null);
       pendingSaved = (st.b || []).filter((x) => !(x.name && x.slot != null));
       bookings[TODAY] = full.map((x) => Object.assign({ day: TODAY, keys: [], enteredAt: null, outAt: null }, x, { naverBusy: false }));
@@ -885,7 +893,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     unpaidBusy = true;
     try {
       for (const b of list) {
-        const r = await window.desk.naver.cancel({ day: b.day, time: hm(b.slot), product: b.naverProduct || "", no: b.no, qty: b.qty }).catch((e) => ({ ok: false, why: String(e) }));
+        const r = await window.desk.naver.cancel({ day: b.day, time: hm(b.naverSlot ?? b.slot), product: b.naverProduct || "", no: b.no, qty: b.qty }).catch((e) => ({ ok: false, why: String(e) }));
         unpaidLog.unshift({ at: hm(now), name: b.name, time: hm(b.slot), qty: b.qty, ok: !!(r && r.ok), why: r && !r.ok ? r.why : "" });
         if (r && r.ok) {
           const arr = bookings[TODAY]; arr.splice(arr.indexOf(b), 1);
@@ -1068,7 +1076,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         ${partyTag}${chainTag}<div class="visits num">${visitText(b)}</div>
         <dl class="kv">
           <dt>전화번호</dt><dd class="phone num">${fmtPhone(b.phone)}</dd>${visitorRow(b)}
-          <dt>이용일시</dt><dd class="num">${when}</dd>
+          <dt>이용일시</dt><dd class="num">${when}${b.naverSlot != null && b.naverSlot !== b.slot ? ` <span class="moved">네이버 ${hm(b.naverSlot)}</span>` : ""}</dd>
           <dt>수량</dt><dd>${b.product} ${qtyNum(b.qty)}</dd>
           <dt>결제상태</dt><dd><span class="badge paid">${b.pay}</span></dd>
         </dl>
@@ -1478,7 +1486,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           <dt>예약자</dt><dd style="font-size:18px">${esc(b.name)} <span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span></dd>
           <dt>이용완료</dt><dd class="num visits big">${visitText(b)}</dd>
           <dt>전화번호</dt><dd class="num">${fmtPhone(b.phone)}</dd>${visitorRow(b)}
-          <dt>이용일시</dt><dd class="num">${hm(b.slot)} ${m == null ? "· 무제한" : `~ ${hm(b.slot + m)} (${dur(m)})`}</dd>
+          <dt>이용일시</dt><dd class="num">${hm(b.slot)} ${m == null ? "· 무제한" : `~ ${hm(b.slot + m)} (${dur(m)})`}${b.naverSlot != null && b.naverSlot !== b.slot ? ` <span class="moved">네이버 ${hm(b.naverSlot)}</span>` : ""}${b.day === TODAY && b.no ? `
+            <span class="mvrow" aria-label="예약시간 변경">→ <button class="btn btn-sm" data-act="mvSlot" data-d="-30" aria-label="앞 시간" ${(sheet.mv ?? b.slot) <= SLOTS[0] ? "disabled" : ""}>◀</button><b class="num">${hm(sheet.mv ?? b.slot)}</b><button class="btn btn-sm" data-act="mvSlot" data-d="30" aria-label="뒤 시간" ${(sheet.mv ?? b.slot) >= SLOTS[SLOTS.length - 1] ? "disabled" : ""}>▶</button><button class="btn btn-sm btn-ink" data-act="mvDo" ${(sheet.mv ?? b.slot) === b.slot ? "disabled" : ""}>변경</button></span>` : ""}</dd>
           <dt>수량</dt><dd>${b.product} ${qtyNum(b.qty)}</dd>
           <dt>결제상태</dt><dd>${b.pay}</dd>
           ${b.status === "완료" ? `<dt>열쇠</dt><dd>${b.keys.length ? `<div class="bigkeys">${b.keys.map((k) => `<span class="bigkey num">${k}</span>`).join("")}</div>` : b.outAt != null ? `<span class="num">${b.enteredAt != null ? hm(b.enteredAt) + " 입장 · " : ""}${hm(b.outAt)} 퇴장 (반납함)</span>` : "-"}</dd>` : ""}
@@ -2098,6 +2107,20 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       sheet.phone = "010" + rest;
       const p = $("w-phone"); if (p) p.value = walkFmt(sheet.phone);
       updateWalkButtons();
+    },
+    // 예약시간 변경: ◀ ▶ 로 시간을 고르고 [변경] → 데스크 카드만 그 시간으로 (네이버 예약은 원래 시간 그대로, 이용완료도 원래 시간 칸에서)
+    mvSlot(btn) { const b = findB(sheet.id); if (!b) return; sheet.mv = Math.max(SLOTS[0], Math.min(SLOTS[SLOTS.length - 1], (sheet.mv ?? b.slot) + Number(btn.dataset.d))); renderSheet(); },
+    mvDo() {
+      const b = findB(sheet.id); if (!b || sheet.mv == null || sheet.mv === b.slot) return;
+      const to = sheet.mv, from = b.slot;
+      for (const x of partyOf(b)) { // 같은 사람이 같은 시간에 나눠 한 예약은 같이 옮김
+        if (x.naverSlot == null) x.naverSlot = x.slot;
+        x.slot = to;
+        if (to === x.naverSlot) moved.delete(x.no); else moved.set(x.no, to);
+      }
+      selSlot = to; sheet.mv = null;
+      saveState(); renderAll(); renderSheet();
+      toast(`${b.name}님 카드를 ${hm(from)} → ${hm(to)}로 옮겼어요${b.naverSlot !== to ? ` (네이버 예약은 ${hm(b.naverSlot)} 그대로 · 이용완료도 그 칸에서)` : " (네이버 원래 시간)"}`);
     },
     // 맨 위 '포스 전환': 결제와 상관없이 POS 화면으로 (POS를 최소화하면 데스크로 돌아옴)
     async posGo() {
