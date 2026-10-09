@@ -96,6 +96,71 @@ test("계산: 어느 2시간(4타임)도 상한을 넘지 않음 (열린 수량�
   }
 });
 
+// 사장님 10/9: 좌석(열쇠) 기준 · 비인기 타임은 예상만큼만 팔린다고 보고 남는 열쇠를 인기 타임에
+test("좌석 기준: 일찍 나간 자리는 다시 팖 · 비인기 먼 타임은 예상만큼 · 인기 먼 타임은 다 팔린다고 · 예상 비율 70/10/10/10", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage();
+    await page.goto(DESK);
+    const run = (slots, adj, o) => page.evaluate(([s, a, x]) => { const p = window.__deskTest.planCaps(s, a, x); return { plan: p.map((c) => ({ ...c })), inside: s.filter((y) => !y.started).map((y) => p.inside(y.t)) }; }, [slots, adj, o]);
+    const S = (t, used, walk, started, cap = 10, extra = {}) => Object.assign({ t, used, mainUsed: used, walk, started, cap, product: "P" }, extra);
+    const sum = (r) => r.plan.reduce((a, c) => a + c.open, 0);
+    const O = { target: 42, ceiling: 43, max: 13, walkAvg: 0 };
+
+    // 10:00 에 20장 · 10:30 에 4장 들어옴(시작함), 지금 10:50 · 앞 3타임(11:00~12:00) 조절 · 12:30 은 4장 열려 있음
+    const slots = [S(600, 20, 0, true), S(630, 4, 0, true), S(660, 0, 0, false), S(690, 0, 0, false), S(720, 0, 0, false), S(750, 0, 0, false, 4)];
+    const old = await run(slots, [660, 690, 720], O); // 예전: 20 + 4 가 4타임 내내 있다고
+    // 좌석 기준: 10:00 손님 20명 중 16명이 일찍 나가고 4명만 열쇠를 가짐(11:50 반납), 10:30 손님 4명은 12:20 반납
+    const present = [{ from: 650, to: 710, n: 4 }, { from: 650, to: 740, n: 4 }];
+    const seat = await run(slots, [660, 690, 720], { ...O, present });
+    assert.ok(sum(seat) >= sum(old) + 5, `일찍 나간 자리만큼 더 엶: 예전 ${sum(old)} → 좌석 ${sum(seat)}`);
+    assert.ok(seat.inside.every((v) => v <= 43), "어느 시각도 상한 이하 " + seat.inside.join(" "));
+
+    // 먼 타임(12:30 · 13:00 · 13:30)이 13장씩 열려 있음 — 비인기(예상 3, 과거 실적 있음)면 예상만큼, 인기(예상 15)면 다 팔린다고
+    const far = (fc) => [S(660, 0, 0, false, 10, { demand: 9 }), S(690, 0, 0, false, 10, { demand: 9 }), S(720, 0, 0, false, 10, { demand: 9 }),
+      S(750, 0, 0, false, 13, { demand: fc, fc }), S(780, 0, 0, false, 13, { demand: fc, fc }), S(810, 0, 0, false, 13, { demand: fc, fc })];
+    const quiet = await run(far(3), [660, 690, 720], { ...O, forecast: true });
+    const busy = await run(far(15), [660, 690, 720], { ...O, forecast: true });
+    const worst = await run(far(3), [660, 690, 720], O); // 예상 없이(예전)
+    assert.ok(sum(quiet) > sum(busy), `비인기 먼 타임 몫을 앞 타임에: 비인기 ${sum(quiet)} > 인기 ${sum(busy)}`);
+    assert.strictEqual(sum(busy), sum(worst), "인기 먼 타임은 예전처럼 다 팔린다고");
+    assert.ok(quiet.inside.every((v) => v <= 43), quiet.inside.join(" "));
+    // 과거 실적이 없으면(fc = null) 예상이 낮아도 다 팔린다고 (안전)
+    const none = await run(far(null).map((x, i) => (i >= 3 ? { ...x, demand: 3 } : x)), [660, 690, 720], { ...O, forecast: true });
+    assert.strictEqual(sum(none), sum(worst), "과거 실적 없음 → 예전처럼");
+
+    // 예상 비율: 같은 요일 지난주 70% · 최근 3주 평균 10% · 추세 10% · 오늘 10%
+    const mix = await page.evaluate(() => [window.__deskTest.capMix([10, 6, 4], 8), window.__deskTest.capMix([], 5), window.__deskTest.capMix([10], null)]);
+    assert.ok(Math.abs(mix[0] - (0.7 * 10 + 0.1 * (20 / 3) + 0.1 * 13 + 0.1 * 8)) < 1e-9, "70/10/10/10 — 추세 = 10 + (10 − 4) / 2 = 13 · " + mix[0]);
+    assert.strictEqual(mix[1], 5, "과거가 없으면 오늘 것만");
+    assert.ok(Math.abs(mix[2] - 10) < 1e-9, "있는 것만으로 비율을 나눔");
+    // 같은 요일: 월~금 각각 · 토 · 일 · 평일에 낀 공휴일
+    const types = await page.evaluate(() => ["2026-10-08", "2026-10-10", "2026-10-11", "2026-10-09", "2026-10-07"].map(window.__deskTest.dayType));
+    assert.deepStrictEqual(types, ["목", "토", "일", "공휴일", "수"], "10/9 한글날 = 공휴일");
+  } finally {
+    await browser.close();
+  }
+});
+
+test("데스크: 열쇠를 일찍 반납하면 앞 타임 '그때 안' 손님이 줄어듦 (좌석 기준)", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK); // 체험판 10/5(휴일) 13:50
+    const inside = () => page.evaluate(() => window.__deskTest.capPlan().win(840));
+    const before = await inside();
+    await page.click('.key[data-k="7"]'); // 서도현 13:00 입장 · 14:50 반납 예정 → 지금 반납(일찍 나감)
+    await page.click("[data-act=returnAll]");
+    const after = await inside();
+    assert.strictEqual(after, before - 1, `14:00 때 안에 있을 손님 ${before} → ${after}`);
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
 test("데스크 [지금 한 번 조절] → 네이버 칸의 회차당 수량이 바뀜 (휴일 13:56, 앞 3타임)", async () => {
   const browser = await launch();
   try {
@@ -131,8 +196,12 @@ test("데스크 [지금 한 번 조절] → 네이버 칸의 회차당 수량이
     for (const x of log) assert.strictEqual(capAt(x.t), x.to, `${x.t} 기록대로`);
     assert.ok(log.some((x) => x.to > x.from), "앞 타임을 더 엶");
     assert.strictEqual(capAt("13:30"), 10, "이미 시작한 타임은 그대로");
-    const times = ["13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30"];
+    // 좌석 기준(10/9): 이미 시작한 13:30 은 안에 있는 손님(열쇠)으로 셈 → 아직 안 시작한 타임끼리 4타임 수량 합은 상한 이하
+    // (과거 같은 요일 실적이 없으니 먼 타임도 열린 수량이 다 팔린다고 봄)
+    const times = ["14:00", "14:30", "15:00", "15:30", "16:00", "16:30"];
     for (let i = 0; i + 4 <= times.length; i++) { const w = times.slice(i, i + 4).reduce((a, t) => a + Math.max(capAt(t), 0), 0); assert.ok(w <= 43, `${times[i]}부터 2시간 ${w}`); }
+    const inside = await desk.evaluate(() => { const p = window.__deskTest.capPlan(); return p.slots.filter((x) => !x.started).map((x) => p.win(x.t)); });
+    assert.ok(inside.every((v) => v <= 43), "어느 타임 시작 때도 안에 있을 손님 ≤ 43: " + inside.join(" "));
     // 데스크 시간표 잔여도 바로 반영 (14:00: 수량 − 확정 4)
     const c14 = await desk.$$eval('.slot[data-s="840"] .c', (e) => e.map((x) => x.textContent.trim()));
     assert.deepStrictEqual(c14, ["0", "4", String(capAt("14:00") - 4)]);

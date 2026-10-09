@@ -35,7 +35,7 @@ test("맨 위: 통합 데스크 · 포스 전환 · 환전 오픈(현금통 열�
       window.__drawer = [];
       window.desk = {
         naver: { load: async (day) => ({ ok: true, day, slots: [], bookings: [] }), complete: async () => ({ ok: true }) },
-        config: { get: async () => ({ build: "1.33", printMode: "com", comPort: "COM3" }), set: async () => ({ ok: true }) },
+        config: { get: async () => ({ build: "1.33", printMode: "com", comPort: "COM3" }), set: async (p) => { window.__cfg = p; return { ok: true }; } },
         print: { drawer: async (job) => { window.__drawer.push(job); return { ok: true }; } },
       };
     });
@@ -44,8 +44,16 @@ test("맨 위: 통합 데스크 · 포스 전환 · 환전 오픈(현금통 열�
     await page.click("[data-act=drawer]");
     await page.waitForFunction(() => window.__drawer.length === 1);
     const job = await page.evaluate(() => window.__drawer[0]);
-    assert.deepStrictEqual([job.mode, job.port], ["com", "COM3"]);
+    assert.deepStrictEqual([job.mode, job.port, job.pin], ["com", "COM3", "auto"]);
     assert.match(await page.textContent("#toast"), /현금통을 열었어요/);
+    // 현금통 단자 5번으로 → 그 핀만 (운영 설정 → 프린터)
+    await page.click("text=운영 설정");
+    await page.click('[data-t="printer"]');
+    await page.click("[data-act=drawerPin][data-v='5']");
+    assert.strictEqual(await page.evaluate(() => window.__cfg.drawerPin), "5", "이 PC 설정에 저장");
+    await page.click("#sheet [data-act=drawer]");
+    await page.waitForFunction(() => window.__drawer.length === 2);
+    assert.strictEqual(await page.evaluate(() => window.__drawer[1].pin), "5");
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();

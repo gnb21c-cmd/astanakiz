@@ -676,7 +676,7 @@ ipcMain.handle("print:list", async () => {
 });
 // 영수증 프린터에 날 바이트(ESC/POS)를 보냄 — Windows 인쇄 대기열에 RAW 로 (드라이버가 그대로 프린터에 넘김)
 // PowerShell 이 winspool.drv 를 불러 씀 (따로 설치할 것 없음)
-const RAW_PS = `
+const RAW_LIB = `
 $code = @"
 using System; using System.Runtime.InteropServices;
 public class RawPrn {
@@ -699,8 +699,8 @@ public class RawPrn {
 }
 "@
 Add-Type -TypeDefinition $code
-[Console]::Out.Write([RawPrn]::Send($env:ASTANA_PRN, [Convert]::FromBase64String($env:ASTANA_DATA)))
 `;
+const RAW_PS = RAW_LIB + `[Console]::Out.Write([RawPrn]::Send($env:ASTANA_PRN, [Convert]::FromBase64String($env:ASTANA_DATA)))`;
 function rawSend(printer, bytes) {
   return new Promise((resolve) => {
     if (process.platform !== "win32") return resolve({ ok: false, why: "Windows 에서만 됨" });
@@ -770,16 +770,98 @@ ipcMain.handle("print:escpos", async (_e, { port, baud, parts }) => {
 
 /* 현금통(돈통) 열기 — 데스크 맨 위 '환전 오픈' (사장님 10/9)
    현금통은 보통 영수증 프린터 뒤의 돈통 단자(DK · RJ11)에 꽂혀 있고, POS 도 프린터에 이 명령을 보내 엶 → POS 프로그램이 꺼져 있어도 열림
-   ESC p m t1 t2: 핀 2(m=0) · 핀 5(m=1) 둘 다 50ms 펄스 (현금통이 어느 핀이어도 열리게) */
-const DRAWER = [0x1b, 0x70, 0x00, 0x19, 0xfa, 0x1b, 0x70, 0x01, 0x19, 0xfa];
-ipcMain.handle("print:drawer", async (_e, { mode, port, baud, deviceName }) => {
-  if (mode === "com") {
-    if (!port) return { ok: false, why: "영수증 프린터 COM 포트를 먼저 정해 주세요" };
-    const r = await psRun(ESC_PS, { ASTANA_MODE: "com", ASTANA_PORT: port, ASTANA_BAUD: String(baud || 115200), ASTANA_JSON: Buffer.from(JSON.stringify([{ b: DRAWER }]), "utf8").toString("base64") });
-    return r === "ok" ? { ok: true } : { ok: false, why: r || "응답 없음" };
+   ESC p m t1 t2: 핀 2(m=0) · 핀 5(m=1), 50ms 켜고 100ms 쉼
+   - 빠르게 (현장 10/9 "POS보다 두 배 느림"): ① 프린터 도우미(PowerShell)를 미리 띄워 두고 바로 보냄 ② 현금통 단자를 정하면 그 핀만
+     (자동 = 2번 → 5번 차례로. 예전에는 사이에 0.5초를 쉬어 5번 단자면 그만큼 늦었음) */
+const drawerBytes = (pin) => {
+  const p2 = [0x1b, 0x70, 0x00, 0x19, 0x32], p5 = [0x1b, 0x70, 0x01, 0x19, 0x32];
+  return pin === "2" ? p2 : pin === "5" ? p5 : p2.concat(p5);
+};
+/* 프린터 도우미: 앱이 켜질 때 PowerShell 을 띄워 둠 (posAgent 와 같은 방식). 한 줄(base64 JSON { m: com|win, port, baud, prn, data })을 받으면
+   COM 포트나 Windows 프린터(RAW)로 보내고 결과 한 줄("ok" 또는 까닭) */
+const PRN_AGENT_PS = RAW_LIB + `
+while ($true) {
+  $line = [Console]::In.ReadLine()
+  if ($line -eq $null) { break }
+  if ($line -eq "PING") { [Console]::Out.WriteLine("PONG"); [Console]::Out.Flush(); continue }
+  $r = ""
+  try {
+    $j = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($line.Trim())) | ConvertFrom-Json
+    $data = [Convert]::FromBase64String([string]$j.data)
+    if ($j.m -eq "com") {
+      $sp = New-Object System.IO.Ports.SerialPort ([string]$j.port), ([int]$j.baud), "None", 8, "One"
+      $sp.Handshake = "None"; $sp.DtrEnable = $true; $sp.RtsEnable = $true; $sp.WriteTimeout = 3000
+      try { $sp.Open(); $sp.Write($data, 0, $data.Length); Start-Sleep -Milliseconds 80 } finally { if ($sp.IsOpen) { $sp.Close() } }
+      $r = "ok"
+    } else { $r = [RawPrn]::Send([string]$j.prn, $data) }
+  } catch {
+    $m = $_.Exception.Message
+    if ($m -match "denied|거부|in use|사용") { $r = "포트를 다른 프로그램(OKPOS)이 쓰는 중: " + $m } else { $r = "도우미 오류: " + $m }
   }
-  if (deviceName) return rawSend(deviceName, DRAWER);
-  return { ok: false, why: "운영 설정 → 프린터에서 영수증 프린터를 먼저 정해 주세요" };
+  [Console]::Out.WriteLine(($r -replace "[\r\n]+", " ")); [Console]::Out.Flush()
+}`;
+let prnAgent = null; // { proc, wait: [], buf, ready }
+let prnAgentBroken = false;
+function startPrnAgent() {
+  if (process.platform !== "win32" || prnAgent || prnAgentBroken) return;
+  let proc;
+  try {
+    proc = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", Buffer.from(PRN_AGENT_PS, "utf16le").toString("base64")], { windowsHide: true });
+  } catch (e) {
+    return;
+  }
+  const me = { proc, wait: [], buf: "", ready: false };
+  prnAgent = me;
+  proc.stdout.setEncoding("utf8");
+  proc.stdout.on("data", (d) => {
+    me.buf += d;
+    let i;
+    while ((i = me.buf.indexOf("\n")) >= 0) {
+      const line = me.buf.slice(0, i).trim();
+      me.buf = me.buf.slice(i + 1);
+      const w = me.wait.shift();
+      if (w) w(line);
+    }
+  });
+  const gone = () => {
+    if (prnAgent === me) prnAgent = null;
+    me.wait.splice(0).forEach((w) => w(""));
+  };
+  proc.on("exit", gone);
+  proc.on("error", gone);
+  const t = setTimeout(() => { if (!me.ready) { prnAgentBroken = true; stopPrnAgent(me); } }, 20000);
+  me.wait.push((l) => { clearTimeout(t); if (l === "PONG") me.ready = true; });
+  try { proc.stdin.write("PING\n"); } catch (e) {}
+}
+function stopPrnAgent(me = prnAgent) {
+  if (!me) return;
+  if (prnAgent === me) prnAgent = null;
+  try { me.proc.kill(); } catch (e) {}
+}
+/** 도우미로 보냄 — 준비 안 됐거나 답이 없으면 "" (그때는 예전처럼 한 번 실행) */
+function prnAgentSend(job, ms = 6000) {
+  const me = prnAgent;
+  if (!me || !me.ready) return Promise.resolve("");
+  return new Promise((resolve) => {
+    const t = setTimeout(() => { stopPrnAgent(me); resolve(""); }, ms); // 꼬였으면 버리고 다음에 새로
+    me.wait.push((l) => { clearTimeout(t); resolve(l); });
+    try { me.proc.stdin.write(Buffer.from(JSON.stringify(job), "utf8").toString("base64") + "\n"); } catch (e) { clearTimeout(t); resolve(""); }
+  });
+}
+ipcMain.handle("print:drawer", async (_e, { mode, port, baud, deviceName, pin }) => {
+  const bytes = drawerBytes(pin);
+  if (mode === "com" && !port) return { ok: false, why: "영수증 프린터 COM 포트를 먼저 정해 주세요" };
+  if (mode !== "com" && !deviceName) return { ok: false, why: "운영 설정 → 프린터에서 영수증 프린터를 먼저 정해 주세요" };
+  const fast = await prnAgentSend({ m: mode === "com" ? "com" : "win", port: port || "", baud: baud || 115200, prn: deviceName || "", data: Buffer.from(bytes).toString("base64") });
+  if (fast === "ok") return { ok: true };
+  if (/OKPOS/.test(fast)) return { ok: false, why: fast }; // 포트를 POS 가 쥐고 있음 — 다시 해도 같음
+  startPrnAgent(); // 다음 번엔 빠르게
+  // 예전 방식 (한 번 실행)
+  if (mode === "com") {
+    const r = await psRun(ESC_PS, { ASTANA_MODE: "com", ASTANA_PORT: port, ASTANA_BAUD: String(baud || 115200), ASTANA_JSON: Buffer.from(JSON.stringify([{ b: bytes }]), "utf8").toString("base64") });
+    return r === "ok" ? { ok: true } : { ok: false, why: r || fast || "응답 없음" };
+  }
+  return rawSend(deviceName, bytes);
 });
 
 // 종이 자르기: 3줄 올리고(ESC d 3) 부분 자르기(GS V 1) — 대부분의 80mm 영수증 프린터(ESC/POS)
@@ -857,11 +939,13 @@ app.whenReady().then(() => {
   openNaver(); // 맨 뒤 네이버 예약관리
   createDesk(); // 맨 앞 데스크 (POS 는 원래대로 따로 켜져 있음)
   startPosAgent(); // POS로 넘어가는 도우미를 미리 켜 둠
+  setTimeout(startPrnAgent, 3000); // 현금통 · 프린터 도우미도 (환전 오픈을 바로)
   setTimeout(talkTick, 8000); // 톡톡 상담 목록 (네이버 예약 창이 먼저 뜬 뒤)
   setInterval(talkTick, 20 * 1000);
 });
 app.on("before-quit", () => {
   app.isQuitting = true;
   stopPosAgent();
+  stopPrnAgent();
 });
 app.on("window-all-closed", () => app.quit());
