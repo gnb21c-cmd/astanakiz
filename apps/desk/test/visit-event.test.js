@@ -291,7 +291,7 @@ test("이벤트: a 시작 → A기한 안 c → B기한 안 e / B 넘김 · 리�
     assert.match(await page.textContent("#sheet .evstate"), /켜짐/);
     assert.match(await page.textContent("#ev-def"), /아직 예시 문구: 1 · 2 · 3 · 4 · 5번 양식/);
     const rows = (await page.$$eval("#sheet .evrule", (e) => e.map((x) => x.innerText.replace(/\s+/g, " ").trim())));
-    assert.deepStrictEqual(rows.map((r) => r.split(" ").slice(0, 3).join(" ")), ["1번 양식 a", "2번 양식 b", "3번 양식 c", "4번 양식 d", "5번 양식 e"]);
+    assert.deepStrictEqual(rows.map((r) => r.split(" ").slice(0, 3).join(" ")), ["공통 양식 입장권", "1번 양식 a", "2번 양식 b", "3번 양식 c", "4번 양식 d", "5번 양식 e"], "맨 위 공통 양식(입장권 나머지) + a~e");
     // 미리보기: 3번(c) — A음식 쿠폰 + B기한 안내
     await page.click("[data-act=evTpl][data-i='2']");
     assert.match((await page.textContent("#ev-paper")).replace(/\s+/g, " "), /이벤트 성공!.*\[ 감자튀김 쿠폰 \].*10월 12일\(포함\)까지 재방문 하시면.*핫도그 쿠폰을 드려요.*\(2번째 방문\)/);
@@ -365,6 +365,63 @@ test("이벤트: a 시작 → A기한 안 c → B기한 안 e / B 넘김 · 리�
     assert.match(await page.inputValue("#ev-text"), /방문 이벤트 \{이벤트회\}번째/);
     await page.click("[data-act=evMode][data-m=stamp]");
     assert.match(await page.inputValue("#ev-text"), /이벤트 시작!/);
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("공통 양식: 이벤트 동안 입장권의 나머지(안내 문구)도 이벤트 탭에서 고침 · 끄면 프린터 탭 원래 양식 그대로", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK);
+    const OLD = "[평일 시간제한 X 이벤트 = 8/18 ~ 11/30]";
+    await openEvent(page);
+    for (const [k, v] of [["a", "14"], ["b", "7"], ["m", "30"]]) await page.fill(`.evpn[data-k=${k}]`, v);
+    await page.fill(".evfood[data-k=foodA]", "수제돈까스");
+    await page.fill(".evfood[data-k=foodB]", "핫도그");
+    await page.fill("#ev-from", "2026-10-05");
+    await page.click("[data-act=evApply]");
+    // 공통 양식: 처음엔 프린터 탭의 원래 양식 그대로
+    await page.click(`[data-act=evTpl][data-i='5']`);
+    assert.match(await page.textContent("#ev-def"), /원래 입장권 양식 그대로/);
+    const base = await page.inputValue("#ev-text");
+    assert.ok(base.includes(OLD) && base.includes("{열쇠}"), "원래 양식이 들어 있음");
+    await page.fill("#ev-text", base.replace(OLD, "^11월 재방문 이벤트 기간").replace("^[예약 1번 = 예약시 구매수량 무관/예약 수]", ""));
+    const prev = (await page.textContent("#ev-paper")).replace(/\s+/g, " ");
+    assert.ok(prev.includes("11월 재방문 이벤트 기간") && !prev.includes("8/18") && !prev.includes("예약 1번"), "미리보기에 바로");
+    assert.match(prev, /이벤트 시작!.*수제돈까스 쿠폰을 드려요/, "1번 양식 안내도 같이");
+    assert.match(await page.textContent("#ev-def"), /이벤트 동안 모든 입장권/);
+    // 프린터 탭 원래 양식은 그대로 · 이벤트 중이라는 안내
+    await page.click('[data-t="printer"]');
+    assert.ok((await page.inputValue("#form-text")).includes(OLD), "원래 양식은 안 건드림");
+    assert.match(await page.textContent("#sheet"), /방문 이벤트 중이라 지금은 '방문 이벤트 → 공통 양식'으로 출력돼요/);
+    await close(page);
+
+    // 이벤트 손님 · 현장 손님 입장권 모두 공통 양식
+    await enter(page, 840, "전시윤");
+    let t = await ticket(page, "전시윤");
+    assert.ok(t.includes("11월 재방문 이벤트 기간") && !t.some((l) => /8\/18|예약 1번/.test(l)) && t.includes("이벤트 시작!"), t.join(" | "));
+    const walk = await page.evaluate(() => { const T = window.__deskTest, w = T.holders().find((x) => x.walk); return T.receiptLines(T.form(), T.keyVals(w)).map((l) => l.t.trim()); });
+    assert.ok(walk.includes("11월 재방문 이벤트 기간") && walk.some((l) => /네이버 예약하고/.test(l)), walk.join(" | "));
+
+    // 끄면 원래 양식 · 다시 켜면 고친 공통 양식 그대로 (이 PC에 저장)
+    await openEvent(page);
+    await page.click("[data-act=evOff]");
+    await close(page);
+    t = await ticket(page, "전시윤");
+    assert.ok(t.some((l) => l.includes("8/18")) && !t.includes("11월 재방문 이벤트 기간"), "꺼지면 원래 양식");
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("astanakiz-visitevent")).form);
+    assert.ok(saved.includes("11월 재방문 이벤트 기간"));
+    await openEvent(page);
+    await page.click("[data-act=evApply]");
+    await page.click(`[data-act=evTpl][data-i='5']`);
+    await page.click("[data-act=evReset]"); // 원래 양식으로
+    await close(page);
+    assert.ok((await ticket(page, "전시윤")).some((l) => l.includes("8/18")), "'원래 양식으로' → 프린터 탭 양식");
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();
