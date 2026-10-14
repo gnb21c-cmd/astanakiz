@@ -39,6 +39,11 @@ contextBridge.exposeInMainWorld("desk", {
     load: (day) => ipcRenderer.sendSync("state:load", day),
     save: (day, json) => ipcRenderer.send("state:save", day, json),
   },
+  // 방문 이벤트 장부 (손님별 이름 · 전화번호 · 기준일 완료 수 · 10/14) — 지우지 않음
+  ledger: {
+    load: () => ipcRenderer.sendSync("ledger:load"),
+    save: (json) => ipcRenderer.send("ledger:save", json),
+  },
   print: {
     list: () => ipcRenderer.invoke("print:list"),
     html: (job) => ipcRenderer.invoke("print:html", job),

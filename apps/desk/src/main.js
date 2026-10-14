@@ -671,6 +671,35 @@ ipcMain.on("state:save", (_e, day, json) => {
   }
 });
 
+// 방문 이벤트 장부 (사장님 10/14): 손님마다 이름 · 전화번호 · 기준일 기준 완료 수 — 이벤트를 끄거나 되돌릴 때 필요해 지우지 않음
+// 바꿀 때마다 임시 파일에 쓰고 바꿔 끼움 + 하루 한 벌 백업(visit-ledger-backup/날짜.json, 그날 처음 바꾸기 전 것)
+const LEDGER_FILE = () => path.join(app.getPath("userData"), "visit-ledger.json");
+ipcMain.on("ledger:load", (e) => {
+  try {
+    e.returnValue = fs.readFileSync(LEDGER_FILE(), "utf8");
+  } catch (err) {
+    e.returnValue = null;
+  }
+});
+ipcMain.on("ledger:save", (_e, json) => {
+  try {
+    const f = LEDGER_FILE();
+    if (fs.existsSync(f)) {
+      const dir = path.join(app.getPath("userData"), "visit-ledger-backup");
+      const bak = path.join(dir, `${stampDay()}.json`);
+      if (!fs.existsSync(bak)) { fs.mkdirSync(dir, { recursive: true }); fs.copyFileSync(f, bak); }
+    }
+    fs.writeFileSync(f + ".tmp", json, "utf8");
+    fs.renameSync(f + ".tmp", f);
+  } catch (err) {
+    /* 저장 실패 — 브라우저 저장소에 한 벌 더 있음 */
+  }
+});
+function stampDay() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 // ── 영수증 프린터 (80mm 감열지) ──
 // Windows 에 설치된 프린터 목록 (POS 프린터도 Windows 에 드라이버가 깔려 있어야 보임 — '설정 → 프린터 및 스캐너' 에 있는 것)
 ipcMain.handle("print:list", async () => {
