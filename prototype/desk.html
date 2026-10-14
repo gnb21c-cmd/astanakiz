@@ -196,7 +196,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .evhit { border-bottom: 1px solid var(--line); padding-bottom: 3px; }
 .evhit .help { font-weight: 400; }
 /* 80mm 감열지 미리보기 (인쇄 폭 약 72mm) */
-.paper { width: 288px; max-width: 100%; justify-self: center; background: #fff; color: #111; border-radius: 4px; padding: 14px 12px 22px; box-shadow: 0 1px 6px rgba(0,0,0,.25); font-family: ui-monospace, Consolas, "D2Coding", monospace; font-size: 13px; line-height: 1.45; max-height: 330px; overflow: auto; }
+.paper { width: 288px; max-width: 100%; justify-self: center; background: #fff; color: #111; border-radius: 4px; padding: 14px 12px 22px; box-shadow: 0 1px 6px rgba(0,0,0,.25); font-family: ui-monospace, Consolas, "D2Coding", monospace; font-size: 13px; line-height: 1.45; max-height: 300px; overflow: auto; }
 .paper .pl { white-space: pre-wrap; overflow-wrap: anywhere; }
 .paper .ctr { text-align: center; }
 .paper .big { text-align: center; font-size: 20px; font-weight: 700; }
@@ -1820,15 +1820,15 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
                 <div class="evstate">${st}</div>
                 <div class="btns" style="align-items:center"><label class="help" for="ev-from">기준일</label><input type="date" id="ev-from" class="date-in" value="${esc(EV.from || TODAY)}" min="${EV.from && EV.from < TODAY ? EV.from : TODAY}" max="${shiftDay(TODAY, 365)}"></div>
                 <div class="btns"><button class="btn btn-sm btn-ink" data-act="evApply">${EV.on ? "기준일 바꾸기" : "적용 (켜기)"}</button>${EV.on ? `<button class="btn btn-sm" data-act="evOff">끄기</button>` : ""}</div>
-                <span class="help">기준일부터 모든 손님을 처음처럼: 기록에 없으면 네이버 완료를 0으로 보고 이용완료 순간 POS PC에 기록 · 끄면 원래대로</span></div>
+                <span class="help">기록에 없는 손님은 네이버 완료를 0으로 보고 이용완료 순간 기록 · 끄면 원래대로</span></div>
               <div class="field"><span class="label">이벤트 방식</span>
                 <div class="seg2"><button class="${stamp ? "on" : ""}" data-act="evMode" data-m="stamp" aria-pressed="${stamp}">이벤트 (a~e)</button><button class="${stamp ? "" : "on"}" data-act="evMode" data-m="rule" aria-pressed="${!stamp}">양식별 조건</button></div>
                 ${stamp ? `<div class="evps">${num("a", "A기한")}${num("b", "B기한")}${num("m", "리셋")}</div>
                 <div class="evps">${food("foodA", "A음식")}${food("foodB", "B음식")}</div>
                 <span class="help evdates" id="ev-dates">${esc(evDatesText())}</span>
-                <span class="help">영수증엔 날짜로: {다음기한} = 방문일 + 기한 · {리셋일} = 방문일 + 리셋 (그날 포함) · 같은 사람(예약자 이름 · 전화) 기록으로 a~e 자동 · 같은 날 또 오면 없음 <b id="ev-warn" class="evwarn">${esc(evStampWarn())}</b></span>` : `<span class="help">양식 번호 옆 조건 · 위에서부터 먼저 맞는 양식 하나 · 없으면 안내 없이</span>`}</div>
+                <span class="help">영수증엔 날짜로 (방문일 + 일수, 그날 포함) · 같은 사람(예약자 이름 · 전화) 기록으로 a~e 자동 · 같은 날 또 오면 없음 <b id="ev-warn" class="evwarn">${esc(evStampWarn())}</b></span>` : `<span class="help">양식 번호 옆 조건 · 위에서부터 먼저 맞는 양식 하나 · 없으면 안내 없이</span>`}</div>
               <div class="field"><span class="label">손님 찾기 ${APP && window.desk.ledger && window.desk.ledger.open ? `<button class="btn btn-sm" data-act="evOpen">바탕화면 폴더</button>` : ""}</span>
-                <span class="help">${L ? `기록 ${L.people.size}명 · 이용완료 ${L.count}건 · ` : ""}${APP ? "바탕화면 '아스타나키즈-이벤트' + 앱 폴더 두 곳에 저장 (엑셀 정리본도)" : "체험판: 이 브라우저에만 저장 (설치한 앱은 바탕화면 + 앱 폴더)"}${evSaveErr ? ` <b class="evwarn">⚠ 저장 확인: ${esc(evSaveErr)}</b>` : ""}</span>
+                <span class="help">${L ? `기록 ${L.people.size}명 · 이용완료 ${L.count}건 · ` : ""}${APP ? "바탕화면 + 앱 폴더 두 곳에 저장" : "체험판: 이 브라우저에만 (앱은 바탕화면 + 앱 폴더)"}${evSaveErr ? ` <b class="evwarn">⚠ 저장 확인: ${esc(evSaveErr)}</b>` : ""}</span>
                 <input id="ev-q" class="cfg" placeholder="이름 또는 전화 뒷번호" value="${esc(EV.q)}" autocomplete="off" aria-label="손님 찾기 (이름 또는 전화 뒷번호)">
                 <div class="caplog evhits" id="ev-hits">${evFindHtml()}</div></div>
             </div>
@@ -2340,7 +2340,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   }
   function evFindHtml() {
     const r = evFind(EV.q);
-    if (r == null) return `<span class="help">이름이나 전화 뒷번호(2자리 이상)를 넣으면 기준일 뒤 실적이 나와요</span>`;
+    if (r == null) return "";
     if (!r.length) return `<span class="help">'${esc(EV.q)}' — 기준일 뒤 이용완료 기록이 없어요 (처음 오면 0부터 셈)</span>`;
     const md = (d) => String(d).slice(5).replace("-", "/");
     return r.slice(0, 20).map((p) => {

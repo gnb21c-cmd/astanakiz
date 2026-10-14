@@ -244,7 +244,7 @@ test("방문 이벤트(앱): 장부는 POS PC 파일(기준일.jsonl)에 이용�
     assert.match(await page.textContent("#sheet"), /기록 2명 · 이용완료 2건/);
     assert.match(await find(page, "0001"), /박새로 010-5555-0001 · 이벤트 1회.*10\/14 \d\d:\d\d 1번째/);
     assert.match(await find(page, "김기"), /김기록 .*이벤트 1회.*이벤트 지금 a · 다음 기한 10\/26\(A\) · 리셋 11\/11.*10\/12 10:58 1번째 a/);
-    assert.match(await page.textContent("#sheet"), /바탕화면 '아스타나키즈-이벤트' \+ 앱 폴더 두 곳에 저장/);
+    assert.match(await page.textContent("#sheet"), /바탕화면 \+ 앱 폴더 두 곳에 저장/);
     assert.ok(await page.$("#sheet [data-act=evOpen]"), "바탕화면 폴더 열기");
     await close(page);
     assert.deepStrictEqual(await page.evaluate(() => window.__adds), [], "다시 켜도 같은 예약을 두 번 적지 않음");
