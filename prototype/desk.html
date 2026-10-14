@@ -155,13 +155,14 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .evgrid { display: grid; grid-template-columns: 290px minmax(0, 1fr) 300px; gap: 14px; }
 .evgrid > .field, .evgrid > .stack { align-content: start; }
 .evtpl #ev-text { min-height: 210px; }
-.evps { display: flex; gap: 6px; flex-wrap: wrap; }
+.evps { display: flex; gap: 4px 6px; flex-wrap: wrap; }
 .evp { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; }
-.field .evp input.evpn { width: 54px; min-height: 30px; font-size: 14px; padding: 2px 6px; border-radius: 7px; letter-spacing: 0; text-align: right; }
+.field .evp input.evpn { width: 46px; min-height: 30px; font-size: 14px; padding: 2px 6px; border-radius: 7px; letter-spacing: 0; text-align: right; }
 .field .evp input.evfood { width: 92px; min-height: 30px; font-size: 14px; padding: 2px 6px; border-radius: 7px; letter-spacing: 0; }
 .evdesc { font-size: 12.5px; line-height: 1.3; }
 .evdesc b { display: inline-block; min-width: 14px; }
 .evwarn { color: var(--red); }
+.evdates { color: var(--fg); font-weight: 700; }
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
 .tabs button { border: 0; background: transparent; padding: 6px 12px; font-weight: 700; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .tabs button.on { color: var(--fg); border-bottom-color: var(--ink); }
@@ -1819,12 +1820,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
                 <div class="evstate">${st}</div>
                 <div class="btns" style="align-items:center"><label class="help" for="ev-from">기준일</label><input type="date" id="ev-from" class="date-in" value="${esc(EV.from || TODAY)}" min="${EV.from && EV.from < TODAY ? EV.from : TODAY}" max="${shiftDay(TODAY, 365)}"></div>
                 <div class="btns"><button class="btn btn-sm btn-ink" data-act="evApply">${EV.on ? "기준일 바꾸기" : "적용 (켜기)"}</button>${EV.on ? `<button class="btn btn-sm" data-act="evOff">끄기</button>` : ""}</div>
-                <span class="help">기준일부터 모든 손님을 처음 오는 손님처럼 — 기록에 없으면 네이버 완료 수를 0으로 보고, 이용완료하는 순간 POS PC에 기록 · 네이버 숫자는 그대로 · 끄면 원래대로</span></div>
+                <span class="help">기준일부터 모든 손님을 처음처럼: 기록에 없으면 네이버 완료를 0으로 보고 이용완료 순간 POS PC에 기록 · 끄면 원래대로</span></div>
               <div class="field"><span class="label">이벤트 방식</span>
                 <div class="seg2"><button class="${stamp ? "on" : ""}" data-act="evMode" data-m="stamp" aria-pressed="${stamp}">이벤트 (a~e)</button><button class="${stamp ? "" : "on"}" data-act="evMode" data-m="rule" aria-pressed="${!stamp}">양식별 조건</button></div>
                 ${stamp ? `<div class="evps">${num("a", "A기한")}${num("b", "B기한")}${num("m", "리셋")}</div>
                 <div class="evps">${food("foodA", "A음식")}${food("foodB", "B음식")}</div>
-                <span class="help">기한 · 리셋 = 마지막 방문 뒤 일수 (회의 뒤 직접 넣음) · 같은 사람(네이버 예약자 이름 · 전화번호)의 방문 기록으로 a~e 자동 · 같은 날 또 오면 이벤트 영수증 없음 <b id="ev-warn" class="evwarn">${esc(evStampWarn())}</b></span>` : `<span class="help">양식 번호 옆 조건 · 위에서부터 먼저 맞는 양식 하나 · 없으면 안내 없이</span>`}</div>
+                <span class="help evdates" id="ev-dates">${esc(evDatesText())}</span>
+                <span class="help">영수증엔 날짜로: {다음기한} = 방문일 + 기한 · {리셋일} = 방문일 + 리셋 (그날 포함) · 같은 사람(예약자 이름 · 전화) 기록으로 a~e 자동 · 같은 날 또 오면 없음 <b id="ev-warn" class="evwarn">${esc(evStampWarn())}</b></span>` : `<span class="help">양식 번호 옆 조건 · 위에서부터 먼저 맞는 양식 하나 · 없으면 안내 없이</span>`}</div>
               <div class="field"><span class="label">손님 찾기 <span class="help">${L ? `기록 ${L.people.size}명 · 이용완료 ${L.count}건 · POS PC에 저장` : "켜면 이용완료할 때마다 기록해요"}</span></span>
                 <input id="ev-q" class="cfg" placeholder="이름 또는 전화 뒷번호" value="${esc(EV.q)}" autocomplete="off" aria-label="손님 찾기 (이름 또는 전화 뒷번호)">
                 <div class="caplog evhits" id="ev-hits">${evFindHtml()}</div></div>
@@ -2168,12 +2170,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   const EV_STAMP = "abcde"; // 1~5번 양식
   const EV_STAMP_NAME = { a: "처음 방문 — 이벤트 시작", b: "A기한 · 리셋 넘김 — 다시 재도전", c: "A기한 안 재방문 — A음식 쿠폰 + B 안내", d: "B기한 넘김 · 리셋 전 — A음식 쿠폰 + A 다시", e: "B기한 안 재방문 — B음식 쿠폰 + A 다시" };
   const EV_NEXT = { a: "A", b: "A", c: "B", d: "A", e: "A" }; // 그 영수증 뒤 다음 기한
+  // 예시 문구 — 기한은 일수가 아니라 날짜로 ({다음기한} = 방문한 날 + 기한 일수, 그날 포함 · 사장님 10/14)
   const EV_TPL_STAMP = [
-    "#* 이벤트 시작!\n^*{다음기한}까지 다시 오시면\n^*{A음식} 쿠폰을 드려요\n^({A일}일 안 재방문 · {연속}번째 방문)\n^마지막 방문 뒤 {리셋일수}일이 지나면\n^이벤트가 처음부터 다시 시작돼요",
-    "#* 다시!! 재도전\n^이벤트를 처음부터 다시 시작해요\n^*{다음기한}까지 다시 오시면\n^*{A음식} 쿠폰을 드려요\n^마지막 방문 뒤 {리셋일수}일이 지나면 처음부터",
-    "#* 이벤트 성공!\n^*[ {A음식} 쿠폰 ]\n^이 영수증을 보여 주세요\n^*{다음기한}까지 또 오시면\n^*{B음식} 쿠폰을 드려요\n^({B일}일 안 · {연속}번째 방문)",
-    "#* 이벤트 계속!\n^*[ {A음식} 쿠폰 ]\n^이 영수증을 보여 주세요\n^*{다음기한}까지 다시 오시면\n^*{A음식} 쿠폰을 또 드려요\n^({A일}일 안 · {연속}번째 방문)",
-    "#* 이벤트 대성공!\n^*[ {B음식} 쿠폰 ]\n^이 영수증을 보여 주세요\n^*{다음기한}까지 다시 오시면\n^*{A음식} 쿠폰을 드려요\n^({A일}일 안 · {연속}번째 방문)",
+    "#* 이벤트 시작!\n^*{다음기한}(포함)까지 재방문 하시면\n^*{A음식} 쿠폰을 드려요\n^{리셋일}(포함)까지 다시 오지 않으면\n^이벤트가 처음부터 다시 시작돼요",
+    "#* 다시!! 재도전\n^이벤트를 처음부터 다시 시작해요\n^*{다음기한}(포함)까지 재방문 하시면\n^*{A음식} 쿠폰을 드려요\n^{리셋일}(포함)까지 다시 오지 않으면\n^이벤트가 처음부터 다시 시작돼요",
+    "#* 이벤트 성공!\n^*[ {A음식} 쿠폰 ]\n^이 영수증을 보여 주세요\n^*{다음기한}(포함)까지 재방문 하시면\n^*{B음식} 쿠폰을 드려요\n^({연속}번째 방문)",
+    "#* 이벤트 계속!\n^*[ {A음식} 쿠폰 ]\n^이 영수증을 보여 주세요\n^*{다음기한}(포함)까지 재방문 하시면\n^*{A음식} 쿠폰을 또 드려요\n^({연속}번째 방문)",
+    "#* 이벤트 대성공!\n^*[ {B음식} 쿠폰 ]\n^이 영수증을 보여 주세요\n^*{다음기한}(포함)까지 재방문 하시면\n^*{A음식} 쿠폰을 드려요\n^({연속}번째 방문)",
   ];
   const EV_STAMP0 = { a: null, b: null, m: null, foodA: "", foodB: "" }; // A기한 · B기한 · 리셋(마지막 방문 뒤) 일수 · 사은 음식 — 사장님이 회의 뒤 직접 넣음 (비어 있으면 이벤트가 켜지지 않음)
   const evDays = (v) => { const n = Number(v); return v == null || v === "" || !(n >= 1) ? null : Math.min(365, Math.round(n)); };
@@ -2342,6 +2345,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   }
   /** 아직 기본 문구인 회차 (설정 화면 알림) */
   const evDefText = () => { const D = evTplDef(), d = EV_NAMES.map((t, j) => j + 1).filter((n) => (EV.mode === "stamp" || EV.rules[n - 1].t !== "off") && EV.tpl[n - 1] === D[n - 1]); return d.length ? `아직 예시 문구: ${d.join(" · ")}번 양식 — 회의 뒤 직접 고쳐 쓰세요` : "쓰는 양식은 모두 직접 씀"; };
+  /** 일수를 넣으면 영수증에 찍힐 날짜 예시 (기준일에 오면) — {다음기한} · {리셋일} 은 방문한 날 + 일수, 그날 포함 */
+  const evDatesText = () => { const S = EV.stamp, d = EV.from && EV.from > TODAY ? EV.from : TODAY, f = (n) => (n ? `${krDate(shiftDay(d, n))}(포함)까지` : "—"); return `${krDate(d)}에 오면 → A ${f(S.a)} · B ${f(S.b)} · 리셋 ${f(S.m)}`; };
   /** 이벤트 설정 확인: B < A < 리셋 · 음식 이름 */
   const evStampWarn = () => {
     const S = EV.stamp, w = [];
@@ -2852,7 +2857,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (t.id === "form-text") { PRINT.forms[PRINT.cur].text = t.value; $("paper").innerHTML = paperHtml(t.value, SAMPLE); savePrint(); }
     if (t.classList.contains("evsel")) { const r = EV.rules[+t.dataset.i]; r.t = t.value; EV.cur = +t.dataset.i; evSaveCfg(); renderAll(); renderSheet(); }
     if (t.classList.contains("evn") && t.value !== "") { EV.rules[+t.dataset.i].n = Math.max(1, Math.min(999, Number(t.value) || 1)); evSaveCfg(); $("ev-paper").innerHTML = paperHtml(PRINT.forms.enter.text, evSample(EV.cur)); evScroll("ev-paper"); renderAll(); }
-    if (t.classList.contains("evpn")) { EV.stamp[t.dataset.k] = evDays(t.value); evSaveCfg(); $("ev-paper").innerHTML = paperHtml(PRINT.forms.enter.text, evSample(EV.cur)); evScroll("ev-paper"); $("ev-warn").textContent = evStampWarn(); renderAll(); }
+    if (t.classList.contains("evpn")) { EV.stamp[t.dataset.k] = evDays(t.value); evSaveCfg(); $("ev-paper").innerHTML = paperHtml(PRINT.forms.enter.text, evSample(EV.cur)); evScroll("ev-paper"); $("ev-warn").textContent = evStampWarn(); $("ev-dates").textContent = evDatesText(); renderAll(); }
     if (t.classList.contains("evfood")) { EV.stamp[t.dataset.k] = t.value.trim(); evSaveCfg(); $("ev-paper").innerHTML = paperHtml(PRINT.forms.enter.text, evSample(EV.cur)); evScroll("ev-paper"); $("ev-warn").textContent = evStampWarn(); }
     if (t.id === "ev-q") { EV.q = t.value; $("ev-hits").innerHTML = evFindHtml(); }
     if (t.id === "ev-text" && $("ev-warn")) $("ev-warn").textContent = evStampWarn();

@@ -265,6 +265,8 @@ test("이벤트: a 시작 → A기한 안 c → B기한 안 e / B 넘김 · 리�
     await page.fill(".evfood[data-k=foodA]", "감자튀김");
     await page.fill(".evfood[data-k=foodB]", "핫도그");
     assert.strictEqual((await page.textContent("#ev-warn")).trim(), "");
+    // 일수를 넣으면 영수증에 찍힐 날짜를 바로 보여 줌 (기준일 10/5에 오면)
+    assert.match((await page.textContent("#ev-dates")).replace(/\s+/g, " "), /10월 5일에 오면 → A 10월 19일\(포함\)까지 · B 10월 12일\(포함\)까지 · 리셋 11월 4일\(포함\)까지/);
     await page.click("[data-act=evApply]");
     assert.match(await page.textContent("#sheet .evstate"), /켜짐/);
     assert.match(await page.textContent("#ev-def"), /아직 예시 문구: 1 · 2 · 3 · 4 · 5번 양식/);
@@ -272,7 +274,7 @@ test("이벤트: a 시작 → A기한 안 c → B기한 안 e / B 넘김 · 리�
     assert.deepStrictEqual(rows.map((r) => r.split(" ").slice(0, 3).join(" ")), ["1번 양식 a", "2번 양식 b", "3번 양식 c", "4번 양식 d", "5번 양식 e"]);
     // 미리보기: 3번(c) — A음식 쿠폰 + B기한 안내
     await page.click("[data-act=evTpl][data-i='2']");
-    assert.match((await page.textContent("#ev-paper")).replace(/\s+/g, " "), /이벤트 성공!.*\[ 감자튀김 쿠폰 \].*10월 12일까지 또 오시면.*핫도그 쿠폰을 드려요.*\(7일 안 · 2번째 방문\)/);
+    assert.match((await page.textContent("#ev-paper")).replace(/\s+/g, " "), /이벤트 성공!.*\[ 감자튀김 쿠폰 \].*10월 12일\(포함\)까지 재방문 하시면.*핫도그 쿠폰을 드려요.*\(2번째 방문\)/);
     await close(page);
 
     // 기준일 뒤 지난 기록 (오늘 10/5)
@@ -289,20 +291,20 @@ test("이벤트: a 시작 → A기한 안 c → B기한 안 e / B 넘김 · 리�
     await enter(page, 840, "전시윤");
     assert.match(await page.textContent("#toast"), /이벤트 a · 1번 양식/);
     let t = await ticket(page, "전시윤");
-    for (const l of ["이벤트 시작!", "10월 19일까지 다시 오시면", "감자튀김 쿠폰을 드려요", "(14일 안 재방문 · 1번째 방문)", "마지막 방문 뒤 30일이 지나면"]) assert.ok(t.includes(l), l + " | " + t.join(" | "));
+    for (const l of ["이벤트 시작!", "10월 19일(포함)까지 재방문 하시면", "감자튀김 쿠폰을 드려요", "11월 4일(포함)까지 다시 오지 않으면", "이벤트가 처음부터 다시 시작돼요"]) assert.ok(t.includes(l), l + " | " + t.join(" | "));
     assert.ok(!t.some((l) => /네이버 예약 \d+번|사은권/.test(l)), "원래 누계 · 사은권 줄 없음");
     await enter(page, 840, "홍예준");
     t = await ticket(page, "홍예준");
-    for (const l of ["이벤트 성공!", "[ 감자튀김 쿠폰 ]", "10월 12일까지 또 오시면", "핫도그 쿠폰을 드려요", "(7일 안 · 2번째 방문)"]) assert.ok(t.includes(l), l + " | " + t.join(" | "));
+    for (const l of ["이벤트 성공!", "[ 감자튀김 쿠폰 ]", "10월 12일(포함)까지 재방문 하시면", "핫도그 쿠폰을 드려요", "(2번째 방문)"]) assert.ok(t.includes(l), l + " | " + t.join(" | "));
     await enter(page, 840, "류하린");
     t = await ticket(page, "류하린");
-    for (const l of ["이벤트 대성공!", "[ 핫도그 쿠폰 ]", "10월 19일까지 다시 오시면", "감자튀김 쿠폰을 드려요", "(14일 안 · 3번째 방문)"]) assert.ok(t.includes(l), l + " | " + t.join(" | "));
+    for (const l of ["이벤트 대성공!", "[ 핫도그 쿠폰 ]", "10월 19일(포함)까지 재방문 하시면", "감자튀김 쿠폰을 드려요", "(3번째 방문)"]) assert.ok(t.includes(l), l + " | " + t.join(" | "));
     await enter(page, 840, "송다온");
     t = await ticket(page, "송다온");
-    for (const l of ["이벤트 계속!", "[ 감자튀김 쿠폰 ]", "감자튀김 쿠폰을 또 드려요", "(14일 안 · 3번째 방문)"]) assert.ok(t.includes(l), l + " | " + t.join(" | "));
+    for (const l of ["이벤트 계속!", "[ 감자튀김 쿠폰 ]", "10월 19일(포함)까지 재방문 하시면", "감자튀김 쿠폰을 또 드려요", "(3번째 방문)"]) assert.ok(t.includes(l), l + " | " + t.join(" | "));
     await enter(page, 840, "고은우");
     t = await ticket(page, "고은우");
-    for (const l of ["다시!! 재도전", "10월 19일까지 다시 오시면"]) assert.ok(t.includes(l), l + " | " + t.join(" | "));
+    for (const l of ["다시!! 재도전", "10월 19일(포함)까지 재방문 하시면", "11월 4일(포함)까지 다시 오지 않으면"]) assert.ok(t.includes(l), l + " | " + t.join(" | "));
     // 예시 문구도 OK-50 한 줄(42칸) 안
     const cols = (x) => [...x].reduce((a, c) => a + (c.charCodeAt(0) < 128 ? 1 : 2), 0);
     for (const n of ["전시윤", "홍예준", "류하린", "송다온", "고은우"]) {
@@ -327,9 +329,9 @@ test("이벤트: a 시작 → A기한 안 c → B기한 안 e / B 넘김 · 리�
     // 일수를 바꿔도 이미 찍어 준 기한은 그대로 (전시윤 a: 10/19), 새 손님부터 바뀐 일수
     await openEvent(page);
     await page.fill(".evpn[data-k=a]", "10");
-    assert.match((await page.textContent("#ev-paper")).replace(/\s+/g, " "), /10월 12일까지 또 오시면/, "미리보기 3번(c)은 B 7일");
+    assert.match((await page.textContent("#ev-paper")).replace(/\s+/g, " "), /10월 12일\(포함\)까지 재방문 하시면/, "미리보기 3번(c)은 B 7일");
     await page.click("[data-act=evTpl][data-i='0']");
-    assert.match((await page.textContent("#ev-paper")).replace(/\s+/g, " "), /10월 15일까지 다시 오시면/, "1번(a)은 바뀐 A 10일");
+    assert.match((await page.textContent("#ev-paper")).replace(/\s+/g, " "), /10월 15일\(포함\)까지 재방문 하시면/, "1번(a)은 바뀐 A 10일");
     await close(page);
     assert.strictEqual(lastOf("전시윤").due, "2026-10-19");
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("astanakiz-visitevent")));
