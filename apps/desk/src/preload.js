@@ -39,6 +39,8 @@ contextBridge.exposeInMainWorld("desk", {
     load: (day) => ipcRenderer.sendSync("state:load", day),
     save: (day, json) => ipcRenderer.send("state:save", day, json),
   },
+  // 설문조사 누적 보고 (매일 20:00 · 10/14) — 파일로 남기고 보고앱 주소가 있으면 POST → { ok, posted, file, why }
+  survey: { send: (job) => ipcRenderer.invoke("survey:send", job) },
   // 방문 이벤트 참여자 기록 (이용완료마다 한 줄 · 10/14) — 앱 폴더 + 바탕화면 '아스타나키즈-이벤트' 두 곳 · 지우지 않음
   ledger: {
     load: (from) => ipcRenderer.sendSync("ledger:load", from), // 두 곳을 합친 글 (빠진 쪽은 채움)

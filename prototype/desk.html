@@ -181,6 +181,31 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .prn > .field { align-content: start; }
 #form-text, #ev-text { width: 100%; min-height: 150px; border: 1px solid var(--line); border-radius: 8px; padding: 8px; font-family: ui-monospace, Consolas, "D2Coding", monospace; font-size: 13px; background: var(--surface); color: var(--fg); resize: vertical; }
 #ev-text { min-height: 74px; }
+/* 설문조사 (10/14) */
+.svgrid { display: grid; grid-template-columns: minmax(0, 1fr) 236px; gap: 12px; align-items: start; }
+.svbox { border: 2px solid var(--line); border-radius: 12px; padding: 10px; display: grid; gap: 8px; }
+.svbox.need, .svwalk.need { border-color: var(--red); }
+.svbox.ok { border-color: var(--ok); }
+.svq { font-size: 13px; font-weight: 700; line-height: 1.35; }
+.svbtns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.svbtns.row { display: flex; flex-wrap: wrap; gap: 5px; }
+.svb { min-height: 44px; border: 1.5px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--fg); display: grid; place-items: center; padding: 2px 4px; line-height: 1.1; }
+.svb b { font-size: 20px; }
+.svb small { font-size: 10.5px; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.svb.on { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+.svb.on small { color: var(--on-ink); }
+.svb.skip { font-weight: 700; font-size: 14px; }
+.svbtns.row .svb { min-width: 44px; min-height: 38px; }
+.svwalk { flex: 1; display: flex; align-items: center; gap: 10px; margin: 0 8px 0 14px; padding: 4px 8px; border: 2px solid var(--line); border-radius: 10px; }
+.svwalk.ok { border-color: var(--ok); }
+.svwalk .svq { flex: 1; font-size: 12.5px; }
+.svwarn { color: var(--red); }
+.svtargets { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.svopts { display: grid; gap: 4px; max-height: 260px; overflow: auto; }
+.svopt { display: flex; align-items: center; gap: 8px; }
+.svopt > b { min-width: 22px; text-align: center; font-size: 16px; }
+.field .svopt input.svlabel { flex: 1; min-height: 34px !important; font-size: 14px !important; padding: 4px 8px; }
+.field input.svurl { flex: 1; min-width: 260px; min-height: 34px !important; font-size: 13px !important; padding: 4px 8px; }
 /* 방문 이벤트 (10/14) */
 .evtag { display: inline-block; font-size: 11px; font-weight: 700; color: var(--on-ink); background: var(--accent); border-radius: 5px; padding: 0 6px; margin-left: 2px; }
 .evstate { font-size: 13.5px; }
@@ -823,7 +848,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
      - 앱: 저장 폴더(%APPDATA%\아스타나키즈 입장 데스크\desk-state\날짜.json)에 바로 씀 (갑자기 꺼져도 남게) + 브라우저 저장소에도 한 벌
      - 켜자마자 빈 화면으로 저장본을 덮어쓰지 않게: 저장본을 먼저 읽어 들인 뒤부터 저장 */
   const STATE_KEY = "astanakiz-desk-" + TODAY;
-  const SAVE_FIELDS = ["id", "day", "no", "slot", "name", "phone", "qty", "product", "naverProduct", "pay", "cancels", "prevDone", "visitNo", "visitEnd", "proxy", "visitor", "status", "keys", "enteredAt", "outAt", "overPaid", "naverPending", "naverWhy", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut", "naverSlot"];
+  const SAVE_FIELDS = ["id", "day", "no", "slot", "name", "phone", "qty", "product", "naverProduct", "pay", "cancels", "prevDone", "visitNo", "visitEnd", "proxy", "visitor", "status", "keys", "enteredAt", "outAt", "overPaid", "naverPending", "naverWhy", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut", "naverSlot", "sv"];
   let stateReady = !APP; // 저장본을 읽기 전에는 저장하지 않음
   let pendingSaved = []; // 예전 형식(예약번호만 있는) 저장본 — 네이버에서 그 예약을 불러오면 합침
   /* 열쇠 기록: 그 손님이 받은 열쇠 번호는 반납해도 남김(keysTaken) — 다음날 아침 없는 열쇠를 마지막에 누가 썼는지 찾아 연락 (사장님 10/8)
@@ -1616,13 +1641,15 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const canEnter = b.status === "확정" && b.day === TODAY && ci <= 0 && pi <= 0;
       const early = canEnter && now < b.slot - RULES.earlyMinutes;
       let pickHtml = "";
+      // 설문조사 (사장님 10/14): 대상 손님은 번호를 먼저 눌러야 열쇠를 고름
+      const sv = canEnter ? svFor(b) : null, svLock = !!sv && sheet.sv == null;
       if (b.status === "확정") {
         let btns = "";
         for (let k = 1; k <= RULES.keys; k++) {
           const used = !!holderOf(k), on = sheet.keys.includes(k);
-          btns += `<button type="button" class="num ${on ? "on" : ""}" data-act="pickKey" data-k="${k}" ${used || !canEnter ? "disabled" : ""} aria-pressed="${on}" aria-label="${k}번${used ? " 지급됨" : ""}">${k}</button>`;
+          btns += `<button type="button" class="num ${on ? "on" : ""}" data-act="pickKey" data-k="${k}" ${used || !canEnter || svLock ? "disabled" : ""} aria-pressed="${on}" aria-label="${k}번${used ? " 지급됨" : ""}">${k}</button>`;
         }
-        pickHtml = `<div class="field"><span class="label">지급할 열쇠 <span class="help num">${party.length > 1 ? "같은 시간 예약 합계" : "예약 수량"} ${need}개만큼 누르세요 · ${sheet.keys.length}/${need} · 흐린 번호는 이미 지급됨</span></span><div class="kpick">${btns}</div></div>`;
+        pickHtml = `<div class="field"><span class="label">지급할 열쇠 <span class="help num">${svLock ? `<b class="svwarn">설문 번호를 먼저 눌러 주세요</b> · ` : ""}${party.length > 1 ? "같은 시간 예약 합계" : "예약 수량"} ${need}개만큼 누르세요 · ${sheet.keys.length}/${need} · 흐린 번호는 이미 지급됨</span></span><div class="kpick">${btns}</div></div>`;
       }
       const chainNote = ch.length < 2 ? "" : ci > 0 ? `<div class="banner warn">연속예약 ${ci + 1}/${ch.length} — 첫 예약(${hm(ch[0].slot)}) 카드에서 입장 처리하면 이 예약도 함께 이용완료돼요</div>`
         : `<div class="banner"><b>★${ch.length}타임 연속예약</b> (${ch.map((x) => `${hm(x.slot)} ${x.qty}장`).join(" · ")}) — 입장하면 ${ch.length}건 모두 이용완료 · 열쇠 ${b.qty}개: ${keyPlan(ch, b.qty)}</div>`;
@@ -1634,7 +1661,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         : early ? `<div class="banner">예약 ${hm(b.slot)}보다 일찍 입장 — 근무자 판단으로 가능해요 (손님 안내 기준은 ${hm(b.slot - RULES.earlyMinutes)}). ${m == null ? "" : `이용시간은 예약 시간부터라 일찍 온 만큼 더 놀 수 있어요 (반납 ${hm(b.slot + m)})`}</div>` : "");
       el.innerHTML = `
         <h3 id="sheet-title">네이버 예약자 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
-        <dl class="facts">
+        <div class="${sv ? "svgrid" : ""}"><dl class="facts">
           <dt>예약자</dt><dd style="font-size:18px">${esc(b.name)} <span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span></dd>
           <dt>이용완료</dt><dd class="num visits big">${visitText(b)}</dd>
           <dt>전화번호</dt><dd class="num">${fmtPhone(b.phone)}</dd>${visitorRow(b)}
@@ -1643,11 +1670,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           <dt>수량</dt><dd>${b.product} ${qtyNum(b.qty)}</dd>
           <dt>결제상태</dt><dd>${b.pay}</dd>
           ${b.status === "완료" ? `<dt>열쇠</dt><dd>${b.keys.length ? `<div class="bigkeys">${b.keys.map((k) => `<span class="bigkey num">${k}</span>`).join("")}</div>` : b.outAt != null ? `<span class="num">${b.enteredAt != null ? hm(b.enteredAt) + " 입장 · " : ""}${hm(b.outAt)} 퇴장 (반납함)</span>` : "-"}</dd>` : ""}
-        </dl>
+        </dl>${sv ? `<div class="svbox ${svLock ? "need" : "ok"}">${svButtons(sv)}</div>` : ""}</div>
         ${note}${pickHtml}
         <div class="sheet-foot">${b.status === "확정"
           ? `${sheet.naverErr ? `<div class="banner warn" style="flex-basis:100%">네이버 이용완료 실패: ${esc(sheet.naverErr)}</div><button class="btn" data-act="doEnter" data-skip-naver="1">네이버 없이 열쇠만 등록</button>` : ""}
-             <button class="btn" data-act="close">닫기</button><button class="btn btn-ink" id="enter-done" data-act="doEnter" ${canEnter && sheet.keys.length === need && !sheet.busy ? "" : "disabled"}>${sheet.busy ? "네이버 이용완료 중…" : sheet.naverErr ? "다시 시도" : "등록 완료"}</button>`
+             <button class="btn" data-act="close">닫기</button><button class="btn btn-ink" id="enter-done" data-act="doEnter" ${canEnter && sheet.keys.length === need && !sheet.busy && !svLock ? "" : "disabled"}>${sheet.busy ? "네이버 이용완료 중…" : sheet.naverErr ? "다시 시도" : "등록 완료"}</button>`
           : `<button class="btn btn-ink" data-act="close" data-autofocus>닫기</button>`}</div>`;
       return;
     }
@@ -1664,8 +1691,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const cur = done.indexOf(false);
       const step = (i, t) => `<li class="${done[i] ? "done" : i === cur ? "now" : ""}"><b>${"①②③④⑤"[i]}</b> ${t}</li>`;
       const tag = (i) => `<span class="wn ${done[i] ? "done" : i === cur ? "now" : ""}">${"①②③④⑤"[i]}</span>`;
+      const sv = svForWalk(), svLock = !!sv && sheet.sv == null; // 설문조사: 현장구매자도 대상이면 번호(또는 제외)를 눌러야 등록
       el.innerHTML = `
-        <h3 id="sheet-title">현장입장 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
+        <h3 id="sheet-title">현장입장 ${sv ? `<span class="svwalk ${svLock ? "need" : "ok"}">${svButtons(sv, "row")}</span>` : ""}<button class="x" data-act="close" aria-label="닫기">×</button></h3>
         <div class="walkgrid">
           <ol class="wguide">
             ${step(0, `<b>판매 가능한지</b> 오른쪽 맨 위 색을 봐요. <span class="g">초록 = 판매 가능</span> · <span class="r">빨강 = 지금은 판매 불가</span> (예약 손님 자리를 남겨 둔 계산)`)}
@@ -1692,7 +1720,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
                 <input id="w-phone" inputmode="numeric" autocomplete="off" value="${esc(walkFmt(sheet.phone))}" placeholder="010-0000-0000" data-autofocus></div>
               <div class="keypad" aria-label="전화번호 키패드">${["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((n) => `<button data-act="kp" data-k="${n}">${n}</button>`).join("")}<button class="fn" data-act="kp" data-k="clr">지우기</button><button data-act="kp" data-k="0">0</button><button class="fn" data-act="kp" data-k="del" aria-label="한 자리 지우기">←</button></div>
             </div>
-            <button class="btn btn-ink wdone" id="w-done" data-act="walkDone" ${st.over || !st.phoneOk || (st.flex && !sheet.flexOk) ? "disabled" : ""}>${tag(4)} 결제 완료 · 열쇠 등록</button>
+            ${svLock ? `<div class="help svwarn">위 설문 번호(신규가 아니면 [제외])를 먼저 눌러 주세요</div>` : ""}<button class="btn btn-ink wdone" id="w-done" data-act="walkDone" ${st.over || !st.phoneOk || (st.flex && !sheet.flexOk) || svLock ? "disabled" : ""}>${tag(4)} 결제 완료 · 열쇠 등록</button>
           </div>
         </div>`;
       return;
@@ -1802,7 +1830,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     }
     if (sheet.mode === "settings") {
       const tab = sheet.tab || "rules";
-      const tabs = `<div class="tabs" role="tablist">${[["rules", "운영 규칙"], ["cap", "수량 자동조절"], ["event", "방문 이벤트"], ["printer", "프린터"], ["link", "아마노 · POS"]].map(([k, t]) => `<button role="tab" class="${tab === k ? "on" : ""}" aria-selected="${tab === k}" data-act="setTab" data-t="${k}">${t}</button>`).join("")}</div>`;
+      const tabs = `<div class="tabs" role="tablist">${[["rules", "운영 규칙"], ["cap", "수량 자동조절"], ["event", "방문 이벤트"], ["printer", "프린터"], ["link", "아마노 · POS"], ["survey", "설문조사"]].map(([k, t]) => `<button role="tab" class="${tab === k ? "on" : ""}" aria-selected="${tab === k}" data-act="setTab" data-t="${k}">${t}</button>`).join("")}</div>`;
       if (tab === "event") {
         const L = EV.from ? evLog() : null, stamp = EV.mode === "stamp";
         const st = !EV.on ? `<b>꺼짐</b> — 입장권에 네이버 이용완료 누계(완료 +1)와 ${RULES.giftEvery}회 사은권을 출력 중`
@@ -1841,6 +1869,26 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           </div>
           <div class="sheet-foot"><button class="btn btn-ink" data-act="close">닫기</button></div>`;
         if (i !== EV_BASE) evScroll("ev-paper");
+        return;
+      }
+      if (tab === "survey") {
+        const c = svCounts(), st = !SV.from || !SV.to ? "기간을 정하면 시작해요" : svOn() ? `<b class="on">진행 중</b> — ${krDate(SV.from)} ~ ${krDate(SV.to)}` : TODAY < SV.from ? `${krDate(SV.from)}부터 시작해요` : TODAY > SV.to ? `끝났어요 (${krDate(SV.to)}까지)` : "대상을 하나 이상 골라 주세요";
+        const L = SV.last;
+        el.innerHTML = `
+          <h3 id="sheet-title">운영 설정 <button class="x" data-act="close" aria-label="닫기">×</button></h3>${tabs}
+          <div class="field"><span class="label">설문 기간 <span class="help">신규 손님에게 '아스타나키즈를 어떻게 알게 되었는지' — 현장 안내문의 번호를 근무자가 누름 (번호를 눌러야 열쇠 등록)</span></span>
+            <div class="btns" style="align-items:center"><input type="date" id="sv-from" class="date-in" value="${esc(SV.from)}"> <span>~</span> <input type="date" id="sv-to" class="date-in" value="${esc(SV.to)}"> <span class="evstate">${st}</span></div></div>
+          <div class="field"><label class="chk"><input type="checkbox" id="sv-send" ${SV.send ? "checked" : ""}> <b>누적 정보 보고앱에 보내기</b> <span class="help">설문 기간 동안 매일 20:00 · 번호별 오늘 · 누적 수</span></label>
+            <div class="btns" style="align-items:center"><label class="help" for="sv-url">보고앱 주소</label><input id="sv-url" class="cfg svurl" value="${esc(SV.url)}" placeholder="보고 시스템에서 정하면 넣어요 (비어 있으면 파일로만 남김)" autocomplete="off"><button class="btn btn-sm" data-act="svSendNow">지금 보내기</button></div>
+            ${L ? `<span class="help ${L.ok ? "" : "evwarn"}">마지막: ${esc(L.at)} ${L.auto ? "자동" : "직접"} · ${L.ok ? (L.posted ? "보고앱에 보냄" : "파일로 남김") : `실패 ${esc(L.why || "")}`}</span>` : ""}</div>
+          <div class="field"><span class="label">대상 <span class="help">대상 손님은 설문 번호를 눌러야 열쇠를 고르고 등록해요</span></span>
+            <div class="svtargets"><label class="chk"><input type="checkbox" id="sv-new" ${SV.naverNew || SV.all ? "checked" : ""} ${SV.all ? "disabled" : ""}> 신규고객 <span class="help">(네이버 첫 예약 · 완료 0)</span></label>
+            <label class="chk"><input type="checkbox" id="sv-walk" ${SV.walkin || SV.all ? "checked" : ""} ${SV.all ? "disabled" : ""}> 현장구매자 <span class="help">(신규가 아니면 [제외])</span></label>
+            <label class="chk"><input type="checkbox" id="sv-all" ${SV.all ? "checked" : ""}> 전체고객 <span class="help">(네이버 · 현장 모두 — 기존 손님은 [제외])</span></label></div></div>
+          <div class="field"><span class="label">선택지 <span class="help">현장 안내문의 번호와 같게 · 오늘 / 기간 누적</span></span>
+            <div class="svopts">${SV.opts.map((o, i) => `<div class="svopt"><b class="num">${i + 1}</b><input class="cfg svlabel" data-i="${i}" value="${esc(o)}" placeholder="${i + 1}번 내용 (예: 네이버 검색)" aria-label="${i + 1}번 선택지"><span class="help num">오늘 ${(c.cnt[i + 1] || {}).today || 0} · 누적 <b>${(c.cnt[i + 1] || {}).total || 0}</b></span>${i === SV.opts.length - 1 && SV.opts.length > 1 ? `<button class="btn btn-sm" data-act="svDel" aria-label="${i + 1}번 지우기">×</button>` : ""}</div>`).join("")}</div>
+            <div class="btns" style="align-items:center"><button class="btn btn-sm" data-act="svAdd">+ 선택지 추가</button><span class="help num">응답 오늘 ${c.ans.today} · 누적 <b>${c.ans.total}</b> · 제외 오늘 ${c.ex.today} · 누적 ${c.ex.total}</span></div></div>
+          <div class="sheet-foot"><button class="btn btn-ink" data-act="close">닫기</button></div>`;
         return;
       }
       if (tab === "rules") {
@@ -2413,6 +2461,88 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     return Object.assign({}, SAMPLE_NAVER, { 이벤트회: String(no), 기준일: krDate(d), 첫방문: krDate(d), 경과일: String(days), _이벤트: true, _이벤트문구: EV.tpl[i] });
   };
 
+  // ── 설문조사 (사장님 10/14) ───────────────────────
+  /* 신규 손님에게 '아스타나키즈를 어떻게 알게 되었는지' (현장 안내문의 1~n 번호) — 근무자가 손님이 말한 번호를 누름
+     - 대상: 신규고객(네이버 '완료 0' 예약자) · 현장구매자 · 전체고객(네이버 · 현장 모두) — 운영 설정 → 설문조사
+     - 대상 손님은 번호를 눌러야 열쇠를 고르고 등록할 수 있음 (필수 단계). 신규가 아닌 현장구매자 · 전체고객의 기존 손님은 [제외]
+     - 답(번호, 제외 = 0)은 그 예약 · 현장입장 기록(sv)에 붙어 날짜별 저장 파일에 남음 → 설문 기간 누적 = 저장 파일을 더함
+     - 보고앱에 보내기를 켜면 기간 동안 매일 20:00 에 번호별 오늘 · 누적 수를 보냄 (파일로 남기고 · 보고앱 주소가 있으면 그 주소로) */
+  const SV0 = { from: "", to: "", send: false, url: "", naverNew: true, walkin: false, all: false, opts: ["", "", "", "", ""], sentDay: "", last: null };
+  const SV = JSON.parse(JSON.stringify(SV0));
+  function svSaveCfg() {
+    const v = JSON.parse(JSON.stringify(SV));
+    if (APP && window.desk.config) window.desk.config.set({ survey: v });
+    else try { localStorage.setItem("astanakiz-survey", JSON.stringify(v)); } catch (e) { /* 저장 못 해도 동작 */ }
+  }
+  function svLoadCfg(v) {
+    if (!v) return;
+    const day = (x) => (/^\d{4}-\d{2}-\d{2}$/.test(x || "") ? x : "");
+    Object.assign(SV, { from: day(v.from), to: day(v.to), send: !!v.send, url: String(v.url || ""), naverNew: v.naverNew !== false, walkin: !!v.walkin, all: !!v.all, sentDay: day(v.sentDay), last: v.last || null });
+    if (Array.isArray(v.opts) && v.opts.length) SV.opts = v.opts.slice(0, 20).map((o) => String(o || ""));
+  }
+  if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c && c.survey) { svLoadCfg(c.survey); renderAll(); } }).catch(() => {});
+  else try { svLoadCfg(JSON.parse(localStorage.getItem("astanakiz-survey"))); } catch (e) { /* 없음 */ }
+  const svOn = () => !!(SV.from && SV.to && SV.from <= TODAY && TODAY <= SV.to && (SV.all || SV.naverNew || SV.walkin) && SV.opts.length);
+  const SV_Q_NEW = "신규고객께 아스타나키즈를 어떻게 알게 되었는지 물어봐주세요";
+  const SV_Q = "고객께 아스타나키즈를 어떻게 알게 되었는지 물어봐주세요";
+  /** 이 예약 손님이 설문 대상인가 → { isNew, skip(제외 버튼) } 또는 null */
+  function svFor(b) {
+    if (!svOn() || !b || b.status !== "확정" || b.day !== TODAY) return null;
+    const isNew = b.prevDone === 0;
+    if (SV.all || (SV.naverNew && isNew)) return { isNew, skip: !isNew };
+    return null;
+  }
+  /** 현장입장이 설문 대상인가 (신규가 아니면 제외) */
+  const svForWalk = () => (svOn() && (SV.all || SV.walkin) ? { isNew: true, skip: true } : null); // 같은 문구로 묻고, 신규가 아니면 [제외]
+  /** 설문 번호 버튼 (예약자 창 오른쪽 · 현장입장 창 위) */
+  function svButtons(sv, cls) {
+    const pick = sheet.sv;
+    return `<div class="svq">${sv.isNew ? SV_Q_NEW : SV_Q}</div>
+      <div class="svbtns ${cls || ""}">${SV.opts.map((o, i) => `<button type="button" class="svb ${pick === i + 1 ? "on" : ""}" data-act="svPick" data-n="${i + 1}" aria-pressed="${pick === i + 1}" title="${esc(o)}"><b class="num">${i + 1}</b>${o ? `<small>${esc(o)}</small>` : ""}</button>`).join("")}${sv.skip ? `<button type="button" class="svb skip ${pick === 0 ? "on" : ""}" data-act="svPick" data-n="0" aria-pressed="${pick === 0}">제외</button>` : ""}</div>`;
+  }
+  /** 설문 기간 누적 · 오늘: 번호별 · 제외 · 응답 (저장 파일 + 오늘 화면) */
+  function svCounts() {
+    const cnt = {}, ex = { today: 0, total: 0 }, ans = { today: 0, total: 0 };
+    const add = (sv, today) => {
+      if (sv == null) return;
+      const o = sv === 0 ? ex : (cnt[sv] = cnt[sv] || { today: 0, total: 0 });
+      o.total++; if (today) o.today++;
+      if (sv !== 0) { ans.total++; if (today) ans.today++; }
+    };
+    if (SV.from && SV.to) {
+      const end = SV.to < TODAY ? SV.to : TODAY;
+      for (let d = SV.from, i = 0; d <= end && i < 400; d = shiftDay(d, 1), i++) {
+        if (d === TODAY) { for (const b of bookings[TODAY] || []) if (b.enteredAt != null) add(b.sv, true); for (const w of walkins) add(w.sv, true); }
+        else { const f = dayFile(d); for (const b of f.b) add(b.sv, false); for (const w of f.w) add(w.sv, false); }
+      }
+    }
+    return { cnt, ex, ans };
+  }
+  /** 보고앱에 보낼 내용 (보고 시스템이 받아 보고 화면에 — 형식은 docs/SHARE.md) */
+  function svPayload() {
+    const c = svCounts();
+    return { type: "astanakiz-survey", v: 1, day: TODAY, sentAt: `${TODAY} ${hm(now)}`, question: "아스타나키즈를 어떻게 알게 되었나요", period: { from: SV.from, to: SV.to },
+      targets: { naverNew: SV.naverNew, walkin: SV.walkin, all: SV.all },
+      options: SV.opts.map((label, i) => ({ no: i + 1, label, today: (c.cnt[i + 1] || {}).today || 0, total: (c.cnt[i + 1] || {}).total || 0 })),
+      excluded: c.ex, answered: c.ans };
+  }
+  let svBusy = false;
+  async function svSend(manual) {
+    if (svBusy) return;
+    svBusy = true;
+    const p = svPayload();
+    let r;
+    if (!APP || !window.desk.survey) r = { ok: true, demo: true };
+    else r = await window.desk.survey.send({ url: SV.url.trim(), json: JSON.stringify(p) }).catch((e) => ({ ok: false, why: String(e) }));
+    svBusy = false;
+    SV.sentDay = TODAY; SV.last = { at: `${TODAY} ${hm(now)}`, ok: !!(r && r.ok), why: (r && r.why) || "", posted: !!(r && r.posted), auto: !manual };
+    svSaveCfg();
+    toast(r && r.demo ? `체험판: 설문 누적(응답 ${p.answered.total} · 제외 ${p.excluded.total})을 보고앱에 보내는 흉내` : r && r.ok ? `설문 누적을 보고앱에 보냈어요${r.posted ? "" : " (파일로 남김 — 보고앱 주소가 없어요)"}` : `설문 보고 실패: ${(r && r.why) || "응답 없음"} — 파일에는 남겼어요`);
+    if (sheet.mode === "settings" && sheet.tab === "survey") renderSheet();
+  }
+  /** 매일 20:00 (설문 기간 · 보내기 켬 · 그날 아직 안 보냄) */
+  function svTick() { if (SV.send && svOn() && now >= 20 * 60 && SV.sentDay !== TODAY && !svBusy) svSend(false); }
+
   // ── 초과요금 미터 ────────────────────────────────
   /* 초과요금 (열쇠 1개 기준, 예약 입장시간부터)
      ~ 1:50:00 페널티 없음 · 1:50:01 부터 카운트업 시작
@@ -2464,6 +2594,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       if (sec >= 60) { sec = 0; now++; renderAll(); }
     }
     autoLoad();
+    svTick(); // 설문 누적 20:00 보고
     capTick();
     if (sheet.mode === "key" && $("pos").hidden) { const h = holderById(sheet.hid); const mt = $("meter"); if (h && mt) { const before = !!overInfo(h).due; mt.innerHTML = meterHtml(h); if (sec === 0 || (!!overInfo(h).due !== before)) renderSheet(); } }
   }, 1000);
@@ -2505,7 +2636,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   function updateWalkButtons() {
     const done = $("w-done"); if (!done) return;
     const st = walkState();
-    done.disabled = st.over || !st.phoneOk || (st.flex && !sheet.flexOk);
+    done.disabled = st.over || !st.phoneOk || (st.flex && !sheet.flexOk) || (!!svForWalk() && sheet.sv == null); // 설문 대상이면 번호(또는 제외) 먼저
   }
 
   const acts = {
@@ -2521,6 +2652,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     openRes(el) { openSheet({ mode: "enter", id: el.dataset.id, keys: [] }); },
     pickKey(btn) {
       const k = Number(btn.dataset.k), b = findB(sheet.id), need = partyNeed(b);
+      if (svFor(b) && sheet.sv == null) { toast("설문 번호를 먼저 눌러 주세요"); return; }
       if (sheet.keys.includes(k)) sheet.keys = sheet.keys.filter((x) => x !== k);
       else if (sheet.keys.length < need) sheet.keys.push(k);
       else if (need === 1) sheet.keys = [k];
@@ -2537,6 +2669,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const b = findB(sheet.id);
       const party = partyOpen(b), need = partyNeed(b);
       if (sheet.keys.length !== need || sheet.busy || party.indexOf(b) > 0) return;
+      if (svFor(b) && sheet.sv == null) { toast("설문 번호를 먼저 눌러 주세요"); return; }
+      if (svFor(b)) b.sv = sheet.sv; // 설문 답 (번호 · 제외 = 0)
       if (sheet.keys.some((k) => holderOf(k))) { toast("그 사이 다른 손님이 쓴 열쇠가 있어요. 다시 골라 주세요."); sheet.keys = []; renderSheet(); return; }
       // 열쇠는 바로 등록하고 네이버 이용완료는 뒤에서 (naverFlush) — 근무자가 기다리지 않음
       if (APP) b.naverPending = true;
@@ -2662,8 +2796,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       renderSheet(); const p = $("w-phone"); if (p) p.focus();
     },
     walkDone() {
+      if (svForWalk() && sheet.sv == null) { toast("설문 번호(또는 제외)를 먼저 눌러 주세요"); return; }
       if (sheet.keys.some((k) => holderOf(k))) { toast("그 사이 다른 손님이 쓴 열쇠가 있어요"); closeSheet(); renderAll(); return; }
       const w = walkin(digits(sheet.phone), sheet.keys, now, sheet.slot);
+      if (svForWalk()) { w.sv = sheet.sv; saveState(); } // 설문 답 (번호 · 제외 = 0)
       closeSheet(); toast(`현장입장자 · 열쇠 ${w.keys.join(", ")}번 등록${printForm("enter", keyVals(w))}`); renderAll();
     },
     bulkReturn() { openSheet({ mode: "bulk" }); },
@@ -2713,6 +2849,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const h = holderById(sheet.hid); returnKeys(h, [Number(btn.dataset.k)]); renderAll();
       if (h.keys.length) renderSheet(); else closeSheet();
     },
+    // 설문조사 (10/14)
+    svPick(btn) { sheet.sv = Number(btn.dataset.n); renderSheet(); },
+    svAdd() { if (SV.opts.length < 20) SV.opts.push(""); svSaveCfg(); renderSheet(); },
+    svDel() { if (SV.opts.length > 1) SV.opts.pop(); svSaveCfg(); renderSheet(); },
+    svSendNow() { svSend(true); },
     // 방문 이벤트 (10/14)
     evApply() {
       const v = ($("ev-from") || {}).value || "";
@@ -2892,6 +3033,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (t.classList.contains("evn") && t.value !== "") { EV.rules[+t.dataset.i].n = Math.max(1, Math.min(999, Number(t.value) || 1)); evSaveCfg(); $("ev-paper").innerHTML = evPrev(); evScroll("ev-paper"); renderAll(); }
     if (t.classList.contains("evpn")) { EV.stamp[t.dataset.k] = evDays(t.value); evSaveCfg(); $("ev-paper").innerHTML = evPrev(); evScroll("ev-paper"); $("ev-warn").textContent = evStampWarn(); $("ev-dates").textContent = evDatesText(); renderAll(); }
     if (t.classList.contains("evfood")) { EV.stamp[t.dataset.k] = t.value.trim(); evSaveCfg(); $("ev-paper").innerHTML = evPrev(); evScroll("ev-paper"); $("ev-warn").textContent = evStampWarn(); }
+    if (t.id === "sv-from" || t.id === "sv-to") { SV[t.id === "sv-from" ? "from" : "to"] = t.value; svSaveCfg(); renderSheet(); }
+    if (t.id === "sv-send") { SV.send = t.checked; svSaveCfg(); toast(t.checked ? "설문 누적을 매일 20:00 보고앱에 보내요" : "설문 보고앱 보내기를 껐어요"); }
+    if (t.id === "sv-url") { SV.url = t.value.trim(); svSaveCfg(); }
+    if (t.id === "sv-new" || t.id === "sv-walk" || t.id === "sv-all") { SV[{ "sv-new": "naverNew", "sv-walk": "walkin", "sv-all": "all" }[t.id]] = t.checked; svSaveCfg(); renderSheet(); }
+    if (t.classList.contains("svlabel")) { SV.opts[+t.dataset.i] = t.value; svSaveCfg(); }
     if (t.id === "ev-q") { EV.q = t.value; $("ev-hits").innerHTML = evFindHtml(); }
     if (t.id === "ev-text" && $("ev-warn")) $("ev-warn").textContent = evStampWarn();
     if (t.id === "ev-text") { if (EV.cur === EV_BASE) EV.form = t.value; else EV.tpl[EV.cur] = t.value; $("ev-paper").innerHTML = evPrev(); if (EV.cur !== EV_BASE) evScroll("ev-paper"); $("ev-def").innerHTML = evDefText(); evSaveCfg(); }
@@ -2968,7 +3114,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const o = typeof base === "object" ? base : { base, n, day }, nn = o.n ?? b.prevDone, d = o.day || EV.from;
       evAdd(Object.assign({ at: `${d} 10:00`, day: d, no: "t-" + name + nn, k: evKey(b), name, phone: digits(b.phone), prev: nn - 1, n: nn, base: o.base ?? nn - 1 }, o.st ? { st: o.st, kind: o.kind, due: o.due, reset: o.reset, cnt: o.cnt || 1 } : {}));
       renderAll();
-    }, evRules: () => EV.rules };
+    }, evRules: () => EV.rules, SV, svCounts, svPayload, svSend };
 
   // ── 반납안내 커튼 ─────────────────────────────────
   (function curtain() {
