@@ -175,9 +175,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .evstate .on { color: var(--ok); }
 .evtabs { flex-wrap: wrap; }
 .evtabs button { padding: 5px 8px; font-size: 13px; }
-.evlog { max-height: 92px; }
+.evhits { max-height: 112px; gap: 4px; }
+.evhit { border-bottom: 1px solid var(--line); padding-bottom: 3px; }
+.evhit .help { font-weight: 400; }
 /* 80mm 감열지 미리보기 (인쇄 폭 약 72mm) */
-.paper { width: 288px; max-width: 100%; justify-self: center; background: #fff; color: #111; border-radius: 4px; padding: 14px 12px 22px; box-shadow: 0 1px 6px rgba(0,0,0,.25); font-family: ui-monospace, Consolas, "D2Coding", monospace; font-size: 13px; line-height: 1.45; max-height: 420px; overflow: auto; }
+.paper { width: 288px; max-width: 100%; justify-self: center; background: #fff; color: #111; border-radius: 4px; padding: 14px 12px 22px; box-shadow: 0 1px 6px rgba(0,0,0,.25); font-family: ui-monospace, Consolas, "D2Coding", monospace; font-size: 13px; line-height: 1.45; max-height: 330px; overflow: auto; }
 .paper .pl { white-space: pre-wrap; overflow-wrap: anywhere; }
 .paper .ctr { text-align: center; }
 .paper .big { text-align: center; font-size: 20px; font-weight: 700; }
@@ -1780,8 +1782,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const tab = sheet.tab || "rules";
       const tabs = `<div class="tabs" role="tablist">${[["rules", "운영 규칙"], ["cap", "수량 자동조절"], ["event", "방문 이벤트"], ["printer", "프린터"], ["link", "아마노 · POS"]].map(([k, t]) => `<button role="tab" class="${tab === k ? "on" : ""}" aria-selected="${tab === k}" data-act="setTab" data-t="${k}">${t}</button>`).join("")}</div>`;
       if (tab === "event") {
-        const set = EV.from ? evBook.sets[EV.from] : null;
-        const ppl = set ? Object.values(set.people).sort((a, b) => ((b.lastDay || b.first || "") > (a.lastDay || a.first || "") ? 1 : (b.lastDay || b.first || "") < (a.lastDay || a.first || "") ? -1 : a.name.localeCompare(b.name, "ko"))) : [];
+        const L = EV.from ? evLog() : null;
         const st = !EV.on ? `<b>꺼짐</b> — 입장권에 네이버 이용완료 누계(완료 +1)와 ${RULES.giftEvery}회 사은권을 출력 중`
           : evActive() ? `<b class="on">켜짐</b> — ${krDate(EV.from)}부터 손님마다 0부터 다시 셈 · 원래 누계 · 사은권 출력은 멈춤`
           : `<b>기다리는 중</b> — ${krDate(EV.from)}부터 켜져요 (그 전에는 원래대로)`;
@@ -1792,18 +1793,18 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
             <div class="stack">
               <div class="field"><span class="label">방문 이벤트 <span class="help">기준일부터 네이버 예약 손님마다 이용완료를 0부터 다시 세어 회차별 안내 출력 · 네이버 숫자는 그대로</span></span>
                 <div class="evstate">${st}</div>
-                <div class="btns" style="align-items:center"><label class="help" for="ev-from">기준일</label><input type="date" id="ev-from" class="date-in" value="${esc(EV.from || TODAY)}" min="${shiftDay(TODAY, -EV_BACK)}" max="${shiftDay(TODAY, 365)}">
+                <div class="btns" style="align-items:center"><label class="help" for="ev-from">기준일</label><input type="date" id="ev-from" class="date-in" value="${esc(EV.from || TODAY)}" min="${EV.from && EV.from < TODAY ? EV.from : TODAY}" max="${shiftDay(TODAY, 365)}">
                   <button class="btn btn-sm btn-ink" data-act="evApply">${EV.on ? "기준일 바꾸기" : "적용 (켜기)"}</button>${EV.on ? `<button class="btn btn-sm" data-act="evOff">끄기</button>` : ""}</div>
-                <span class="help">예) 기준일에 완료 7 → 7 = 0, 다음 이용완료(8)가 이벤트 1번째 · 끄면 바로 원래대로 · 손님 기록(이름 · 전화번호 · 기준일 완료 수)은 지우지 않음</span></div>
+                <span class="help">기준일부터 모든 손님을 처음 오는 손님처럼: 기록에 없으면 네이버 완료 수를 0으로 보고, 이용완료하는 순간 POS PC에 기록 (완료 7 → 이번 8이 이벤트 1번째) · 끄면 바로 원래대로 · 기록은 지우지 않음</span></div>
               <div class="field"><span class="label">회차별 입장권 안내 <span class="help">네이버 누계 · 사은권 줄 자리에 나옴</span></span>
                 <div class="tabs evtabs" role="tablist">${EV_NAMES.map((t, j) => `<button role="tab" class="${i === j ? "on" : ""}" aria-selected="${i === j}" data-act="evTpl" data-i="${j}">${t}</button>`).join("")}</div>
                 <textarea id="ev-text" spellcheck="false" aria-label="${EV_NAMES[i]} 안내 문구">${esc(EV.tpl[i])}</textarea>
-                <span class="help">값: {이벤트회} {기준일} {누계} {고객} {전화뒤4} · 줄 앞 <b>#</b> <b>^</b> <b>*</b> <b>---</b> 는 입장권 양식과 같음 · <span id="ev-def">${evDefText()}</span></span>
-                <div class="btns"><button class="btn btn-sm" data-act="evReset">기본 문구로</button><button class="btn btn-sm" data-act="evTest">이 회차로 시험 출력</button></div></div>
-              <div class="field"><span class="label">기록된 손님 ${ppl.length}명 <span class="help">${set && set.at ? `${esc(set.at)}부터 기록 · ` : ""}기준 = 기준일 전까지 완료 · 이벤트 = 그 뒤 완료</span></span>
-                <div class="caplog evlog">${ppl.slice(0, 300).map((p) => `<div>${esc(p.name)} <span class="num">${fmtPhone(p.phone)}</span> · 기준 ${p.base} → 지금 ${p.last ?? p.base} · <b>이벤트 ${Math.max(0, (p.last ?? p.base) - p.base)}</b></div>`).join("") || `<span class="help">${evActive() ? "아직 없어요 — 네이버 예약을 불러오면 기록돼요" : "켜면 기록해요"}</span>`}</div></div>
+                <div class="btns" style="align-items:center"><button class="btn btn-sm" data-act="evReset">기본 문구로</button><button class="btn btn-sm" data-act="evTest">이 회차로 시험 출력</button><span class="help" id="ev-def">${evDefText()}</span></div></div>
+              <div class="field"><span class="label">손님 찾기 <span class="help">${L ? `기록 ${L.people.size}명 · 이용완료 ${L.count}건 · POS PC에 저장` : "켜면 이용완료할 때마다 기록해요"}</span></span>
+                <input id="ev-q" class="cfg" placeholder="이름 또는 전화 뒷번호" value="${esc(EV.q)}" autocomplete="off" aria-label="손님 찾기 (이름 또는 전화 뒷번호)">
+                <div class="caplog evhits" id="ev-hits">${evFindHtml()}</div></div>
             </div>
-            <div class="field"><span class="label">미리보기 <span class="help">${EV_NAMES[i]} · 예시 값</span></span><div class="paper" id="ev-paper">${paperHtml(PRINT.forms.enter.text, evSample(i))}</div></div>
+            <div class="field"><span class="label">미리보기 <span class="help">${EV_NAMES[i]} · 예시 값</span></span><div class="paper" id="ev-paper">${paperHtml(PRINT.forms.enter.text, evSample(i))}</div>${formHelp()}</div>
           </div>
           <div class="sheet-foot"><button class="btn btn-ink" data-act="close">닫기</button></div>`;
         return;
@@ -1911,10 +1912,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
             <div class="field"><span class="label">출력 양식</span>
               <div class="help">입장권 (네이버 · 현장) · 초과요금은 POS에서 결제하고 POS 영수증을 드려요 · <button class="btn btn-sm" data-act="resetForm">기본 양식으로</button></div>
               <label class="chk"><input type="checkbox" id="form-auto" ${f.auto ? "checked" : ""}> ${f.when}에 자동 출력</label>
-              <textarea id="form-text" spellcheck="false" aria-label="양식 내용">${esc(f.text)}</textarea>
-              <span class="help">넣을 수 있는 값: ${PRINT_KEYS.map((k) => `{${k}}`).join(" ")}<br>줄 앞에 <b>#</b> 2배 · <b>##</b> 3배 · <b>###</b> 4배 (가운데) · <b>^</b> 가운데 · <b>*</b> 굵게 — 붙여 씀: <b>#*</b> 2배 굵게 · <b>^*</b> 가운데 굵게 · <b>---</b> 구분선 · <b>===</b> 이중선 · <b>[네이버]</b> 네이버 예약만 · <b>[현장]</b> 현장입장만 · <b>[사은권]</b> 사은권 회차만<br>방문 이벤트가 켜지면 <b>[네이버] · [사은권]</b> 줄 대신 그 회차 안내가 그 자리에 나와요 (다른 자리에 두려면 그 자리에 <b>{이벤트안내}</b> 한 줄)</span></div>
+              <textarea id="form-text" spellcheck="false" aria-label="양식 내용">${esc(f.text)}</textarea></div>
           </div>
-          <div class="field"><span class="label">미리보기 <span class="help">80mm 폭 (예시 값)</span> <button class="btn btn-sm ${SAMPLE === SAMPLE_NAVER ? "btn-ink" : ""}" data-act="previewKind" data-k="naver">네이버</button><button class="btn btn-sm ${SAMPLE === SAMPLE_WALK ? "btn-ink" : ""}" data-act="previewKind" data-k="walk">현장</button></span><div class="paper" id="paper">${paperHtml(f.text, SAMPLE)}</div></div>
+          <div class="field"><span class="label">미리보기 <span class="help">예시 값</span> <button class="btn btn-sm ${SAMPLE === SAMPLE_NAVER ? "btn-ink" : ""}" data-act="previewKind" data-k="naver">네이버</button><button class="btn btn-sm ${SAMPLE === SAMPLE_WALK ? "btn-ink" : ""}" data-act="previewKind" data-k="walk">현장</button><button class="btn btn-sm ${SAMPLE._이벤트 ? "btn-ink" : ""}" data-act="previewKind" data-k="event" title="방문 이벤트 ${EV_NAMES[EV.cur]} 안내로">이벤트</button></span><div class="paper" id="paper">${paperHtml(f.text, SAMPLE)}</div>${formHelp()}</div>
         </div>
         <div class="sheet-foot"><button class="btn btn-ink" data-act="close">닫기</button></div>`;
     }
@@ -1925,7 +1925,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
      POS 영수증 프린터도 Windows '프린터 및 스캐너'에 드라이버가 깔려 있어야 목록에 나옴.
      체험판: 목록과 출력은 흉내만 내고, 양식과 미리보기는 그대로 동작
      양식 문법: 줄 앞 # 크게 가운데 · ^ 가운데 · --- 구분선 · [네이버] 네이버 예약만 · [현장] 현장입장만 · [사은권] 사은권 받는 회차만 */
-  const PRINT_KEYS = ["구분", "고객", "전화뒤4", "열쇠", "입장시간", "퇴장시간", "누계", "기준회", "사은권", "날짜", "시각"];
+  const PRINT_KEYS = ["구분", "고객", "전화뒤4", "열쇠", "입장시간", "퇴장시간", "누계", "기준회", "사은권", "날짜", "시각", "이벤트회", "기준일"];
+  /** 양식 쓰는 법 — 입장권 양식과 방문 이벤트 안내가 똑같음 (서로의 값 · 줄 표시 · 조건을 다 씀 · 사장님 10/14) */
+  const formHelp = () => `<span class="help formhelp">넣을 수 있는 값: ${PRINT_KEYS.map((k) => `{${k}}`).join(" ")}<br>줄 앞에 <b>#</b> 2배 · <b>##</b> 3배 · <b>###</b> 4배 (가운데) · <b>^</b> 가운데 · <b>*</b> 굵게 — 붙여 씀: <b>#*</b> 2배 굵게 · <b>^*</b> 가운데 굵게 · <b>---</b> 구분선 · <b>===</b> 이중선<br>조건(줄 맨 앞): <b>[네이버]</b> 네이버 예약만 · <b>[현장]</b> 현장입장만 · <b>[사은권]</b> 사은권 회차만 · <b>[이벤트]</b> 방문 이벤트 손님만<br>방문 이벤트가 켜지면 입장권 양식의 <b>[네이버] · [사은권]</b> 줄 대신 그 회차 안내가 그 자리에 나와요 (다른 자리에 두려면 <b>{이벤트안내}</b> 한 줄)</span>`;
   const SAMPLE_NAVER = { 구분: "네이버", 고객: "송*온", 전화뒤4: "5489", 열쇠: "3, 13", 입장시간: "오후 2시 00분", 퇴장시간: "오후 3시 50분", 누계: "8", 기준회: "10", 사은권: "2만원 사은권", 날짜: "2026-10-06", 시각: "13:55", _네이버: true, _현장: false, _사은권: false };
   const SAMPLE_WALK = { 구분: "현장", 고객: "   ", 전화뒤4: "9013", 열쇠: "30", 입장시간: "오후 12시 30분", 퇴장시간: "오후 2시 20분", 누계: "", 기준회: "10", 사은권: "2만원 사은권", 날짜: "2026-10-06", 시각: "12:40", _네이버: false, _현장: true, _사은권: false };
   let SAMPLE = SAMPLE_NAVER; // 미리보기 · 테스트 출력 예시 (네이버 / 현장)
@@ -2007,9 +2009,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     const fill = (line) => line.replace(/\{([^}]+)\}/g, (m, k) => (k in v ? String(v[k]) : m));
     const out = [];
     for (let l of text.split("\n")) {
-      // [네이버] · [현장] · [사은권] 조건 (여러 개 붙여도 됨)
+      // [네이버] · [현장] · [사은권] · [이벤트] 조건 (여러 개 붙여도 됨)
       let skip = false;
-      l = l.replace(/^(\[(네이버|현장|사은권)\])+/, (m) => { for (const [, k] of m.matchAll(/\[(네이버|현장|사은권)\]/g)) if (!v["_" + k]) skip = true; return ""; });
+      l = l.replace(/^(\[(네이버|현장|사은권|이벤트)\])+/, (m) => { for (const [, k] of m.matchAll(/\[(네이버|현장|사은권|이벤트)\]/g)) if (!v["_" + k]) skip = true; return ""; });
       if (skip) continue;
       // 값이 비어 있는 칸이 든 줄은 뺌
       if ([...l.matchAll(/\{([^}]+)\}/g)].some(([, k]) => k in v && v[k] === "")) continue;
@@ -2100,41 +2102,30 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       // 입장시간 = 예약한 입장 시간 (현장은 입장한 시각)
       입장시간: krTime(h.slot), 퇴장시간: out, 누계: h.visitNo ? String(h.visitEnd || h.visitNo) : "", 기준회: String(RULES.giftEvery), 사은권: RULES.giftName,
       날짜: TODAY, 시각: hm(now), _현장: !naver,
-      // 방문 이벤트 중(10/14): 원래 로직([네이버] 누계 · [사은권] 줄)은 멈추고 그 회차 안내를 그 자리에
-      _네이버: naver && !!h.visitNo && !ev, _사은권: naver && !!giftIn(h) && !ev,
+      // 방문 이벤트 중(10/14): 입장권 양식의 [네이버] 누계 · [사은권] 줄은 멈추고 그 회차 안내를 그 자리에 (evText) — 안내 안에서는 조건을 똑같이 씀
+      _네이버: naver && !!h.visitNo, _사은권: naver && !!giftIn(h),
       이벤트회: ev ? String(ev.end) : "", 기준일: EV.from ? krDate(EV.from) : "", _이벤트: !!ev, _이벤트문구: ev ? evTplOf(ev.end) : "",
     };
   };
 
   // ── 방문 이벤트 (사장님 10/14 · 1.37) ─────────────
-  /* 운영 설정 → 방문 이벤트에서 기준일을 정하면, 그날부터 네이버 예약 손님마다 이용완료 횟수를 0부터 다시 셈
+  /* 운영 설정 → 방문 이벤트에서 기준일을 정하면, 그날부터 네이버 예약 손님을 모두 처음 오는 손님처럼 셈
      (네이버의 '완료 n'은 그대로 · 이 데스크에서만 다시 셈)
-     - 이벤트 회차 = 네이버 완료 − 기준(base, 기준일 전까지의 완료 수). 예) 기준일에 완료 7 → 7 = 0 · 8번째 이용완료가 이벤트 1번째
-     - 켜져 있는 동안 원래 로직(입장권의 네이버 완료 +1 누계 · 10회 사은권)은 멈추고, 그 회차 안내(1 · 2 · 3 · 4 · 5번째 이상)를 그 자리에 출력
-     - 손님마다 이름 · 전화번호 · 기준(base)을 이 PC 장부(visit-ledger.json)에 남김 → 끄면 원래대로, 다시 켜면 그대로 이어서 · 지우지 않음
-     - 기준 정하기: 장부 → 기준일 ~ 어제 저장 파일에서 그 손님 첫 입장 때의 '완료 n' → 오늘 예약 카드의 '완료 n'(이번 방문 전까지)
-       네이버에서 모든 손님 목록을 한 번에 읽을 수 없어서, 기준일 뒤 처음 보이는 때 기록함 (그 사이 방문은 저장 파일로 셈) */
-  const EV_BACK = 90; // 기준일은 90일 전까지 (저장 파일을 그만큼 읽음)
+     - 장부에 없는 손님 = 네이버에 보이는 완료 수를 0으로 바꿔 봄 → 이용완료하는 순간 장부(POS PC 하드)에 한 줄 쓰고 거기서부터 셈
+       예) 완료 7인 손님이 처음 이용완료 → 기준(base) 7 = 0 · 이번(8)이 이벤트 1번째 · 다음(9)이 2번째
+     - 이벤트 회차 = 네이버 완료 − 기준(base). 켜져 있는 동안 원래 로직(입장권의 네이버 완료 +1 누계 · 10회 사은권)은 멈추고,
+       그 회차 안내(1 · 2 · 3 · 4 · 5번째 이상)를 입장권의 [네이버] · [사은권] 줄 자리에 출력
+     - 장부: 이용완료(네이버 예약 1건)마다 한 줄 덧붙임 { at, day, no, k, name, phone, prev, n, base } → visit-ledger\기준일.jsonl
+       (월 3,000건이 넘어도 가볍게: 통째로 다시 쓰지 않고 덧붙이기만 · 지우지 않음 → 끄면 원래대로, 다시 켜면 그대로 이어서)
+     - 화면에 전체 목록은 없음 — 운영 설정에서 이름 · 전화 뒷번호로 찾으면 기준일 뒤 실적(회차 · 날짜)이 나옴 */
   const EV_NAMES = ["1번째", "2번째", "3번째", "4번째", "5번째 이상"];
   const EV_TPL = EV_NAMES.map(() => "#* 방문 이벤트 {이벤트회}번째\n^{기준일}부터 새로 세는 방문 이벤트"); // 기본 문구 (사장님이 회차마다 고쳐 씀)
-  const EV = { on: false, from: "", tpl: EV_TPL.slice(), cur: 0 };
+  const EV = { on: false, from: "", tpl: EV_TPL.slice(), cur: 0, q: "" };
   const krDate = (key) => { const [, m, d] = String(key).split("-").map(Number); return `${m}월 ${d}일`; };
   const evTplOf = (n) => EV.tpl[Math.min(Math.max(n, 1), EV_TPL.length) - 1];
   const evActive = () => EV.on && !!EV.from && TODAY >= EV.from;
   const evKey = (b) => digits(b.phone || "") || (b.name ? "이름:" + b.name : "");
-  const EV_LS = "astanakiz-visitledger";
-  let evBook = (() => {
-    let t = null;
-    try { if (APP && window.desk.ledger) t = window.desk.ledger.load(); } catch (e) { t = null; }
-    if (!t) try { t = localStorage.getItem(EV_LS); } catch (e) { t = null; }
-    try { const v = JSON.parse(t); if (v && v.sets) return v; } catch (e) { /* 없음 */ }
-    return { v: 1, sets: {} };
-  })();
-  function evSave() {
-    const json = JSON.stringify(evBook);
-    try { if (APP && window.desk.ledger) window.desk.ledger.save(json); } catch (e) { /* 파일 저장 실패 — 브라우저 저장소에 한 벌 */ }
-    try { localStorage.setItem(EV_LS, json); } catch (e) { /* 저장 못 해도 동작 */ }
-  }
+  const EV_LS = "astanakiz-visitlog-"; // 체험판 · 파일 저장이 없을 때: 브라우저 저장소 (기준일마다)
   function evSaveCfg() {
     const v = { on: EV.on, from: EV.from, tpl: EV.tpl };
     if (APP && window.desk.config) window.desk.config.set({ visitEvent: v });
@@ -2147,32 +2138,42 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   }
   if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c && c.visitEvent) { evLoadCfg(c.visitEvent); renderAll(); } }).catch(() => {});
   else try { evLoadCfg(JSON.parse(localStorage.getItem("astanakiz-visitevent"))); } catch (e) { /* 없음 */ }
-  const evSet = () => (evBook.sets[EV.from] = evBook.sets[EV.from] || { at: "", people: {} });
-  let evIdx = null; // { from, map } — 기준일 ~ 어제 저장 파일: 손님별 첫 입장 때의 '완료 n'(base) · 마지막 완료 수(last)
-  function evPast() {
-    if (evIdx && evIdx.from === EV.from) return evIdx.map;
-    const map = new Map();
-    if (APP && EV.from && EV.from < TODAY) {
-      for (let d = EV.from, i = 0; d < TODAY && i <= EV_BACK; d = shiftDay(d, 1), i++) {
-        for (const b of dayFile(d).b) {
-          if (b.status !== "완료" || b.prevDone == null) continue;
-          const k = evKey(b); if (!k) continue;
-          const p = map.get(k), last = b.visitEnd || b.visitNo || b.prevDone + 1;
-          if (!p) map.set(k, { base: b.prevDone, last, name: b.name, phone: b.phone, day: d });
-          else { p.base = Math.min(p.base, b.prevDone); p.last = Math.max(p.last, last); }
-        }
-      }
+  const evFile = () => APP && window.desk.ledger;
+  let evL = null; // 지금 기준일의 장부 (메모리) { from, people: 전화번호 → { name, phone, base, last, visits: [{ at, n }] }, nos: 적은 예약번호, count }
+  function evLog() {
+    if (evL && evL.from === EV.from) return evL;
+    evL = { from: EV.from, people: new Map(), nos: new Set(), count: 0 };
+    let t = null;
+    try { t = evFile() ? window.desk.ledger.load(EV.from) : localStorage.getItem(EV_LS + EV.from); } catch (e) { t = null; }
+    for (const line of String(t || "").split("\n")) {
+      if (!line.trim()) continue;
+      try { evPut(JSON.parse(line)); } catch (e) { /* 반쯤 쓴 줄(갑자기 꺼짐)은 건너뜀 */ }
     }
-    evIdx = { from: EV.from, map };
-    return map;
+    return evL;
   }
-  /** 그 손님의 기준(기준일 전까지의 완료 수): 장부 → 저장 파일 → 오늘 예약 카드. 모르면 null */
+  function evPut(r) {
+    if (!r || !r.k || r.n == null || evL.nos.has(r.no)) return;
+    evL.nos.add(r.no); evL.count++;
+    let p = evL.people.get(r.k);
+    if (!p) evL.people.set(r.k, (p = { name: r.name, phone: r.phone, base: r.base, last: r.n, visits: [] }));
+    p.last = Math.max(p.last, r.n); if (r.name) p.name = r.name;
+    p.visits.push({ at: r.at, n: r.n });
+  }
+  /** 장부에 한 줄 덧붙임 (POS PC 하드 · 체험판은 브라우저) */
+  function evAdd(r) {
+    evLog(); evPut(r);
+    const line = JSON.stringify(r);
+    try {
+      if (evFile()) window.desk.ledger.add(EV.from, line);
+      else localStorage.setItem(EV_LS + EV.from, (localStorage.getItem(EV_LS + EV.from) || "") + line + "\n");
+    } catch (e) { /* 저장 못 해도 화면은 동작 */ }
+  }
+  /** 그 손님의 기준(base): 장부 → 없으면 처음 오는 손님처럼 지금 보이는 '완료 n'(이번 방문 전까지)을 0으로. 모르면 null */
   function evBase(b) {
     const k = evKey(b); if (!k) return null;
-    const p = evSet().people[k]; if (p) return p.base;
-    const past = evPast().get(k); if (past) return past.base;
-    const today = (bookings[TODAY] || []).filter((x) => x.prevDone != null && evKey(x) === k).map((x) => x.prevDone);
-    return today.length ? Math.min(...today) : b.prevDone ?? null;
+    const p = evLog().people.get(k); if (p) return p.base;
+    const same = (bookings[b.day] || []).filter((x) => x.prevDone != null && evKey(x) === k).map((x) => x.prevDone); // 같은 날 함께 완료하는 예약(나눠 한 예약 · 연속예약)
+    return same.length ? Math.min(...same) : b.prevDone ?? null;
   }
   /** 이번 방문의 이벤트 회차 { no: 이 예약, end: 함께 이용완료한 뒤 } — 꺼짐 · 기준일 전 · 현장 · 완료 수를 모르면 null */
   function evOf(b) {
@@ -2183,23 +2184,34 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     const end = b.status === "완료" ? b.visitEnd || b.visitNo : n;
     return { no: Math.max(1, n - base), end: Math.max(1, end - base) };
   }
-  /** 장부 맞추기 (화면을 그릴 때마다 · 바뀐 것만 저장): 기준일 뒤 처음 보이는 손님의 이름 · 전화번호 · 기준 · 지금 완료 수 */
+  /** 오늘 이용완료한 네이버 예약을 장부에 (화면을 그릴 때마다 · 이미 적은 예약번호는 건너뜀) */
   function evSync() {
     if (!evActive()) return;
-    const set = evSet(); let ch = false;
-    if (!set.at) {
-      set.at = `${TODAY} ${hm(now)}`; ch = true;
-      for (const [k, x] of evPast()) if (!set.people[k]) set.people[k] = { name: x.name, phone: digits(x.phone || ""), base: x.base, first: x.day, src: "기록", at: TODAY, last: x.last, lastDay: x.day };
-    }
+    const L = evLog();
     for (const b of bookings[TODAY] || []) {
-      if (b.prevDone == null) continue;
+      if (b.status !== "완료" || !b.visitNo || b.walk || testOut.has(b.no)) continue;
+      const no = b.no || b.id; if (L.nos.has(no)) continue;
       const k = evKey(b); if (!k) continue;
-      let p = set.people[k];
-      if (!p) { const past = evPast().get(k); p = set.people[k] = { name: b.name, phone: digits(b.phone || ""), base: evBase(b), first: past ? past.day : TODAY, src: past ? "기록" : "네이버", at: TODAY }; ch = true; }
-      const last = b.status === "완료" ? b.visitEnd || b.visitNo || 0 : b.prevDone;
-      if (last > (p.last ?? -1)) { p.last = last; p.lastDay = TODAY; ch = true; }
+      const p = L.people.get(k), base = p ? p.base : evBase(b);
+      if (base == null) continue;
+      evAdd({ at: `${TODAY} ${hm(b.enteredAt ?? now)}`, day: TODAY, no, k, name: b.name, phone: digits(b.phone || ""), prev: b.prevDone ?? null, n: b.visitNo, base });
     }
-    if (ch) evSave();
+  }
+  /** 손님 찾기: 이름(글자) 또는 전화 뒷번호(숫자 2자리 이상) → 기준일 뒤 실적 */
+  function evFind(q) {
+    q = String(q || "").trim();
+    const d = /^[\d\s-]+$/.test(q) ? digits(q) : "";
+    if (d ? d.length < 2 : !q) return null;
+    const out = [];
+    for (const [k, p] of evLog().people) if (d ? k.endsWith(d) : String(p.name || "").includes(q)) out.push(p);
+    return out.sort((a, b) => a.name.localeCompare(b.name, "ko"));
+  }
+  function evFindHtml() {
+    const r = evFind(EV.q);
+    if (r == null) return `<span class="help">이름이나 전화 뒷번호(2자리 이상)를 넣으면 기준일 뒤 실적이 나와요</span>`;
+    if (!r.length) return `<span class="help">'${esc(EV.q)}' — 기준일 뒤 이용완료 기록이 없어요 (처음 오면 0부터 셈)</span>`;
+    return r.slice(0, 20).map((p) => `<div class="evhit"><b>${esc(p.name)}</b> <span class="num">${fmtPhone(p.phone)}</span> · <b>이벤트 ${p.last - p.base}회</b> <span class="help">(네이버 완료 ${p.base} → ${p.last})</span>
+      <div class="help num">${p.visits.map((v) => `${esc(String(v.at).slice(5).replace("-", "/"))} ${v.n - p.base}번째`).join(" · ")}</div></div>`).join("") + (r.length > 20 ? `<span class="help">${r.length}명 중 20명 — 더 넣어 좁혀 주세요</span>` : "");
   }
   /** 입장권에 이벤트 안내 끼우기: [네이버] · [사은권] 줄(원래 로직) 대신 그 자리에 (양식에 {이벤트안내} 줄이 있으면 거기) */
   function evText(text, v) {
@@ -2217,9 +2229,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     return out.join("\n");
   }
   /** 아직 기본 문구인 회차 (설정 화면 알림) */
-  const evDefText = () => { const d = EV_NAMES.filter((t, j) => EV.tpl[j] === EV_TPL[j]); return d.length ? `<b>아직 기본 문구: ${d.join(" · ")}</b>` : "5가지 모두 고쳐 씀"; };
+  const evDefText = () => { const d = EV_NAMES.map((t, j) => j + 1).filter((n) => EV.tpl[n - 1] === EV_TPL[n - 1]); return d.length ? `<b>아직 기본 문구: ${d.join(" · ")}번째</b>` : "5가지 모두 고쳐 씀"; };
   /** 설정 화면 미리보기 · 시험 출력용 예시 (그 회차) */
-  const evSample = (i) => Object.assign({}, SAMPLE_NAVER, { 이벤트회: String(i + 1), 기준일: krDate(EV.from || TODAY), _이벤트: true, _이벤트문구: EV.tpl[i], _네이버: false, _사은권: false });
+  const evSample = (i) => Object.assign({}, SAMPLE_NAVER, { 이벤트회: String(i + 1), 기준일: krDate(EV.from || TODAY), _이벤트: true, _이벤트문구: EV.tpl[i] });
 
   // ── 초과요금 미터 ────────────────────────────────
   /* 초과요금 (열쇠 1개 기준, 예약 입장시간부터)
@@ -2525,9 +2537,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     evApply() {
       const v = ($("ev-from") || {}).value || "";
       if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) { toast("기준일을 골라 주세요"); return; }
-      if (v < shiftDay(TODAY, -EV_BACK)) { toast(`기준일은 ${EV_BACK}일 전까지만 정할 수 있어요`); return; }
+      if (v < TODAY && v !== EV.from) { toast("기준일은 오늘이나 앞날로 정해 주세요 — 기준일부터 이용완료하는 순간 기록해요"); return; }
       const was = EV.on ? EV.from : "";
-      EV.on = true; EV.from = v; evIdx = null;
+      EV.on = true; EV.from = v;
       evSaveCfg(); renderAll(); renderSheet();
       toast(was && was !== v ? `기준일을 ${krDate(v)}로 바꿨어요 — 그날 기준으로 새로 셉니다 (전 기록은 남아요)` : evActive() ? `방문 이벤트를 켰어요 — ${krDate(v)}부터 손님마다 0부터 다시 셉니다` : `${krDate(v)}부터 방문 이벤트가 켜져요 (그 전에는 원래대로)`);
     },
@@ -2614,7 +2626,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       renderSheet();
     },
     testPrintDlg(btn) { return acts.testPrint(btn); },
-    previewKind(btn) { SAMPLE = btn.dataset.k === "walk" ? SAMPLE_WALK : SAMPLE_NAVER; renderSheet(); },
+    previewKind(btn) { SAMPLE = btn.dataset.k === "walk" ? SAMPLE_WALK : btn.dataset.k === "event" ? evSample(EV.cur) : SAMPLE_NAVER; renderSheet(); },
     resetForm() { PRINT.forms.enter.text = ENTER_FORM; savePrint(); renderSheet(); },
     car(btn) {
       park.sel = btn.dataset.id;
@@ -2687,6 +2699,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   document.addEventListener("input", (e) => {
     const t = e.target;
     if (t.id === "form-text") { PRINT.forms[PRINT.cur].text = t.value; $("paper").innerHTML = paperHtml(t.value, SAMPLE); savePrint(); }
+    if (t.id === "ev-q") { EV.q = t.value; $("ev-hits").innerHTML = evFindHtml(); }
     if (t.id === "ev-text") { EV.tpl[EV.cur] = t.value; $("ev-paper").innerHTML = paperHtml(PRINT.forms.enter.text, evSample(EV.cur)); $("ev-def").innerHTML = evDefText(); evSaveCfg(); }
     if (t.id === "form-auto") { PRINT.forms[PRINT.cur].auto = t.checked; savePrint(); }
     if (t.id === "print-cut") { PRINT.cut = t.checked; savePrint(); }
@@ -2754,7 +2767,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 
   // 시험용: 입장권을 만드는 함수들 (자동 시험이 실제 입장 손님으로 출력 내용을 확인)
   document.addEventListener("change", (e) => { if (/^cap-(target|max|ceil)$/.test(e.target.id)) renderSheet(); }); // 숫자를 다 넣으면 계획 다시
-  window.__deskTest = { extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capPlan, capRun, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => PRINT.forms.enter.text, holders: () => holders(), LINE_COLS, evBook: () => evBook, evOf: (b) => evOf(b) };
+  window.__deskTest = { extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capPlan, capRun, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => PRINT.forms.enter.text, holders: () => holders(), LINE_COLS, evOf: (b) => evOf(b),
+    evLog: () => { const L = evLog(); return { from: L.from, count: L.count, people: Object.fromEntries([...L.people].map(([k, p]) => [k, JSON.parse(JSON.stringify(p))])) }; },
+    evInject: (name, base, n) => { const b = bookings[TODAY].find((x) => x.name === name); evAdd({ at: `${EV.from} 10:00`, day: EV.from, no: "t-" + name + n, k: evKey(b), name, phone: digits(b.phone), prev: n - 1, n, base }); renderAll(); } };
 
   // ── 반납안내 커튼 ─────────────────────────────────
   (function curtain() {

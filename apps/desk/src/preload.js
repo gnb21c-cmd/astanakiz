@@ -39,10 +39,10 @@ contextBridge.exposeInMainWorld("desk", {
     load: (day) => ipcRenderer.sendSync("state:load", day),
     save: (day, json) => ipcRenderer.send("state:save", day, json),
   },
-  // 방문 이벤트 장부 (손님별 이름 · 전화번호 · 기준일 완료 수 · 10/14) — 지우지 않음
+  // 방문 이벤트 장부 (이용완료마다 한 줄: 이름 · 전화번호 · 기준 · 네이버 완료 수 · 10/14) — 기준일마다 파일 하나 · 지우지 않음
   ledger: {
-    load: () => ipcRenderer.sendSync("ledger:load"),
-    save: (json) => ipcRenderer.send("ledger:save", json),
+    load: (from) => ipcRenderer.sendSync("ledger:load", from),
+    add: (from, line) => ipcRenderer.send("ledger:add", from, line),
   },
   print: {
     list: () => ipcRenderer.invoke("print:list"),
