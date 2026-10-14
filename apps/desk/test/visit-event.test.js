@@ -33,7 +33,7 @@ const openEvent = async (page) => { await page.click("text=운영 설정"); awai
 const find = async (page, q) => { await page.fill("#ev-q", q); return (await page.textContent("#ev-hits")).replace(/\s+/g, " "); };
 const close = (page) => page.click("#sheet [data-act=close] >> nth=0");
 
-test("방문 이벤트: 기준일부터 처음 오는 손님처럼 · 이용완료 때 기록 · 찾기 · 회차별 안내 · 끄면 원래대로", async () => {
+test("방문 이벤트(양식별 조건): 기준일부터 처음 오는 손님처럼 · 이용완료 때 기록 · 찾기 · 양식 조건 · 끄면 원래대로", async () => {
   const browser = await launch();
   try {
     const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
@@ -44,6 +44,8 @@ test("방문 이벤트: 기준일부터 처음 오는 손님처럼 · 이용완�
     assert.match(await card(page, 840, "전시윤"), /완료 9( · 취소 \d)? → 10번 완료 예정.*사은권 증정/, "꺼져 있으면 원래대로");
     await openEvent(page);
     assert.match(await page.textContent("#sheet .evstate"), /꺼짐/);
+    // 이 시험은 '양식별 조건' 방식 (기본은 도장깨기 — 아래 시험)
+    await page.click("[data-act=evMode][data-m=rule]");
     await page.fill("#ev-from", "2026-10-04");
     await page.click("[data-act=evApply]");
     assert.match(await page.textContent("#toast"), /오늘이나 앞날/, "지난 날은 기준일로 못 정함");
@@ -188,7 +190,7 @@ test("방문 이벤트(앱): 장부는 POS PC 파일(기준일.jsonl)에 이용�
     await page.clock.install({ time: new Date("2026-10-14T13:00:00") });
     await page.addInitScript(() => {
       // 기준일 10/12 · 김기록은 10/12 에 이미 이용완료 (그때 완료 6 → 7 = 이벤트 1번째)
-      const first = JSON.stringify({ at: "2026-10-12 10:58", day: "2026-10-12", no: "N1", k: "01012340000", name: "김기록", phone: "01012340000", prev: 6, n: 7, base: 6 }) + "\n";
+      const first = JSON.stringify({ at: "2026-10-12 10:58", day: "2026-10-12", no: "N1", k: "01012340000", name: "김기록", phone: "01012340000", prev: 6, n: 7, base: 6, st: "a", kind: "A", due: "2026-10-26", reset: "2026-11-11", cnt: 1 }) + "\n";
       if (localStorage.getItem("test-ledger") == null) localStorage.setItem("test-ledger", first);
       window.__adds = [];
       const BK = (no, time, name, phone, done) => ({ no, time, name, phone, qty: 1, qtyText: "1시간 50분 1", product: "1시간 50분", status: "확정", pay: "결제완료", doneCount: done, cancelCount: 0 });
@@ -198,7 +200,7 @@ test("방문 이벤트(앱): 장부는 POS PC 파일(기준일.jsonl)에 이용�
           complete: async () => ({ ok: true }),
         },
         state: { load: (day) => localStorage.getItem("test-state-" + day), save: (day, json) => localStorage.setItem("test-state-" + day, json) },
-        config: { get: async () => ({ build: "1.37", visitEvent: { on: true, from: "2026-10-12" } }), set: async () => ({ ok: true }) },
+        config: { get: async () => ({ build: "1.37", visitEvent: { on: true, from: "2026-10-12", stamp: { a: 14, b: 7, m: 30 } } }), set: async () => ({ ok: true }) },
         ledger: {
           load: (from) => (from === "2026-10-12" ? localStorage.getItem("test-ledger") : null),
           add: (from, line) => { window.__adds.push([from, line]); localStorage.setItem("test-ledger", (localStorage.getItem("test-ledger") || "") + line + "\n"); },
@@ -209,9 +211,9 @@ test("방문 이벤트(앱): 장부는 POS PC 파일(기준일.jsonl)에 이용�
     page.on("pageerror", (e) => errs.push(e.message));
     await page.goto(DESK);
     await page.waitForFunction(() => /불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 15000 });
-    // 김기록: 장부 기준 6 · 지금 완료 7 → 이번 8번째 = 이벤트 2번째 / 박새로: 장부에 없음 → 완료 3을 0으로 → 이벤트 1번째
-    assert.match(await card(page, 840, "김기록"), /완료 7 → 8번 완료 예정.*이벤트 2번째 · 2번 양식/, "10/12 처음 방문 뒤 2일 → 30일 안 재방문");
-    assert.match(await card(page, 840, "박새로"), /완료 3 → 4번 완료 예정.*이벤트 1번째 · 1번 양식/);
+    // 도장깨기(기본): 김기록은 10/12 a(다음 기한 10/26) → 오늘 10/14 기한 안 → c · 박새로는 기록 없음 → a
+    assert.match(await card(page, 840, "김기록"), /완료 7 → 8번 완료 예정.*도장깨기 c · 3번 양식/);
+    assert.match(await card(page, 840, "박새로"), /완료 3 → 4번 완료 예정.*도장깨기 a · 1번 양식/);
     assert.deepStrictEqual(await page.evaluate(() => window.__adds), [], "아직 아무도 이용완료 안 함 → 기록 없음");
 
     await enter(page, 840, "박새로");
@@ -220,6 +222,7 @@ test("방문 이벤트(앱): 장부는 POS PC 파일(기준일.jsonl)에 이용�
     const r = JSON.parse(line);
     assert.strictEqual(from, "2026-10-12");
     assert.deepStrictEqual([r.name, r.phone, r.no, r.prev, r.n, r.base, r.day], ["박새로", "01055550001", "N3", 3, 4, 3, "2026-10-14"]);
+    assert.deepStrictEqual([r.st, r.kind, r.due, r.reset, r.cnt], ["a", "A", "2026-10-28", "2026-11-13", 1], "도장 a · 다음 기한 A(14일) · 리셋 30일");
     assert.match(r.at, /^2026-10-14 \d\d:\d\d$/);
 
     // 다시 켜기: 파일에서 그대로 → 찾기
@@ -228,9 +231,118 @@ test("방문 이벤트(앱): 장부는 POS PC 파일(기준일.jsonl)에 이용�
     await openEvent(page);
     assert.match(await page.textContent("#sheet"), /기록 2명 · 이용완료 2건/);
     assert.match(await find(page, "0001"), /박새로 010-5555-0001 · 이벤트 1회.*10\/14 \d\d:\d\d 1번째/);
-    assert.match(await find(page, "김기"), /김기록 .*이벤트 1회.*10\/12 10:58 1번째/);
+    assert.match(await find(page, "김기"), /김기록 .*이벤트 1회.*도장깨기 지금 a · 다음 기한 10\/26\(A\) · 리셋 11\/11.*10\/12 10:58 1번째 a/);
     await close(page);
     assert.deepStrictEqual(await page.evaluate(() => window.__adds), [], "다시 켜도 같은 예약을 두 번 적지 않음");
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("도장깨기: a 시작 → A기한 안 c → B기한 안 e / B 넘김 · 리셋 전 d / 넘김 b · 같은 날 도장 없음 · 약속한 기한은 그대로", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK); // 체험판 10/5 (기준일 10/5)
+    await openEvent(page);
+    assert.strictEqual(await page.getAttribute("[data-act=evMode][data-m=stamp]", "aria-pressed"), "true", "기본 방식 = 도장깨기");
+    // 기한 · 음식은 사장님이 회의 뒤 직접 넣음 → 처음엔 비어 있고, 비어 있으면 못 켬
+    assert.deepStrictEqual(await page.$$eval("#sheet .evps .evpn", (e) => e.map((x) => [x.dataset.k, x.value])), [["a", ""], ["b", ""], ["m", ""]]);
+    await page.fill("#ev-from", "2026-10-05");
+    await page.click("[data-act=evApply]");
+    assert.match(await page.textContent("#toast"), /기한을 먼저 넣어/);
+    assert.match(await page.textContent("#sheet .evstate"), /꺼짐/);
+    await page.fill(".evpn[data-k=a]", "7");
+    await page.fill(".evpn[data-k=b]", "14");
+    await page.fill(".evpn[data-k=m]", "30");
+    assert.match(await page.textContent("#ev-warn"), /B기한 < A기한 < 리셋/);
+    await page.fill(".evpn[data-k=a]", "14");
+    await page.fill(".evpn[data-k=b]", "7");
+    assert.match(await page.textContent("#ev-warn"), /\{A음식\}/, "예시 문구에 쓴 음식 이름이 비어 있음");
+    await page.fill(".evfood[data-k=foodA]", "감자튀김");
+    await page.fill(".evfood[data-k=foodB]", "핫도그");
+    assert.strictEqual((await page.textContent("#ev-warn")).trim(), "");
+    await page.click("[data-act=evApply]");
+    assert.match(await page.textContent("#sheet .evstate"), /켜짐/);
+    assert.match(await page.textContent("#ev-def"), /아직 예시 문구: 1 · 2 · 3 · 4 · 5번 양식/);
+    const rows = (await page.$$eval("#sheet .evrule", (e) => e.map((x) => x.innerText.replace(/\s+/g, " ").trim())));
+    assert.deepStrictEqual(rows.map((r) => r.split(" ").slice(0, 3).join(" ")), ["1번 양식 a", "2번 양식 b", "3번 양식 c", "4번 양식 d", "5번 양식 e"]);
+    // 미리보기: 3번(c) — A음식 쿠폰 + B기한 안내
+    await page.click("[data-act=evTpl][data-i='2']");
+    assert.match((await page.textContent("#ev-paper")).replace(/\s+/g, " "), /도장깨기 성공!.*\[ 감자튀김 쿠폰 \].*10월 12일까지 또 오시면.*핫도그 쿠폰을 드려요.*\(7일 안 · 도장 2개\)/);
+    await close(page);
+
+    // 기준일 뒤 지난 기록 (오늘 10/5)
+    const inject = (name, o) => page.evaluate(([n, x]) => window.__deskTest.evInject(n, x), [name, o]);
+    await inject("홍예준", { day: "2026-09-25", st: "a", kind: "A", due: "2026-10-09", reset: "2026-10-25", cnt: 1 }); // A 안 → c
+    await inject("고은우", { day: "2026-09-10", st: "a", kind: "A", due: "2026-09-24", reset: "2026-10-10", cnt: 1 }); // A 넘김 → b
+    await inject("류하린", { day: "2026-10-01", st: "c", kind: "B", due: "2026-10-08", reset: "2026-10-31", cnt: 2 }); // B 안 → e
+    await inject("송다온", { day: "2026-09-20", st: "c", kind: "B", due: "2026-09-27", reset: "2026-10-20", cnt: 2 }); // B 넘김 · 리셋 전 → d
+    await inject("김어긋", { day: "2026-09-01", st: "c", kind: "B", due: "2026-09-08", reset: "2026-10-01", cnt: 2 }); // 리셋 넘김 → b
+    const expect = { 전시윤: "a · 1번", 홍예준: "c · 3번", 고은우: "b · 2번", 류하린: "e · 5번", 송다온: "d · 4번", 김어긋: "b · 2번" };
+    for (const [n, x] of Object.entries(expect)) assert.match(await card(page, 840, n), new RegExp(`도장깨기 ${x} 양식`), n);
+
+    // 입장 → 입장권 · 장부
+    await enter(page, 840, "전시윤");
+    assert.match(await page.textContent("#toast"), /도장깨기 a · 1번 양식/);
+    let t = await ticket(page, "전시윤");
+    for (const l of ["도장깨기 시작!", "10월 19일까지 다시 오시면", "감자튀김 쿠폰을 드려요", "(14일 안 재방문 · 도장 1개)", "마지막 방문 뒤 30일이 지나면"]) assert.ok(t.includes(l), l + " | " + t.join(" | "));
+    assert.ok(!t.some((l) => /네이버 예약 \d+번|사은권/.test(l)), "원래 누계 · 사은권 줄 없음");
+    await enter(page, 840, "홍예준");
+    t = await ticket(page, "홍예준");
+    for (const l of ["도장깨기 성공!", "[ 감자튀김 쿠폰 ]", "10월 12일까지 또 오시면", "핫도그 쿠폰을 드려요", "(7일 안 · 도장 2개)"]) assert.ok(t.includes(l), l + " | " + t.join(" | "));
+    await enter(page, 840, "류하린");
+    t = await ticket(page, "류하린");
+    for (const l of ["도장깨기 대성공!", "[ 핫도그 쿠폰 ]", "10월 19일까지 다시 오시면", "감자튀김 쿠폰을 드려요", "(14일 안 · 도장 3개)"]) assert.ok(t.includes(l), l + " | " + t.join(" | "));
+    await enter(page, 840, "송다온");
+    t = await ticket(page, "송다온");
+    for (const l of ["도장깨기 계속!", "[ 감자튀김 쿠폰 ]", "감자튀김 쿠폰을 또 드려요", "(14일 안 · 도장 3개)"]) assert.ok(t.includes(l), l + " | " + t.join(" | "));
+    await enter(page, 840, "고은우");
+    t = await ticket(page, "고은우");
+    for (const l of ["다시!! 재도전", "10월 19일까지 다시 오시면"]) assert.ok(t.includes(l), l + " | " + t.join(" | "));
+    // 예시 문구도 OK-50 한 줄(42칸) 안
+    const cols = (x) => [...x].reduce((a, c) => a + (c.charCodeAt(0) < 128 ? 1 : 2), 0);
+    for (const n of ["전시윤", "홍예준", "류하린", "송다온", "고은우"]) {
+      const ls = await page.evaluate((nm) => { const T = window.__deskTest, h = T.holders().find((x) => x.name === nm); return T.receiptLines(T.form(), T.keyVals(h)).filter((l) => l.ev && l.t).map((l) => [l.t, l.size || 1]); }, n);
+      assert.ok(ls.length > 3, n);
+      for (const [x, z] of ls) assert.ok(cols(x) * z <= 42, `${n}: 42칸 넘음 ${x}`);
+    }
+    const ppl = Object.values((await page.evaluate(() => window.__deskTest.evLog())).people);
+    const lastOf = (n) => { const p = ppl.find((x) => x.name === n); return p.visits[p.visits.length - 1]; };
+    assert.deepStrictEqual(["st", "kind", "due", "reset", "cnt"].map((k) => lastOf("홍예준")[k]), ["c", "B", "2026-10-12", "2026-11-04", 2], "c 뒤 다음 기한 B(7일)");
+    assert.deepStrictEqual(["st", "kind", "due", "cnt"].map((k) => lastOf("류하린")[k]), ["e", "A", "2026-10-19", 3]);
+
+    // 같은 시간 나눠 한 예약: 한 번 방문 → 도장 하나 (a)
+    await enter(page, 900, "나분할");
+    const nab = ppl.length && Object.values((await page.evaluate(() => window.__deskTest.evLog())).people).find((x) => x.name === "나분할");
+    assert.deepStrictEqual(nab.visits.map((v) => v.st), ["a", ""], "예약 2건 · 도장은 하나");
+
+    // 같은 날 또 오면 도장 없음 (안내 없이 출력)
+    await page.evaluate(() => { const T = window.__deskTest, h = T.holders().find((x) => x.name === "전시윤"); T.addBooking("2026-10-05", "16:30", "전시윤", h.phone, 1, { prevDone: 10 }); });
+    assert.match(await card(page, 990, "전시윤"), /도장깨기 · 오늘 이미 도장/);
+
+    // 일수를 바꿔도 이미 찍어 준 기한은 그대로 (전시윤 a: 10/19), 새 손님부터 바뀐 일수
+    await openEvent(page);
+    await page.fill(".evpn[data-k=a]", "10");
+    assert.match((await page.textContent("#ev-paper")).replace(/\s+/g, " "), /10월 12일까지 또 오시면/, "미리보기 3번(c)은 B 7일");
+    await page.click("[data-act=evTpl][data-i='0']");
+    assert.match((await page.textContent("#ev-paper")).replace(/\s+/g, " "), /10월 15일까지 다시 오시면/, "1번(a)은 바뀐 A 10일");
+    await close(page);
+    assert.strictEqual(lastOf("전시윤").due, "2026-10-19");
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("astanakiz-visitevent")));
+    assert.deepStrictEqual([saved.mode, saved.stamp], ["stamp", { a: 10, b: 7, m: 30, foodA: "감자튀김", foodB: "핫도그" }]);
+
+    // 찾기: 지금 상태 · 다음 기한
+    await openEvent(page);
+    assert.match(await find(page, "홍예준"), /도장깨기 지금 c · 다음 기한 10\/12\(B\) · 리셋 11\/04.*09\/25 10:00 \d+번째 a.*번째 c/);
+    // 양식별 조건으로 바꾸면 기본 문구인 양식은 그 방식 기본 문구로 · 다시 도장깨기로 바꾸면 돌아옴
+    await page.click("[data-act=evMode][data-m=rule]");
+    assert.match(await page.inputValue("#ev-text"), /방문 이벤트 \{이벤트회\}번째/);
+    await page.click("[data-act=evMode][data-m=stamp]");
+    assert.match(await page.inputValue("#ev-text"), /도장깨기 시작!/);
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();
