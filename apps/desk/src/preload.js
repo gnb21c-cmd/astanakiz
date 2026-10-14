@@ -39,10 +39,13 @@ contextBridge.exposeInMainWorld("desk", {
     load: (day) => ipcRenderer.sendSync("state:load", day),
     save: (day, json) => ipcRenderer.send("state:save", day, json),
   },
-  // 방문 이벤트 장부 (이용완료마다 한 줄: 이름 · 전화번호 · 기준 · 네이버 완료 수 · 10/14) — 기준일마다 파일 하나 · 지우지 않음
+  // 방문 이벤트 참여자 기록 (이용완료마다 한 줄 · 10/14) — 앱 폴더 + 바탕화면 '아스타나키즈-이벤트' 두 곳 · 지우지 않음
   ledger: {
-    load: (from) => ipcRenderer.sendSync("ledger:load", from),
-    add: (from, line) => ipcRenderer.send("ledger:add", from, line),
+    load: (from) => ipcRenderer.sendSync("ledger:load", from), // 두 곳을 합친 글 (빠진 쪽은 채움)
+    add: (from, line) => ipcRenderer.sendSync("ledger:add", from, line), // → { app, desk } 저장됐나
+    csv: (from, text) => ipcRenderer.send("ledger:csv", from, text), // 바탕화면 엑셀 정리본
+    dirs: () => ipcRenderer.sendSync("ledger:dirs"),
+    open: () => ipcRenderer.invoke("ledger:open"), // 바탕화면 폴더 열기
   },
   print: {
     list: () => ipcRenderer.invoke("print:list"),

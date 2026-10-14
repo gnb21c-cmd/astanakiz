@@ -201,9 +201,13 @@ test("방문 이벤트(앱): 장부는 POS PC 파일(기준일.jsonl)에 이용�
         },
         state: { load: (day) => localStorage.getItem("test-state-" + day), save: (day, json) => localStorage.setItem("test-state-" + day, json) },
         config: { get: async () => ({ build: "1.37", visitEvent: { on: true, from: "2026-10-12", stamp: { a: 14, b: 7, m: 30 } } }), set: async () => ({ ok: true }) },
+        // 설치한 앱: 앱 폴더 + 바탕화면 두 곳에 저장 → { app, desk } · 바탕화면 엑셀 정리본
         ledger: {
           load: (from) => (from === "2026-10-12" ? localStorage.getItem("test-ledger") : null),
-          add: (from, line) => { window.__adds.push([from, line]); localStorage.setItem("test-ledger", (localStorage.getItem("test-ledger") || "") + line + "\n"); },
+          add: (from, line) => { window.__adds.push([from, line]); localStorage.setItem("test-ledger", (localStorage.getItem("test-ledger") || "") + line + "\n"); return { app: true, desk: !window.__deskFail }; },
+          csv: (from, text) => { window.__csv = [from, text]; },
+          dirs: () => ({ app: "C:/앱/visit-ledger", desk: "C:/바탕화면/아스타나키즈-이벤트" }),
+          open: async () => ({ ok: true }),
         },
       };
     });
@@ -223,6 +227,14 @@ test("방문 이벤트(앱): 장부는 POS PC 파일(기준일.jsonl)에 이용�
     assert.strictEqual(from, "2026-10-12");
     assert.deepStrictEqual([r.name, r.phone, r.no, r.prev, r.n, r.base, r.day], ["박새로", "01055550001", "N3", 3, 4, 3, "2026-10-14"]);
     assert.deepStrictEqual([r.st, r.kind, r.due, r.reset, r.cnt], ["a", "A", "2026-10-28", "2026-11-13", 1], "영수증 a · 다음 기한 A(14일) · 리셋 30일");
+    // 바탕화면 엑셀 정리본: 손님마다 한 줄 (잠깐 뒤 한 번에)
+    await page.clock.runFor(1500);
+    const [cf, ct] = await page.evaluate(() => window.__csv);
+    const crow = ct.split("\r\n");
+    assert.strictEqual(cf, "2026-10-12");
+    assert.match(crow[0], /"이름","전화번호","이벤트 방문 수","첫 방문","마지막 방문","마지막 영수증","다음 기한\(포함\)"/);
+    assert.ok(crow.some((l) => /^"박새로","010-5555-0001","1","2026-10-14","2026-10-14","a","2026-10-28","A","2026-11-13"/.test(l)), crow.join("\n"));
+    assert.ok(crow.some((l) => /^"김기록","010-1234-0000","1","2026-10-12"/.test(l)), "지난 기록도");
     assert.match(r.at, /^2026-10-14 \d\d:\d\d$/);
 
     // 다시 켜기: 파일에서 그대로 → 찾기
@@ -232,8 +244,16 @@ test("방문 이벤트(앱): 장부는 POS PC 파일(기준일.jsonl)에 이용�
     assert.match(await page.textContent("#sheet"), /기록 2명 · 이용완료 2건/);
     assert.match(await find(page, "0001"), /박새로 010-5555-0001 · 이벤트 1회.*10\/14 \d\d:\d\d 1번째/);
     assert.match(await find(page, "김기"), /김기록 .*이벤트 1회.*이벤트 지금 a · 다음 기한 10\/26\(A\) · 리셋 11\/11.*10\/12 10:58 1번째 a/);
+    assert.match(await page.textContent("#sheet"), /바탕화면 '아스타나키즈-이벤트' \+ 앱 폴더 두 곳에 저장/);
+    assert.ok(await page.$("#sheet [data-act=evOpen]"), "바탕화면 폴더 열기");
     await close(page);
     assert.deepStrictEqual(await page.evaluate(() => window.__adds), [], "다시 켜도 같은 예약을 두 번 적지 않음");
+    // 바탕화면에 못 쓰면 알림 (앱 폴더에는 저장)
+    await page.evaluate(() => { window.__deskFail = true; });
+    await enter(page, 840, "김기록");
+    await page.waitForFunction(() => window.__adds.length === 1);
+    await openEvent(page); // 알림은 다른 알림에 덮일 수 있어 설정 화면에도 남김
+    assert.match(await page.textContent("#sheet"), /⚠ 저장 확인: \d\d:\d\d 바탕화면 폴더에 못 씀 \(다른 한 곳에는 저장됨\)/);
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();

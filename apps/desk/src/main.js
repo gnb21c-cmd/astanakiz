@@ -671,24 +671,31 @@ ipcMain.on("state:save", (_e, day, json) => {
   }
 });
 
-// 방문 이벤트 장부 (사장님 10/14): 기준일마다 파일 하나(visit-ledger\기준일.jsonl), 이용완료(네이버 예약 1건)마다 한 줄 덧붙임
-// { at, day, no, k, name, phone, prev, n, base } — 월 3,000건이 넘어도 통째로 다시 쓰지 않음 · 지우지 않음 (이벤트를 끄거나 되돌릴 때 필요)
-const LEDGER_DIR = () => path.join(app.getPath("userData"), "visit-ledger");
-const ledgerFile = (from) => path.join(LEDGER_DIR(), `${String(from).replace(/[^0-9-]/g, "") || "x"}.jsonl`);
+// 방문 이벤트 참여자 기록 (사장님 10/14): 앱 폴더 + 바탕화면 '아스타나키즈-이벤트' 두 곳에 같이 (ledger-store.js)
+// 이용완료(네이버 예약 1건)마다 두 곳에 한 줄 · 켤 때 두 곳을 합치고 빠진 쪽을 채움 · 바탕화면에 엑셀 정리본 · 지우지 않음
+const ledgerStore = require("./ledger-store");
+const ledgerDirs = () => ({ app: path.join(app.getPath("userData"), "visit-ledger"), desk: path.join(app.getPath("desktop"), ledgerStore.DESK_FOLDER) });
 ipcMain.on("ledger:load", (e, from) => {
   try {
-    e.returnValue = fs.readFileSync(ledgerFile(from), "utf8");
+    e.returnValue = ledgerStore.load(ledgerDirs(), from).text;
   } catch (err) {
     e.returnValue = null;
   }
 });
-ipcMain.on("ledger:add", (_e, from, line) => {
+ipcMain.on("ledger:add", (e, from, line) => {
   try {
-    fs.mkdirSync(LEDGER_DIR(), { recursive: true });
-    fs.appendFileSync(ledgerFile(from), String(line).replace(/[\r\n]+/g, " ") + "\n", "utf8");
+    e.returnValue = ledgerStore.add(ledgerDirs(), from, line);
   } catch (err) {
-    /* 저장 실패 — 다음 이용완료 때 다시 (화면은 그대로) */
+    e.returnValue = { app: false, desk: false };
   }
+});
+ipcMain.on("ledger:csv", (_e, from, text) => { ledgerStore.csv(ledgerDirs(), from, text); });
+ipcMain.on("ledger:dirs", (e) => { e.returnValue = ledgerDirs(); });
+ipcMain.handle("ledger:open", async () => {
+  const d = ledgerDirs().desk;
+  try { fs.mkdirSync(d, { recursive: true }); } catch (err) { /* 아래에서 알림 */ }
+  const why = await shell.openPath(d);
+  return why ? { ok: false, why } : { ok: true, dir: d };
 });
 
 // ── 영수증 프린터 (80mm 감열지) ──
