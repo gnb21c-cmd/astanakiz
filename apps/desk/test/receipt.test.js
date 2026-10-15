@@ -64,3 +64,60 @@ test("입장권: 빈칸이 다 채워지고 · 입장시간은 예약 시간 · 
     await browser.close();
   }
 });
+
+test("[자르기]: 양식 한 줄로 그 자리에서 종이를 자름 (쿠폰 떼기) — COM 은 그 자리에 자르기 명령 · Windows 프린터는 조각마다 출력 + 자르기 · 미리보기 표시 · 조건", async () => {
+  const browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK);
+    const FORM = "^위 입장권\n[자르기]\n#* [ 수제돈까스 쿠폰 ]\n[이벤트][자르기]\n^아래 안내";
+    const r = await page.evaluate((f) => {
+      const T = window.__deskTest, h = T.holders().find((x) => !x.walk), v = T.keyVals(h);
+      const lines = T.receiptLines(f, v).map((l) => l.k + ":" + l.t);
+      const flat = (parts) => parts.flatMap((p) => (p.b ? p.b.map((x) => "b" + x) : ["t:" + p.t.trim()]));
+      return { lines, on: flat(T.escposParts(f, v, true)), off: flat(T.escposParts(f, v, false)), docs: T.receiptDocs(f, v), whole: T.receiptDocs(f, v, true) };
+    }, FORM);
+    assert.deepStrictEqual(r.lines, ["ctr:위 입장권", "cut:", "big:[ 수제돈까스 쿠폰 ]", "ctr:아래 안내"], "조건 [이벤트] 가 안 맞으면 그 자르기는 없음");
+    const CUT = ["b29", "b86", "b1"];
+    const at = (arr, from) => arr.findIndex((x, i) => i >= from && x === "b29" && arr[i + 1] === "b86" && arr[i + 2] === "b1");
+    for (const [name, arr, end] of [["끝 자르기 켬", r.on, true], ["끝 자르기 끔", r.off, false]]) {
+      const top = arr.indexOf("t:위 입장권"), coupon = arr.indexOf("t:[ 수제돈까스 쿠폰 ]"), mid = at(arr, top);
+      assert.ok(top >= 0 && mid > top && mid < coupon, `${name}: 위 입장권 → 자르기 → 쿠폰`);
+      assert.deepStrictEqual(arr.slice(mid - 2, mid), ["b100", "b4"], `${name}: 자르기 전에 4줄 올림`);
+      assert.strictEqual(at(arr, coupon) >= 0, end, `${name}: 맨 끝 자르기는 설정대로`);
+    }
+    assert.strictEqual(r.docs.length, 2, "Windows 프린터: [자르기] 에서 두 조각");
+    assert.ok(r.docs[0].includes("위 입장권") && !r.docs[0].includes("쿠폰") && r.docs[1].includes("수제돈까스 쿠폰") && r.docs.every((d) => !d.includes("여기서 자름")));
+    assert.strictEqual(r.whole.length, 1, "인쇄 창 확인용은 하나로");
+
+    // Windows 프린터로 출력: 조각마다 차례로 · 사이는 꼭 자르고 · 끝은 설정대로 · 짧은 조각 허용
+    const calls = await page.evaluate(async (f) => {
+      const T = window.__deskTest, h = T.holders().find((x) => !x.walk), v = T.keyVals(h), calls = [];
+      window.desk = { print: { html: async (j) => { calls.push({ cut: j.cut, minMm: j.minMm, coupon: j.html.includes("쿠폰") }); return { ok: true }; } } };
+      Object.assign(T.PRINT, { mode: "win", sel: "POS-80", cut: false });
+      await T.sendPrint(f, v);
+      Object.assign(T.PRINT, { cut: true });
+      await T.sendPrint(f, v);
+      await T.sendPrint(f, v, { dialog: true });
+      delete window.desk;
+      return calls;
+    }, FORM);
+    assert.deepStrictEqual(calls, [
+      { cut: true, minMm: 10, coupon: false }, { cut: false, minMm: 10, coupon: true },
+      { cut: true, minMm: 10, coupon: false }, { cut: true, minMm: 10, coupon: true },
+      { cut: false, minMm: undefined, coupon: true },
+    ]);
+
+    // 미리보기: 자르는 자리 표시 · 설명
+    await page.click("text=운영 설정");
+    await page.click('[data-t="printer"]');
+    await page.fill("#form-text", FORM);
+    assert.deepStrictEqual(await page.$$eval("#paper .pl", (e) => e.map((x) => x.textContent.trim()).filter(Boolean)), ["위 입장권", "✂ 여기서 자름", "[ 수제돈까스 쿠폰 ]", "아래 안내"]);
+    assert.match(await page.textContent("#sheet .formhelp"), /\[자르기\] 한 줄 = 그 자리에서 종이 자름/);
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});

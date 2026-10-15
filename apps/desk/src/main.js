@@ -934,7 +934,7 @@ const CUT = [0x1b, 0x64, 0x03, 0x1d, 0x56, 0x01];
 ipcMain.handle("print:cut", (_e, deviceName) => rawSend(deviceName, CUT));
 
 // 영수증 HTML 을 그 프린터로 출력. silent=false 면 Windows 인쇄 창을 띄움 (드라이버 확인용)
-ipcMain.handle("print:html", async (_e, { html, deviceName, silent = true, widthMm = 80, cut = true }) => {
+ipcMain.handle("print:html", async (_e, { html, deviceName, silent = true, widthMm = 80, cut = true, minMm = 50 }) => {
   let w = null;
   try {
     const file = path.join(app.getPath("temp"), "astanakiz-receipt.html");
@@ -942,8 +942,8 @@ ipcMain.handle("print:html", async (_e, { html, deviceName, silent = true, width
     w = new BrowserWindow({ show: false, width: Math.round((widthMm / 25.4) * 96), height: 1200, webPreferences: { backgroundThrottling: false } });
     await w.loadFile(file);
     const hpx = await w.webContents.executeJavaScript("Math.ceil(document.documentElement.scrollHeight)");
-    // 감열지는 길이가 정해져 있지 않음 → 내용 높이만큼 (+여백 10mm)
-    const heightMicrons = Math.max(50000, Math.ceil((hpx / 96) * 25400) + 10000);
+    // 감열지는 길이가 정해져 있지 않음 → 내용 높이만큼 (+여백 10mm) · [자르기] 로 나눈 조각은 짧아도 됨(minMm)
+    const heightMicrons = Math.max(Math.max(10, Number(minMm) || 50) * 1000, Math.ceil((hpx / 96) * 25400) + 10000);
     const res = await new Promise((resolve) =>
       w.webContents.print(
         { silent, deviceName: deviceName || undefined, printBackground: true, margins: { marginType: "none" }, pageSize: { width: widthMm * 1000, height: heightMicrons } },
