@@ -900,6 +900,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
      방문 횟수(마일리지)는 네이버와 같이 예약 건수로 셈 — 연속예약도 예약마다 1회 */
   const CHAIN_STEP = RULES.useMinutes + 10; // 120분
   const samePerson = (b) => (bookings[b.day] || []).filter((x) => x.name === b.name && digits(x.phone) === digits(b.phone) && x.phone).sort((x, y) => x.slot - y.slot);
+  /** 이 예약 전 네이버 '완료' 수 — 같은 사람이 오늘 이미 따로 입장(이용완료)했는데 네이버를 다시 불러오기 전이면 '완료 n'이 옛 숫자 → 그만큼 올림 (10/15) */
+  const doneSoFar = (b) => { let m = b.prevDone; if (m == null) return m; for (const x of samePerson(b)) if (x !== b && x.status === "완료") { const e = x.visitEnd || x.visitNo; if (e != null && e > m) m = e; } return m; };
+  const liftDone = (x) => { if (x.status === "완료") return; const m = doneSoFar(x); if (m != null && m > x.prevDone) x.prevDone = m; };
   /* 같은 사람(이름 + 전화번호)이 같은 시간에 예약을 나눠 한 것 (1장 + 1장 등) → 한 번에 입장 · 네이버도 모두 이용완료 (사용자 지시 10/7)
      첫 카드(예약번호 순) = 대표, 열쇠는 합친 장수만큼 대표에게 */
   const partyOf = (b) => (b && b.phone ? samePerson(b).filter((x) => x.slot === b.slot).sort((x, y) => String(x.no || x.id).localeCompare(String(y.no || y.id))) : [b]);
@@ -1020,6 +1023,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   }
   function extComplete(e) {
     const { h, x } = e;
+    liftDone(x);
     Object.assign(x, { status: "완료", enteredAt: now, chainHead: h.id, naverPending: APP, visitNo: x.prevDone == null ? null : x.prevDone + 1 });
     const nsl = (naverSlots[x.day] || {})[x.slot]; if (nsl) { nsl.conf = Math.max(0, nsl.conf - x.qty); nsl.done += x.qty; }
     if (APP) setTimeout(naverFlush, 0);
@@ -1112,6 +1116,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   function visitText(b) {
     if (b.status === "완료" ? !b.visitNo : b.prevDone == null) return `<span class="help">이용완료 횟수 확인 중</span>`;
     const c = b.cancels ? ` · 취소 ${b.cancels}` : "", done = b.status === "완료";
+    if (!done) liftDone(b); // 같은 사람이 오늘 이미 따로 입장했으면 '완료 n'을 그만큼 (네이버를 다시 불러오면 같아짐)
     if (evFrozen(b)) {
       const ev = evOf(b), m = evFrozenMile(b);
       return (done ? `<b>${b.visitNo}번째 예약완료</b>` : `완료 ${b.prevDone}${c}`) + (m != null ? ` · <b>마일리지 ${m} 멈춤</b>` : "") + (ev ? ` <span class="evtag">${evLabel(ev)}</span>` : "");
@@ -2328,10 +2333,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     for (const f of evFroms()) {
       if (o.skip && f === o.skip) continue;
       const p = evLog(f).people.get(k);
-      if (p) s += Math.max(0, Math.min(p.last, N) - p.base);
+      if (p) s += evCnt(p, N);
     }
     return s;
   }
+  /** 장부 한 사람의 이벤트 기간 이용완료 수 (네이버 순번 N까지) = 순번 차이 · 기록 건수 중 큰 것 (네이버 '완료 n'이 옛 숫자라 순번이 겹친 기록도 셈) */
+  const evCnt = (p, N = Infinity) => Math.max(0, Math.min(p.last, N) - p.base, p.visits.filter((v) => v.n <= N).length);
   /** 이벤트 기간에 이용완료한 예약인가 (장부에 있음) */
   const evWas = (b) => evFroms().some((f) => evLog(f).nos.has(b.no || b.id));
   /** 장부에 한 줄 덧붙임 — 설치한 앱: 앱 폴더 + 바탕화면 '아스타나키즈-이벤트' 두 곳 (사장님 10/14) · 체험판: 브라우저 */
@@ -2359,10 +2366,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   const evGifts = (p) => p.visits.filter((v) => v.st === "성공").length;
   function evCsv() {
     const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`, md = (d) => (d ? String(d).slice(0, 10) : "");
-    const head = ["이름", "전화번호", "이벤트 방문 수", "사은품(성공)", "첫 방문", "마지막 방문", "다음 기한(포함)", "네이버 완료(이벤트 전)", "네이버 완료(마지막)", "마일리지에서 뺄 수", "방문 기록"];
+    const head = ["이름", "전화번호", "방문일 수", "이용완료 건수", "사은품(성공)", "첫 방문", "마지막 방문", "다음 기한(포함)", "네이버 완료(이벤트 전)", "네이버 완료(마지막)", "마일리지에서 뺄 수", "방문 기록"];
     const rows = [...evLog().people.values()].sort((a, b) => String(a.name).localeCompare(String(b.name), "ko")).map((p) => {
       const vs = p.visits.slice().sort((a, b) => (String(a.at) < String(b.at) ? -1 : 1)), last = evLastOf(p);
-      return [p.name, fmtPhone(p.phone), vs.length, evGifts(p), md(vs[0] && vs[0].at), md(vs.length && vs[vs.length - 1].at), last ? last.due : "", p.base, p.last, p.last - p.base, vs.map((v) => `${v.at}${v.st ? " " + v.st : ""}`).join(" / ")];
+      return [p.name, fmtPhone(p.phone), evDays2(p).length, vs.length, evGifts(p), md(vs[0] && vs[0].at), md(vs.length && vs[vs.length - 1].at), last ? last.due : "", p.base, p.last, evCnt(p), vs.map((v) => `${v.at}${v.st ? " " + v.st : ""}`).join(" / ")];
     });
     return [head, ...rows].map((r) => r.map(q).join(",")).join("\r\n") + "\r\n";
   }
@@ -2375,18 +2382,27 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   }
   /** 이벤트 동안 멈춘 마일리지 = 이벤트 시작 때 네이버 완료 − 지난 이벤트 이용완료 */
   const evFrozenMile = (b) => { const base = evBase(b); return base == null ? null : Math.max(0, base - evSub(b, { skip: EV.from })); };
-  /** 이번 방문의 이벤트 영수증 { st, due, last, same } — 이벤트 밖 · 현장 · 완료 수를 모르면 null */
+  /** 방문일별로 묶음: [{ day, st(그날 영수증), n(이용완료 건수) }] — 이벤트는 방문일 기준 */
+  const evDays2 = (p) => { const m = new Map(); for (const v of p.visits.slice().sort((a, b) => (String(a.at) < String(b.at) ? -1 : 1))) { const d = m.get(v.day) || { day: v.day, st: "", n: 0 }; d.n++; if (v.st && !d.st) d.st = v.st; m.set(v.day, d); } return [...m.values()].sort((a, b) => (a.day < b.day ? -1 : 1)); };
+  /** 이번 방문의 이벤트 영수증 { st, due, last, same } — 이벤트 밖 · 현장 · 완료 수를 모르면 null
+      이벤트는 **방문한 날** 기준 (사장님 10/15): 그날 몇 장 · 몇 건(나눠 한 예약 · 연속예약 · 입장 뒤 추가 예약 · 다시 등록)이든 그날 방문은 한 번
+      → 오늘 이미 기록이 있으면 '오늘 이미 방문'(기한 그대로 · 사은품 없음) · 성공은 오늘 뒤 날짜에 다시 올 때만 (네이버 완료 순번은 안 봄) */
   function evOf(b) {
     if (!evFrozen(b)) return null;
     const n = b.status === "완료" ? b.visitNo : b.prevDone == null ? null : b.prevDone + 1;
     if (!n) return null;
-    // 한 번 방문 단위: 함께 이용완료한 예약(나눠 한 예약 · 연속예약)은 대표 예약으로 봄
+    // 함께 이용완료한 예약은 대표 예약의 기록으로 봄 · 이미 적힌 예약이면 그 줄보다 앞에 적힌 기록만
     const h = (b.chainHead && (bookings[b.day] || []).find((x) => x.id === b.chainHead)) || b;
-    const hn = h === b ? n : h.visitNo || n;
-    return evRule(evLastOf(evLog().people.get(evKey(b)), hn), b.day);
+    const p = evLog().people.get(evKey(b)), vs = p ? p.visits : [];
+    const i = vs.findIndex((v) => String(v.no) === String(h.no || h.id));
+    const before = (i >= 0 ? vs.slice(0, i) : vs).filter((v) => v.day && v.day <= b.day);
+    if (!before.length) return evRule(null, b.day);
+    const day = before.reduce((a, v) => (v.day > a ? v.day : a), "");
+    const that = before.filter((v) => v.day === day), rc = that.filter((v) => v.st); // 그날 영수증 기록(다음 기한)
+    return evRule(rc.length ? rc[rc.length - 1] : { day, due: "" }, b.day);
   }
   /** 카드 · 알림 표시: 이벤트 성공 · 수제돈까스 / 이벤트 안내 · 11/21까지 */
-  const evLabel = (ev) => (ev.st === "성공" ? `이벤트 성공 · ${EV.gift}` : `이벤트 안내${ev.same ? " · 오늘 또 옴" : ""}${ev.due ? ` · ${md2(ev.due)}까지` : " · 마지막 날"}`);
+  const evLabel = (ev) => (ev.st === "성공" ? `이벤트 성공 · ${EV.gift}` : `이벤트 안내${ev.same ? " · 오늘 이미 방문" : ""}${ev.due ? ` · ${md2(ev.due)}까지` : " · 마지막 날"}`);
   const md2 = (d) => { const [, m, x] = String(d).split("-").map(Number); return `${m}/${x}`; };
   /** 오늘 이용완료한 네이버 예약을 장부에 (화면을 그릴 때마다 · 이미 적은 예약번호는 건너뜀) */
   function evSync() {
@@ -2423,10 +2439,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (!r.length) return `<span class="help">'${esc(EV.q)}' — 이벤트 기간 이용완료 기록이 없어요 (마일리지 = 네이버 완료 그대로)</span>`;
     const md = (d) => String(d).slice(5).replace("-", "/"), many = evFroms().length > 1;
     return r.slice(0, 20).map((x) => {
-      const sub = x.evs.reduce((a, e) => a + Math.max(0, e.p.last - e.p.base), 0);
+      const sub = x.evs.reduce((a, e) => a + evCnt(e.p), 0);
       const top = x.evs[0].p, mile = Math.max(0, top.last - sub);
       return `<div class="evhit"><b>${esc(x.name)}</b> <span class="num">${fmtPhone(x.phone)}</span> · <b>마일리지 ${mile}</b> <span class="help">(네이버 완료 ${top.last} − 이벤트 ${sub})</span>
-      ${x.evs.map((e) => { const p = e.p, last = evLastOf(p); return `<div class="help num">${many ? `${md(e.from)}~ ` : ""}이벤트 ${p.visits.length}회 · 성공 ${evGifts(p)}번${last && last.due && e.from === EV.from ? ` · 다음 기한 ${md(last.due)}` : ""} — ${p.visits.slice().sort((a, b) => a.n - b.n).map((v) => `${esc(md(v.day || v.at).slice(0, 5))}${v.st ? ` ${v.st}` : ""}`).join(" · ")}</div>`; }).join("")}</div>`;
+      ${x.evs.map((e) => { const p = e.p, last = evLastOf(p), ds = evDays2(p); return `<div class="help num">${many ? `${md(e.from)}~ ` : ""}방문 ${ds.length}일 · 성공 ${evGifts(p)}번${last && last.due && e.from === EV.from ? ` · 다음 기한 ${md(last.due)}` : ""} — ${ds.map((d) => `${esc(md(d.day).slice(0, 5))}${d.st ? ` ${d.st}` : ""}${d.n > 1 ? `(${d.n}건)` : ""}`).join(" · ")}</div>`; }).join("")}</div>`;
     }).join("") + (r.length > 20 ? `<span class="help">${r.length}명 중 20명 — 더 넣어 좁혀 주세요</span>` : "");
   }
   /** 입장권에 이벤트 안내 끼우기: [네이버] · [사은권] 줄(마일리지) 대신 그 자리에 (양식에 {이벤트안내} 줄이 있으면 거기)
@@ -2681,6 +2697,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       // 열쇠는 바로 등록하고 네이버 이용완료는 뒤에서 (naverFlush) — 근무자가 기다리지 않음
       if (APP) b.naverPending = true;
       const ch = chainOf(b);
+      for (const x of [b, ...party, ...ch]) liftDone(x); // 오늘 이미 따로 입장한 만큼 (네이버를 다시 불러오기 전)
       Object.assign(b, { status: "완료", keys: sheet.keys.slice(), enteredAt: now, visitNo: b.prevDone == null ? null : b.prevDone + 1 });
       const moveSlot = (x) => { const nsl = (naverSlots[x.day] || {})[x.slot]; if (nsl) { nsl.conf = Math.max(0, nsl.conf - x.qty); nsl.done += x.qty; } }; // 다음 불러오기 전까지 칸 숫자도 확정 → 완료
       moveSlot(b);

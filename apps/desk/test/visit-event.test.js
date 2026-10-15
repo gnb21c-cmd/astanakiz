@@ -93,7 +93,7 @@ test("재방문 이벤트: 시작일 ~ 종료일 · 켜는 순간부터 마일�
 
     // 같은 날 또 오면 1번 안내 (기한 그대로)
     await page.evaluate(() => { const T = window.__deskTest, h = T.holders().find((x) => x.name === "전시윤"); T.addBooking("2026-10-05", "16:30", "전시윤", h.phone, 1, { prevDone: 10 }); });
-    assert.match(await card(page, 990, "전시윤"), /완료 10 · 마일리지 9 멈춤 이벤트 안내 · 오늘 또 옴 · 10\/25까지/);
+    assert.match(await card(page, 990, "전시윤"), /완료 10 · 마일리지 9 멈춤 이벤트 안내 · 오늘 이미 방문 · 10\/25까지/);
     // 같은 시간 나눠 한 예약(완료 8, 2건): 한 번 방문 → 이벤트 영수증 하나 · 장부엔 2건
     await enter(page, 900, "나분할");
     assert.ok((await ticket(page, "나분할")).includes("재방문 이벤트"));
@@ -103,14 +103,14 @@ test("재방문 이벤트: 시작일 ~ 종료일 · 켜는 순간부터 마일�
     await openEvent(page);
     assert.match(await page.textContent("#sheet"), /기록 2명 · 이용완료 3건/);
     const hits = await find(page, "1234");
-    assert.match(hits, /나분할 010-6660-1234 · 마일리지 8 \(네이버 완료 10 − 이벤트 2\).*이벤트 2회 · 성공 0번 · 다음 기한 10\/25/);
+    assert.match(hits, /나분할 010-6660-1234 · 마일리지 8 \(네이버 완료 10 − 이벤트 2\).*방문 1일 · 성공 0번 · 다음 기한 10\/25 — 10\/05 안내\(2건\)/, "같은 날 나눠 한 예약 2건 = 방문 1일");
     assert.doesNotMatch(hits, /나연속/);
     assert.match(await find(page, "홍예준"), /기록이 없어요.*네이버 완료 그대로/);
 
     // 끄기 → 마일리지로 (이벤트 기간 이용완료는 빼고: 전시윤 네이버 10 − 이벤트 1 = 9 → 사은권 아님)
     await page.click("[data-act=evOff]");
     assert.match(await page.textContent("#sheet .evstate"), /꺼짐.*지난 이벤트 기간 이용완료는 빼고 셈/);
-    assert.match(await find(page, "1327"), /전시윤 .*마일리지 9 \(네이버 완료 10 − 이벤트 1\).*이벤트 1회/, "꺼도 기록은 찾아짐");
+    assert.match(await find(page, "1327"), /전시윤 .*마일리지 9 \(네이버 완료 10 − 이벤트 1\).*방문 1일/, "꺼도 기록은 찾아짐");
     await close(page);
     t = await ticket(page, "전시윤");
     assert.ok(t.some((l) => /네이버 예약 9번/.test(l)) && !t.includes("재방문 이벤트"), t.join(" | "));
@@ -124,7 +124,7 @@ test("재방문 이벤트: 시작일 ~ 종료일 · 켜는 순간부터 마일�
     await openEvent(page);
     await page.click("[data-act=evApply]");
     await close(page);
-    assert.match(await card(page, 990, "전시윤"), /마일리지 9 멈춤 이벤트 안내 · 오늘 또 옴/);
+    assert.match(await card(page, 990, "전시윤"), /마일리지 9 멈춤 이벤트 안내 · 오늘 이미 방문/);
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();
@@ -195,8 +195,8 @@ test("재방문 이벤트: 기한(20일, 그날 포함) 안 재방문 = 성공 �
 
     // 찾기: 방문 기록 · 성공 수 · 다음 기한
     await openEvent(page);
-    assert.match(await find(page, "홍예준"), /홍예준 .*마일리지 9 \(네이버 완료 11 − 이벤트 2\).*이벤트 2회 · 성공 1번 · 다음 기한 10\/25 — 09\/20 안내 · 10\/05 성공/);
-    assert.match(await find(page, "송다온"), /이벤트 3회 · 성공 2번 — 09\/12 안내 · 09\/30 성공 · 10\/05 성공/);
+    assert.match(await find(page, "홍예준"), /홍예준 .*마일리지 9 \(네이버 완료 11 − 이벤트 2\).*방문 2일 · 성공 1번 · 다음 기한 10\/25 — 09\/20 안내 · 10\/05 성공/);
+    assert.match(await find(page, "송다온"), /방문 3일 · 성공 2번 — 09\/12 안내 · 09\/30 성공 · 10\/05 성공/);
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("astanakiz-visitevent")));
     assert.deepStrictEqual([saved.from, saved.to, saved.days, saved.gift], ["2026-09-10", "2026-10-05", 20, "수제돈까스"], "이 PC에 저장");
     assert.deepStrictEqual(errs, []);
@@ -255,7 +255,7 @@ test("이벤트가 끝나면: 명단에 있는 손님은 네이버 완료 − �
     assert.deepStrictEqual([jeon.base, jeon.last], [10, 11], "새 이벤트 장부: 시작 때 네이버 완료 10");
     assert.strictEqual(await page.evaluate(() => window.__deskTest.evSub("전시윤")), 4, "지난 3 + 이번 1");
     await openEvent(page);
-    assert.match(await find(page, "전시윤"), /마일리지 7 \(네이버 완료 11 − 이벤트 4\).*10\/05~ 이벤트 1회.*09\/01~ 이벤트 3회 · 성공 1번/);
+    assert.match(await find(page, "전시윤"), /마일리지 7 \(네이버 완료 11 − 이벤트 4\).*10\/05~ 방문 1일.*09\/01~ 방문 3일 · 성공 1번/);
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();
@@ -312,9 +312,9 @@ test("재방문 이벤트(앱): 장부는 POS PC 파일(시작일.jsonl)에 이�
     const [cf, ct] = await page.evaluate(() => window.__csv);
     const crow = ct.split("\r\n");
     assert.strictEqual(cf, "2026-10-12");
-    assert.strictEqual(crow[0], '"이름","전화번호","이벤트 방문 수","사은품(성공)","첫 방문","마지막 방문","다음 기한(포함)","네이버 완료(이벤트 전)","네이버 완료(마지막)","마일리지에서 뺄 수","방문 기록"');
-    assert.ok(crow.some((l) => /^"박새로","010-5555-0001","1","0","2026-10-14","2026-10-14","2026-10-31","3","4","1","2026-10-14 \d\d:\d\d 안내"$/.test(l)), crow.join("\n"));
-    assert.ok(crow.some((l) => /^"김기록","010-1234-0000","1","0","2026-10-12"/.test(l)), "지난 기록도");
+    assert.strictEqual(crow[0], '"이름","전화번호","방문일 수","이용완료 건수","사은품(성공)","첫 방문","마지막 방문","다음 기한(포함)","네이버 완료(이벤트 전)","네이버 완료(마지막)","마일리지에서 뺄 수","방문 기록"');
+    assert.ok(crow.some((l) => /^"박새로","010-5555-0001","1","1","0","2026-10-14","2026-10-14","2026-10-31","3","4","1","2026-10-14 \d\d:\d\d 안내"$/.test(l)), crow.join("\n"));
+    assert.ok(crow.some((l) => /^"김기록","010-1234-0000","1","1","0","2026-10-12"/.test(l)), "지난 기록도");
 
     // 다시 켜기: 파일에서 그대로 → 찾기
     // (시험 도구 사정: 가짜 장부는 브라우저 저장소 — 새 페이지가 읽기 전에 저장이 넘어가도록 잠깐 기다림. 실제 앱은 파일에 바로 씀)
@@ -324,7 +324,7 @@ test("재방문 이벤트(앱): 장부는 POS PC 파일(시작일.jsonl)에 이�
     await page.waitForFunction(() => /불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 15000 });
     await openEvent(page);
     assert.match(await page.textContent("#sheet"), /기록 2명 · 이용완료 2건/);
-    assert.match(await find(page, "0001"), /박새로 010-5555-0001 · 마일리지 3 \(네이버 완료 4 − 이벤트 1\).*이벤트 1회 · 성공 0번 · 다음 기한 10\/31 — 10\/14 안내/);
+    assert.match(await find(page, "0001"), /박새로 010-5555-0001 · 마일리지 3 \(네이버 완료 4 − 이벤트 1\).*방문 1일 · 성공 0번 · 다음 기한 10\/31 — 10\/14 안내/);
     assert.match(await find(page, "김기"), /김기록 .*마일리지 6 \(네이버 완료 7 − 이벤트 1\).*10\/12 안내/);
     assert.match(await page.textContent("#sheet"), /바탕화면 \+ 앱 폴더 두 곳에 저장/);
     assert.ok(await page.$("#sheet [data-act=evOpen]"), "바탕화면 폴더 열기");
@@ -463,6 +463,42 @@ test("양식을 쓰는 중에 창이 다시 그려져도(수량 자동조절 등
     // 수량 자동조절이 돌아도 다른 탭은 다시 그리지 않음
     const src = await page.evaluate(() => document.documentElement.innerHTML.includes('sheet.tab === "cap") renderSheet()'));
     assert.ok(src);
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("재방문 이벤트는 방문한 날 기준: 성공 영수증을 받은 뒤 같은 날 따로 다시 예약 · 입장해도 '오늘 이미 방문'(사은품 없음 · 기한 그대로) · 네이버 숫자가 옛 숫자여도 (10/15)", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.addInitScript(() => { if (!localStorage.getItem("astanakiz-visitevent")) localStorage.setItem("astanakiz-visitevent", JSON.stringify({ ver: 2, on: true, from: "2026-09-10", to: "2026-10-31", days: 20, gift: "수제돈까스" })); });
+    await page.goto(DESK);
+    await page.evaluate(() => window.__deskTest.evInject("홍예준", { day: "2026-09-20" })); // 9/20 방문 → 오늘(10/5) 기한 안
+    await enter(page, 840, "홍예준"); // 14:00 성공 (네이버 완료 10 → 11)
+    assert.match(await page.textContent("#toast"), /이벤트 성공 — 수제돈까스 드리세요/);
+    // 영수증을 받은 뒤 같은 날 17:00 을 따로 또 예약 — 네이버를 다시 불러오기 전이라 '완료 10'(옛 숫자)
+    await page.evaluate(() => { const T = window.__deskTest, h = T.holders().find((x) => x.name === "홍예준"); T.addBooking("2026-10-05", "17:00", "홍예준", h.phone, 2, { prevDone: 10 }); T.setNow(1015); });
+    const c = await card(page, 1020, "홍예준");
+    assert.match(c, /완료 11 · 마일리지 9 멈춤 이벤트 안내 · 오늘 이미 방문 · 10\/25까지/, "오늘 이미 완료한 만큼 올려 셈(완료 11) · 마일리지는 이벤트 시작 때 9 · 사은품 없음");
+    assert.doesNotMatch(c, /이벤트 성공/);
+    await enter(page, 1020, "홍예준");
+    assert.match(await page.textContent("#toast"), /이벤트 안내 · 오늘 이미 방문 · 10\/25까지/);
+    assert.doesNotMatch(await page.textContent("#toast"), /이벤트 성공/);
+    const t = await page.evaluate(() => { const T = window.__deskTest, h = T.holders().filter((x) => x.name === "홍예준").sort((a, b) => b.slot - a.slot)[0]; return T.receiptLines(T.form(), T.keyVals(h)).map((l) => l.t.trim()).filter(Boolean); });
+    assert.ok(t.includes("재방문 이벤트") && t.includes("10월 25일(포함)까지 다시 오시면") && !t.includes("재방문 이벤트 성공!"), t.join(" | "));
+    const p = await person(page, "홍예준");
+    assert.deepStrictEqual(p.visits.map((v) => [v.day, v.st, v.n]), [["2026-09-20", "안내", 10], ["2026-10-05", "성공", 11], ["2026-10-05", "안내", 12]], "네이버 순번도 겹치지 않음 (11 → 12)");
+    assert.strictEqual(await page.evaluate(() => window.__deskTest.evSub("홍예준")), 3, "마일리지에서 뺄 이벤트 이용완료 3건");
+    await openEvent(page);
+    assert.match(await find(page, "홍예준"), /방문 2일 · 성공 1번 · 다음 기한 10\/25 — 09\/20 안내 · 10\/05 성공\(2건\)/);
+    await close(page);
+    // 다음 날 이후에 와야 재방문 (오늘 날짜 뒤) — 같은 날 기록이 있어도 오늘 이미 방문
+    const r = await page.evaluate(() => { const T = window.__deskTest, b = T.holders().filter((x) => x.name === "홍예준").sort((a, b) => b.slot - a.slot)[0]; return T.evOf(b); });
+    assert.deepStrictEqual([r.st, r.same, r.due], ["안내", true, "2026-10-25"]);
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();
