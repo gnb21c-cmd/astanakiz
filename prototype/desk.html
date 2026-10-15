@@ -206,7 +206,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .svopt { display: flex; align-items: center; gap: 8px; }
 .svopt > b { min-width: 22px; text-align: center; font-size: 16px; }
 .field .svopt input.svlabel { flex: 1; min-height: 34px !important; font-size: 14px !important; padding: 4px 8px; }
-.field input.svurl { flex: 1; min-width: 260px; min-height: 34px !important; font-size: 13px !important; padding: 4px 8px; }
+.svopt .svpm { min-width: 34px; min-height: 30px; padding: 0 8px; font-size: 18px; font-weight: 800; line-height: 1; flex: none; }
+.svopt .svplus { color: var(--accent); border-color: var(--accent); }
+.svopt .svpm-sp { width: 34px; flex: none; }
+.svopt .svcnt { min-width: 150px; flex: none; }
+.svopt .svdel, .svopt .svdel-sp { width: 34px; flex: none; }
 /* 방문 이벤트 (10/14) */
 .evtag { display: inline-block; font-size: 11px; font-weight: 700; color: var(--on-ink); background: var(--accent); border-radius: 5px; padding: 0 6px; margin-left: 2px; }
 .evstate { font-size: 13.5px; }
@@ -849,6 +853,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   const STATE_KEY = "astanakiz-desk-" + TODAY;
   const SAVE_FIELDS = ["id", "day", "no", "slot", "name", "phone", "qty", "product", "naverProduct", "pay", "cancels", "prevDone", "visitNo", "visitEnd", "proxy", "visitor", "status", "keys", "enteredAt", "outAt", "overPaid", "naverPending", "naverWhy", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut", "naverSlot", "sv"];
   let stateReady = !APP; // 저장본을 읽기 전에는 저장하지 않음
+  let svExtra = {}; // 설문: 오늘 근무자가 [+]로 직접 더한 수 { 번호: 건수 } — 예약 없이 이벤트로 들어온 손님 등 (사장님 10/15 · 따로 기록은 없음)
   let pendingSaved = []; // 예전 형식(예약번호만 있는) 저장본 — 네이버에서 그 예약을 불러오면 합침
   /* 열쇠 기록: 그 손님이 받은 열쇠 번호는 반납해도 남김(keysTaken) — 다음날 아침 없는 열쇠를 마지막에 누가 썼는지 찾아 연락 (사장님 10/8)
      일괄 반납으로 돌려받은 열쇠는 bulkOut (하나씩 확인하지 않은 열쇠) */
@@ -857,7 +862,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     for (const h of (bookings[TODAY] || []).concat(walkins)) noteKeys(h);
     if (!APP || !stateReady) return;
     const b = (bookings[TODAY] || []).filter((x) => x.enteredAt != null).map((x) => Object.fromEntries(SAVE_FIELDS.filter((k) => x[k] !== undefined).map((k) => [k, x[k]])));
-    const json = JSON.stringify({ v: 2, b: b.concat(pendingSaved.filter((p) => !b.some((x) => x.no === p.no))), w: walkins, x: [...testOut], ig: [...extIgnored], mv: [...moved], g: golden, seq, posSeq });
+    const json = JSON.stringify({ v: 2, b: b.concat(pendingSaved.filter((p) => !b.some((x) => x.no === p.no))), w: walkins, x: [...testOut], ig: [...extIgnored], mv: [...moved], g: golden, sa: svExtra, seq, posSeq });
     try { if (window.desk.state) window.desk.state.save(TODAY, json); } catch (e) { /* 파일 저장 실패 */ }
     try { localStorage.setItem(STATE_KEY, json); } catch (e) { /* 저장 못 해도 화면은 동작 */ }
   }
@@ -878,6 +883,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       for (const no of st.ig || []) extIgnored.add(no);
       for (const [no, s] of st.mv || []) moved.set(no, s);
       if (st.g) golden = st.g;
+      if (st.sa && typeof st.sa === "object") svExtra = st.sa;
       const full = (st.b || []).filter((x) => x.name && x.slot != null);
       pendingSaved = (st.b || []).filter((x) => !(x.name && x.slot != null));
       bookings[TODAY] = full.map((x) => Object.assign({ day: TODAY, keys: [], enteredAt: null, outAt: null }, x, { naverBusy: false }));
@@ -1305,11 +1311,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   /** 그날 저장 파일 { b: 입장한 예약, w: 현장입장, x: 통계에서 뺀 예약번호 } — 오늘은 화면의 것, 지난날은 파일에서 한 번만 읽음
       저장 파일은 지우지 않음 (입장권 목록에서 2주 전까지 보고 찾음) */
   function dayFile(day) {
-    if (day === TODAY) return { b: [], w: walkins, x: testOut };
+    if (day === TODAY) return { b: [], w: walkins, x: testOut, sa: svExtra };
     if (!dayFiles[day]) {
       let f = {};
       try { const t = APP && window.desk.state ? window.desk.state.load(day) : null; if (t) f = JSON.parse(t); } catch (e) { f = {}; }
-      dayFiles[day] = { b: f.b || [], w: f.w || [], x: new Set(f.x || []) };
+      dayFiles[day] = { b: f.b || [], w: f.w || [], x: new Set(f.x || []), sa: f.sa && typeof f.sa === "object" ? f.sa : {} };
     }
     return dayFiles[day];
   }
@@ -1893,15 +1899,14 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           <h3 id="sheet-title">운영 설정 <button class="x" data-act="close" aria-label="닫기">×</button></h3>${tabs}
           <div class="field"><span class="label">설문 기간 <span class="help">신규 손님에게 '아스타나키즈를 어떻게 알게 되었는지' — 현장 안내문의 번호를 근무자가 누름 (번호를 눌러야 열쇠 등록)</span></span>
             <div class="btns" style="align-items:center"><input type="date" id="sv-from" class="date-in" value="${esc(SV.from)}"> <span>~</span> <input type="date" id="sv-to" class="date-in" value="${esc(SV.to)}"> <span class="evstate">${st}</span></div></div>
-          <div class="field"><label class="chk"><input type="checkbox" id="sv-send" ${SV.send ? "checked" : ""}> <b>누적 정보 보고앱에 보내기</b> <span class="help">설문 기간 동안 매일 20:00 · 번호별 오늘 · 누적 수</span></label>
-            <div class="btns" style="align-items:center"><label class="help" for="sv-url">보고앱 주소</label><input id="sv-url" class="cfg svurl" value="${esc(SV.url)}" placeholder="보고 시스템에서 정하면 넣어요 (비어 있으면 파일로만 남김)" autocomplete="off"><button class="btn btn-sm" data-act="svSendNow">지금 보내기</button></div>
-            ${L ? `<span class="help ${L.ok ? "" : "evwarn"}">마지막: ${esc(L.at)} ${L.auto ? "자동" : "직접"} · ${L.ok ? (L.posted ? "보고앱에 보냄" : "파일로 남김") : `실패 ${esc(L.why || "")}`}</span>` : ""}</div>
+          <div class="field"><label class="chk"><input type="checkbox" id="sv-send" ${SV.send ? "checked" : ""}> <b>보고앱에 보내기</b> <span class="help">매일 20:00 번호별 오늘 · 누적 수를 POS PC 파일로 → 보고 시스템이 가져감 (뒤에 바뀌면 다시 씀)</span></label>
+            <div class="btns" style="align-items:center"><button class="btn btn-sm" data-act="svSendNow">지금 보내기</button>${L ? `<span class="help ${L.ok ? "" : "evwarn"}">마지막: ${esc(L.at)} ${L.auto ? "자동" : "직접"} · ${L.ok ? "파일로 남김" : `실패 ${esc(L.why || "")}`}</span>` : ""}</div></div>
           <div class="field"><span class="label">대상 <span class="help">대상 손님은 설문 번호를 눌러야 열쇠를 고르고 등록해요</span></span>
             <div class="svtargets"><label class="chk"><input type="checkbox" id="sv-new" ${SV.naverNew || SV.all ? "checked" : ""} ${SV.all ? "disabled" : ""}> 신규고객 <span class="help">(네이버 첫 예약 · 완료 0)</span></label>
             <label class="chk"><input type="checkbox" id="sv-walk" ${SV.walkin || SV.all ? "checked" : ""} ${SV.all ? "disabled" : ""}> 현장구매자 <span class="help">(신규가 아니면 [제외])</span></label>
             <label class="chk"><input type="checkbox" id="sv-all" ${SV.all ? "checked" : ""}> 전체고객 <span class="help">(네이버 · 현장 모두 — 기존 손님은 [제외])</span></label></div></div>
           <div class="field"><span class="label">선택지 <span class="help">현장 안내문의 번호와 같게 · 오늘 / 기간 누적</span></span>
-            <div class="svopts">${SV.opts.map((o, i) => `<div class="svopt"><b class="num">${i + 1}</b><input class="cfg svlabel" data-i="${i}" value="${esc(o)}" placeholder="${i + 1}번 내용 (예: 네이버 검색)" aria-label="${i + 1}번 선택지"><span class="help num">오늘 ${(c.cnt[i + 1] || {}).today || 0} · 누적 <b>${(c.cnt[i + 1] || {}).total || 0}</b></span>${i === SV.opts.length - 1 && SV.opts.length > 1 ? `<button class="btn btn-sm" data-act="svDel" aria-label="${i + 1}번 지우기">×</button>` : ""}</div>`).join("")}</div>
+            <div class="svopts">${SV.opts.map((o, i) => `<div class="svopt"><b class="num">${i + 1}</b><input class="cfg svlabel" data-i="${i}" value="${esc(o)}" placeholder="${i + 1}번 내용 (예: 네이버 검색)" aria-label="${i + 1}번 선택지">${svExtra[i + 1] > 0 ? `<button class="btn btn-sm svpm" data-act="svMinus" data-n="${i + 1}" aria-label="${i + 1}번 직접 더한 것 1건 빼기" title="잘못 누른 [+] 되돌리기">−</button>` : `<span class="svpm-sp"></span>`}<button class="btn btn-sm svpm svplus" data-act="svPlus" data-n="${i + 1}" ${svOn() ? "" : "disabled"} aria-label="${i + 1}번 확인된 1건 더하기" title="예약 없이 들어온 손님 등 — 확인된 1건 더하기">+</button><span class="help num svcnt">오늘 ${(c.cnt[i + 1] || {}).today || 0}${svExtra[i + 1] > 0 ? ` (직접 +${svExtra[i + 1]})` : ""} · 누적 <b>${(c.cnt[i + 1] || {}).total || 0}</b></span>${i === SV.opts.length - 1 && SV.opts.length > 1 ? `<button class="btn btn-sm svdel" data-act="svDel" aria-label="${i + 1}번 지우기">×</button>` : `<span class="svdel-sp"></span>`}</div>`).join("")}</div>
             <div class="btns" style="align-items:center"><button class="btn btn-sm" data-act="svAdd">+ 선택지 추가</button><span class="help num">응답 오늘 ${c.ans.today} · 누적 <b>${c.ans.total}</b> · 제외 오늘 ${c.ex.today} · 누적 ${c.ex.total}</span></div></div>
           <div class="sheet-foot"><button class="btn btn-ink" data-act="close">닫기</button></div>`;
         return;
@@ -2489,7 +2494,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
      - 대상 손님은 번호를 눌러야 열쇠를 고르고 등록할 수 있음 (필수 단계). 신규가 아닌 현장구매자 · 전체고객의 기존 손님은 [제외]
      - 답(번호, 제외 = 0)은 그 예약 · 현장입장 기록(sv)에 붙어 날짜별 저장 파일에 남음 → 설문 기간 누적 = 저장 파일을 더함
      - 보고앱에 보내기를 켜면 기간 동안 매일 20:00 에 번호별 오늘 · 누적 수를 보냄 (파일로 남기고 · 보고앱 주소가 있으면 그 주소로) */
-  const SV0 = { from: "", to: "", send: false, url: "", naverNew: true, walkin: false, all: false, opts: ["", "", "", "", ""], sentDay: "", last: null };
+  const SV0 = { from: "", to: "", send: false, naverNew: true, walkin: false, all: false, opts: ["", "", "", "", ""], sentDay: "", sentSig: "", last: null };
   const SV = JSON.parse(JSON.stringify(SV0));
   function svSaveCfg() {
     const v = JSON.parse(JSON.stringify(SV));
@@ -2499,7 +2504,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   function svLoadCfg(v) {
     if (!v) return;
     const day = (x) => (/^\d{4}-\d{2}-\d{2}$/.test(x || "") ? x : "");
-    Object.assign(SV, { from: day(v.from), to: day(v.to), send: !!v.send, url: String(v.url || ""), naverNew: v.naverNew !== false, walkin: !!v.walkin, all: !!v.all, sentDay: day(v.sentDay), last: v.last || null });
+    Object.assign(SV, { from: day(v.from), to: day(v.to), send: !!v.send, naverNew: v.naverNew !== false, walkin: !!v.walkin, all: !!v.all, sentDay: day(v.sentDay), sentSig: String(v.sentSig || ""), last: v.last || null });
     if (Array.isArray(v.opts) && v.opts.length) SV.opts = v.opts.slice(0, 20).map((o) => String(o || ""));
   }
   if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c && c.survey) { svLoadCfg(c.survey); renderAll(); } }).catch(() => {});
@@ -2534,8 +2539,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (SV.from && SV.to) {
       const end = SV.to < TODAY ? SV.to : TODAY;
       for (let d = SV.from, i = 0; d <= end && i < 400; d = shiftDay(d, 1), i++) {
-        if (d === TODAY) { for (const b of bookings[TODAY] || []) if (b.enteredAt != null) add(b.sv, true); for (const w of walkins) add(w.sv, true); }
-        else { const f = dayFile(d); for (const b of f.b) add(b.sv, false); for (const w of f.w) add(w.sv, false); }
+        const today = d === TODAY, f = dayFile(d);
+        if (today) { for (const b of bookings[TODAY] || []) if (b.enteredAt != null) add(b.sv, true); for (const w of walkins) add(w.sv, true); }
+        else { for (const b of f.b) add(b.sv, false); for (const w of f.w) add(w.sv, false); }
+        for (const [no, n] of Object.entries(f.sa || {})) for (let k = 0; k < Math.min(999, Number(n) || 0); k++) add(Number(no), today); // [+] 직접 더한 수
       }
     }
     return { cnt, ex, ans };
@@ -2555,15 +2562,22 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     const p = svPayload();
     let r;
     if (!APP || !window.desk.survey) r = { ok: true, demo: true };
-    else r = await window.desk.survey.send({ url: SV.url.trim(), json: JSON.stringify(p) }).catch((e) => ({ ok: false, why: String(e) }));
+    else r = await window.desk.survey.send({ json: JSON.stringify(p) }).catch((e) => ({ ok: false, why: String(e) }));
     svBusy = false;
-    SV.sentDay = TODAY; SV.last = { at: `${TODAY} ${hm(now)}`, ok: !!(r && r.ok), why: (r && r.why) || "", posted: !!(r && r.posted), auto: !manual };
+    const again = !manual && SV.sentDay === TODAY; // 20:00 뒤 숫자가 바뀌어 다시 씀 (알림 없이)
+    SV.sentDay = TODAY; SV.sentSig = svSig(p); SV.last = { at: `${TODAY} ${hm(now)}`, ok: !!(r && r.ok), why: (r && r.why) || "", auto: !manual };
     svSaveCfg();
-    toast(r && r.demo ? `체험판: 설문 누적(응답 ${p.answered.total} · 제외 ${p.excluded.total})을 보고앱에 보내는 흉내` : r && r.ok ? `설문 누적을 보고앱에 보냈어요${r.posted ? "" : " (파일로 남김 — 보고앱 주소가 없어요)"}` : `설문 보고 실패: ${(r && r.why) || "응답 없음"} — 파일에는 남겼어요`);
+    if (!again || !(r && r.ok)) toast(r && r.demo ? `체험판: 설문 누적(응답 ${p.answered.total} · 제외 ${p.excluded.total})을 보고 파일로 남기는 흉내` : r && r.ok ? "설문 누적을 보고 파일로 남겼어요 — 보고 시스템이 가져가요" : `설문 보고 파일을 못 썼어요: ${(r && r.why) || "응답 없음"}`);
     if (sheet.mode === "settings" && sheet.tab === "survey") renderSheet();
   }
-  /** 매일 20:00 (설문 기간 · 보내기 켬 · 그날 아직 안 보냄) */
-  function svTick() { if (SV.send && svOn() && now >= 20 * 60 && SV.sentDay !== TODAY && !svBusy) svSend(false); }
+  /** 보낸 숫자 (바뀌었는지 보려고) */
+  const svSig = (p) => JSON.stringify([p.options.map((o) => [o.label, o.today, o.total]), p.excluded, p.answered]);
+  /** 매일 20:00 (설문 기간 · 보내기 켬 · 그날 아직 안 보냄) — 보낸 뒤 숫자가 바뀌면(늦게 온 손님 · [+]) 10초 안에 그날 파일을 다시 씀 (보고 시스템이 22:45까지 30분마다 가져감) */
+  function svTick() {
+    if (!SV.send || !svOn() || now < 20 * 60 || svBusy) return;
+    if (SV.sentDay !== TODAY) svSend(false);
+    else if (sec % 10 === 0 && svSig(svPayload()) !== SV.sentSig) svSend(false);
+  }
 
   // ── 초과요금 미터 ────────────────────────────────
   /* 초과요금 (열쇠 1개 기준, 예약 입장시간부터)
@@ -2875,6 +2889,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     // 설문조사 (10/14)
     svPick(btn) { sheet.sv = Number(btn.dataset.n); renderSheet(); },
     svAdd() { if (SV.opts.length < 20) SV.opts.push(""); svSaveCfg(); renderSheet(); },
+    // [+] 확인된 1건 더하기 (예약 없이 이벤트로 들어온 손님 등 · 사장님 10/15) — 그날 저장 파일에 번호별 수만 (따로 기록 없음)
+    svPlus(btn) { if (!svOn()) return; const n = Number(btn.dataset.n); svExtra[n] = (svExtra[n] || 0) + 1; saveState(); renderSheet(); toast(`${n}번${SV.opts[n - 1] ? ` ${SV.opts[n - 1]}` : ""} 1건 더함 (오늘 직접 +${svExtra[n]})`); },
+    svMinus(btn) { const n = Number(btn.dataset.n); if (!(svExtra[n] > 0)) return; svExtra[n]--; if (!svExtra[n]) delete svExtra[n]; saveState(); renderSheet(); toast(`${n}번 직접 더한 것 1건 뺌`); },
     svDel() { if (SV.opts.length > 1) SV.opts.pop(); svSaveCfg(); renderSheet(); },
     svSendNow() { svSend(true); },
     // 방문 이벤트 (10/14 · 10/15 시작일 ~ 종료일)
@@ -3056,7 +3073,6 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (t.id === "ev-gift") { EV.gift = t.value.trim(); evSaveCfg(); $("ev-paper").innerHTML = evPrev(); evScroll("ev-paper"); $("ev-dates").textContent = evDatesText(); }
     if (t.id === "sv-from" || t.id === "sv-to") { SV[t.id === "sv-from" ? "from" : "to"] = t.value; svSaveCfg(); renderSheet(); }
     if (t.id === "sv-send") { SV.send = t.checked; svSaveCfg(); toast(t.checked ? "설문 누적을 매일 20:00 보고앱에 보내요" : "설문 보고앱 보내기를 껐어요"); }
-    if (t.id === "sv-url") { SV.url = t.value.trim(); svSaveCfg(); }
     if (t.id === "sv-new" || t.id === "sv-walk" || t.id === "sv-all") { SV[{ "sv-new": "naverNew", "sv-walk": "walkin", "sv-all": "all" }[t.id]] = t.checked; svSaveCfg(); renderSheet(); }
     if (t.classList.contains("svlabel")) { SV.opts[+t.dataset.i] = t.value; svSaveCfg(); }
     if (t.id === "ev-q") { EV.q = t.value; $("ev-hits").innerHTML = evFindHtml(); }

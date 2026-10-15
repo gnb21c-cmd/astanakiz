@@ -111,7 +111,7 @@ test("설문조사: 신규 예약자는 번호를 눌러야 열쇠 · 현장구�
     assert.strictEqual(await page.evaluate(() => window.__deskTest.SV.sentDay), "", "20:00 전엔 안 보냄");
     await page.evaluate(() => window.__deskTest.setNow(1200));
     await page.waitForFunction(() => window.__deskTest.SV.sentDay === "2026-10-05", null, { timeout: 4000 });
-    assert.match(await page.textContent("#toast"), /보고앱에 보내는 흉내/);
+    assert.match(await page.textContent("#toast"), /보고 파일로 남기는 흉내/);
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();
@@ -126,13 +126,13 @@ test("설문조사(앱): 20:00 에 보고앱으로 한 번 · 다시 켜도 누�
     await page.clock.install({ time: new Date("2026-10-14T19:58:30") });
     await page.addInitScript(() => {
       window.__sent = JSON.parse(localStorage.getItem("test-sent") || "[]");
-      const cfg = JSON.parse(localStorage.getItem("test-cfg") || "null") || { build: "1.38", survey: { from: "2026-10-14", to: "2026-10-31", send: true, url: "https://report.example/survey", naverNew: true, opts: ["네이버 검색", "인스타그램", "지인 소개", "블로그", "기타"] } };
+      const cfg = JSON.parse(localStorage.getItem("test-cfg") || "null") || { build: "1.38", survey: { from: "2026-10-14", to: "2026-10-31", send: true, naverNew: true, opts: ["네이버 검색", "인스타그램", "지인 소개", "블로그", "기타"] } };
       const BK = (no, time, name, phone, done) => ({ no, time, name, phone, qty: 1, qtyText: "1시간 50분 1", product: "1시간 50분", status: "확정", pay: "결제완료", doneCount: done, cancelCount: 0 });
       window.desk = {
         naver: { load: async (day) => ({ ok: true, day, slots: day === "2026-10-14" ? [{ time: "19:30", cap: 10, conf: 2, done: 0 }] : [], bookings: day === "2026-10-14" ? [BK("S1", "19:30", "김신규", "010-7777-0001", 0), BK("S2", "19:30", "박단골", "010-7777-0002", 6)] : [] }), complete: async () => ({ ok: true }) },
         state: { load: (day) => localStorage.getItem("test-state-" + day), save: (day, json) => localStorage.setItem("test-state-" + day, json) },
         config: { get: async () => cfg, set: async (patch) => { Object.assign(cfg, patch); localStorage.setItem("test-cfg", JSON.stringify(cfg)); return { ok: true }; } },
-        survey: { send: async (job) => { window.__sent.push(job); localStorage.setItem("test-sent", JSON.stringify(window.__sent)); return { ok: true, posted: true, file: "C:/report-outbox/survey-2026-10-14.json" }; } },
+        survey: { send: async (job) => { window.__sent.push(job); localStorage.setItem("test-sent", JSON.stringify(window.__sent)); return { ok: true, file: "C:/report-outbox/survey-2026-10-14.json" }; } },
       };
     });
     const errs = [];
@@ -152,21 +152,41 @@ test("설문조사(앱): 20:00 에 보고앱으로 한 번 · 다시 켜도 누�
     await page.clock.runFor(95000); // 20:00 지남
     await page.waitForFunction(() => window.__sent.length === 1);
     const [job] = await page.evaluate(() => window.__sent);
-    assert.strictEqual(job.url, "https://report.example/survey");
+    assert.strictEqual(job.url, undefined, "보고앱 주소로 보내지 않음 — 파일만 (보고 시스템이 POS PC 폴더에서 가져감)");
     const pl = JSON.parse(job.json);
     assert.strictEqual(pl.type, "astanakiz-survey");
     assert.deepStrictEqual(pl.options.map((o) => [o.no, o.label, o.today, o.total]), [[1, "네이버 검색", 0, 0], [2, "인스타그램", 0, 0], [3, "지인 소개", 1, 1], [4, "블로그", 0, 0], [5, "기타", 0, 0]]);
     await page.clock.runFor(120000);
-    assert.strictEqual(await page.evaluate(() => window.__sent.length), 1, "하루 한 번");
+    assert.strictEqual(await page.evaluate(() => window.__sent.length), 1, "하루 한 번 (바뀐 게 없으면)");
+
+    // [+] 예약 없이 이벤트로 들어온 손님 등 확인된 수 (사장님 10/15) — 20:00 뒤에 바뀌면 그날 파일을 다시 씀 · 따로 기록 없음
+    await openSurvey(page);
+    assert.strictEqual(await page.$("#sv-url"), null, "보고앱 주소 칸 없음");
+    await page.click("[data-act=svPlus][data-n='1']");
+    await page.click("[data-act=svPlus][data-n='1']");
+    await page.click("[data-act=svPlus][data-n='3']");
+    await page.click("[data-act=svMinus][data-n='1']"); // 잘못 누른 것 되돌리기
+    const rows = await page.$$eval("#sheet .svopt", (e) => e.map((x) => x.textContent.replace(/\s+/g, " ")));
+    assert.match(rows[0], /오늘 1 \(직접 \+1\) · 누적 1/);
+    assert.match(rows[2], /오늘 2 \(직접 \+1\) · 누적 2/);
+    assert.strictEqual(await page.$("[data-act=svMinus][data-n='2']"), null, "직접 더한 게 없으면 [−] 없음");
+    await close(page);
+    await page.clock.runFor(12000);
+    await page.waitForFunction(() => window.__sent.length === 2);
+    const p2 = JSON.parse((await page.evaluate(() => window.__sent))[1].json);
+    assert.deepStrictEqual(p2.options.map((o) => [o.no, o.today, o.total]).slice(0, 3), [[1, 1, 1], [2, 0, 0], [3, 2, 2]]);
+    assert.deepStrictEqual(p2.answered, { today: 3, total: 3 }, "직접 더한 수도 응답 수에");
+    const saved = JSON.parse(await page.evaluate(() => localStorage.getItem("test-state-2026-10-14")));
+    assert.deepStrictEqual(saved.sa, { 1: 1, 3: 1 }, "그날 저장 파일에 번호별 수만");
 
     // 다시 켜기: 오늘 기록(저장 파일)에서 누적 그대로 · 이미 보냈으니 또 안 보냄
     await page.goto(DESK);
     await page.waitForFunction(() => /불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 15000 });
-    await page.clock.runFor(5000);
-    assert.strictEqual(await page.evaluate(() => window.__sent.length), 1);
+    await page.clock.runFor(15000);
+    assert.strictEqual(await page.evaluate(() => window.__sent.length), 2, "다시 켜도 같은 숫자면 또 안 씀");
     await openSurvey(page);
-    assert.match((await page.$$eval("#sheet .svopt", (e) => e.map((x) => x.textContent.replace(/\s+/g, " "))))[2], /오늘 1 · 누적 1/);
-    assert.match(await page.textContent("#sheet"), /마지막: 2026-10-14 20:0\d 자동 · 보고앱에 보냄/);
+    assert.match((await page.$$eval("#sheet .svopt", (e) => e.map((x) => x.textContent.replace(/\s+/g, " "))))[2], /오늘 2 \(직접 \+1\) · 누적 2/, "다시 켜도 직접 더한 수 그대로");
+    assert.match(await page.textContent("#sheet"), /마지막: 2026-10-14 20:0\d 자동 · 파일로 남김/);
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();

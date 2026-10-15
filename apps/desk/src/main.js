@@ -698,34 +698,22 @@ ipcMain.handle("ledger:open", async () => {
   return why ? { ok: false, why } : { ok: true, dir: d };
 });
 
-// 설문조사 누적 보고 (사장님 10/14): 매일 20:00 데스크가 번호별 오늘 · 누적 수를 넘겨줌
-// → 앱 폴더 report-outbox\survey-날짜.json 에 남기고 (보고 시스템이 가져갈 수 있게), 보고앱 주소가 있으면 그 주소로 POST (JSON · 손님 정보 없음)
+// 설문조사 누적 보고 (사장님 10/14 · 10/15): 매일 20:00 데스크가 번호별 오늘 · 누적 수를 넘겨줌
+// → 앱 폴더 report-outbox\survey-날짜.json 에 남김 — 보고 시스템(gnb21c-cmd/report)이 POS PC 에서 이 폴더를 읽어 감 (손님 정보 없음)
+//   (보고앱 주소로 보내는 기능은 받을 서버가 없어 뺌 · 10/15)
 ipcMain.handle("survey:send", async (_e, job) => {
   const json = String((job && job.json) || "{}");
-  let file = null;
   try {
     const dir = path.join(app.getPath("userData"), "report-outbox");
     fs.mkdirSync(dir, { recursive: true });
     let day = "";
     try { day = String(JSON.parse(json).day || "").replace(/[^0-9-]/g, ""); } catch (err) { /* 날짜 없음 */ }
-    file = path.join(dir, `survey-${day || "x"}.json`);
+    const file = path.join(dir, `survey-${day || "x"}.json`);
     fs.writeFileSync(file + ".tmp", json, "utf8");
     fs.renameSync(file + ".tmp", file);
+    return { ok: true, file };
   } catch (err) {
-    file = null;
-  }
-  const url = String((job && job.url) || "").trim();
-  if (!url) return file ? { ok: true, posted: false, file } : { ok: false, why: "파일을 못 씀" };
-  if (!/^https?:\/\//i.test(url)) return { ok: false, why: "보고앱 주소는 http(s):// 로 시작해야 해요", file };
-  try {
-    const { net } = require("electron");
-    const ac = new AbortController();
-    const t = setTimeout(() => ac.abort(), 15000);
-    const r = await net.fetch(url, { method: "POST", headers: { "content-type": "application/json; charset=utf-8" }, body: json, signal: ac.signal });
-    clearTimeout(t);
-    return r.ok ? { ok: true, posted: true, file } : { ok: false, why: `보고앱 응답 ${r.status}`, file };
-  } catch (err) {
-    return { ok: false, why: `보고앱에 못 보냄: ${err && err.message ? err.message : err}`, file };
+    return { ok: false, why: `파일을 못 씀: ${err && err.message ? err.message : err}` };
   }
 });
 

@@ -271,7 +271,8 @@ test("재방문 이벤트(앱): 장부는 POS PC 파일(시작일.jsonl)에 이�
     await page.addInitScript(() => {
       // 이벤트 10/12 ~ 10/31 · 김기록은 10/12 에 이미 이용완료 (그때 완료 6 → 7 · 1번 안내 · 기한 10/31)
       const first = JSON.stringify({ at: "2026-10-12 10:58", day: "2026-10-12", no: "N1", k: "01012340000", name: "김기록", phone: "01012340000", prev: 6, n: 7, base: 6, st: "안내", due: "2026-10-31" }) + "\n";
-      if (localStorage.getItem("test-ledger") == null) localStorage.setItem("test-ledger", first);
+      // 처음 열 때만 넣음 — 다시 열 때(?again)는 건드리지 않음 (새 페이지가 저장소를 아직 못 받은 순간 덮어쓰지 않게)
+      if (!/again/.test(location.search) && localStorage.getItem("test-ledger") == null) localStorage.setItem("test-ledger", first);
       window.__adds = [];
       const BK = (no, time, name, phone, done) => ({ no, time, name, phone, qty: 1, qtyText: "1시간 50분 1", product: "1시간 50분", status: "확정", pay: "결제완료", doneCount: done, cancelCount: 0 });
       window.desk = {
@@ -320,7 +321,7 @@ test("재방문 이벤트(앱): 장부는 POS PC 파일(시작일.jsonl)에 이�
     // (시험 도구 사정: 가짜 장부는 브라우저 저장소 — 새 페이지가 읽기 전에 저장이 넘어가도록 잠깐 기다림. 실제 앱은 파일에 바로 씀)
     await new Promise((r) => setTimeout(r, 500));
     assert.strictEqual((await page.evaluate(() => localStorage.getItem("test-ledger"))).trim().split("\n").length, 2);
-    await page.goto(DESK);
+    await page.goto(DESK + "?again=1");
     await page.waitForFunction(() => /불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 15000 });
     await openEvent(page);
     assert.match(await page.textContent("#sheet"), /기록 2명 · 이용완료 2건/);
