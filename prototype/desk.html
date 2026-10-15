@@ -1534,7 +1534,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   async function capRun(manual) {
     if (capBusy) return;
     if (!manual && (naverBusy || sheet.mode === "enter" || sheet.mode === "walk")) return "wait";
-    capBusy = true; if (sheet.mode === "settings") renderSheet();
+    capBusy = true; if (sheet.mode === "settings" && sheet.tab === "cap") renderSheet(); // 다른 탭에서 글을 쓰는 중이면 건드리지 않음 (10/15 이벤트 양식 입력이 끊김)
     try {
       if (APP) { if (naverBusy) { toast("네이버를 불러오는 중이에요 — 잠시 뒤에 다시"); return "wait"; } await loadNaver(TODAY, false); if (naverErr && /로그인/.test(naverErr)) { capNote({ ok: false, why: naverErr }); return; } }
       const p = capPlan();
@@ -1561,7 +1561,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       capFails = bad ? capFails + 1 : 0;
       if (capFails >= 3) { capPauseUntil = now + 30; capFails = 0; capNote({ ok: false, why: "3번 연속 실패 — 30분 쉬었다가 다시 해요 (네이버 화면 확인)" }); }
       toast(`네이버 판매 수량 조절${done.length ? `: ${done.join(" · ")}` : ""}${bad ? ` · 실패 ${bad}건 (운영 설정 → 수량 자동조절)` : ""}`);
-    } finally { capBusy = false; renderAll(); if (sheet.mode === "settings") renderSheet(); }
+    } finally { capBusy = false; renderAll(); if (sheet.mode === "settings" && sheet.tab === "cap") renderSheet(); }
   }
   /** 매분: 켜져 있으면 10분마다 (실패 · 바쁨이면 다음 분에 다시) */
   function capTick() {
@@ -1630,7 +1630,15 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 
   /** 미리보기를 이벤트 안내 줄로 (방문 이벤트 탭 · 프린터 탭 '이벤트' 예시) */
   function evScroll(id) { const pp = $(id), f = pp && pp.querySelector(".evl"); if (f) pp.scrollTop = Math.max(0, f.offsetTop - pp.offsetTop - 70); }
+  /** 창을 다시 그려도 쓰던 칸(글 · 커서 위치)은 그대로 — 뒤에서 도는 일(수량 자동조절 등)이 다시 그려도 입력이 끊기지 않게 (10/15) */
   function renderSheet() {
+    const a = document.activeElement, id = a && a.id && $("sheet").contains(a) ? a.id : "";
+    const pos = id && typeof a.selectionStart === "number" ? [a.selectionStart, a.selectionEnd, a.scrollTop] : null;
+    renderSheet0();
+    const n = id && $(id);
+    if (n && n !== document.activeElement && !n.disabled) { n.focus(); if (pos) try { n.setSelectionRange(pos[0], pos[1]); n.scrollTop = pos[2]; } catch (e) { /* 숫자 칸 등 */ } }
+  }
+  function renderSheet0() {
     const el = $("sheet");
     el.classList.toggle("wide", sheet.mode === "enter" || sheet.mode === "sold" || sheet.mode === "rec");
     el.classList.toggle("walksheet", sheet.mode === "walk");
@@ -3102,7 +3110,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 
   // 시험용: 입장권을 만드는 함수들 (자동 시험이 실제 입장 손님으로 출력 내용을 확인)
   document.addEventListener("change", (e) => { if (/^cap-(target|max|ceil)$/.test(e.target.id)) renderSheet(); }); // 숫자를 다 넣으면 계획 다시
-  window.__deskTest = { extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capPlan, capRun, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => enterText(), holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, evOf: (b) => evOf(b),
+  window.__deskTest = { extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capPlan, capRun, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => enterText(), holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, evOf: (b) => evOf(b),
     evLog: (from) => { const L = evLog(from); return { from: L.from, count: L.count, people: Object.fromEntries([...L.people].map(([k, p]) => [k, JSON.parse(JSON.stringify(p))])) }; },
     // 장부에 지난 방문 한 줄 넣기: o = { day, n(네이버 순번, 기본 = 지금 완료 수), base, st("안내" | "성공"), due, from(장부 · 기본 지금 이벤트), no }
     evInject: (name, o = {}) => {

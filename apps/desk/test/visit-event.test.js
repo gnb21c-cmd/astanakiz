@@ -441,3 +441,30 @@ test("1.38 이벤트(a~e) 설정이 남아 있으면: 시작일 · 공통 양식
     await browser.close();
   }
 });
+
+test("양식을 쓰는 중에 창이 다시 그려져도(수량 자동조절 등) 쓰던 칸 · 커서 위치 그대로 — 계속 칠 수 있음 (10/15 현장)", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK);
+    await openEvent(page);
+    await page.click(`[data-act=evTpl][data-i='9']`); // 공통 양식
+    await page.fill("#ev-text", "#* {열쇠}번\n^퇴장 때 열쇠는 바구니에");
+    await page.focus("#ev-text");
+    await page.evaluate(() => { const t = document.getElementById("ev-text"); t.setSelectionRange(t.value.length, t.value.length); });
+    await page.keyboard.type(" 넣어주세요");
+    await page.evaluate(() => window.__deskTest.renderSheet()); // 뒤에서 다시 그림
+    assert.strictEqual(await page.evaluate(() => document.activeElement && document.activeElement.id), "ev-text", "쓰던 칸에 그대로");
+    await page.keyboard.type("!");
+    assert.strictEqual(await page.inputValue("#ev-text"), "#* {열쇠}번\n^퇴장 때 열쇠는 바구니에 넣어주세요!");
+    assert.match(await page.textContent("#ev-paper"), /퇴장 때 열쇠는 바구니에 넣어주세요!/, "미리보기도");
+    // 수량 자동조절이 돌아도 다른 탭은 다시 그리지 않음
+    const src = await page.evaluate(() => document.documentElement.innerHTML.includes('sheet.tab === "cap") renderSheet()'));
+    assert.ok(src);
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
