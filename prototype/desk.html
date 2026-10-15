@@ -208,6 +208,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .field .svopt input.svlabel { flex: 1; min-height: 34px !important; font-size: 14px !important; padding: 4px 8px; }
 .svopt .svpm { min-width: 34px; min-height: 30px; padding: 0 8px; font-size: 18px; font-weight: 800; line-height: 1; flex: none; }
 .svopt .svplus { color: var(--accent); border-color: var(--accent); }
+.field input.svkey { width: 260px; min-height: 32px !important; font-size: 13px !important; padding: 4px 8px; letter-spacing: 0; }
 .svopt .svpm-sp { width: 34px; flex: none; }
 .svopt .svcnt { min-width: 150px; flex: none; }
 .svopt .svdel, .svopt .svdel-sp { width: 34px; flex: none; }
@@ -1899,8 +1900,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           <h3 id="sheet-title">운영 설정 <button class="x" data-act="close" aria-label="닫기">×</button></h3>${tabs}
           <div class="field"><span class="label">설문 기간 <span class="help">신규 손님에게 '아스타나키즈를 어떻게 알게 되었는지' — 현장 안내문의 번호를 근무자가 누름 (번호를 눌러야 열쇠 등록)</span></span>
             <div class="btns" style="align-items:center"><input type="date" id="sv-from" class="date-in" value="${esc(SV.from)}"> <span>~</span> <input type="date" id="sv-to" class="date-in" value="${esc(SV.to)}"> <span class="evstate">${st}</span></div></div>
-          <div class="field"><label class="chk"><input type="checkbox" id="sv-send" ${SV.send ? "checked" : ""}> <b>보고앱에 보내기</b> <span class="help">매일 20:00 번호별 오늘 · 누적 수를 POS PC 파일로 → 보고 시스템이 가져감 (뒤에 바뀌면 다시 씀)</span></label>
-            <div class="btns" style="align-items:center"><button class="btn btn-sm" data-act="svSendNow">지금 보내기</button>${L ? `<span class="help ${L.ok ? "" : "evwarn"}">마지막: ${esc(L.at)} ${L.auto ? "자동" : "직접"} · ${L.ok ? "파일로 남김" : `실패 ${esc(L.why || "")}`}</span>` : ""}</div></div>
+          <div class="field"><label class="chk"><input type="checkbox" id="sv-send" ${SV.send ? "checked" : ""}> <b>보고앱에 보내기</b> <span class="help">매일 20:00 번호별 오늘 · 누적 수를 파일로 남기고 보고 열쇠가 있으면 클라우드 보고함에도 (뒤에 바뀌면 다시)</span></label>
+            <div class="btns" style="align-items:center"><label class="help" for="sv-key">보고 열쇠</label><input id="sv-key" class="cfg svkey" type="password" autocomplete="off" spellcheck="false" maxlength="64" placeholder="${svKey.has ? `저장됨 (끝 ••${esc(svKey.tail)}) — 바꾸려면 새로 넣기` : "보고 앱 주소 …/b/{열쇠}/ 의 열쇠 (16~64자)"}" aria-label="보고 열쇠"><button class="btn btn-sm" data-act="svKeySave">열쇠 저장</button>${svKey.has ? `<button class="btn btn-sm" data-act="svKeyDel">지우기</button>` : ""}<button class="btn btn-sm" data-act="svSendNow">지금 보내기</button></div>
+            <span class="help ${L && (!L.ok || (L.inbox && !L.inbox.ok)) ? "evwarn" : ""}">${L ? `마지막: ${esc(L.at)} ${L.auto ? "자동" : "직접"} · ${L.ok ? "파일로 남김" : `파일 실패 ${esc(L.why || "")}`} · ${L.inbox ? (L.inbox.ok ? "보고함에 보냄" : `보고함 실패 ${esc(L.inbox.why || "")}${SV.retry && SV.retry.day === TODAY ? ` — ${hm(SV.retry.m)} 다시` : ""}`) : "보고 열쇠 없음 (파일만)"}` : svKey.has ? "보고 열쇠 있음 — 보고 파일을 쓸 때마다 보고함에도 보냄" : "보고 열쇠를 넣으면 보고 시스템 클라우드 '설문 보고함'에도 보내요 (보고 앱에 바로 보임)"}</span></div>
           <div class="field"><span class="label">대상 <span class="help">대상 손님은 설문 번호를 눌러야 열쇠를 고르고 등록해요</span></span>
             <div class="svtargets"><label class="chk"><input type="checkbox" id="sv-new" ${SV.naverNew || SV.all ? "checked" : ""} ${SV.all ? "disabled" : ""}> 신규고객 <span class="help">(네이버 첫 예약 · 완료 0)</span></label>
             <label class="chk"><input type="checkbox" id="sv-walk" ${SV.walkin || SV.all ? "checked" : ""} ${SV.all ? "disabled" : ""}> 현장구매자 <span class="help">(신규가 아니면 [제외])</span></label>
@@ -2494,7 +2496,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
      - 대상 손님은 번호를 눌러야 열쇠를 고르고 등록할 수 있음 (필수 단계). 신규가 아닌 현장구매자 · 전체고객의 기존 손님은 [제외]
      - 답(번호, 제외 = 0)은 그 예약 · 현장입장 기록(sv)에 붙어 날짜별 저장 파일에 남음 → 설문 기간 누적 = 저장 파일을 더함
      - 보고앱에 보내기를 켜면 기간 동안 매일 20:00 에 번호별 오늘 · 누적 수를 보냄 (파일로 남기고 · 보고앱 주소가 있으면 그 주소로) */
-  const SV0 = { from: "", to: "", send: false, naverNew: true, walkin: false, all: false, opts: ["", "", "", "", ""], sentDay: "", sentSig: "", last: null };
+  const SV0 = { from: "", to: "", send: false, naverNew: true, walkin: false, all: false, opts: ["", "", "", "", ""], sentDay: "", sentSig: "", last: null, retry: null };
   const SV = JSON.parse(JSON.stringify(SV0));
   function svSaveCfg() {
     const v = JSON.parse(JSON.stringify(SV));
@@ -2504,10 +2506,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   function svLoadCfg(v) {
     if (!v) return;
     const day = (x) => (/^\d{4}-\d{2}-\d{2}$/.test(x || "") ? x : "");
-    Object.assign(SV, { from: day(v.from), to: day(v.to), send: !!v.send, naverNew: v.naverNew !== false, walkin: !!v.walkin, all: !!v.all, sentDay: day(v.sentDay), sentSig: String(v.sentSig || ""), last: v.last || null });
+    Object.assign(SV, { from: day(v.from), to: day(v.to), send: !!v.send, naverNew: v.naverNew !== false, walkin: !!v.walkin, all: !!v.all, sentDay: day(v.sentDay), sentSig: String(v.sentSig || ""), last: v.last || null, retry: v.retry && day(v.retry.day) ? { day: v.retry.day, m: Number(v.retry.m) || 0 } : null });
     if (Array.isArray(v.opts) && v.opts.length) SV.opts = v.opts.slice(0, 20).map((o) => String(o || ""));
   }
-  if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c && c.survey) { svLoadCfg(c.survey); renderAll(); } }).catch(() => {});
+  let svKey = { has: false, tail: "" }; // 설문 보고함 '보고 열쇠' — 앱은 이 PC 에 암호화 저장(있는지 · 끝 4자리만 앎) · 체험판은 화면에만
+  if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c) svKey = { has: !!c.hasSurveyKey, tail: String(c.surveyKeyTail || "") }; if (c && c.survey) { svLoadCfg(c.survey); renderAll(); } }).catch(() => {});
   else try { svLoadCfg(JSON.parse(localStorage.getItem("astanakiz-survey"))); } catch (e) { /* 없음 */ }
   const svOn = () => !!(SV.from && SV.to && SV.from <= TODAY && TODAY <= SV.to && (SV.all || SV.naverNew || SV.walkin) && SV.opts.length);
   const SV_Q_NEW = "신규고객께 아스타나키즈를 어떻게 알게 되었는지 물어봐주세요";
@@ -2561,20 +2564,27 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     svBusy = true;
     const p = svPayload();
     let r;
-    if (!APP || !window.desk.survey) r = { ok: true, demo: true };
-    else r = await window.desk.survey.send({ json: JSON.stringify(p) }).catch((e) => ({ ok: false, why: String(e) }));
+    if (!APP || !window.desk.survey) r = { ok: true, demo: true, inbox: svKey.has ? { ok: true, code: 200, demo: true } : null };
+    else r = await window.desk.survey.send({ json: JSON.stringify(p), at: `${TODAY} ${hm(now)}` }).catch((e) => ({ ok: false, why: String(e) }));
     svBusy = false;
-    const again = !manual && SV.sentDay === TODAY; // 20:00 뒤 숫자가 바뀌어 다시 씀 (알림 없이)
-    SV.sentDay = TODAY; SV.sentSig = svSig(p); SV.last = { at: `${TODAY} ${hm(now)}`, ok: !!(r && r.ok), why: (r && r.why) || "", auto: !manual };
+    const prev = SV.last, again = !manual && SV.sentDay === TODAY; // 20:00 뒤 다시 씀 · 10분 뒤 다시 보냄 (바뀐 게 없으면 알림 없이)
+    const ib = r && r.inbox ? { ok: !!r.inbox.ok, code: r.inbox.code || 0, why: r.inbox.why || "" } : null;
+    SV.sentDay = TODAY; SV.sentSig = svSig(p); SV.last = { at: `${TODAY} ${hm(now)}`, ok: !!(r && r.ok), why: (r && r.why) || "", auto: !manual, inbox: ib };
+    // 보고함에 못 보냈으면 10분 뒤 다시 (그날 보낼 때까지 · 파일은 그대로)
+    SV.retry = ib && !ib.ok ? { day: TODAY, m: now + 10 } : null;
     svSaveCfg();
-    if (!again || !(r && r.ok)) toast(r && r.demo ? `체험판: 설문 누적(응답 ${p.answered.total} · 제외 ${p.excluded.total})을 보고 파일로 남기는 흉내` : r && r.ok ? "설문 누적을 보고 파일로 남겼어요 — 보고 시스템이 가져가요" : `설문 보고 파일을 못 썼어요: ${(r && r.why) || "응답 없음"}`);
+    const same = again && prev && prev.ok === SV.last.ok && !!(prev.inbox && prev.inbox.ok) === !!(ib && ib.ok);
+    if (!same) toast(r && r.demo ? `체험판: 설문 누적(응답 ${p.answered.total} · 제외 ${p.excluded.total})을 보고 파일로 남기는 흉내${ib ? " · 보고함에도 보내는 흉내" : ""}`
+      : `${r && r.ok ? "설문 누적을 보고 파일로 남겼어요" : `설문 보고 파일을 못 썼어요: ${(r && r.why) || "응답 없음"}`}${ib ? (ib.ok ? " · 보고함에 보냄 (보고 앱에 바로 보여요)" : ` · 보고함 실패: ${ib.why} — 10분 뒤 다시`) : " · 보고 열쇠가 없어 보고함에는 안 보냄"}`);
     if (sheet.mode === "settings" && sheet.tab === "survey") renderSheet();
   }
   /** 보낸 숫자 (바뀌었는지 보려고) */
   const svSig = (p) => JSON.stringify([p.options.map((o) => [o.label, o.today, o.total]), p.excluded, p.answered]);
   /** 매일 20:00 (설문 기간 · 보내기 켬 · 그날 아직 안 보냄) — 보낸 뒤 숫자가 바뀌면(늦게 온 손님 · [+]) 10초 안에 그날 파일을 다시 씀 (보고 시스템이 22:45까지 30분마다 가져감) */
   function svTick() {
-    if (!SV.send || !svOn() || now < 20 * 60 || svBusy) return;
+    if (svBusy || !svOn()) return;
+    if (SV.retry && SV.retry.day === TODAY && now >= SV.retry.m && svKey.has) { svSend(false); return; } // 보고함 실패 → 10분 뒤 다시
+    if (!SV.send || now < 20 * 60) return;
     if (SV.sentDay !== TODAY) svSend(false);
     else if (sec % 10 === 0 && svSig(svPayload()) !== SV.sentSig) svSend(false);
   }
@@ -2894,6 +2904,20 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     svMinus(btn) { const n = Number(btn.dataset.n); if (!(svExtra[n] > 0)) return; svExtra[n]--; if (!svExtra[n]) delete svExtra[n]; saveState(); renderSheet(); toast(`${n}번 직접 더한 것 1건 뺌`); },
     svDel() { if (SV.opts.length > 1) SV.opts.pop(); svSaveCfg(); renderSheet(); },
     svSendNow() { svSend(true); },
+    // 보고 열쇠 (보고 앱 주소 …/b/{열쇠}/) — 앱은 이 PC 에 암호화 저장, 화면에는 끝 4자리만 · 체험판은 저장 · 보내기 없음
+    async svKeySave() {
+      const k = (($("sv-key") || {}).value || "").trim();
+      if (!/^[A-Za-z0-9_-]{16,64}$/.test(k)) { toast("보고 열쇠는 16~64자 영문 · 숫자 · _ - 만 돼요"); return; }
+      if (APP && window.desk.config) { const r = await window.desk.config.set({ surveyKey: k }).catch((e) => ({ ok: false, why: String(e) })); if (!r || !r.ok) { toast(`열쇠를 저장 못 했어요: ${(r && r.why) || ""}`); return; } }
+      svKey = { has: true, tail: k.slice(-4) };
+      toast(APP ? "보고 열쇠를 저장했어요 — [지금 보내기]로 확인해 보세요" : "체험판: 보고 열쇠는 이 화면에만 (저장 · 보내기 없음)");
+      renderSheet();
+    },
+    async svKeyDel() {
+      if (APP && window.desk.config) await window.desk.config.set({ surveyKey: "" }).catch(() => {});
+      svKey = { has: false, tail: "" }; SV.retry = null; svSaveCfg();
+      toast("보고 열쇠를 지웠어요 — 보고 파일만 남겨요"); renderSheet();
+    },
     // 방문 이벤트 (10/14 · 10/15 시작일 ~ 종료일)
     evApply() {
       const from = ($("ev-from") || {}).value || "", to = ($("ev-to") || {}).value || "";

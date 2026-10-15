@@ -21,6 +21,7 @@ const DEFAULTS = {
   amanoId: "", // 아마노 아이디
   amanoPwEnc: "", // 아마노 비밀번호: Windows 암호화로 이 PC 계정만 풀 수 있게 저장 (저장소·설치파일에 넣지 않음)
   talkUrls: { kids: "", cafe: "" }, // 네이버 톡톡 상담 목록 주소 (계정마다). 저장소에 적지 않고 운영 설정 '지금 화면을 …으로'로 기억
+  surveyKeyEnc: "", // 설문 보고함 '보고 열쇠' (보고 앱 주소 …/b/{열쇠}/): Windows 암호화로 이 PC 에만 (저장소·설치파일에 넣지 않음 · 10/15)
 };
 let settings = { ...DEFAULTS };
 let deskWin = null;
@@ -623,9 +624,15 @@ ipcMain.handle("talk:dump", async (_e, k) => {
   }
 });
 
+const SURVEY_KEY_RE = /^[A-Za-z0-9_-]{16,64}$/;
+/** 저장한 보고 열쇠 (없거나 풀 수 없으면 "") */
+function surveyKey() {
+  try { return settings.surveyKeyEnc ? safeStorage.decryptString(Buffer.from(settings.surveyKeyEnc, "base64")) : ""; } catch (e) { return ""; }
+}
 ipcMain.handle("config:get", () => {
-  const { amanoPwEnc, ...rest } = settings;
-  return { ...rest, hasAmanoPw: !!amanoPwEnc, build: BUILD };
+  const { amanoPwEnc, surveyKeyEnc, ...rest } = settings;
+  const k = surveyKey();
+  return { ...rest, hasAmanoPw: !!amanoPwEnc, hasSurveyKey: !!k, surveyKeyTail: k ? k.slice(-4) : "", build: BUILD };
 });
 ipcMain.handle("config:set", (_e, patch) => {
   const urlChanged = patch.amanoUrl !== undefined && patch.amanoUrl !== settings.amanoUrl;
@@ -636,6 +643,16 @@ ipcMain.handle("config:set", (_e, patch) => {
   }
   delete patch.amanoPw;
   delete patch.amanoPwEnc;
+  // 설문 보고 열쇠: "" = 지움 · 16~64자 영문 · 숫자 · _ - 만 (화면에는 끝 4자리만 돌려줌)
+  if (patch.surveyKey !== undefined) {
+    const k = String(patch.surveyKey || "").trim();
+    if (!k) settings.surveyKeyEnc = "";
+    else if (!SURVEY_KEY_RE.test(k)) return { ok: false, why: "보고 열쇠는 16~64자 영문 · 숫자 · _ - 만 돼요" };
+    else if (!safeStorage.isEncryptionAvailable()) return { ok: false, why: "이 PC에서 암호화를 쓸 수 없음" };
+    else settings.surveyKeyEnc = safeStorage.encryptString(k).toString("base64");
+  }
+  delete patch.surveyKey;
+  delete patch.surveyKeyEnc;
   settings = { ...settings, ...patch };
   saveSettings();
   if (urlChanged) openAmano();
@@ -698,23 +715,49 @@ ipcMain.handle("ledger:open", async () => {
   return why ? { ok: false, why } : { ok: true, dir: d };
 });
 
-// 설문조사 누적 보고 (사장님 10/14 · 10/15): 매일 20:00 데스크가 번호별 오늘 · 누적 수를 넘겨줌
-// → 앱 폴더 report-outbox\survey-날짜.json 에 남김 — 보고 시스템(gnb21c-cmd/report)이 POS PC 에서 이 폴더를 읽어 감 (손님 정보 없음)
-//   (보고앱 주소로 보내는 기능은 받을 서버가 없어 뺌 · 10/15)
+// 설문조사 누적 보고 (사장님 10/14 · 10/15): 매일 20:00(뒤에 숫자가 바뀌면 다시 · [지금 보내기]) 데스크가 번호별 오늘 · 누적 수를 넘겨줌
+// ① 앱 폴더 report-outbox\survey-날짜.json 에 남김 (손님 정보 없음)
+// ② 보고 열쇠가 있으면 같은 글을 보고 시스템 클라우드 '설문 보고함'에 씀 (gnb21c-cmd/report docs/SURVEY.md '통합데스크가 할 일')
+//    통합데스크(키즈 POS)와 보고 시스템 수집(바리스타 POS)이 다른 PC 라 파일만으로는 못 가져감 → 보고 앱이 보고함을 바로 읽음
+//    PATCH …/boards/{열쇠}/surveyInbox/{설문 시작일} · 로그인 · API 키 없음 · 200 = 보냄 / 403 = 열쇠나 모양이 틀림 / 그 밖 = 실패
+const INBOX_BASE = process.env.ASTANA_INBOX_BASE || "https://firestore.googleapis.com/v1/projects/astana-report/databases/(default)/documents"; // ASTANA_INBOX_BASE 는 시험용
+async function surveyInbox(json, at) {
+  const key = surveyKey();
+  if (!key) return null;
+  let from = "";
+  try { from = String(JSON.parse(json).period.from || ""); } catch (err) { /* 모양 틀림 */ }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from)) return { ok: false, code: 0, why: "설문 시작일이 없어요" };
+  if (json.length >= 20000) return { ok: false, code: 0, why: "보고 글이 너무 길어요 (선택지 이름을 줄여 주세요)" };
+  const body = JSON.stringify({ fields: { json: { stringValue: json }, at: { stringValue: String(at || "").slice(0, 39) } } });
+  try {
+    const { net } = require("electron");
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(), 15000);
+    const r = await net.fetch(`${INBOX_BASE}/boards/${encodeURIComponent(key)}/surveyInbox/${from}`, { method: "PATCH", headers: { "content-type": "application/json; charset=utf-8" }, body, signal: ac.signal });
+    clearTimeout(t);
+    if (r.status === 200) return { ok: true, code: 200 };
+    return { ok: false, code: r.status, why: r.status === 403 ? "열쇠나 모양이 틀림 (403)" : `응답 ${r.status}` };
+  } catch (err) {
+    return { ok: false, code: 0, why: `인터넷 오류: ${err && err.name === "AbortError" ? "응답 없음" : err && err.message ? err.message : err}` };
+  }
+}
 ipcMain.handle("survey:send", async (_e, job) => {
   const json = String((job && job.json) || "{}");
+  let file = null, why = "";
   try {
     const dir = path.join(app.getPath("userData"), "report-outbox");
     fs.mkdirSync(dir, { recursive: true });
     let day = "";
     try { day = String(JSON.parse(json).day || "").replace(/[^0-9-]/g, ""); } catch (err) { /* 날짜 없음 */ }
-    const file = path.join(dir, `survey-${day || "x"}.json`);
+    file = path.join(dir, `survey-${day || "x"}.json`);
     fs.writeFileSync(file + ".tmp", json, "utf8");
     fs.renameSync(file + ".tmp", file);
-    return { ok: true, file };
   } catch (err) {
-    return { ok: false, why: `파일을 못 씀: ${err && err.message ? err.message : err}` };
+    file = null;
+    why = `파일을 못 씀: ${err && err.message ? err.message : err}`;
   }
+  const inbox = await surveyInbox(json, job && job.at); // 파일을 못 써도 보고함에는 보냄
+  return { ok: !!file, file, why, inbox };
 });
 
 // ── 영수증 프린터 (80mm 감열지) ──

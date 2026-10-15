@@ -192,3 +192,71 @@ test("설문조사(앱): 20:00 에 보고앱으로 한 번 · 다시 켜도 누�
     await browser.close();
   }
 });
+
+test("설문 보고함(앱): 보고 열쇠가 있으면 보고 파일을 쓸 때마다 클라우드 보고함에도 · 실패하면 10분 뒤 다시 · 열쇠는 앱 본체에만 (10/15)", async () => {
+  const browser = await launch();
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+    const page = await ctx.newPage();
+    await page.clock.install({ time: new Date("2026-10-14T19:59:30") });
+    await page.addInitScript(() => {
+      window.__sent = []; window.__set = []; window.__inbox = [{ ok: false, code: 503, why: "응답 503" }, { ok: true, code: 200 }];
+      const cfg = { build: "1.41", hasSurveyKey: false, surveyKeyTail: "", survey: { from: "2026-10-14", to: "2026-10-31", send: true, naverNew: true, opts: ["네이버 검색", "인스타그램", "지인 소개"] } };
+      window.desk = {
+        naver: { load: async (day) => ({ ok: true, day, slots: [], bookings: [] }), complete: async () => ({ ok: true }) },
+        state: { load: () => null, save: () => {} },
+        config: { get: async () => cfg, set: async (patch) => { window.__set.push(patch); if (patch.surveyKey !== undefined) { cfg.hasSurveyKey = !!patch.surveyKey; cfg.surveyKeyTail = String(patch.surveyKey).slice(-4); } else Object.assign(cfg, patch); return { ok: true }; } },
+        survey: { send: async (job) => { window.__sent.push(job); return { ok: true, file: "C:/report-outbox/survey-2026-10-14.json", inbox: cfg.hasSurveyKey ? window.__inbox.shift() || { ok: true, code: 200 } : null }; } },
+      };
+    });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK);
+    await page.waitForFunction(() => /불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 15000 });
+    await openSurvey(page);
+    assert.match(await page.textContent("#sheet"), /보고 열쇠를 넣으면 보고 시스템 클라우드 '설문 보고함'에도 보내요/);
+    assert.strictEqual(await page.getAttribute("#sv-key", "type"), "password", "비밀번호처럼 가려서");
+    await page.fill("#sv-key", "too_short");
+    await page.click("[data-act=svKeySave]");
+    assert.match(await page.textContent("#toast"), /16~64자 영문 · 숫자 · _ - 만/);
+    await page.fill("#sv-key", "Board_key-0123456789xyz");
+    await page.click("[data-act=svKeySave]");
+    assert.deepStrictEqual(await page.evaluate(() => window.__set.filter((p) => "surveyKey" in p)), [{ surveyKey: "Board_key-0123456789xyz" }], "열쇠는 앱 본체(암호화 저장)로");
+    assert.match(await page.getAttribute("#sv-key", "placeholder"), /저장됨 \(끝 ••9xyz\)/);
+    assert.strictEqual(await page.inputValue("#sv-key"), "", "화면에 열쇠를 다시 보여 주지 않음");
+    const cfgSurvey = await page.evaluate(() => JSON.stringify(window.__set.filter((p) => p.survey)));
+    assert.ok(!cfgSurvey.includes("Board_key"), "설문 설정(survey)에는 열쇠가 안 들어감");
+    await close(page);
+
+    // 20:00 — 파일 + 보고함: 이번엔 실패(503) → 10분 뒤 다시 → 보냄
+    await page.clock.runFor(40000);
+    await page.waitForFunction(() => window.__sent.length === 1);
+    assert.match(await page.textContent("#toast"), /보고 파일로 남겼어요 · 보고함 실패: 응답 503 — 10분 뒤 다시/);
+    const job = (await page.evaluate(() => window.__sent))[0];
+    assert.strictEqual(job.at, "2026-10-14 20:00");
+    assert.strictEqual(JSON.parse(job.json).type, "astanakiz-survey");
+    await openSurvey(page);
+    assert.match((await page.textContent("#sheet")).replace(/\s+/g, " "), /마지막: 2026-10-14 20:00 자동 · 파일로 남김 · 보고함 실패 응답 503 — 20:10 다시/);
+    await close(page);
+    await page.clock.runFor(5 * 60000);
+    assert.strictEqual(await page.evaluate(() => window.__sent.length), 1, "10분이 안 됐으면 아직");
+    await page.clock.runFor(5 * 60000 + 2000);
+    await page.waitForFunction(() => window.__sent.length === 2);
+    assert.match(await page.textContent("#toast"), /보고함에 보냄/);
+    await openSurvey(page);
+    assert.match((await page.textContent("#sheet")).replace(/\s+/g, " "), /마지막: 2026-10-14 20:1\d 자동 · 파일로 남김 · 보고함에 보냄/);
+    await close(page);
+    await page.clock.runFor(15 * 60000);
+    assert.strictEqual(await page.evaluate(() => window.__sent.length), 2, "보낸 뒤엔 바뀐 게 없으면 더 안 보냄");
+    // [지금 보내기]도 보고함에 · 열쇠 지우기 → 파일만
+    await openSurvey(page);
+    await page.click("[data-act=svKeyDel]");
+    assert.deepStrictEqual(await page.evaluate(() => window.__set.filter((p) => "surveyKey" in p).pop()), { surveyKey: "" });
+    await page.click("[data-act=svSendNow]");
+    await page.waitForFunction(() => window.__sent.length === 3);
+    assert.match(await page.textContent("#toast"), /보고 열쇠가 없어 보고함에는 안 보냄/);
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
