@@ -32,7 +32,7 @@ test("맨 위: 통합 데스크 · 포스 전환 · 환전 오픈(현금통 열�
     const line = await page.$$eval("#slots .slot.unl", (e) => e.map((x) => ({ t: x.dataset.s, bg: getComputedStyle(x, "::before").backgroundColor })));
     assert.deepStrictEqual(line.map((x) => x.t), ["1080"], "18:00 줄 위에만");
     assert.notStrictEqual(line[0].bg, "rgba(0, 0, 0, 0)");
-    // 예약 수량 2장 이상이면 숫자만 표시 (10/9 빨강 글씨 → 10/16 미입장 스티커처럼 노랑 네모 · 흰 글씨)
+    // 예약 수량 2장 이상이면 숫자만 표시 (10/9 빨강 글씨 → 10/16 미입장 스티커처럼 노랑 네모 · 빨강 글씨)
     await page.click('.slot[data-s="840"]');
     const q = await page.evaluate(() => [...document.querySelectorAll("#res .res")].map((c) => ({ name: c.querySelector(".name").firstChild.textContent.trim(), many: (c.querySelector(".qmany") || {}).textContent || "" })));
     assert.strictEqual(q.find((x) => x.name === "류하린").many, "2", "2장 → 노랑 네모");
@@ -42,7 +42,10 @@ test("맨 위: 통합 데스크 · 포스 전환 · 환전 오픈(현금통 열�
     assert.ok(yellow, "--yellow 색");
     const st = await page.$eval(".qmany", (e) => { const c = getComputedStyle(e); return { bg: c.backgroundColor, color: c.color, radius: c.borderRadius }; });
     assert.strictEqual(st.bg, await asColor("backgroundColor", yellow), "노랑 네모");
-    assert.strictEqual(st.color, "rgb(255, 255, 255)", "흰 글씨");
+    const fg = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--yellow-fg").trim());
+    assert.strictEqual(st.color, await asColor("color", fg), "빨강 글씨");
+    const [r, g, b] = st.color.match(/\d+/g).map(Number);
+    assert.ok(r > 150 && g < 80 && b < 80, "빨강 계열 " + st.color);
     assert.notStrictEqual(st.radius, "0px", "미입장 스티커처럼 둥근 네모");
 
     // 설치한 앱: 운영 설정의 프린터(COM3)로 현금통 열기

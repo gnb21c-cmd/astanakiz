@@ -27,7 +27,7 @@
   --pink: #F2A7BC;
   --pink-fg: #7A1F3A;
   --red: #D23A3A;
-  --yellow: #E3A008; /* 예약 수량 2장 이상 스티커 (사장님 10/16) */
+  --yellow: #FFD23F; --yellow-fg: #C81E1E; /* 예약 수량 2장 이상 스티커: 노랑 네모 · 빨강 글씨 (사장님 10/16) */
   --ok: #1D7F52;
   --warn-bg: #FBE3E3;
   --shadow: 0 1px 2px rgba(20, 26, 38, .06), 0 3px 12px rgba(20, 26, 38, .05);
@@ -38,7 +38,7 @@
     --sky-bg: #16324A; --sky-line: #2F6A96; --done-bg: #262C35;
     --bg: #0F141C; --surface: #18202B; --surface-2: #1F2834; --fg: #E8ECF2; --muted: #9AA4B5; --faint: #4A5566; --line: #2C3645;
     --ink: #E8ECF2; --on-ink: #10151D; --accent: #82A3F2; --accent-bg: #1E2B4A; --naver: #4CC788; --naver-bg: #163126;
-    --pink: #E58FA8; --pink-fg: #3A0E1B; --red: #EF6B6B; --yellow: #D99A06; --ok: #5BCB92; --warn-bg: #43201F;
+    --pink: #E58FA8; --pink-fg: #3A0E1B; --red: #EF6B6B; --yellow: #FFD23F; --yellow-fg: #C81E1E; --ok: #5BCB92; --warn-bg: #43201F;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 3px 12px rgba(0,0,0,.25);
     color-scheme: dark;
   }
@@ -47,7 +47,7 @@
     --sky-bg: #16324A; --sky-line: #2F6A96; --done-bg: #262C35;
   --bg: #0F141C; --surface: #18202B; --surface-2: #1F2834; --fg: #E8ECF2; --muted: #9AA4B5; --faint: #4A5566; --line: #2C3645;
   --ink: #E8ECF2; --on-ink: #10151D; --accent: #82A3F2; --accent-bg: #1E2B4A; --naver: #4CC788; --naver-bg: #163126;
-  --pink: #E58FA8; --pink-fg: #3A0E1B; --red: #EF6B6B; --yellow: #D99A06; --ok: #5BCB92; --warn-bg: #43201F;
+  --pink: #E58FA8; --pink-fg: #3A0E1B; --red: #EF6B6B; --yellow: #FFD23F; --yellow-fg: #C81E1E; --ok: #5BCB92; --warn-bg: #43201F;
   --shadow: 0 1px 2px rgba(0,0,0,.3), 0 3px 12px rgba(0,0,0,.25);
   color-scheme: dark;
 }
@@ -278,7 +278,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .gift { display: inline-block; font-size: 11px; font-weight: 700; color: #fff; background: var(--red); border-radius: 5px; padding: 0 6px; margin-left: 2px; }
 .badge { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
 .badge.conf { background: var(--red); color: #fff; } /* 미입장 = 빨강 스티커 */
-.qmany { display: inline-block; background: var(--yellow); color: #fff; font-weight: 800; border-radius: 6px; padding: 0 7px; line-height: 1.4; } /* 예약 수량 2장 이상 = 노랑 스티커 · 흰 글씨 (미입장 빨강 스티커처럼 · 사장님 10/16) */
+.qmany { display: inline-block; background: var(--yellow); color: var(--yellow-fg); font-weight: 800; border-radius: 6px; padding: 0 7px; line-height: 1.4; } /* 예약 수량 2장 이상 = 노랑 네모 · 빨강 글씨 (미입장 스티커처럼 · 사장님 10/16) */
 .golden { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; background: rgba(0, 0, 0, .55); }
 .golden[hidden] { display: none; }
 .golden .gbox { width: min(560px, 92%); background: var(--surface); border: 3px solid #F2C94C; border-radius: 18px; padding: 24px 26px; text-align: center; display: grid; gap: 12px; box-shadow: 0 24px 70px rgba(0,0,0,.5); }
@@ -1165,7 +1165,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   /** 이번 입장으로 함께 이용완료되는 예약들 중 사은권 회차가 있는지 (예: 8 → 같은 시간 2건이면 9, 10) — 마일리지 기준(이벤트 기간 이용완료는 뺌) · 이벤트 기간엔 없음 */
   const giftIn = (h) => { if (!h.visitNo || evFrozen(h)) return 0; const s = evSub(h), a = h.visitNo - s, z = (h.visitEnd || h.visitNo) - s; for (let n = Math.max(1, a); n <= z; n++) if (isGift(n)) return n; return 0; };
   /** 대리예약: 예약자 정보와 함께 방문자 이름 · 전화번호도 (네이버 '방문자' 줄 "박소희(010-2785-4295)") */
-  /** 예약 수량: 2장 이상이면 숫자만 노랑 스티커 · 흰 글씨 (열쇠를 여러 개 줘야 함 · 사장님 10/9 빨강 글씨 → 10/16 노랑 네모) */
+  /** 예약 수량: 2장 이상이면 숫자만 노랑 네모 · 빨강 글씨 (열쇠를 여러 개 줘야 함 · 사장님 10/9 빨강 글씨 → 10/16 노랑 네모) */
   const qtyNum = (q) => (q >= 2 ? `<b class="qmany num">${q}</b>` : String(q));
   function visitorRow(b) {
     if (!b.visitor) return "";
