@@ -46,7 +46,8 @@ test("골든벨: 16:00 이후 열쇠 20개 이하 → 알림창 · 모든 열쇠
     assert.doesNotMatch(await page.textContent("#sheet"), /초과/);
     // 10/9 현장: 골든벨 뒤 열쇠 창에 시간 바꾸기 줄이 아예 없어 '없다'고 보임 → 줄은 보이고 버튼만 잠김 + 까닭
     assert.ok(await page.isVisible("#sheet .mvrow"), "무제한이어도 ◀ ▶ 변경 +1타임 줄은 보임");
-    assert.deepStrictEqual(await page.$$eval("#sheet .mvrow button", (b) => b.map((x) => x.disabled)), [true, true, true, true], "무제한이라 바꿀 반납 시각 없음 → 잠김");
+    assert.deepStrictEqual(await page.$$eval("#sheet .mvrow button:not(.svcbtn)", (b) => b.map((x) => x.disabled)), [true, true, true, true], "무제한이라 바꿀 반납 시각 없음 → 잠김");
+    assert.ok(!(await page.isDisabled("#sheet .mvrow .svcbtn")), "[서비스 키]는 무제한이어도 줄 수 있음 (10/16)");
     assert.match((await page.textContent("#sheet .mvwhy")).replace(/\s+/g, " "), /골든벨 무제한/);
     const s0 = await page.$eval("#sold b", (e) => +e.textContent);
     await page.$eval("#sheet [data-act=plusSlot]", (e) => e.click());

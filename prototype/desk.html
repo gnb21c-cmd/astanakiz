@@ -405,6 +405,18 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .wguide li.done { color: var(--ok); }
 .wguide .g { color: var(--ok); font-weight: 700; } .wguide .r { color: var(--red); font-weight: 700; }
 .wmain { display: grid; gap: 9px; }
+/* 서비스 키 (10/16): 판매 아닌 열쇠 — 열쇠판 점선 · 현장입장 왼쪽 아래 버튼 · 열쇠 창 빈 열쇠 고르기 */
+.wleft { display: grid; gap: 10px; align-content: start; }
+.svcwalk { display: grid; gap: 4px; padding: 8px 10px; border: 1.5px dashed var(--line); border-radius: 10px; }
+.svcwalk .btn { min-height: 38px; font-weight: 700; }
+.svcwalk .help { font-size: 12px; line-height: 1.4; }
+.badge.svcb { background: var(--surface-2); color: var(--fg); border: 1.5px dashed var(--muted); font-size: 12px; vertical-align: middle; }
+.key.svc { border-style: dashed; }
+.key.svc span { font-weight: 700; }
+.svcpick { margin: 4px 0 8px; padding: 8px 10px; border: 1.5px dashed var(--accent); border-radius: 10px; display: grid; gap: 6px; }
+.svckeys { display: flex; flex-wrap: wrap; gap: 5px; }
+.svckeys .btn { min-width: 38px; padding: 0 4px; }
+.svcgiven .kchip { margin-right: 2px; }
 .wmain .banner { font-size: 14px; padding: 10px 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .banner.bad { background: var(--red); color: #fff; }
 .wn { display: inline-grid; place-items: center; min-width: 22px; height: 22px; border-radius: 50%; font-size: 13px; font-weight: 800; color: var(--muted); }
@@ -719,6 +731,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   // 현장입장자
   let posSeq = 31;
   const walkins = [];
+  /* 서비스 키 (사장님 10/16): 판매가 아닌 열쇠 — 판매수 · 네이버/현장 인원 집계 · 보고 시스템의 현장 구매(w)에 안 들어가게 따로 둠 (저장 파일 s)
+     - 열쇠 창 [서비스 키]: 그 손님에게 빈 열쇠 하나를 더 줌 → of = 그때 손님 정보를 복사해 둠 (이름 · 전화 · 열쇠 · 예약번호)
+       → 원래 손님이 먼저 반납 · 퇴장해도 서비스 키에는 연결 정보가 그대로 남음 (사장님 10/16)
+     - 현장입장 창 [서비스 키]: 임직원 등 예약 없이 쓸 때 (staff · 이름이나 전화번호로 사용자 표시)
+     - 반납 시각 · 색 · 반납 · 퇴장 · 일괄 반납은 다른 열쇠와 같음. 다른 점: 판매 아님(입장권 · POS 결제 · 설문 없음) · 초과요금 없음
+     - 열쇠는 나가 있으므로 빈 열쇠 · 현장 판매 가능 열쇠에서는 빠짐 · 네이버/현장 인원(시간표 · 판매수 · 수량 자동조절 좌석)에는 안 셈 */
+  const svcKeys = [];
   const extIgnored = new Set(); // 추가 예약을 '그대로 두기'로 한 예약번호 — 다시 묻지 않음 (네이버 이용완료도 안 함)
   /* 예약시간 변경 (사장님 10/9): 네이버 예약 시간은 바꿀 수 없어 데스크에서만 카드를 다른 시간으로 옮김
      naverSlot = 네이버의 원래 시간(이용완료 · 취소는 이 시간 칸에서 누름), slot = 데스크 시간(명단 · 이용시간 · 반납은 이 시간부터)
@@ -867,10 +886,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
      일괄 반납으로 돌려받은 열쇠는 bulkOut (하나씩 확인하지 않은 열쇠) */
   const noteKeys = (h) => { if (h.keys && h.keys.length) h.keysTaken = [...new Set([...(h.keysTaken || []), ...h.keys])]; };
   function saveState() {
-    for (const h of (bookings[TODAY] || []).concat(walkins)) noteKeys(h);
+    for (const h of (bookings[TODAY] || []).concat(walkins, svcKeys)) noteKeys(h);
     if (!APP || !stateReady) return;
     const b = (bookings[TODAY] || []).filter((x) => x.enteredAt != null).map((x) => Object.fromEntries(SAVE_FIELDS.filter((k) => x[k] !== undefined).map((k) => [k, x[k]])));
-    const json = JSON.stringify({ v: 2, b: b.concat(pendingSaved.filter((p) => !b.some((x) => x.no === p.no))), w: walkins, x: [...testOut], ig: [...extIgnored], mv: [...moved], g: golden, sa: svExtra, seq, posSeq });
+    const json = JSON.stringify({ v: 2, b: b.concat(pendingSaved.filter((p) => !b.some((x) => x.no === p.no))), w: walkins, x: [...testOut], ig: [...extIgnored], mv: [...moved], g: golden, sa: svExtra, s: svcKeys, seq, posSeq });
     try { if (window.desk.state) window.desk.state.save(TODAY, json); } catch (e) { /* 파일 저장 실패 */ }
     try { localStorage.setItem(STATE_KEY, json); } catch (e) { /* 저장 못 해도 화면은 동작 */ }
   }
@@ -887,6 +906,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (st) {
       seq = Math.max(seq, st.seq || 0); posSeq = Math.max(posSeq, st.posSeq || 0);
       walkins.push(...(st.w || []));
+      svcKeys.push(...(st.s || []));
       for (const no of st.x || []) testOut.add(no);
       for (const no of st.ig || []) extIgnored.add(no);
       for (const [no, s] of st.mv || []) moved.set(no, s);
@@ -1013,7 +1033,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   const extEnd = (h) => { const v = h.keys.map((k) => useOf(h, k)); return v.includes(null) || !v.length ? null : h.slot + Math.max(...v); };
   const samePhone = (a, b) => digits(a.phone) && digits(a.phone) === digits(b.phone);
   function extFor(h) {
-    if (!h || !h.keys.length) return null;
+    if (!h || h.svc || !h.keys.length) return null; // 서비스 키는 추가 예약을 찾지 않음 (원래 손님 열쇠에서)
     const end = extEnd(h);
     if (end == null) return null; // 무제한 손님
     const L = end - RULES.useMinutes;
@@ -1059,7 +1079,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   }
 
   // ── 열쇠 계산 ─────────────────────────────────────
-  const holders = () => bookings[TODAY].concat(walkins).filter((x) => x.keys.length);
+  const holders = () => bookings[TODAY].concat(walkins, svcKeys).filter((x) => x.keys.length);
   const holderOf = (k) => holders().find((x) => x.keys.includes(k));
   const freeKeys = () => { const out = []; for (let k = 1; k <= RULES.keys; k++) if (!holderOf(k)) out.push(k); return out; };
   /* 열쇠 색: 예약한 입장시간(현장은 입장 시각)부터
@@ -1199,7 +1219,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       if (k > RULES.keys) break; // 남는 칸(46~50)은 비워 둠
       const h = holderOf(k);
       if (!h) { html += `<button class="key free" data-act="key" data-k="${k}" aria-label="${k}번 빈 열쇠"><b class="num">${k}</b><span>&nbsp;</span></button>`; continue; }
-      html += `<button class="key ${keyColor(h, k)}" data-act="key" data-k="${k}" aria-label="${k}번 ${esc(h.name)}"><b class="num">${k}</b><span>${esc(h.walk ? "현장" : h.name)}</span></button>`;
+      html += `<button class="key ${keyColor(h, k)}${h.svc ? " svc" : ""}" data-act="key" data-k="${k}" aria-label="${k}번 ${h.svc ? "서비스 키 " : ""}${esc(h.name)}"><b class="num">${k}</b><span>${h.svc ? "서비스" : esc(h.walk ? "현장" : h.name)}</span></button>`;
     }
     // 설명은 45번 오른쪽 빈 칸에 (사장님이 정한 순서 10/8)
     if (RULES.keys > 40 && RULES.keys <= 45) html += `<div class="legend" style="grid-column: ${RULES.keys - 39} / -1">
@@ -1319,11 +1339,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   /** 그날 저장 파일 { b: 입장한 예약, w: 현장입장, x: 통계에서 뺀 예약번호 } — 오늘은 화면의 것, 지난날은 파일에서 한 번만 읽음
       저장 파일은 지우지 않음 (입장권 목록에서 2주 전까지 보고 찾음) */
   function dayFile(day) {
-    if (day === TODAY) return { b: [], w: walkins, x: testOut, sa: svExtra };
+    if (day === TODAY) return { b: [], w: walkins, x: testOut, sa: svExtra, s: svcKeys };
     if (!dayFiles[day]) {
       let f = {};
       try { const t = APP && window.desk.state ? window.desk.state.load(day) : null; if (t) f = JSON.parse(t); } catch (e) { f = {}; }
-      dayFiles[day] = { b: f.b || [], w: f.w || [], x: new Set(f.x || []), sa: f.sa && typeof f.sa === "object" ? f.sa : {} };
+      dayFiles[day] = { b: f.b || [], w: f.w || [], x: new Set(f.x || []), sa: f.sa && typeof f.sa === "object" ? f.sa : {}, s: Array.isArray(f.s) ? f.s : [] };
     }
     return dayFiles[day];
   }
@@ -1335,9 +1355,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     const nb = f.b.concat(bookings[day] || []).filter((b) => b.status === "완료" && b.no && !seen.has(b.no) && seen.add(b.no));
     return nb.map((b) => ({ k: "n", id: b.no, day, name: b.name, phone: b.phone, src: b, keys: b.keysTaken || b.keys || [], at: b.enteredAt != null ? b.enteredAt : b.slot, qty: b.qty, out: f.x.has(b.no) }))
       .concat(f.w.map((w) => ({ k: "w", id: w.id, day, name: w.extra ? `추가 1타임 · ${w.of}` : "현장구매자", phone: w.phone, src: w, keys: w.keysTaken || w.keys || [], at: w.enteredAt != null ? w.enteredAt : w.slot, qty: walkQty(w), out: false })))
+      .concat((f.s || []).map((x) => ({ k: "s", id: x.id, day, name: svcLabel(x), phone: x.phone, src: x, keys: x.keysTaken || x.keys || [], at: x.enteredAt != null ? x.enteredAt : x.slot, qty: 0, out: false, svc: true })))
       .sort((a, b) => b.at - a.at || a.name.localeCompare(b.name, "ko"));
   }
   const walkQty = (w) => w.qty || Math.max(1, (w.keys || []).length);
+  /** 서비스 키 이름: '서비스 키 · 백성욱 3번' / '서비스 키 · 직원 홍길동' */
+  const svcLabel = (x) => `서비스 키 · ${x.of ? x.of.label : `직원${x.name && x.name !== "직원" ? " " + x.name : ""}`}`;
   function walkTickets(day) { return dayFile(day).w.reduce((a, w) => a + walkQty(w), 0); }
   /** 통계에서 뺀(시험으로 잡힌) 네이버 이용완료 장수 */
   const testQty = (day) => { const x = dayFile(day).x; return (bookings[day] || []).filter((b) => x.has(b.no) && b.status === "완료").reduce((a, b) => a + b.qty, 0); };
@@ -1499,7 +1522,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   function capPresent() {
     const out = [];
     for (const h of holders()) {
-      if (h.slot > now || (h.no && testOut.has(h.no))) continue;
+      if (h.svc || h.slot > now || (h.no && testOut.has(h.no))) continue; // 서비스 키는 네이버 · 현장 인원에 안 셈
       for (const k of h.keys) { const m = useOf(h, k); out.push({ from: now, to: m == null ? Infinity : Math.max(h.slot + m, now + 10), n: 1 }); }
     }
     for (const b of bookings[TODAY] || []) {
@@ -1724,17 +1747,57 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const cur = done.indexOf(false);
       const step = (i, t) => `<li class="${done[i] ? "done" : i === cur ? "now" : ""}"><b>${"①②③④⑤"[i]}</b> ${t}</li>`;
       const tag = (i) => `<span class="wn ${done[i] ? "done" : i === cur ? "now" : ""}">${"①②③④⑤"[i]}</span>`;
+      // 왼쪽 아래 [서비스 키] (사장님 10/16): 임직원 등 예약 없이 쓸 때 — 누르면 판매 단계 없이 사용자만 적는 창으로
+      const svcBox = `<div class="svcwalk"><button class="btn ${sheet.svc ? "btn-ink" : ""}" data-act="svcWalk" aria-pressed="${!!sheet.svc}">${sheet.svc ? "← 판매로 돌아가기" : "서비스 키 (판매 아님)"}</button>
+        <span class="help">${sheet.svc ? "판매 · 결제 · 입장권 · 설문 없이 열쇠만 등록" : "임직원 등 예약 없이 쓸 때 — 쓰는 사람만 적고 열쇠 등록 · 총 판매수 · 인원에 안 셈"}</span></div>`;
+      const slotRow = `<div class="wrow"><span class="wn"></span> <span class="wl">입장 타임</span>
+              <button class="btn btn-sm" data-act="wslot" data-d="-30" aria-label="앞 타임" ${ws <= SLOTS[0] ? "disabled" : ""}>◀</button>
+              <b class="num wtime">${hm(ws)} 입장</b>
+              <button class="btn btn-sm" data-act="wslot" data-d="30" aria-label="뒤 타임" ${ws >= SLOTS[SLOTS.length - 1] ? "disabled" : ""}>▶</button>
+              <span class="help num">${m == null ? "무제한" : `~ ${hm(ws + m)} 퇴장`} · 접수 ${hm(now)}${ws !== walkSlot(now) ? " · 바꾼 타임" : ""}</span></div>`;
+      const keypad = `<div class="keypad" aria-label="전화번호 키패드">${["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((n) => `<button data-act="kp" data-k="${n}">${n}</button>`).join("")}<button class="fn" data-act="kp" data-k="clr">지우기</button><button data-act="kp" data-k="0">0</button><button class="fn" data-act="kp" data-k="del" aria-label="한 자리 지우기">←</button></div>`;
+      if (sheet.svc) {
+        const vs = svcWalkState();
+        const sdone = [sheet.keys.length > 0, vs.ok, false], scur = sdone.indexOf(false);
+        const sstep = (i, t) => `<li class="${sdone[i] ? "done" : i === scur ? "now" : ""}"><b>${"①②③"[i]}</b> ${t}</li>`;
+        const stag = (i) => `<span class="wn ${sdone[i] ? "done" : i === scur ? "now" : ""}">${"①②③"[i]}</span>`;
+        el.innerHTML = `
+        <h3 id="sheet-title"><span>현장입장 · 서비스 키 <span class="badge svcb">판매 아님</span></span><button class="x" data-act="close" aria-label="닫기">×</button></h3>
+        <div class="walkgrid">
+          <div class="wleft"><ol class="wguide">
+            ${sstep(0, `쓸 <b>열쇠 수</b>를 맞춰요 (빈 열쇠가 이어서 붙어요) · 입장 타임은 ◀ ▶`)}
+            ${sstep(1, `열쇠를 누가 가져가는지 <b>이름</b>(임직원 등)이나 <b>전화번호</b>를 적어요 — 미반납 때 찾을 수 있게`)}
+            ${sstep(2, `<b>[서비스 키 등록]</b> → 결제 · 입장권 · 설문 없음. 총 판매수 · 네이버/현장 인원에 안 들어가요. 반납은 다른 열쇠와 같아요`)}
+          </ol>${svcBox}</div>
+          <div class="wmain">
+            ${st.over ? `<div class="banner warn">열쇠가 빠듯해요 — 예약 손님이 오실 자리까지 쓰게 돼요. 확인하고 주세요</div>` : ""}
+            <div class="wrow">${stag(0)} <span class="wl">열쇠 수</span>
+              <div class="stepper"><button data-act="qty" data-d="-1" aria-label="열쇠 수 줄이기">−</button><output class="num">${st.need}</output><button data-act="qty" data-d="1" aria-label="열쇠 수 늘리기">+</button></div>
+              <span class="wl">열쇠</span><div class="bigkeys">${sheet.keys.map((k) => `<span class="bigkey num">${k}</span>`).join("")}</div></div>
+            ${slotRow}
+            <div class="field svcname"><label for="w-svcname">${stag(1)} 쓰는 사람 <span class="help">이름 · 직책 (예: 홍길동 매니저)</span></label>
+              <input id="w-svcname" maxlength="20" autocomplete="off" value="${esc(sheet.svcName || "")}" placeholder="이름" data-autofocus></div>
+            <div class="wphone">
+              <div class="field"><label for="w-phone">전화번호 <span class="help">있으면 · 010 뒤 8자리</span></label>
+                <input id="w-phone" inputmode="numeric" autocomplete="off" value="${esc(walkFmt(sheet.phone))}" placeholder="010-0000-0000"></div>
+              ${keypad}
+            </div>
+            <button class="btn btn-ink wdone" id="w-done" data-act="walkDone" ${vs.ok ? "" : "disabled"}>${stag(2)} 서비스 키 등록 (판매 아님)</button>
+          </div>
+        </div>`;
+        return;
+      }
       const sv = svForWalk(), svLock = !!sv && sheet.sv == null; // 설문조사: 현장구매자도 대상이면 번호(또는 제외)를 눌러야 등록
       el.innerHTML = `
         <h3 id="sheet-title">현장입장 ${sv ? `<span class="svwalk ${svLock ? "need" : "ok"}">${svButtons(sv, "row")}</span>` : ""}<button class="x" data-act="close" aria-label="닫기">×</button></h3>
         <div class="walkgrid">
-          <ol class="wguide">
+          <div class="wleft"><ol class="wguide">
             ${step(0, `<b>판매 가능한지</b> 오른쪽 맨 위 색을 봐요. <span class="g">초록 = 판매 가능</span> · <span class="r">빨강 = 지금은 판매 불가</span> (예약 손님 자리를 남겨 둔 계산)`)}
             ${step(1, `<b>[POS로 이동]</b>을 눌러 POS에서 결제해요. 입장권 매수별 인원을 안내하고 필요한 만큼 결제 → 끝나면 POS를 최소화하면 이 창으로 돌아와요`)}
             ${step(2, `결제한 만큼 <b>입장권 수</b>를 맞춰요 (열쇠가 이어서 붙어요). <b>입장 타임</b>은 바로 앞 타임이 기본 — 앞뒤로 바꿀 땐 ◀ ▶`)}
             ${step(3, `열쇠를 드리기 전에 <b>전화번호</b>를 받아요 (열쇠 미반납 때 연락). 010 뒤 8자리를 키패드로`)}
             ${step(4, `<b>[결제 완료 · 열쇠 등록]</b> → 입장권이 나오면 열쇠와 함께 드려요`)}
-          </ol>
+          </ol>${svcBox}</div>
           <div class="wmain">
             <div class="banner ${okSell ? "" : "bad"}">${tag(0)} ${st.over ? `<b>지금은 판매 불가</b> — 열쇠 <b class="num">${st.all}</b>개까지만 내줄 수 있어요 (예약 손님이 오실 자리)`
               : st.flex ? `기본 ${RULES.baseKeys}개를 넘어 <b>유동 열쇠</b> — 안에 빈 좌석이 있는지 보고 판매 <button class="btn btn-sm ${sheet.flexOk ? "btn-ink" : ""}" data-act="flexOk" aria-pressed="${!!sheet.flexOk}">${sheet.flexOk ? "빈 좌석 확인함" : "빈 좌석 확인했어요"}</button>`
@@ -1743,15 +1806,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
             <div class="wrow">${tag(2)} <span class="wl">입장권 수</span>
               <div class="stepper"><button data-act="qty" data-d="-1" aria-label="수량 줄이기">−</button><output class="num">${st.need}</output><button data-act="qty" data-d="1" aria-label="수량 늘리기">+</button></div>
               <span class="wl">열쇠</span><div class="bigkeys">${sheet.keys.map((k) => `<span class="bigkey num">${k}</span>`).join("")}</div></div>
-            <div class="wrow"><span class="wn"></span> <span class="wl">입장 타임</span>
-              <button class="btn btn-sm" data-act="wslot" data-d="-30" aria-label="앞 타임" ${ws <= SLOTS[0] ? "disabled" : ""}>◀</button>
-              <b class="num wtime">${hm(ws)} 입장</b>
-              <button class="btn btn-sm" data-act="wslot" data-d="30" aria-label="뒤 타임" ${ws >= SLOTS[SLOTS.length - 1] ? "disabled" : ""}>▶</button>
-              <span class="help num">${m == null ? "무제한" : `~ ${hm(ws + m)} 퇴장`} · 접수 ${hm(now)}${ws !== walkSlot(now) ? " · 바꾼 타임" : ""}</span></div>
+            ${slotRow}
             <div class="wphone">
               <div class="field"><label for="w-phone">${tag(3)} 전화번호 <span class="help">010 뒤 8자리</span></label>
                 <input id="w-phone" inputmode="numeric" autocomplete="off" value="${esc(walkFmt(sheet.phone))}" placeholder="010-0000-0000" data-autofocus></div>
-              <div class="keypad" aria-label="전화번호 키패드">${["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((n) => `<button data-act="kp" data-k="${n}">${n}</button>`).join("")}<button class="fn" data-act="kp" data-k="clr">지우기</button><button data-act="kp" data-k="0">0</button><button class="fn" data-act="kp" data-k="del" aria-label="한 자리 지우기">←</button></div>
+              ${keypad}
             </div>
             ${svLock ? `<div class="help svwarn">위 설문 번호(신규가 아니면 [제외])를 먼저 눌러 주세요</div>` : ""}<button class="btn btn-ink wdone" id="w-done" data-act="walkDone" ${st.over || !st.phoneOk || (st.flex && !sheet.flexOk) || svLock ? "disabled" : ""}>${tag(4)} 결제 완료 · 열쇠 등록</button>
           </div>
@@ -1775,7 +1834,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           <select id="sold-key" aria-label="열쇠 번호로 찾기"><option value="">열쇠 번호로 찾기 (전체)</option>${Array.from({ length: RULES.keys }, (_, i) => `<option value="${i + 1}" ${key === i + 1 ? "selected" : ""}>${i + 1}번 열쇠</option>`).join("")}</select>
         </div>
         <div class="help">${key ? "최근에 가져간 사람이 위 · 줄을 누르면 고객 카드(전화번호)" : `열쇠를 가져간 순서(최근 입장이 위) · 합계 <b class="num">${total}</b>장 · 줄을 누르면 고객 카드(전화번호) · <b>기록 삭제</b> = 시험으로 잡힌 손님을 판매수 · 통계에서 뺌 (네이버 예약 기록은 그대로)`}</div>
-        <div class="soldlist ${key ? "bykey" : ""}">${rows.length ? rows.map((r) => `<div class="srow ${r.out ? "out" : ""}" data-act="soldOpen" data-day="${r.day}" data-k="${r.k}" data-id="${esc(r.id)}" role="button" tabindex="0"><span class="sn">${esc(r.name)}</span><span class="sk num">${keysCell(r)}</span><span class="st num">${key ? md(r.day) + " " : ""}${hm(r.at)} 입장</span><span class="num">${r.qty}장</span>${edit ? (r.out ? `<button class="btn btn-sm" data-act="soldBack" data-k="${r.k}" data-id="${esc(r.id)}">되살리기</button>` : `<button class="btn btn-sm btn-red" data-act="soldDel" data-k="${r.k}" data-id="${esc(r.id)}">기록 삭제</button>`) : key ? "" : "<span></span>"}</div>`).join("") : `<span class="help">${key ? "최근 2주 동안 이 열쇠를 가져간 기록이 없어요" : "아직 없어요"}</span>`}</div>
+        <div class="soldlist ${key ? "bykey" : ""}">${rows.length ? rows.map((r) => `<div class="srow ${r.out ? "out" : ""}" data-act="soldOpen" data-day="${r.day}" data-k="${r.k}" data-id="${esc(r.id)}" role="button" tabindex="0"><span class="sn">${esc(r.name)}</span><span class="sk num">${keysCell(r)}</span><span class="st num">${key ? md(r.day) + " " : ""}${hm(r.at)} 입장</span><span class="num">${r.svc ? "서비스" : `${r.qty}장`}</span>${edit ? (r.out ? `<button class="btn btn-sm" data-act="soldBack" data-k="${r.k}" data-id="${esc(r.id)}">되살리기</button>` : `<button class="btn btn-sm btn-red" data-act="soldDel" data-k="${r.k}" data-id="${esc(r.id)}">기록 삭제</button>`) : key ? "" : "<span></span>"}</div>`).join("") : `<span class="help">${key ? "최근 2주 동안 이 열쇠를 가져간 기록이 없어요" : "아직 없어요"}</span>`}</div>
         ${edit || key ? "" : `<div class="help">지난날 기록은 보기만 해요 · 입장 기록은 이 PC에 남아 있어 2주 전까지 볼 수 있어요</div>`}
         <div class="sheet-foot"><button class="btn btn-ink" data-act="close" data-autofocus>닫기</button></div>`;
       return;
@@ -1793,8 +1852,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           <dt>날짜</dt><dd class="num">${esc(dateLabel(r.day))}</dd>
           <dt>입장</dt><dd class="num">${hm(r.at)}${r.k === "n" && s.slot != null ? ` · 예약 ${hm(s.slot)}` : s.slot != null ? ` · 입장 타임 ${hm(s.slot)}` : ""}</dd>
           <dt>열쇠</dt><dd class="num reckeys">${r.keys.length ? r.keys.map((k) => `<span class="kchip num">${k}</span>`).join(" ") : "—"}${holding ? " 지금 가지고 있음" : s.outAt != null ? ` ${hm(s.outAt)} 반납${s.bulkOut ? "<small>일괄 반납 — 열쇠를 하나씩 확인하지 않음</small>" : ""}` : ""}</dd>
-          <dt>수량</dt><dd class="num">${r.qty}장</dd>
-          <dt>${r.k === "n" ? "예약번호" : "POS 번호"}</dt><dd class="num">${esc(r.k === "n" ? r.id : s.posNo || "—")}</dd>
+          <dt>수량</dt><dd class="num">${r.svc ? "서비스 키 (판매 아님)" : `${r.qty}장`}</dd>
+          ${r.svc ? `<dt>연결</dt><dd>${s.of ? `${esc(s.of.label)} 손님에게 준 서비스 키${s.of.no ? ` · 예약 <span class="num">${esc(s.of.no)}</span>` : s.of.posNo ? ` · <span class="num">${esc(s.of.posNo)}</span>` : ""}` : `직원 · 예약 없이 쓴 열쇠`}</dd>`
+            : `<dt>${r.k === "n" ? "예약번호" : "POS 번호"}</dt><dd class="num">${esc(r.k === "n" ? r.id : s.posNo || "—")}</dd>${(() => {
+              const given = (dayFile(r.day).s || []).filter((x) => svcLinked(x, s));
+              return given.length ? `<dt>서비스 키</dt><dd>${given.map((x) => `<span class="kchip num">${(x.keysTaken || x.keys || []).join(", ")}</span>`).join(" ")} 이 손님에게 줌 (판매 아님)</dd>` : "";
+            })()}`}
         </dl></div>
         <div class="sheet-foot"><button class="btn" data-act="soldList">목록으로</button><button class="btn btn-ink" data-act="close" data-autofocus>닫기</button></div>`;
       return;
@@ -1808,7 +1871,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         <h3 id="sheet-title">열쇠 일괄 반납처리 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
         <p class="help">지금 열쇠를 가진 손님 ${hs.length}명 · 열쇠 ${nKeys}개를 모두 반납 · 퇴장 처리합니다.</p>
         ${owing.length ? `<div class="banner warn">초과요금이 남은 손님 ${owing.length}명: ${owing.map((h) => `${esc(h.walk ? "현장" : h.name)} ${won(overInfo(h).due)}`).join(", ")} — 결제했는지 확인하세요</div>` : ""}
-        <div class="bulklist">${hs.map((h) => `<div><span>${esc(h.walk ? "현장입장" : h.name)}</span><b class="num">${h.keys.join(", ")}번</b></div>`).join("")}</div>
+        <div class="bulklist">${hs.map((h) => `<div><span>${esc(h.svc ? `서비스 키 · ${svcWho(h)}` : h.walk ? "현장입장" : h.name)}</span><b class="num">${h.keys.join(", ")}번</b></div>`).join("")}</div>
         <div class="sheet-foot"><button class="btn" data-act="close" data-autofocus>닫기</button><button class="btn btn-red" data-act="bulkDo" ${hs.length ? "" : "disabled"}>모두 반납 (${hs.length}명 · ${nKeys}개)</button></div>`;
       return;
     }
@@ -1821,6 +1884,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const many = h.keys.length > 1;
       const lock = over.due > 0 && !h.overPaid; // 초과요금이 있으면 결제 뒤에 반납
       const e = extFor(h);
+      // [서비스 키] (사장님 10/16): 이 손님에게 빈 열쇠 하나를 판매 아닌 열쇠로 더 줌 → 빈 열쇠 고르기
+      const svcBtn = `<button class="btn btn-sm svcbtn ${sheet.svcPick ? "btn-ink" : ""}" data-act="svcPick" aria-pressed="${!!sheet.svcPick}" title="빈 열쇠 하나를 서비스로 더 줌 (판매수 · 인원에 안 셈)">서비스 키</button>`;
       el.classList.toggle("extsheet", !!e);
       const extHtml = !e ? "" : (() => {
         const { x } = e, t = (v) => (v == null ? "무제한" : hm(v));
@@ -1839,21 +1904,23 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           <button class="btn btn-ink extok" data-act="extOk" ${sheet.extPick ? "" : "disabled"}>확인</button>`;
       })();
       el.innerHTML = `
-        <h3 id="sheet-title">${h.keys.join(", ")}번 열쇠 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
+        <h3 id="sheet-title">${h.svc ? `<span>${h.keys.join(", ")}번 서비스 키 <span class="badge svcb">판매 아님</span></span>` : `${h.keys.join(", ")}번 열쇠`} <button class="x" data-act="close" aria-label="닫기">×</button></h3>
         <div class="${e ? "extgrid" : ""}"><div>
         <dl class="facts">
-          <dt>${h.walk ? "고객명" : "예약자"}</dt><dd>${esc(h.name)}${h.walk ? ` · ${h.posNo}` : ""}</dd>
-          <dt>전화번호</dt><dd class="num">${fmtPhone(h.phone)}</dd>
+          ${h.svc ? svcFacts(h) : `<dt>${h.walk ? "고객명" : "예약자"}</dt><dd>${esc(h.name)}${h.walk ? ` · ${h.posNo}` : ""}</dd>`}
+          <dt>전화번호</dt><dd class="num">${h.phone ? fmtPhone(h.phone) : "—"}</dd>
           <dt>입장</dt><dd class="num">${hm(h.enteredAt)}${h.walk ? "" : ` (예약 ${hm(h.slot)})`}</dd>
           <dt>이용</dt><dd class="num">${m == null ? "무제한" : `${used < 0 ? `예약 ${hm(h.slot)}부터 셈` : `${Math.floor(used / 60)}시간 ${used % 60}분째`} · ${h.keyUse && new Set(h.keys.map((k) => useOf(h, k))).size > 1 ? h.keys.map((k) => { const mk = useOf(h, k); return `${k}번 ${mk == null ? "무제한" : hm(h.slot + mk)}`; }).join(" · ") + " 반납" : `${hm(h.slot + m)} 반납`}`}${(() => {
             const cur = holderEnd(h);
             // 무제한(골든벨 · 18:00 이후 입장 · 무제한인 날)이면 바꿀 반납 시각이 없음 → 줄은 보이고 버튼만 잠금 + 까닭 (10/9 현장: 줄이 없어 '없다'고 보였음)
-            if (cur == null) return `<span class="mvrow off" aria-label="반납 시각 바꾸기">→ <button class="btn btn-sm" data-act="endSlot" data-d="-10" aria-label="10분 앞" disabled>◀</button><b class="num">무제한</b><button class="btn btn-sm" data-act="endSlot" data-d="10" aria-label="10분 뒤" disabled>▶</button><button class="btn btn-sm btn-ink" data-act="endDo" disabled>변경</button><button class="btn btn-sm" data-act="plusSlot" disabled>+1타임</button></span><div class="help mvwhy">${golden ? `골든벨 무제한(${hm(golden.at)}~)` : "무제한 이용"}이라 바꿀 반납 시각이 없어요 · 판매수 그대로</div>`;
+            if (cur == null) return `<span class="mvrow off" aria-label="반납 시각 바꾸기">→ <button class="btn btn-sm" data-act="endSlot" data-d="-10" aria-label="10분 앞" disabled>◀</button><b class="num">무제한</b><button class="btn btn-sm" data-act="endSlot" data-d="10" aria-label="10분 뒤" disabled>▶</button><button class="btn btn-sm btn-ink" data-act="endDo" disabled>변경</button>${h.svc ? "" : `<button class="btn btn-sm" data-act="plusSlot" disabled>+1타임</button>${svcBtn}`}</span><div class="help mvwhy">${golden ? `골든벨 무제한(${hm(golden.at)}~)` : "무제한 이용"}이라 바꿀 반납 시각이 없어요 · 판매수 그대로</div>`;
             const v = sheet.end ?? cur;
-            return `<span class="mvrow" aria-label="반납 시각 바꾸기">→ <button class="btn btn-sm" data-act="endSlot" data-d="-10" aria-label="10분 앞" ${v - 10 <= h.slot ? "disabled" : ""}>◀</button><b class="num">${hm(v)}</b><button class="btn btn-sm" data-act="endSlot" data-d="10" aria-label="10분 뒤">▶</button><button class="btn btn-sm btn-ink" data-act="endDo" ${v === cur ? "disabled" : ""}>변경</button><button class="btn btn-sm" data-act="plusSlot" title="반납 1시간 50분 연장 · 입장권 ${h.keys.length}장 더 (판매수 · 인원에 넣음)">+1타임</button></span>`;
+            return `<span class="mvrow" aria-label="반납 시각 바꾸기">→ <button class="btn btn-sm" data-act="endSlot" data-d="-10" aria-label="10분 앞" ${v - 10 <= h.slot ? "disabled" : ""}>◀</button><b class="num">${hm(v)}</b><button class="btn btn-sm" data-act="endSlot" data-d="10" aria-label="10분 뒤">▶</button><button class="btn btn-sm btn-ink" data-act="endDo" ${v === cur ? "disabled" : ""}>변경</button>${h.svc ? "" : `<button class="btn btn-sm" data-act="plusSlot" title="반납 1시간 50분 연장 · 입장권 ${h.keys.length}장 더 (판매수 · 인원에 넣음)">+1타임</button>${svcBtn}`}</span>`;
           })()}</dd>
-          <dt>열쇠</dt><dd class="num">${h.keys.length}개</dd>
+          <dt>열쇠</dt><dd class="num">${h.keys.length}개${h.svc ? " · 판매수 · 인원에 안 셈 · 초과요금 없음" : ""}</dd>
+          ${!h.svc && svcOf(h).length ? `<dt>서비스 키</dt><dd class="num svcgiven">${svcOf(h).map((x) => `<span class="kchip num">${(x.keys.length ? x.keys : x.keysTaken || []).join(", ")}</span>${x.keys.length ? "" : " 반납"}`).join(" ")} <span class="help">판매 아님</span></dd>` : ""}
         </dl>
+        ${sheet.svcPick ? svcPickHtml(h) : ""}
         <div id="meter">${meterHtml(h)}</div>
         <div class="field"><span class="label">반납 ${lock ? `<span class="help">초과요금을 결제한 뒤 반납하세요</span>` : ""}</span>
           ${many ? `<div class="rbtns">${h.keys.map((k) => `<button class="btn" data-act="returnKey" data-k="${k}" ${lock ? "disabled" : ""}>${k}번만</button>`).join("")}</div>` : ""}
@@ -2624,6 +2691,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
      2:00:00 정각에 5,000원 · 2:10:00 정각에 10,000원 … 10분이 꽉 찰 때마다 오름
      열쇠 수만큼 곱함. POS 결제를 누른 순간 금액으로 고정 */
   function overInfo(h) {
+    if (h.svc) return { sec: 0, units: 0, due: 0 }; // 서비스 키는 초과요금 없음
     // 열쇠마다 반납 시각이 다를 수 있음(연속예약) → 열쇠별로 세어 더함
     let best = { sec: 0, due: 0, units: 0 };
     let due = 0;
@@ -2657,7 +2725,27 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   const holderEnd = (h) => { const ms = h.keys.map((k) => useOf(h, k)); return ms.includes(null) ? null : h.slot + Math.max(...ms); };
   /** 열쇠 모두 반납 시각을 to 로 */
   const setEnd = (h, to) => { h.keyUse = Object.fromEntries(h.keys.map((k) => [k, to - h.slot])); };
-  const holderById = (id) => bookings[TODAY].concat(walkins).find((x) => x.id === id && x.keys.length);
+  const holderById = (id) => bookings[TODAY].concat(walkins, svcKeys).find((x) => x.id === id && x.keys.length);
+  /** 서비스 키 x 가 손님 h 에게 준 것인지 — 네이버 예약은 예약번호로 (다시 켜도 같음) · 현장은 기록 번호로 */
+  const svcLinked = (x, h) => !!(x && x.of && h && !h.svc && (x.of.no ? h.no === x.of.no : x.of.id === h.id));
+  /** 그 손님에게 준 서비스 키 (반납한 것도) */
+  const svcOf = (h) => svcKeys.filter((x) => svcLinked(x, h));
+  /** 서비스 키 열쇠 창의 '받은 사람' 줄 — 연결 정보는 줄 때 복사해 둔 것 (원래 손님이 먼저 나가도 그대로) */
+  function svcFacts(h) {
+    const o = h.of;
+    if (!o) return `<dt>사용자</dt><dd>직원${h.name && h.name !== "직원" ? ` · <b>${esc(h.name)}</b>` : ""} <span class="help">예약 없이 쓰는 열쇠</span></dd>`;
+    const cur = holders().some((y) => svcLinked(h, y));
+    return `<dt>연결 손님</dt><dd><b>${esc(o.name)}</b>${o.k === "w" ? "" : "님"} <span class="num">${esc((o.keys || []).join(", "))}번 열쇠</span> · ${o.k === "w" ? `현장${o.posNo ? ` <span class="num">${esc(o.posNo)}</span>` : ""}` : `네이버${o.no ? ` 예약 <span class="num">${esc(o.no)}</span>` : ""}`}
+      <span class="help">${cur ? "이용 중" : "먼저 반납 · 퇴장함"}</span></dd>`;
+  }
+  /** [서비스 키] 를 누르면: 빈 열쇠 중에서 고르기 */
+  function svcPickHtml(h) {
+    const free = freeKeys();
+    return `<div class="svcpick"><span class="label">서비스로 줄 열쇠 — 빈 열쇠 중에서 고르세요 <span class="help">${esc(h.walk ? "현장" : h.name)} ${h.keys.join(", ")}번 손님과 연결 · 판매수 · 인원에 안 셈</span></span>
+      <div class="svckeys">${free.length ? free.map((k) => `<button class="btn btn-sm num" data-act="svcGive" data-k="${k}" aria-label="${k}번을 서비스 키로">${k}</button>`).join("") : `<span class="help">빈 열쇠가 없어요</span>`}</div></div>`;
+  }
+  /** 서비스 키를 받은 사람 (한 줄) */
+  const svcWho = (x) => (x.of ? `${x.of.label} 손님 연결` : `직원${x.name && x.name !== "직원" ? " " + x.name : ""}`);
   let sec = 0; // 체험 시계의 초
   setInterval(() => {
     if (APP) {
@@ -2700,7 +2788,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     noteKeys(h);
     h.keys = h.keys.filter((k) => !ks.includes(k));
     if (!h.keys.length) h.outAt = now;
-    toast(`${ks.join(", ")}번 반납${h.keys.length ? "" : ` · ${h.walk ? "현장입장자" : h.name + "님"} 퇴장`}`);
+    toast(`${ks.join(", ")}번 ${h.svc ? "서비스 키 " : ""}반납${h.keys.length ? "" : ` · ${h.svc ? svcWho(h) : h.walk ? "현장입장자" : h.name + "님"} 퇴장`}`);
   }
   // 현장입장 전화번호: 010은 고정, 뒤 8자리만 받음 (010을 지워도 다시 붙음)
   function walkPhone(v) {
@@ -2708,8 +2796,15 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     return "010" + (d.startsWith("010") ? d.slice(3) : d.length < 3 ? "" : d).slice(0, 8);
   }
   const walkFmt = (p) => { const r = digits(p).slice(3); return "010-" + r.slice(0, 4) + (r.length > 4 ? "-" + r.slice(4) : ""); };
+  /** 현장입장 서비스 키: 이름 또는 전화번호(11자리) 중 하나 · 전화는 비우거나 다 넣기 */
+  function svcWalkState() {
+    const name = String(sheet.svcName || "").trim().slice(0, 20), d = digits(sheet.phone);
+    const phone = d.length === 11 ? d : "";
+    return { name, phone, ok: sheet.keys.length > 0 && (!!name || !!phone) && (d.length <= 3 || d.length === 11) };
+  }
   function updateWalkButtons() {
     const done = $("w-done"); if (!done) return;
+    if (sheet.svc) { done.disabled = !svcWalkState().ok; return; }
     const st = walkState();
     done.disabled = st.over || !st.phoneOk || (st.flex && !sheet.flexOk) || (!!svForWalk() && sheet.sv == null); // 설문 대상이면 번호(또는 제외) 먼저
   }
@@ -2791,7 +2886,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const d = Number(btn.dataset.d);
       if (d < 0 && sheet.keys.length > 1) sheet.keys.pop();
       if (d > 0) { const add = nextFree(sheet.keys[sheet.keys.length - 1] + 1, sheet.keys); if (add) sheet.keys.push(add); else toast("빈 열쇠가 없어요"); }
-      renderSheet(); $("w-phone").focus();
+      renderSheet(); const f = $(sheet.svc && !String(sheet.svcName || "").trim() ? "w-svcname" : "w-phone"); if (f) f.focus();
     },
     flexOk() { sheet.flexOk = !sheet.flexOk; renderSheet(); },
     // 터치 키패드: 전화번호 뒤 8자리
@@ -2842,6 +2937,23 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       saveState(); renderAll(); renderSheet();
       toast(`+1타임: 반납 ${hm(cur)} → ${hm(to)} · 입장권 ${n}장 더 (판매수에 넣음) — POS에서 결제해 주세요`);
     },
+    // 서비스 키 (사장님 10/16): [서비스 키] → 빈 열쇠 고르기 → 그 열쇠를 판매 아닌 열쇠로 이 손님과 연결
+    svcPick() { sheet.svcPick = !sheet.svcPick; renderSheet(); },
+    svcGive(btn) {
+      const h = holderById(sheet.hid), k = Number(btn.dataset.k);
+      if (!h || h.svc) return;
+      if (holderOf(k)) { toast(`${k}번은 그 사이 다른 손님이 썼어요`); renderSheet(); return; }
+      const end = holderEnd(h);
+      // 연결 정보는 지금 손님 정보를 복사해 둠 → 원래 손님이 먼저 반납 · 퇴장해도 남음 (반납 시각은 지금 그 손님과 같게 시작 · 그 뒤로는 따로)
+      const x = { id: "s" + seq++, svc: true, walk: true, name: h.walk ? "현장구매자" : h.name, phone: h.phone || "", keys: [k], qty: 0, enteredAt: now, slot: h.slot, keyUse: { [k]: end == null ? null : end - h.slot }, outAt: null,
+        of: { id: h.id, k: h.walk ? "w" : "n", no: h.no || null, posNo: h.posNo || null, name: h.walk ? "현장구매자" : h.name, keys: h.keys.slice(), label: `${h.walk ? "현장" : h.name} ${h.keys.join(", ")}번`, slot: h.slot, enteredAt: h.enteredAt } };
+      svcKeys.push(x);
+      sheet.svcPick = false;
+      saveState(); renderAll(); renderSheet();
+      toast(`${k}번 서비스 키 → ${x.of.label} 손님과 연결 (판매수 · 인원에 안 셈)`);
+    },
+    // 현장입장 창 왼쪽 아래 [서비스 키]: 임직원 등 예약 없이 쓸 때 — 판매 · 결제 · 설문 없이 사용자만 적고 열쇠 등록
+    svcWalk() { sheet.svc = !sheet.svc; renderSheet(); const n = $(sheet.svc ? "w-svcname" : "w-phone"); if (n) n.focus(); },
     // 맨 위 '포스 전환': 결제와 상관없이 POS 화면으로 (POS를 최소화하면 데스크로 돌아옴)
     async posGo() {
       if (window.desk && window.desk.pos) {
@@ -2872,6 +2984,17 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       renderSheet(); const p = $("w-phone"); if (p) p.focus();
     },
     walkDone() {
+      if (sheet.svc) {
+        // 서비스 키 (직원 등): 판매 아님 — 입장권 · 설문 없음 · 총 판매수 · 인원에 안 셈 (저장 파일 s)
+        const st = svcWalkState();
+        if (!st.ok) { toast("쓰는 사람 이름이나 전화번호를 적어 주세요"); return; }
+        if (sheet.keys.some((k) => holderOf(k))) { toast("그 사이 다른 손님이 쓴 열쇠가 있어요"); closeSheet(); renderAll(); return; }
+        const x = { id: "s" + seq++, svc: true, staff: true, walk: true, name: st.name || "직원", phone: st.phone, keys: sheet.keys.slice(), qty: 0, enteredAt: now, slot: sheet.slot ?? walkSlot(now), outAt: null, of: null };
+        svcKeys.push(x);
+        closeSheet(); saveState(); renderAll();
+        toast(`서비스 키 ${x.keys.join(", ")}번 · ${svcWho(x)} 등록 (판매수 · 인원에 안 셈)`);
+        return;
+      }
       if (svForWalk() && sheet.sv == null) { toast("설문 번호(또는 제외)를 먼저 눌러 주세요"); return; }
       if (sheet.keys.some((k) => holderOf(k))) { toast("그 사이 다른 손님이 쓴 열쇠가 있어요"); closeSheet(); renderAll(); return; }
       const w = walkin(digits(sheet.phone), sheet.keys, now, sheet.slot);
@@ -2901,7 +3024,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     soldDay(btn) { sheet.day = shiftDay(sheet.day || viewDay, Number(btn.dataset.d)); renderSheet(); },
     soldOpen(el) { openSheet({ mode: "rec", day: el.dataset.day, k: el.dataset.k, id: el.dataset.id, listDay: sheet.day, listKey: sheet.key }); },
     soldDel(btn) {
-      if (btn.dataset.k === "w") {
+      if (btn.dataset.k === "s") {
+        const i = svcKeys.findIndex((x) => x.id === btn.dataset.id); if (i < 0) return;
+        const x = svcKeys[i];
+        if (!confirm(`서비스 키 (${svcWho(x)}) 기록을 지울까요?${x.keys.length ? `\n열쇠 ${x.keys.join(", ")}번도 빈 열쇠로 돌아갑니다.` : ""}\n되돌릴 수 없어요.`)) return;
+        svcKeys.splice(i, 1);
+      } else if (btn.dataset.k === "w") {
         const i = walkins.findIndex((w) => w.id === btn.dataset.id); if (i < 0) return;
         const w = walkins[i];
         if (!confirm(`현장구매자 ${hm(w.slot)} 입장 ${walkQty(w)}장 기록을 지울까요?${w.keys.length ? `\n열쇠 ${w.keys.join(", ")}번도 빈 열쇠로 돌아갑니다.` : ""}\n판매수 · 통계에서 빠지고 되돌릴 수 없어요.`)) return;
@@ -3144,6 +3272,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if ((t.id === "cap-target" || t.id === "cap-max" || t.id === "cap-ceil" || t.id === "cap-vis") && t.value) { RULES.capAuto[{ "cap-target": "target", "cap-max": "max", "cap-ceil": "ceiling", "cap-vis": "visible" }[t.id]] = Math.max(1, Math.min(60, Number(t.value) || 0)); saveCapAuto(); }
     if (t.id === "com-baud") { PRINT.baud = Number(t.value); savePrint(); }
     if (t.id === "w-phone") { sheet.phone = walkPhone(t.value); t.value = walkFmt(sheet.phone); updateWalkButtons(); }
+    if (t.id === "w-svcname") { sheet.svcName = t.value; updateWalkButtons(); } // 서비스 키 쓰는 사람
     const m = /^p(f|t)-(\d+)$/.exec(t.id);
     if (m && t.value) { RULES.peaks[+m[2]][m[1] === "f" ? "from" : "to"] = t.value; savePeaks(); renderAll(); }
   });
@@ -3199,7 +3328,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 
   // 시험용: 입장권을 만드는 함수들 (자동 시험이 실제 입장 손님으로 출력 내용을 확인)
   document.addEventListener("change", (e) => { if (/^cap-(target|max|ceil)$/.test(e.target.id)) renderSheet(); }); // 숫자를 다 넣으면 계획 다시
-  window.__deskTest = { extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capPlan, capRun, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => enterText(), holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, evOf: (b) => evOf(b),
+  window.__deskTest = { svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capPlan, capRun, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => enterText(), holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, evOf: (b) => evOf(b),
     evLog: (from) => { const L = evLog(from); return { from: L.from, count: L.count, people: Object.fromEntries([...L.people].map(([k, p]) => [k, JSON.parse(JSON.stringify(p))])) }; },
     // 장부에 지난 방문 한 줄 넣기: o = { day, n(네이버 순번, 기본 = 지금 완료 수), base, st("안내" | "성공"), due, from(장부 · 기본 지금 이벤트), no }
     evInject: (name, o = {}) => {
