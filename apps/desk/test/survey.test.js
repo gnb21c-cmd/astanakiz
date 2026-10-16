@@ -312,3 +312,41 @@ test("설문조사 스위치: 끄면 예약자 · 현장입장 창에 설문 없
     await browser.close();
   }
 });
+
+test("설문조사 + 재방문 이벤트: 카드에 횟수가 안 보여도 네이버 '완료 n'으로 신규를 계속 판단 · 현장구매자 설문도 그대로 (10/16)", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.addInitScript(() => {
+      if (localStorage.getItem("astanakiz-visitevent")) return;
+      localStorage.setItem("astanakiz-visitevent", JSON.stringify({ ver: 2, on: true, from: "2026-10-05", to: "2026-10-31", days: 20, gift: "수제돈까스" }));
+      localStorage.setItem("astanakiz-survey", JSON.stringify({ on: true, from: "2026-10-01", to: "2026-10-31", naverNew: true, walkin: true, opts: ["네이버 검색", "인스타그램", "지인 소개"] }));
+    });
+    await page.goto(DESK); // 체험판 10/5 13:50 · 이벤트 진행 중
+    await page.evaluate(() => window.__deskTest.addBooking("2026-10-05", "14:00", "신규손님", "01099990000", 1, { prevDone: 0 }));
+    await page.click('.slot[data-s="840"]');
+    // 신규(완료 0): 카드는 "이벤트 시작"(횟수 없음) · 예약자 창에 설문
+    const card = (await page.textContent('.res:has-text("신규손님")')).replace(/\s+/g, " ");
+    assert.match(card, /이벤트 시작/);
+    assert.doesNotMatch(card, /완료 \d/);
+    await page.click('.res:has-text("신규손님")');
+    assert.match(await page.textContent("#sheet .svbox"), new RegExp(Q));
+    await page.click("#sheet .svb[data-n='2']");
+    await page.click(".kpick button:not([disabled]):not(.on) >> nth=0");
+    await page.click("#enter-done");
+    assert.strictEqual(await page.evaluate(() => window.__deskTest.holders().find((h) => h.name === "신규손님").sv), 2, "신규 설문 답 저장");
+    // 기존 손님(완료 9): 카드에 횟수 없음 · 설문 없음
+    await page.click('.res:has-text("전시윤")');
+    assert.strictEqual(await page.$("#sheet .svbox"), null, "기존 손님은 설문 대상 아님");
+    await close(page);
+    // 현장구매자: 현장입장 창에 설문 그대로
+    await page.click('.key[data-k="32"]');
+    assert.ok(await page.$("#sheet .svwalk"), "현장구매자 설문");
+    await close(page);
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
