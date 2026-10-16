@@ -31,6 +31,8 @@ const ticket = (page, name, text) => page.evaluate(([n, t]) => {
   return T.receiptLines(t || T.form(), T.keyVals(h)).map((l) => l.t.trim()).filter(Boolean);
 }, [name, text || null]);
 const card = async (page, slot, name) => { await page.click(`.slot[data-s="${slot}"]`); return (await page.textContent(`.res:has-text("${name}") >> nth=0`)).replace(/\s+/g, " "); };
+/** 이벤트 기간 카드 글자(이벤트 시작 · {사은품} 쿠폰 지급하세요)에 마우스를 올리면 보이는 자세한 것 (다음 기한 · 오늘 이미 방문) — 10/16 카드는 짧게 */
+const tip = async (page, slot, name) => { await page.click(`.slot[data-s="${slot}"]`); return page.locator(`.res:has-text("${name}")`).first().locator(".evstart, .evcoupon").getAttribute("title"); };
 const openEvent = async (page) => { await page.click("text=운영 설정"); await page.click('[data-t="event"]'); };
 const find = async (page, q) => { await page.fill("#ev-q", q); return (await page.textContent("#ev-hits")).replace(/\s+/g, " "); };
 const close = (page) => page.click("#sheet [data-act=close] >> nth=0");
@@ -67,9 +69,11 @@ test("재방문 이벤트: 시작일 ~ 종료일 · 켜는 순간부터 마일�
     assert.strictEqual(await page.$("#sheet .evlog"), null, "전체 목록은 없음");
     await close(page);
 
-    // 카드: 마일리지 멈춤 + 1번 안내 (다음 기한) · 사은권 표시 없음
+    // 카드 (10/16): 이벤트 기간엔 네이버 완료 횟수 · 마일리지 · 사은권 없이 "이벤트 시작" 만 (다음 기한은 마우스를 올리면)
     let c = await card(page, 840, "전시윤");
-    assert.match(c, /완료 9 · 취소 1 · 마일리지 9 멈춤 이벤트 안내 · 10\/25까지/);
+    assert.match(c, /이벤트 시작/);
+    assert.doesNotMatch(c, /완료 \d|마일리지|번째/);
+    assert.strictEqual(await tip(page, 840, "전시윤"), "이벤트 안내 · 10/25까지");
     assert.doesNotMatch(c, /사은권|완료 예정/);
 
     // 입장(이용완료) → 그 순간 기록 · 입장권: 마일리지 줄 대신 이벤트 안내
@@ -83,7 +87,8 @@ test("재방문 이벤트: 시작일 ~ 종료일 · 켜는 순간부터 마일�
     for (const [x, z] of await evLines(page, "전시윤")) assert.ok(cols(x) * z <= 42, `42칸 넘음: ${x}`);
     const jeon = await person(page, "전시윤");
     assert.deepStrictEqual([jeon.base, jeon.last, jeon.visits.map((v) => [v.day, v.st, v.due])], [9, 10, [["2026-10-05", "안내", "2026-10-25"]]], "이벤트 전 네이버 완료 9 · 이번 10");
-    assert.match(await card(page, 840, "전시윤"), /10번째 예약완료 · 마일리지 9 멈춤/);
+    assert.match(await card(page, 840, "전시윤"), /이벤트 시작/);
+    assert.doesNotMatch(await card(page, 840, "전시윤"), /번째|마일리지/, "이용완료한 카드도 횟수 없음");
 
     // 조건 [이벤트] · [네이버] 는 입장권 양식에서도 (이벤트 기간엔 {누계} 빈칸 → 그 줄 빠짐)
     assert.deepStrictEqual(await ticket(page, "전시윤", "[이벤트]^이벤트 손님만\n[네이버]^누계 {누계}\n^모두"), ["이벤트 손님만", "재방문 이벤트", "10월 25일(포함)까지 다시 오시면", "수제돈까스 무료 증정!", "이벤트 기간에는 마일리지가 멈춰요", "모두"]);
@@ -93,7 +98,8 @@ test("재방문 이벤트: 시작일 ~ 종료일 · 켜는 순간부터 마일�
 
     // 같은 날 또 오면 1번 안내 (기한 그대로)
     await page.evaluate(() => { const T = window.__deskTest, h = T.holders().find((x) => x.name === "전시윤"); T.addBooking("2026-10-05", "16:30", "전시윤", h.phone, 1, { prevDone: 10 }); });
-    assert.match(await card(page, 990, "전시윤"), /완료 10 · 마일리지 9 멈춤 이벤트 안내 · 오늘 이미 방문 · 10\/25까지/);
+    assert.match(await card(page, 990, "전시윤"), /오늘 이미 방문/);
+    assert.strictEqual(await tip(page, 990, "전시윤"), "이벤트 안내 · 오늘 이미 방문 · 10/25까지");
     // 같은 시간 나눠 한 예약(완료 8, 2건): 한 번 방문 → 이벤트 영수증 하나 · 장부엔 2건
     await enter(page, 900, "나분할");
     assert.ok((await ticket(page, "나분할")).includes("재방문 이벤트"));
@@ -124,7 +130,7 @@ test("재방문 이벤트: 시작일 ~ 종료일 · 켜는 순간부터 마일�
     await openEvent(page);
     await page.click("[data-act=evApply]");
     await close(page);
-    assert.match(await card(page, 990, "전시윤"), /마일리지 9 멈춤 이벤트 안내 · 오늘 이미 방문/);
+    assert.match(await card(page, 990, "전시윤"), /오늘 이미 방문/);
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();
@@ -148,7 +154,10 @@ test("재방문 이벤트: 기한(20일, 그날 포함) 안 재방문 = 성공 �
     await inject("송다온", { day: "2026-09-30", n: 2, base: 0, st: "성공" }); // 성공 → 다시 20일 → 오늘 또 성공
     await inject("김어긋", { day: "2026-09-12", due: "2026-10-06" }); // 23일째지만 영수증에 10/6 까지라고 찍어 줌 → 약속대로 성공
     const expect = { 홍예준: "성공 · 수제돈까스", 고은우: "성공 · 수제돈까스", 류하린: "안내 · 10/25까지", 송다온: "성공 · 수제돈까스", 김어긋: "성공 · 수제돈까스", 전시윤: "안내 · 10/25까지" };
-    for (const [n, x] of Object.entries(expect)) assert.match(await card(page, 840, n), new RegExp(`이벤트 ${x}`), n);
+    for (const [n, x] of Object.entries(expect)) {
+      assert.strictEqual(await tip(page, 840, n), `이벤트 ${x}`, n);
+      assert.match(await card(page, 840, n), x.startsWith("성공") ? /수제돈까스 쿠폰 지급하세요/ : /이벤트 시작/, n);
+    }
 
     await enter(page, 840, "홍예준");
     assert.match(await page.textContent("#toast"), /이벤트 성공 — 수제돈까스 드리세요/);
@@ -168,8 +177,8 @@ test("재방문 이벤트: 기한(20일, 그날 포함) 안 재방문 = 성공 �
     assert.match(await page.textContent("#ev-dates"), /10월 5일에 오면 → 10월 15일\(포함\)까지/);
     assert.match((await page.textContent("#ev-paper")).replace(/\s+/g, " "), /10월 15일\(포함\)까지 다시 오시면/, "미리보기도 바로");
     await close(page);
-    assert.match(await card(page, 840, "고은우"), /이벤트 성공/, "20일째지만 영수증 기한(10/5) 안");
-    assert.match(await card(page, 840, "전시윤"), /이벤트 안내 · 10\/15까지/);
+    assert.match(await card(page, 840, "고은우"), /수제돈까스 쿠폰 지급하세요/, "20일째지만 영수증 기한(10/5) 안");
+    assert.strictEqual(await tip(page, 840, "전시윤"), "이벤트 안내 · 10/15까지");
 
     // 기한은 종료일을 넘지 않음 (종료일 10/20)
     await openEvent(page);
@@ -179,13 +188,13 @@ test("재방문 이벤트: 기한(20일, 그날 포함) 안 재방문 = 성공 �
     assert.match(await page.textContent("#sheet .evstate"), /진행 중 — 9월 10일 ~ 10월 20일/);
     assert.strictEqual(await page.isDisabled("#ev-from"), true, "기록이 생긴 뒤엔 시작일을 못 바꿈");
     await close(page);
-    assert.match(await card(page, 840, "전시윤"), /이벤트 안내 · 10\/20까지/);
+    assert.strictEqual(await tip(page, 840, "전시윤"), "이벤트 안내 · 10/20까지");
     // 종료일(오늘)에 오면 다음 기한 없음 → 성공은 사은품만 · 안내는 기한 줄 없이
     await openEvent(page);
     await page.fill("#ev-to", "2026-10-05");
     await page.click("[data-act=evApply]");
     await close(page);
-    assert.match(await card(page, 840, "전시윤"), /이벤트 안내 · 마지막 날/);
+    assert.strictEqual(await tip(page, 840, "전시윤"), "이벤트 안내 · 마지막 날");
     await enter(page, 840, "송다온");
     t = await ticket(page, "송다온");
     assert.ok(t.includes("재방문 이벤트 성공!") && t.includes("[ 수제돈까스 무료 증정 ]") && !t.some((l) => /또 오시면|또 드려요/.test(l)), t.join(" | "));
@@ -246,9 +255,9 @@ test("이벤트가 끝나면: 명단에 있는 손님은 네이버 완료 − �
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("astanakiz-visitevent")));
     assert.deepStrictEqual(saved.past, [{ from: "2026-09-01", to: "2026-09-30" }]);
     await close(page);
-    assert.match(await card(page, 840, "전시윤"), /7번째 예약완료 \(네이버 10 − 이벤트 3\)/, "켜기 전 입장 → 이벤트 방문 아님");
+    assert.match(await card(page, 840, "전시윤"), /이벤트 켜기 전 입장/, "켜기 전 입장 → 이벤트 방문 아님 (이벤트 기간이라 횟수는 안 보임)");
     await page.evaluate(() => { const T = window.__deskTest, h = T.holders().find((x) => x.name === "전시윤"); T.addBooking("2026-10-05", "16:30", "전시윤", h.phone, 1, { prevDone: 10 }); });
-    assert.match(await card(page, 990, "전시윤"), /완료 10 · 마일리지 7 멈춤 이벤트 안내/, "네이버 10 − 지난 이벤트 3");
+    assert.match(await card(page, 990, "전시윤"), /이벤트 시작/, "새 이벤트 첫 방문");
     await page.evaluate(() => window.__deskTest.setNow(990));
     await enter(page, 990, "전시윤");
     const jeon = await person(page, "전시윤");
@@ -297,8 +306,10 @@ test("재방문 이벤트(앱): 장부는 POS PC 파일(시작일.jsonl)에 이�
     await page.goto(DESK);
     await page.waitForFunction(() => /불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 15000 });
     // 김기록: 10/12 방문 → 오늘 10/14 기한 안 → 성공 · 박새로: 기록 없음 → 안내 (10/14 + 20일 = 11/3 → 종료일 10/31 까지)
-    assert.match(await card(page, 840, "김기록"), /완료 7 · 마일리지 6 멈춤 이벤트 성공 · 수제돈까스/);
-    assert.match(await card(page, 840, "박새로"), /완료 3 · 마일리지 3 멈춤 이벤트 안내 · 10\/31까지/);
+    assert.match(await card(page, 840, "김기록"), /수제돈까스 쿠폰 지급하세요/);
+    assert.strictEqual(await page.locator('.res:has-text("김기록") .evcoupon').evaluate((e) => [getComputedStyle(e).color, getComputedStyle(e).backgroundColor].join()), "rgb(27, 27, 27),rgb(232, 203, 142)", "옅은 황토색 네모 · 검은 글씨");
+    assert.match(await card(page, 840, "박새로"), /이벤트 시작/);
+    assert.strictEqual(await tip(page, 840, "박새로"), "이벤트 안내 · 10/31까지");
     assert.deepStrictEqual(await page.evaluate(() => window.__adds), [], "아직 아무도 이용완료 안 함 → 기록 없음");
 
     await enter(page, 840, "박새로");
@@ -484,8 +495,9 @@ test("재방문 이벤트는 방문한 날 기준: 성공 영수증을 받은 �
     // 영수증을 받은 뒤 같은 날 17:00 을 따로 또 예약 — 네이버를 다시 불러오기 전이라 '완료 10'(옛 숫자)
     await page.evaluate(() => { const T = window.__deskTest, h = T.holders().find((x) => x.name === "홍예준"); T.addBooking("2026-10-05", "17:00", "홍예준", h.phone, 2, { prevDone: 10 }); T.setNow(1015); });
     const c = await card(page, 1020, "홍예준");
-    assert.match(c, /완료 11 · 마일리지 9 멈춤 이벤트 안내 · 오늘 이미 방문 · 10\/25까지/, "오늘 이미 완료한 만큼 올려 셈(완료 11) · 마일리지는 이벤트 시작 때 9 · 사은품 없음");
-    assert.doesNotMatch(c, /이벤트 성공/);
+    assert.match(c, /오늘 이미 방문/, "사은품 없음 (쿠폰은 그날 한 번)");
+    assert.strictEqual(await tip(page, 1020, "홍예준"), "이벤트 안내 · 오늘 이미 방문 · 10/25까지");
+    assert.doesNotMatch(c, /쿠폰 지급|이벤트 성공|마일리지/);
     await enter(page, 1020, "홍예준");
     assert.match(await page.textContent("#toast"), /이벤트 안내 · 오늘 이미 방문 · 10\/25까지/);
     assert.doesNotMatch(await page.textContent("#toast"), /이벤트 성공/);

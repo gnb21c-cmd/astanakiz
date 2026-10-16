@@ -28,6 +28,7 @@
   --pink-fg: #7A1F3A;
   --red: #D23A3A;
   --yellow: #FFD23F; --yellow-fg: #C81E1E; /* 예약 수량 2장 이상 스티커: 노랑 네모 · 빨강 글씨 (사장님 10/16) */
+  --ochre: #E8CB8E; /* 이벤트 쿠폰 지급 네모 (옅은 황토색 · 밝은 · 어두운 화면 같음) */
   --ok: #1D7F52;
   --warn-bg: #FBE3E3;
   --shadow: 0 1px 2px rgba(20, 26, 38, .06), 0 3px 12px rgba(20, 26, 38, .05);
@@ -220,6 +221,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .svopt .svcnt { min-width: 150px; flex: none; }
 .svopt .svdel, .svopt .svdel-sp { width: 34px; flex: none; }
 /* 방문 이벤트 (10/14) */
+.evstart { font-weight: 700; color: var(--fg); } /* 이벤트 기간 카드: 처음 온 손님 (사장님 10/16 흰 글씨) */
+.evcoupon { display: inline-block; font-weight: 700; color: #1b1b1b; background: var(--ochre); border-radius: 5px; padding: 0 7px; } /* 기한 안에 다시 온 손님 = 옅은 황토색 네모 · 검은 글씨 */
 .evtag { display: inline-block; font-size: 11px; font-weight: 700; color: var(--on-ink); background: var(--accent); border-radius: 5px; padding: 0 6px; margin-left: 2px; }
 .evstate { font-size: 13.5px; }
 .evstate .on { color: var(--ok); }
@@ -1158,9 +1161,16 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (b.status === "완료" ? !b.visitNo : b.prevDone == null) return `<span class="help">이용완료 횟수 확인 중</span>`;
     const c = b.cancels ? ` · 취소 ${b.cancels}` : "", done = b.status === "완료";
     if (!done) liftDone(b); // 같은 사람이 오늘 이미 따로 입장했으면 '완료 n'을 그만큼 (네이버를 다시 불러오면 같아짐)
-    if (evFrozen(b)) {
-      const ev = evOf(b), m = evFrozenMile(b);
-      return (done ? `<b>${b.visitNo}번째 예약완료</b>` : `완료 ${b.prevDone}${c}`) + (m != null ? ` · <b>마일리지 ${m} 멈춤</b>` : "") + (ev ? ` <span class="evtag">${evLabel(ev)}</span>` : "");
+    /* 재방문 이벤트 기간 (사장님 10/16): 카드에는 네이버 이용완료 횟수 · 마일리지 · 사은권을 안 보임 (장부에는 이름 · 전화 · 완료 수를 계속 셈)
+       처음 오는 손님(또는 기한이 지나 다시 시작) = "이벤트 시작" · 기한 안에 다시 온 손님 = 옅은 황토색 네모 "{사은품} 쿠폰 지급하세요"
+       자세한 것(다음 기한 · 오늘 이미 방문)은 글자에 마우스를 올리면 */
+    if (evActive() && evIn(b.day)) {
+      if (evEarly(b)) return `<span class="help">이벤트 켜기 전 입장</span>`;
+      const ev = evOf(b);
+      if (!ev) return `<span class="help">이용완료 횟수 확인 중</span>`;
+      const tip = esc(evLabel(ev));
+      if (ev.st === "성공") return `<span class="evcoupon" title="${tip}">${esc(EV.gift || "사은품")} 쿠폰 지급하세요</span>`;
+      return `<span class="evstart" title="${tip}">${ev.same ? "오늘 이미 방문" : "이벤트 시작"}</span>`;
     }
     const sub = evSub(b);
     if (done && evWas(b)) return `<b>${b.visitNo}번째 예약완료</b> · 이벤트 기간 방문 <span class="help">(마일리지 ${(b.visitEnd || b.visitNo) - sub})</span>`; // 마일리지에 안 들어간 방문
@@ -1726,7 +1736,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         <h3 id="sheet-title">네이버 예약자 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
         <div class="${sv ? "svgrid" : ""}"><dl class="facts">
           <dt>예약자</dt><dd style="font-size:18px">${esc(b.name)} <span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span></dd>
-          <dt>이용완료</dt><dd class="num visits big">${visitText(b)}</dd>
+          <dt>${evActive() && evIn(b.day) ? "이벤트" : "이용완료"}</dt><dd class="num visits big">${visitText(b)}</dd>
           <dt>전화번호</dt><dd class="num">${fmtPhone(b.phone)}</dd>${visitorRow(b)}
           <dt>이용일시</dt><dd class="num">${hm(b.slot)} ${m == null ? "· 무제한" : `~ ${hm(b.slot + m)} (${dur(m)})`}${b.naverSlot != null && b.naverSlot !== b.slot ? ` <span class="moved">네이버 ${hm(b.naverSlot)}</span>` : ""}${b.day === TODAY && b.no ? `
             <span class="mvrow" aria-label="예약시간 변경">→ <button class="btn btn-sm" data-act="mvSlot" data-d="-30" aria-label="앞 시간" ${(sheet.mv ?? b.slot) <= SLOTS[0] ? "disabled" : ""}>◀</button><b class="num">${hm(sheet.mv ?? b.slot)}</b><button class="btn btn-sm" data-act="mvSlot" data-d="30" aria-label="뒤 시간" ${(sheet.mv ?? b.slot) >= SLOTS[SLOTS.length - 1] ? "disabled" : ""}>▶</button><button class="btn btn-sm btn-ink" data-act="mvDo" ${(sheet.mv ?? b.slot) === b.slot ? "disabled" : ""}>변경</button></span>` : ""}</dd>
