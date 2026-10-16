@@ -104,7 +104,7 @@
 
 ## 6. 다른 프로젝트와의 관계
 - **아스타나 앱(`gnb21c-cmd/astana`)**: 회원 · 결제 · 마일리지를 공유하지 않는다(제로베이스). 가져온 것은 **브랜드 로고**(`packages/ui/src/assets/logo.png` → 설치 아이콘 `apps/desk/build/icon.ico`)뿐
-- **보고 시스템(`gnb21c-cmd/report`)** — **할 일(다음 판)**: `docs/LIVE.md` '보고 시스템이 할 일' — Firestore 규칙 `deskLive` 더하기 · 보고 앱 첫 화면 '입장권 판매' 칸 → '키즈 실시간' 세부 화면(열 때 · 아래로 당길 때 다시 읽음) · 매출 = 장수 × `kidsPrice` + 초과요금
+- **보고 시스템(`gnb21c-cmd/report`)** — 키즈 실시간 화면은 보고 앱에 들어감(2026-10-16, report main `8fb901a` · report `docs/KIDS_LIVE.md`): 첫 화면 '입장권 판매 총 수량' → '키즈 실시간'(열 때 · 아래로 당길 때 다시 읽음) · 매출 = 장수 × `kidsPrice` + 초과요금. Firestore 규칙 `deskLive` 는 콘솔에 붙여 넣어야 함
 - **보고 시스템(`gnb21c-cmd/report`)**: 3장의 `desk-state` 파일로 그날 네이버 입장 · 현장 구매 · 입장 타임 · 초과요금을 읽을 수 있다. `x` 의 예약번호는 시험 기록이니 빼고 셀 것
 - 공유 방법: 다른 세션에서 "gnb21c-cmd/astanakiz 의 docs/SHARE.md 를 읽어" 라고 하면 된다
 

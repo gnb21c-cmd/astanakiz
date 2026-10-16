@@ -10,7 +10,9 @@
 
 이 보인다. **화면을 아래로 당기면(그리고 열 때마다)** 그때 통합데스크 현황을 다시 가져온다.
 
-화면 미리보기(이 저장소): `prototype/live-phone.html` — 통합데스크 체험판 예시 글로 그린 같은 화면. 보고 앱에 옮길 때 그대로 따라 하면 됨.
+화면 미리보기(이 저장소): `prototype/live-phone.html` — 통합데스크 체험판 예시 글로 그린 같은 화면.
+
+**보고 앱 쪽은 끝남 (2026-10-16, gnb21c-cmd/report main `8fb901a`)**: 첫 화면 '입장권 판매 총 수량' → `apps/view/src/screens/KidsLive.tsx` · 검사 `packages/core/src/deskLive.ts` · 규칙 `firebase/firestore.rules deskLive` · 안내 report `docs/KIDS_LIVE.md`. 남은 것: ① Firebase 콘솔 규칙 붙여 넣기(사장님 한 번) ② 통합데스크 다음 판 설치(이 기능이 든 판)
 
 ## 흐름
 1. 통합데스크(키즈 POS, 다음 판 ~)가 **1분마다 · 바뀌면 5초 안에** 지금 현황 글(`astanakiz-live`)을 만들어
@@ -21,7 +23,7 @@
    - 맨 위 "통합데스크 14:05:12 기준 · 20초 전" — `at` 이 **3분** 넘게 지났으면 노란 띠 "통합데스크 소식이 n분째 없어요 (키즈 POS 꺼짐 · 인터넷 확인)"
    - `day` 가 오늘이 아니면 "오늘 현황이 아직 없어요" (어제 마지막 현황은 보여 주되 흐리게)
 
-## 보고 시스템이 할 일 (gnb21c-cmd/report 쪽에 넘길 설명)
+## 보고 시스템이 할 일 (gnb21c-cmd/report 쪽 — 2026-10-16 다 함)
 ### ① Firestore 규칙 — `firebase/firestore.rules` 의 `match /boards/{board} { … }` 안, `surveyInbox` 아래에 더함
 ```
       // 키즈 실시간 (통합데스크 → 보고 앱 '입장권 판매' 세부 화면) — astanakiz docs/LIVE.md
