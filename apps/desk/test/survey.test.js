@@ -260,3 +260,55 @@ test("설문 보고함(앱): 보고 열쇠가 있으면 보고 파일을 쓸 때
     await browser.close();
   }
 });
+
+test("설문조사 스위치: 끄면 예약자 · 현장입장 창에 설문 없이 예전처럼 바로 입장 · 켜면 다시 (설정 · 누적 그대로 · 10/16)", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK); // 체험판 10/5 13:50
+    await page.evaluate(() => { window.__deskTest.addBooking("2026-10-05", "14:00", "신규손님", "01099990000", 1, { prevDone: 0 }); window.__deskTest.addBooking("2026-10-05", "14:00", "신규둘", "01099990001", 1, { prevDone: 0 }); });
+    await openSurvey(page);
+    await page.fill("#sv-from", "2026-10-05");
+    await page.fill("#sv-to", "2026-10-31");
+    await page.check("#sv-walk");
+    assert.strictEqual(await page.getAttribute("[data-act=svToggle]", "aria-checked"), "true", "처음엔 켜짐");
+    assert.match(await page.textContent("#sheet .evstate"), /진행 중/);
+    await page.click("[data-act=svPlus][data-n='1']");
+    // 끄기
+    await page.click("[data-act=svToggle]");
+    assert.strictEqual(await page.getAttribute("[data-act=svToggle]", "aria-checked"), "false");
+    assert.match(await page.textContent("[data-act=svToggle]"), /설문조사 꺼짐/);
+    assert.match(await page.textContent("#sheet .evstate"), /꺼짐 — 설문 없이 바로 입장/);
+    assert.ok(await page.isDisabled("[data-act=svPlus][data-n='1']"), "꺼져 있으면 [+] 도 쉼");
+    assert.strictEqual(JSON.parse(await page.evaluate(() => localStorage.getItem("astanakiz-survey"))).on, false, "이 PC에 저장");
+    await close(page);
+    // 신규 예약자: 설문 없이 열쇠 → 등록
+    await page.click('.slot[data-s="840"]');
+    await page.click('.res:has-text("신규손님")');
+    assert.strictEqual(await page.$("#sheet .svbox"), null, "꺼지면 설문 없음");
+    await page.click(".kpick button:not([disabled]) >> nth=0");
+    assert.ok(!(await page.isDisabled("#enter-done")), "번호 없이 바로 등록");
+    await page.click("#enter-done");
+    assert.strictEqual(await page.evaluate(() => window.__deskTest.holders().find((h) => h.name === "신규손님").sv), undefined, "설문 답 없음");
+    // 현장입장: 설문 없이 결제 완료 · 열쇠 등록
+    await page.click('.key[data-k="43"]');
+    assert.strictEqual(await page.$("#sheet .svwalk"), null);
+    for (const k of "12345678") await page.click(`.keypad [data-k="${k}"]`);
+    assert.ok(!(await page.isDisabled("#w-done")), "번호 없이 바로 등록");
+    await close(page);
+    // 다시 켜기 → 설문 다시 · 직접 더한 수는 그대로
+    await openSurvey(page);
+    await page.click("[data-act=svToggle]");
+    assert.match(await page.textContent("#sheet .evstate"), /진행 중/);
+    assert.match((await page.$$eval("#sheet .svopt", (e) => e.map((x) => x.textContent.replace(/\s+/g, " "))))[0], /오늘 1 \(직접 \+1\)/);
+    await close(page);
+    await page.click('.res:has-text("신규둘")');
+    assert.ok(await page.$("#sheet .svbox"), "켜면 다시 설문");
+    assert.ok(await page.isDisabled("#enter-done"));
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});

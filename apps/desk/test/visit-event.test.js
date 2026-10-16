@@ -356,7 +356,7 @@ test("공통 양식: 이벤트 기간 입장권의 나머지(안내 문구)도 �
     await openEvent(page);
     await setPeriod(page, "2026-10-05", "2026-11-30");
     const rows = await page.$$eval("#sheet .evrule", (e) => e.map((x) => x.innerText.replace(/\s+/g, " ").trim()));
-    assert.deepStrictEqual(rows.map((r) => r.split(" ").slice(0, 2).join(" ")), ["공통 양식", "1번 안내", "2번 성공"], "공통 양식 + 안내 · 성공 둘");
+    assert.deepStrictEqual(rows.map((r) => r.split(" ")[0] === "제공상품" ? "제공상품" : r.split(" ").slice(0, 2).join(" ")), ["공통 양식", "1번 안내", "2번 성공", "제공상품"], "공통 양식 + 안내 · 성공 + 제공상품");
     assert.match(await page.textContent("#ev-def"), /아직 예시 문구: 1번 안내 · 2번 성공/);
     // 양식 고치기 → 미리보기에 바로 · 양식마다 따로 남음
     await page.fill("#ev-text", "#* 11월 재방문 이벤트\n^{다음기한}(포함)까지 오면 {사은품}\n[네이버]^{열쇠}번 열쇠 손님");
@@ -500,6 +500,54 @@ test("재방문 이벤트는 방문한 날 기준: 성공 영수증을 받은 �
     // 다음 날 이후에 와야 재방문 (오늘 날짜 뒤) — 같은 날 기록이 있어도 오늘 이미 방문
     const r = await page.evaluate(() => { const T = window.__deskTest, b = T.holders().filter((x) => x.name === "홍예준").sort((a, b) => b.slot - a.slot)[0]; return T.evOf(b); });
     assert.deepStrictEqual([r.st, r.same, r.due], ["안내", true, "2026-10-25"]);
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("양식 자리 (10/16): 공통 양식의 [이벤트] 줄 = 1번 · 2번 자리 · [사은품] 줄 = 2번 성공일 때만 제공상품 (없으면 2번 안 [사은품] → 2번 바로 뒤) · 예전 2번 예시는 새 예시로", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    const FORM = "#* 아스타나키즈\n#*{열쇠}번\n^*퇴장 때 열쇠는 바구니에 넣어주세요\n[이벤트]\n^아스타나키즈는 고정형 놀이시설 입니다\n^{날짜} {시각}\n[사은품]";
+    const OLD2 = "#* 재방문 이벤트 성공!\n^*[ {사은품} 무료 증정 ]\n^이 영수증을 보여 주세요\n^*{다음기한}(포함)까지 또 오시면\n[기한]^*{사은품} 또 드려요";
+    await page.addInitScript(([form, old2]) => { if (!localStorage.getItem("astanakiz-visitevent")) localStorage.setItem("astanakiz-visitevent", JSON.stringify({ ver: 2, on: true, from: "2026-09-10", to: "2026-10-31", days: 20, gift: "수제돈까스", form, tpl: ["#* 재방문 이벤트\n^{다음기한}까지 다시 오시면 {사은품}", old2] })); }, [FORM, OLD2]);
+    await page.goto(DESK);
+    await page.evaluate(() => window.__deskTest.evInject("홍예준", { day: "2026-09-20" })); // → 오늘 성공
+    const lines = (name) => page.evaluate((n) => { const T = window.__deskTest, h = T.holders().find((x) => x.name === n); return T.receiptLines(T.form(), T.keyVals(h)).map((l) => (l.k === "cut" ? "✂" : l.t.trim())).filter(Boolean); }, name);
+    // 예전 2번 예시(1.39~1.41) 그대로였으면 새 예시: 성공 머리 + [사은품] + 다음 기한 · 제공상품 = 무료 증정 안내
+    await page.click("text=운영 설정"); await page.click('[data-t="event"]');
+    await page.click("[data-act=evTpl][data-i='1']");
+    assert.strictEqual(await page.inputValue("#ev-text"), "#* 재방문 이벤트 성공!\n[사은품]\n^*{다음기한}(포함)까지 또 오시면\n[기한]^*{사은품} 또 드려요");
+    await page.click("[data-act=evTpl][data-i='2']");
+    assert.strictEqual(await page.inputValue("#ev-text"), "^*[ {사은품} 무료 증정 ]\n^이 영수증을 보여 주세요");
+    await page.fill("#ev-text", "[자르기]\n#* 수제돈까스 쿠폰\n^이 쿠폰을 카페에 보여 주세요");
+    assert.match(await page.textContent("#ev-paper"), /재방문 이벤트 성공!.*✂ 여기서 자름수제돈까스 쿠폰/, "제공상품 미리보기 = 성공 예시");
+    await page.click("#sheet [data-act=close] >> nth=0");
+
+    // 안내(1번): [이벤트] 자리에 · 제공상품 없음 · [사은품] 줄은 빠짐
+    await enter(page, 840, "전시윤");
+    let t = await lines("전시윤");
+    assert.deepStrictEqual(t.slice(t.indexOf("퇴장 때 열쇠는 바구니에 넣어주세요")), ["퇴장 때 열쇠는 바구니에 넣어주세요", "재방문 이벤트", "10월 25일까지 다시 오시면 수제돈까스", "아스타나키즈는 고정형 놀이시설 입니다", t[t.length - 1]]);
+    assert.ok(!t.includes("수제돈까스 쿠폰") && !t.includes("✂"), t.join(" | "));
+    // 성공(2번): [이벤트] 자리에 2번 · 2번 안의 [사은품] 은 공통 양식에 [사은품] 이 있어 빠지고 → 맨 아래 [사은품] 자리에 잘린 쿠폰
+    await enter(page, 840, "홍예준");
+    t = await lines("홍예준");
+    const at = (x) => t.indexOf(x);
+    assert.ok(at("퇴장 때 열쇠는 바구니에 넣어주세요") < at("재방문 이벤트 성공!") && at("재방문 이벤트 성공!") < at("아스타나키즈는 고정형 놀이시설 입니다"), "2번은 [이벤트] 자리: " + t.join(" | "));
+    assert.deepStrictEqual(t.slice(at("재방문 이벤트 성공!"), at("재방문 이벤트 성공!") + 3), ["재방문 이벤트 성공!", "10월 25일(포함)까지 또 오시면", "수제돈까스 또 드려요"]);
+    assert.deepStrictEqual(t.slice(-3), ["✂", "수제돈까스 쿠폰", "이 쿠폰을 카페에 보여 주세요"], "제공상품은 맨 아래 [사은품] 자리 (날짜 뒤 · 잘라서)");
+    assert.strictEqual(t.filter((x) => x === "수제돈까스 쿠폰").length, 1, "한 번만");
+
+    // 공통 양식에 [사은품] 이 없으면 2번 안의 [사은품] 자리 · 그것도 없으면 2번 바로 뒤
+    const pick = (form, tpl1) => page.evaluate(([f, t1]) => { const T = window.__deskTest, h = T.holders().find((x) => x.name === "홍예준"), v = Object.assign(T.keyVals(h), t1 ? { _이벤트문구: t1 } : {}); return T.receiptLines(f, v).map((l) => (l.k === "cut" ? "✂" : l.t.trim())).filter(Boolean); }, [form, tpl1 || null]);
+    t = await pick("^위\n[이벤트]\n^아래");
+    assert.deepStrictEqual(t.slice(0, 4), ["위", "재방문 이벤트 성공!", "✂", "수제돈까스 쿠폰"], "2번 안의 [사은품] 자리");
+    t = await pick("^위\n[이벤트]\n^아래", "#* 성공\n^다음 기한 {다음기한}");
+    assert.deepStrictEqual(t, ["위", "성공", "다음 기한 10월 25일", "✂", "수제돈까스 쿠폰", "이 쿠폰을 카페에 보여 주세요", "아래"], "어디에도 없으면 2번 바로 뒤");
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();
