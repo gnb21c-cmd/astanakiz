@@ -1114,20 +1114,26 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   const $ = (id) => document.getElementById(id);
   const findB = (id) => Object.values(bookings).flat().find((b) => b.id === id);
 
-  function renderSlots() {
-    ensureDay(viewDay);
-    $("date").innerHTML = `${dateLabel(viewDay)}<small>${dayKind(viewDay)}</small>`;
-    const list = bookings[viewDay];
-    const tot = { done: 0, conf: 0, left: 0 };
-    $("slots").innerHTML = SLOTS.map((s) => {
+  /** 시간 칸마다 네이버 완료 · 확정(미입장) · 잔여 — 왼쪽 표 · 폰 실시간 현황이 같이 씀
+      잔여 = 기준치 − 확정 − 완료. 기준치는 네이버 칸의 판매 수량(예약가능+확정+이용완료)이라 현장 설정에 따라 10이 아닐 수 있음 */
+  function slotStats(day) {
+    ensureDay(day);
+    const list = bookings[day];
+    return SLOTS.map((s) => {
       const bs = list.filter((b) => b.slot === s);
-      const ns = (naverSlots[viewDay] || {})[s];
-      // 잔여 = 기준치 − 확정 − 완료. 기준치는 네이버 칸의 판매 수량(예약가능+확정+이용완료)이라 현장 설정에 따라 10이 아닐 수 있음
+      const ns = (naverSlots[day] || {})[s];
       const sum = (st) => bs.filter((b) => b.status === st).reduce((a, b) => a + b.qty, 0);
       const done = ns ? ns.done : sum("완료");
       const conf = ns ? ns.conf : sum("확정");
-      const cap = ns ? ns.cap : viewDay === TODAY && capDemo[s] != null ? capDemo[s] : RULES.slotCap;
-      const left = Math.max(0, cap - conf - done);
+      const cap = ns ? ns.cap : day === TODAY && capDemo[s] != null ? capDemo[s] : RULES.slotCap;
+      return { s, done, conf, cap, left: Math.max(0, cap - conf - done) };
+    });
+  }
+  function renderSlots() {
+    ensureDay(viewDay);
+    $("date").innerHTML = `${dateLabel(viewDay)}<small>${dayKind(viewDay)}</small>`;
+    const tot = { done: 0, conf: 0, left: 0 };
+    $("slots").innerHTML = slotStats(viewDay).map(({ s, done, conf, cap, left }) => {
       tot.done += done; tot.conf += conf; tot.left += left;
       const isNow = viewDay === TODAY && now >= s - RULES.earlyMinutes && now < s + 25;
       const unl = timedDay(viewDay) && s === toMin(RULES.unlimitedFrom); // 이 줄부터 무제한 → 위에 빨간 선 (사장님 10/9)
@@ -1220,7 +1226,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       if (k > RULES.keys) break; // 남는 칸(46~50)은 비워 둠
       const h = holderOf(k);
       if (!h) { html += `<button class="key free" data-act="key" data-k="${k}" aria-label="${k}번 빈 열쇠"><b class="num">${k}</b><span>&nbsp;</span></button>`; continue; }
-      html += `<button class="key ${keyColor(h, k)}${h.svc ? " svc" : ""}" data-act="key" data-k="${k}" aria-label="${k}번 ${h.svc ? "서비스 키 " : ""}${esc(h.name)}"><b class="num">${k}</b><span>${h.svc ? "서비스" : esc(h.walk ? "현장" : h.name)}</span></button>`;
+      html += `<button class="key ${keyColor(h, k)}${h.svc ? " svc" : ""}" data-act="key" data-k="${k}" aria-label="${k}번 ${h.svc ? "서비스 키 " : ""}${esc(h.name)}"><b class="num">${k}</b><span>${esc(h.svc ? svcBoard(h) : h.walk ? "현장" : h.name)}</span></button>`;
     }
     // 설명은 45번 오른쪽 빈 칸에 (사장님이 정한 순서 10/8)
     if (RULES.keys > 40 && RULES.keys <= 45) html += `<div class="legend" style="grid-column: ${RULES.keys - 39} / -1">
@@ -1854,7 +1860,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           <dt>입장</dt><dd class="num">${hm(r.at)}${r.k === "n" && s.slot != null ? ` · 예약 ${hm(s.slot)}` : s.slot != null ? ` · 입장 타임 ${hm(s.slot)}` : ""}</dd>
           <dt>열쇠</dt><dd class="num reckeys">${r.keys.length ? r.keys.map((k) => `<span class="kchip num">${k}</span>`).join(" ") : "—"}${holding ? " 지금 가지고 있음" : s.outAt != null ? ` ${hm(s.outAt)} 반납${s.bulkOut ? "<small>일괄 반납 — 열쇠를 하나씩 확인하지 않음</small>" : ""}` : ""}</dd>
           <dt>수량</dt><dd class="num">${r.svc ? "서비스 키 (판매 아님)" : `${r.qty}장`}</dd>
-          ${r.svc ? `<dt>연결</dt><dd>${s.of ? `${esc(s.of.label)} 손님에게 준 서비스 키${s.of.no ? ` · 예약 <span class="num">${esc(s.of.no)}</span>` : s.of.posNo ? ` · <span class="num">${esc(s.of.posNo)}</span>` : ""}` : `직원 · 예약 없이 쓴 열쇠`}</dd>`
+          ${r.svc ? `<dt>수령인</dt><dd>${esc(svcGiven(s))}${s.of && s.of.no ? ` · 예약 <span class="num">${esc(s.of.no)}</span>` : s.of && s.of.posNo ? ` · <span class="num">${esc(s.of.posNo)}</span>` : ""}</dd>`
             : `<dt>${r.k === "n" ? "예약번호" : "POS 번호"}</dt><dd class="num">${esc(r.k === "n" ? r.id : s.posNo || "—")}</dd>${(() => {
               const given = (dayFile(r.day).s || []).filter((x) => svcLinked(x, s));
               return given.length ? `<dt>서비스 키</dt><dd>${given.map((x) => `<span class="kchip num">${(x.keysTaken || x.keys || []).join(", ")}</span>`).join(" ")} 이 손님에게 줌 (판매 아님)</dd>` : "";
@@ -1979,6 +1985,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           <div class="field"><label class="chk"><input type="checkbox" id="sv-send" ${SV.send ? "checked" : ""}> <b>보고앱에 보내기</b> <span class="help">매일 20:00 번호별 오늘 · 누적 수를 파일로 남기고 보고 열쇠가 있으면 클라우드 보고함에도 (뒤에 바뀌면 다시)</span></label>
             <div class="btns" style="align-items:center"><label class="help" for="sv-key">보고 열쇠</label><input id="sv-key" class="cfg svkey" type="password" autocomplete="off" spellcheck="false" maxlength="64" placeholder="${svKey.has ? `저장됨 (끝 ••${esc(svKey.tail)}) — 바꾸려면 새로 넣기` : "보고 앱 주소 …/b/{열쇠}/ 의 열쇠 (16~64자)"}" aria-label="보고 열쇠"><button class="btn btn-sm" data-act="svKeySave">열쇠 저장</button>${svKey.has ? `<button class="btn btn-sm" data-act="svKeyDel">지우기</button>` : ""}<button class="btn btn-sm" data-act="svSendNow">지금 보내기</button></div>
             <span class="help ${L && (!L.ok || (L.inbox && !L.inbox.ok)) ? "evwarn" : ""}">${L ? `마지막: ${esc(L.at)} ${L.auto ? "자동" : "직접"} · ${L.ok ? "파일로 남김" : `파일 실패 ${esc(L.why || "")}`} · ${L.inbox ? (L.inbox.ok ? "보고함에 보냄" : `보고함 실패 ${esc(L.inbox.why || "")}${SV.retry && SV.retry.day === TODAY ? ` — ${hm(SV.retry.m)} 다시` : ""}`) : "보고 열쇠 없음 (파일만)"}` : svKey.has ? "보고 열쇠 있음 — 보고 파일을 쓸 때마다 보고함에도 보냄" : "보고 열쇠를 넣으면 보고 시스템 클라우드 '설문 보고함'에도 보내요 (보고 앱에 바로 보임)"}</span></div>
+          <div class="field"><div class="btns" style="align-items:center"><button type="button" class="svswitch ${LIVE.on ? "on" : ""}" role="switch" aria-checked="${LIVE.on}" data-act="liveToggle" title="같은 보고 열쇠로 1분마다 · 바뀌면 바로"><span class="knob"></span><b>폰 실시간 현황 ${LIVE.on ? "켜짐" : "꺼짐"}</b></button>
+            <span class="help">보고 앱 '입장권 판매' → 네이버 · 열쇠 · 입장료 (1분마다)</span> <span class="help ${LIVE.last && !LIVE.last.ok ? "evwarn" : ""}" id="live-last">${esc(liveText())}</span></div></div>
           <div class="field"><span class="label">대상 <span class="help">대상 손님은 설문 번호를 눌러야 열쇠를 고르고 등록해요</span></span>
             <div class="svtargets"><label class="chk"><input type="checkbox" id="sv-new" ${SV.naverNew || SV.all ? "checked" : ""} ${SV.all ? "disabled" : ""}> 신규고객 <span class="help">(네이버 첫 예약 · 완료 0)</span></label>
             <label class="chk"><input type="checkbox" id="sv-walk" ${SV.walkin || SV.all ? "checked" : ""} ${SV.all ? "disabled" : ""}> 현장구매자 <span class="help">(신규가 아니면 [제외])</span></label>
@@ -2608,6 +2616,70 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   let svKey = { has: false, tail: "" }; // 설문 보고함 '보고 열쇠' — 앱은 이 PC 에 암호화 저장(있는지 · 끝 4자리만 앎) · 체험판은 화면에만
   if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c) svKey = { has: !!c.hasSurveyKey, tail: String(c.surveyKeyTail || "") }; if (c && c.survey) { svLoadCfg(c.survey); renderAll(); } }).catch(() => {});
   else try { svLoadCfg(JSON.parse(localStorage.getItem("astanakiz-survey"))); } catch (e) { /* 없음 */ }
+
+  // ── 폰 실시간 현황 (사장님 10/16) ─────────────────────
+  /* 총괄 관리자가 출근 전에도 보고 앱(입장권 판매 총 수량 → 세부 화면)에서 지금 키즈를 봄 — 폰을 아래로 당기거나 열 때마다 최신 현황을 읽음
+     통합데스크가 1분마다 · 바뀌면 5초 안에 같은 보고 열쇠로 클라우드 boards/{열쇠}/deskLive/now 에 덮어씀 (docs/LIVE.md · 보고 시스템이 화면을 만듦)
+     - 네이버: 오늘 합 완료 · 미입장(확정) · 잔여 + 시간 칸마다 · 상품별 이용완료 장수
+     - 오늘 인원 = 총 판매수 (네이버 이용완료 + 현장 · +1타임) · 서비스 키는 따로(판매 아님)
+     - 입장료: 장수 · 초과요금 결제 합 — 금액(장수 × 단가)은 보고 앱이 자기 단가표로 셈 (단가표를 한 곳에)
+     - 열쇠: 번호마다 색(반납 조건) · 반납 시각 + 손님 이름 · 전화번호 (열쇠 미반납 때 관리자가 전화) — 문서 하나(now)만 덮어써서 지난 기록은 안 쌓임 */
+  const LIVE = { on: true, last: null }; // last = { at, ok, why } 마지막으로 보낸 결과
+  if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c) LIVE.on = c.liveOn !== false; }).catch(() => {});
+  const livePeople = () => { const naver = Math.max(0, slotStats(TODAY).reduce((a, x) => a + x.done, 0) - testQty(TODAY)), walk = walkTickets(TODAY); return { naver, walk, total: naver + walk }; };
+  /** 지금 현황 (보낼 글) */
+  function liveSnap() {
+    const st = slotStats(TODAY);
+    const sum = (k) => st.reduce((a, x) => a + x[k], 0);
+    // 상품별 이용완료 장수 (네이버 칸 그대로 · 체험판은 예약 카드로) — '기록 삭제'(시험) 장수는 뺌
+    const prod = new Map(), add = (p, n) => prod.set(p || "네이버 입장권", (prod.get(p || "네이버 입장권") || 0) + n);
+    const raw = naverRaw[TODAY];
+    if (raw && raw.length) for (const x of raw) { if (x.done) add(x.product, x.done); }
+    else for (const b of bookings[TODAY]) if (b.status === "완료") add(b.naverProduct || b.product, b.qty);
+    for (const b of bookings[TODAY]) if (b.status === "완료" && testOut.has(b.no)) { const p = b.naverProduct || b.product || "네이버 입장권"; if (prod.has(p)) prod.set(p, Math.max(0, prod.get(p) - b.qty)); }
+    const walkQ = (f) => walkins.filter(f).reduce((a, w) => a + walkQty(w), 0);
+    const all = bookings[TODAY].concat(walkins);
+    const paid = all.filter((h) => h.overPaid);
+    const hs = holders().slice().sort((a, b) => Math.min(...a.keys) - Math.min(...b.keys));
+    const map = {};
+    const list = hs.map((h, i) => {
+      for (const k of h.keys) { const m = useOf(h, k); map[k] = { c: keyColor(h, k), end: m == null ? null : hm(h.slot + m), h: i }; }
+      const o = overInfo(h);
+      return { kind: h.svc ? "s" : h.walk ? "w" : "n", name: h.svc || !h.walk ? h.name : "현장구매자", phone: digits(h.phone || ""), visitor: h.visitor || "", keys: h.keys.slice(),
+        in: h.enteredAt != null ? hm(h.enteredAt) : "", slot: hm(h.slot), no: h.no || "", pos: h.posNo || "", qty: h.svc ? 0 : h.qty || h.keys.length, product: h.svc ? "서비스 키" : h.product || "",
+        over: h.overPaid ? 0 : o.due, paid: h.overPaid ? h.overPaid.amount : 0, of: h.svc ? svcGiven(h) : "", staff: !!h.staff };
+    });
+    const pj = projection();
+    return {
+      type: "astanakiz-live", v: 1, day: TODAY, at: `${TODAY} ${hm(now)}:${String(sec).padStart(2, "0")}`, build: (CFG && CFG.build) || "",
+      dayKind: dayKind(TODAY), golden: golden ? hm(golden.at) : null,
+      rules: { keys: RULES.keys, useMinutes: RULES.useMinutes, pinkUntil: RULES.pinkUntil, overFee: RULES.overFee, overUnitMin: RULES.overUnitMin },
+      naver: { done: sum("done"), conf: sum("conf"), left: sum("left"), test: testQty(TODAY), slots: st.map((x) => ({ t: hm(x.s), done: x.done, conf: x.conf, left: x.left, cap: x.cap })), products: [...prod].filter(([, n]) => n > 0).map(([name, done]) => ({ name, done })) },
+      people: livePeople(),
+      walk: { tickets: walkQ((w) => !w.extra), extra: walkQ((w) => w.extra), service: svcKeys.length },
+      over: { paid: paid.reduce((a, h) => a + h.overPaid.amount, 0), count: paid.length, due: holders().reduce((a, h) => a + (h.overPaid ? 0 : overInfo(h).due), 0) },
+      keys: { total: RULES.keys, used: hs.reduce((a, h) => a + h.keys.length, 0), free: freeKeys().length, walkable: pj.base, flex: Math.max(0, pj.all - pj.base), map, holders: list },
+    };
+  }
+  let liveSig = "", liveSentAt = 0, liveBusy = false, liveWait = 0;
+  /** 1초마다: 바뀌었으면 5초 간격으로, 그대로면 1분마다 (폰이 '몇 초 전 기준'인지 알게) · 실패하면 30초 뒤 다시 */
+  function liveTick() {
+    if (!APP || !window.desk.live || !LIVE.on || !svKey.has || !stateReady || liveBusy) return;
+    const t = Date.now();
+    if (t < liveWait) return;
+    const snap = liveSnap();
+    const sig = JSON.stringify({ ...snap, at: "" });
+    if (!(sig !== liveSig ? t - liveSentAt >= 5000 : t - liveSentAt >= 60000)) return;
+    liveBusy = true;
+    const done = (r) => {
+      LIVE.last = { at: `${hm(now)}:${String(sec).padStart(2, "0")}`, ok: !!(r && r.ok), why: (r && r.why) || "" };
+      if (LIVE.last.ok) { liveSig = sig; liveSentAt = Date.now(); } else liveWait = Date.now() + 30000;
+      liveBusy = false;
+      const el = $("live-last"); if (el) { el.textContent = liveText(); el.classList.toggle("evwarn", !LIVE.last.ok); }
+    };
+    window.desk.live.send({ json: JSON.stringify(snap), at: snap.at }).then(done, (e) => done({ ok: false, why: String(e) }));
+  }
+  const liveText = () => (!svKey.has ? "보고 열쇠를 넣으면 보내요" : !LIVE.on ? "꺼짐" : !APP ? "체험판: 보내지 않아요 (설치한 앱에서 1분마다)" : LIVE.last ? `마지막: ${LIVE.last.at} ${LIVE.last.ok ? "보냄" : `실패 ${LIVE.last.why} — 30초 뒤 다시`}` : "곧 보내요");
   /** 설문 진행 중: 스위치 켬(사장님 10/16) · 기간 안 · 대상 · 선택지 — 끄면 예약자 · 현장입장 창에 설문 없이 예전처럼 바로 입장 */
   const svOn = () => !!(SV.on && SV.from && SV.to && SV.from <= TODAY && TODAY <= SV.to && (SV.all || SV.naverNew || SV.walkin) && SV.opts.length);
   const SV_Q_NEW = "신규고객께 아스타나키즈를 어떻게 알게 되었는지 물어봐주세요";
@@ -2731,14 +2803,22 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   const svcLinked = (x, h) => !!(x && x.of && h && !h.svc && (x.of.no ? h.no === x.of.no : x.of.id === h.id));
   /** 그 손님에게 준 서비스 키 (반납한 것도) */
   const svcOf = (h) => svcKeys.filter((x) => svcLinked(x, h));
-  /** 서비스 키 열쇠 창의 '받은 사람' 줄 — 연결 정보는 줄 때 복사해 둔 것 (원래 손님이 먼저 나가도 그대로) */
+  /** 서비스 키 열쇠 창의 '받은 사람' 줄 — 연결 정보는 줄 때 복사해 둔 것 (원래 손님이 먼저 나가도 그대로)
+      사장님 10/16: "10번 김채원님에게 추가 서비스 지급된 열쇠" · 현장은 "현장 (전화번호)님께 …" */
   function svcFacts(h) {
-    const o = h.of;
-    if (!o) return `<dt>사용자</dt><dd>직원${h.name && h.name !== "직원" ? ` · <b>${esc(h.name)}</b>` : ""} <span class="help">예약 없이 쓰는 열쇠</span></dd>`;
+    if (!h.of) return `<dt>사용자</dt><dd>직원${h.name && h.name !== "직원" ? ` · <b>${esc(h.name)}</b>` : ""} <span class="help">예약 없이 쓰는 열쇠</span></dd>`;
     const cur = holders().some((y) => svcLinked(h, y));
-    return `<dt>연결 손님</dt><dd><b>${esc(o.name)}</b>${o.k === "w" ? "" : "님"} <span class="num">${esc((o.keys || []).join(", "))}번 열쇠</span> · ${o.k === "w" ? `현장${o.posNo ? ` <span class="num">${esc(o.posNo)}</span>` : ""}` : `네이버${o.no ? ` 예약 <span class="num">${esc(o.no)}</span>` : ""}`}
-      <span class="help">${cur ? "이용 중" : "먼저 반납 · 퇴장함"}</span></dd>`;
+    return `<dt>수령인</dt><dd><b>${esc(svcGiven(h))}</b> <span class="help">${cur ? "원래 손님 이용 중" : "원래 손님 먼저 반납 · 퇴장함"}</span></dd>`;
   }
+  /** "10번 김채원님에게 추가 서비스 지급된 열쇠" / "10번 현장 (010-1234-5678)님께 추가 서비스 지급된 열쇠" / 직원 */
+  function svcGiven(x) {
+    const o = x.of;
+    if (!o) return `직원${x.name && x.name !== "직원" ? ` ${x.name}` : ""} · 예약 없이 쓰는 열쇠`;
+    const ks = (o.keys || []).length ? `${o.keys.join(", ")}번 ` : "";
+    return o.k === "w" ? `${ks}현장 (${x.phone ? fmtPhone(x.phone) : "전화번호 없음"})님께 추가 서비스 지급된 열쇠` : `${ks}${o.name}님에게 추가 서비스 지급된 열쇠`;
+  }
+  /** 열쇠판에 쓰는 이름: 연결된 사람 (네이버 이름 · 현장) · 직원은 적은 이름 */
+  function svcBoard(x) { return x.of ? (x.of.k === "w" ? "현장" : x.of.name) : x.name || "직원"; }
   /** [서비스 키] 를 누르면: 빈 열쇠 중에서 고르기 */
   function svcPickHtml(h) {
     const free = freeKeys();
@@ -2759,6 +2839,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     }
     autoLoad();
     svTick(); // 설문 누적 20:00 보고
+    liveTick(); // 폰 실시간 현황 (1분마다 · 바뀌면 5초 안에)
     capTick();
     if (sheet.mode === "key" && $("pos").hidden) { const h = holderById(sheet.hid); const mt = $("meter"); if (h && mt) { const before = !!overInfo(h).due; mt.innerHTML = meterHtml(h); if (sec === 0 || (!!overInfo(h).due !== before)) renderSheet(); } }
   }, 1000);
@@ -3062,6 +3143,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     svMinus(btn) { const n = Number(btn.dataset.n); if (!(svExtra[n] > 0)) return; svExtra[n]--; if (!svExtra[n]) delete svExtra[n]; saveState(); renderSheet(); toast(`${n}번 직접 더한 것 1건 뺌`); },
     svDel() { if (SV.opts.length > 1) SV.opts.pop(); svSaveCfg(); renderSheet(); },
     svSendNow() { svSend(true); },
+    // 폰 실시간 현황 켜기 · 끄기 (사장님 10/16) — 켜면 바로 한 번 보냄
+    liveToggle() {
+      LIVE.on = !LIVE.on; liveSig = ""; liveSentAt = 0; liveWait = 0;
+      if (APP && window.desk.config) window.desk.config.set({ liveOn: LIVE.on });
+      renderSheet(); toast(LIVE.on ? (svKey.has ? "폰 실시간 현황을 켰어요 — 1분마다 · 바뀌면 바로 보내요" : "폰 실시간 현황을 켰어요 — 보고 열쇠를 넣어 주세요") : "폰 실시간 현황을 껐어요");
+    },
     // 설문조사 켜기 · 끄기 (사장님 10/16) — 끄면 설문 번호 없이 예전처럼 완료 · 입장 (기간 · 대상 · 선택지 · 누적 · 보고 열쇠는 그대로)
     svToggle() { SV.on = !SV.on; svSaveCfg(); renderSheet(); renderAll(); toast(SV.on ? (svOn() ? "설문조사를 켰어요 — 대상 손님은 번호를 눌러야 입장해요" : "설문조사를 켰어요 — 기간 · 대상 · 선택지를 확인해 주세요") : "설문조사를 껐어요 — 예약자 · 현장입장 창에 설문 없이 바로 입장해요"); },
     // 보고 열쇠 (보고 앱 주소 …/b/{열쇠}/) — 앱은 이 PC 에 암호화 저장, 화면에는 끝 4자리만 · 체험판은 저장 · 보내기 없음
@@ -3070,7 +3157,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       if (!/^[A-Za-z0-9_-]{16,64}$/.test(k)) { toast("보고 열쇠는 16~64자 영문 · 숫자 · _ - 만 돼요"); return; }
       if (APP && window.desk.config) { const r = await window.desk.config.set({ surveyKey: k }).catch((e) => ({ ok: false, why: String(e) })); if (!r || !r.ok) { toast(`열쇠를 저장 못 했어요: ${(r && r.why) || ""}`); return; } }
       svKey = { has: true, tail: k.slice(-4) };
-      toast(APP ? "보고 열쇠를 저장했어요 — [지금 보내기]로 확인해 보세요" : "체험판: 보고 열쇠는 이 화면에만 (저장 · 보내기 없음)");
+      liveSig = ""; liveWait = 0; // 새 열쇠로 폰 실시간 현황도 바로
+      toast(APP ? "보고 열쇠를 저장했어요 — [지금 보내기]로 확인해 보세요 (폰 실시간 현황도 바로 보내요)" : "체험판: 보고 열쇠는 이 화면에만 (저장 · 보내기 없음)");
       renderSheet();
     },
     async svKeyDel() {
@@ -3329,7 +3417,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 
   // 시험용: 입장권을 만드는 함수들 (자동 시험이 실제 입장 손님으로 출력 내용을 확인)
   document.addEventListener("change", (e) => { if (/^cap-(target|max|ceil)$/.test(e.target.id)) renderSheet(); }); // 숫자를 다 넣으면 계획 다시
-  window.__deskTest = { svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capPlan, capRun, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => enterText(), holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, evOf: (b) => evOf(b),
+  window.__deskTest = { liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capPlan, capRun, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => enterText(), holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, evOf: (b) => evOf(b),
     evLog: (from) => { const L = evLog(from); return { from: L.from, count: L.count, people: Object.fromEntries([...L.people].map(([k, p]) => [k, JSON.parse(JSON.stringify(p))])) }; },
     // 장부에 지난 방문 한 줄 넣기: o = { day, n(네이버 순번, 기본 = 지금 완료 수), base, st("안내" | "성공"), due, from(장부 · 기본 지금 이벤트), no }
     evInject: (name, o = {}) => {

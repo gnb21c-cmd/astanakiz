@@ -760,6 +760,30 @@ ipcMain.handle("survey:send", async (_e, job) => {
   return { ok: !!file, file, why, inbox };
 });
 
+// 폰 실시간 현황 (사장님 10/16): 총괄 관리자가 출근 전에도 보고 앱(입장권 판매 총 수량 → 세부 화면)에서 지금 키즈를 봄
+//   데스크가 1분마다 · 바뀌면 5초 안에 현황 글(astanakiz-live)을 넘겨줌 → 같은 보고 열쇠로 클라우드 boards/{열쇠}/deskLive/now 에 덮어씀 (docs/LIVE.md)
+//   손님 이름 · 전화번호가 들어감(열쇠 미반납 때 관리자가 전화) → 문서 하나(now)만 계속 고쳐 써서 지난 기록은 클라우드에 쌓이지 않음 · 파일로도 안 남김
+//   200 = 보냄 / 403 = 열쇠나 모양이 틀림(보고 시스템 규칙에 deskLive 가 아직 없을 때도) / 그 밖 = 실패
+async function liveSend(json, at) {
+  const key = surveyKey();
+  if (!key) return { ok: false, code: 0, why: "보고 열쇠 없음" };
+  if (!/^[{][\s\S]*astanakiz-live/.test(json)) return { ok: false, code: 0, why: "현황 모양이 틀림" };
+  if (json.length >= 100000) return { ok: false, code: 0, why: "현황 글이 너무 길어요" };
+  const body = JSON.stringify({ fields: { json: { stringValue: json }, at: { stringValue: String(at || "").slice(0, 39) } } });
+  try {
+    const { net } = require("electron");
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(), 15000);
+    const r = await net.fetch(`${INBOX_BASE}/boards/${encodeURIComponent(key)}/deskLive/now`, { method: "PATCH", headers: { "content-type": "application/json; charset=utf-8" }, body, signal: ac.signal });
+    clearTimeout(t);
+    if (r.status === 200) return { ok: true, code: 200 };
+    return { ok: false, code: r.status, why: r.status === 403 ? "열쇠나 모양이 틀림 (403) — 보고 시스템 규칙에 deskLive 가 있는지" : `응답 ${r.status}` };
+  } catch (err) {
+    return { ok: false, code: 0, why: `인터넷 오류: ${err && err.name === "AbortError" ? "응답 없음" : err && err.message ? err.message : err}` };
+  }
+}
+ipcMain.handle("live:send", (_e, job) => liveSend(String((job && job.json) || ""), job && job.at));
+
 // ── 영수증 프린터 (80mm 감열지) ──
 // Windows 에 설치된 프린터 목록 (POS 프린터도 Windows 에 드라이버가 깔려 있어야 보임 — '설정 → 프린터 및 스캐너' 에 있는 것)
 ipcMain.handle("print:list", async () => {

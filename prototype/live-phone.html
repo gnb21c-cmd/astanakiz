@@ -1,0 +1,256 @@
+<title>키즈 실시간</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* 키즈 실시간 — 보고 앱(B) '입장권 판매 총 수량' → 세부 화면 미리보기 (통합데스크 deskLive/now 를 읽음 · docs/LIVE.md)
+   한 손 폰 보기: 위 기준 시각 띠 → 오늘 입장(총 = 네이버 + 현장) → 입장료 매출 → 네이버 시간 칸 → 열쇠 45칸(누르면 손님 · 전화)
+   색 이름은 보고 앱 styles.css 와 같게 (밝은 / 어두운 화면) */
+:root {
+  --page: #f6f6f3; --surface-1: #fdfdfc; --text-primary: #0b0b0b; --text-secondary: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --border: rgba(11, 11, 11, 0.1); --accent: #2a78d6; --on-accent: #ffffff; --track: #e8f0fb;
+  --good: #006300; --bad: #c23b3b; --warn-bg: #fff4dc; --warn-ink: #6b4a00; --press: rgba(11, 11, 11, 0.04);
+  --pink: #e0679a; --key-in: #0b0b0b; --key-free: #b4b3ab; --sheet-shade: rgba(0, 0, 0, 0.35);
+  --font: system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface-1: #1a1a19; --text-primary: #ffffff; --text-secondary: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --border: rgba(255, 255, 255, 0.1); --accent: #3987e5; --on-accent: #ffffff; --track: #1f2c3d;
+    --good: #0ca30c; --bad: #e66767; --warn-bg: #3a2d0c; --warn-ink: #fad27a; --press: rgba(255, 255, 255, 0.05);
+    --pink: #ee7fab; --key-in: #ffffff; --key-free: #55544f; --sheet-shade: rgba(0, 0, 0, 0.6);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface-1: #1a1a19; --text-primary: #ffffff; --text-secondary: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --border: rgba(255, 255, 255, 0.1); --accent: #3987e5; --on-accent: #ffffff; --track: #1f2c3d;
+  --good: #0ca30c; --bad: #e66767; --warn-bg: #3a2d0c; --warn-ink: #fad27a; --press: rgba(255, 255, 255, 0.05);
+  --pink: #ee7fab; --key-in: #ffffff; --key-free: #55544f; --sheet-shade: rgba(0, 0, 0, 0.6);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--text-primary); font-family: var(--font); font-size: 15px; line-height: 1.45; -webkit-text-size-adjust: 100%; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--page); }
+.num { font-variant-numeric: tabular-nums; }
+.wrap { max-width: 480px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0 28px; display: grid; gap: 12px; }
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--page); display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; padding-block: 10px 8px; border-bottom: 1px solid var(--grid); }
+.top h1 { margin: 0; font-size: 18px; text-wrap: balance; }
+.back, .reload { border: 0; background: none; color: var(--accent); font: inherit; font-size: 15px; padding: 6px 4px; cursor: pointer; border-radius: 8px; }
+.back:focus-visible, .reload:focus-visible, .key:focus-visible, .x:focus-visible, .call:focus-visible, .copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.stamp { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 13px; color: var(--text-secondary); }
+.stamp b { color: var(--text-primary); }
+.pill { display: inline-block; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 1px 8px; background: var(--track); color: var(--accent); }
+.pull { height: 0; overflow: hidden; display: grid; place-items: center; color: var(--muted); font-size: 13px; transition: height .15s; }
+.pull.on { height: 44px; }
+.spin { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--grid); border-top-color: var(--accent); animation: spin .8s linear infinite; margin-right: 6px; display: inline-block; vertical-align: -4px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } .pull { transition: none; } }
+.stale { background: var(--warn-bg); color: var(--warn-ink); border-radius: 12px; padding: 10px 12px; font-size: 14px; }
+.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.card h2 { margin: 0; font-size: 13px; font-weight: 700; color: var(--text-secondary); letter-spacing: .02em; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.card h2 small { font-weight: 400; color: var(--muted); letter-spacing: 0; }
+.big { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.big .v { font-size: 40px; font-weight: 800; line-height: 1; }
+.big .v small { font-size: 18px; font-weight: 700; margin-left: 2px; }
+.split { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.split div { background: var(--page); border-radius: 10px; padding: 8px 10px; display: grid; gap: 2px; min-width: 0; }
+.split span { font-size: 12px; color: var(--text-secondary); }
+.split b { font-size: 20px; }
+.note { font-size: 12.5px; color: var(--muted); }
+.rows { display: grid; gap: 6px; }
+.row { display: flex; justify-content: space-between; gap: 10px; font-size: 14.5px; }
+.row span { color: var(--text-secondary); min-width: 0; }
+.row.sum { border-top: 1px solid var(--grid); padding-top: 8px; font-weight: 800; font-size: 17px; }
+.row.sum span { color: var(--text-primary); }
+.owed { color: var(--bad); font-weight: 700; }
+.ntot { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
+.ntot div { display: grid; gap: 2px; }
+.ntot span { font-size: 12px; color: var(--text-secondary); }
+.ntot b { font-size: 24px; }
+.ntot .dn b { color: var(--good); } .ntot .cf b { color: var(--bad); }
+.slots { width: 100%; border-collapse: collapse; font-size: 14px; }
+.slots th { font-size: 12px; font-weight: 600; color: var(--muted); text-align: right; padding: 2px 6px 4px; }
+.slots th:first-child, .slots td:first-child { text-align: left; }
+.slots td { text-align: right; padding: 4px 6px; border-top: 1px solid var(--grid); }
+.slots tr.now td { background: var(--track); font-weight: 700; }
+.slots tr.now td:first-child { border-radius: 8px 0 0 8px; } .slots tr.now td:last-child { border-radius: 0 8px 8px 0; }
+.slots .z { color: var(--muted); }
+.slots .cf { color: var(--bad); font-weight: 700; }
+.more { border: 0; background: none; color: var(--accent); font: inherit; font-size: 14px; padding: 4px 0; cursor: pointer; justify-self: start; }
+.ksum { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 14px; color: var(--text-secondary); }
+.ksum b { color: var(--text-primary); font-size: 16px; }
+.keys { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 5px; }
+.key { aspect-ratio: 1; max-width: 100%; border-radius: 8px; border: 1.5px solid var(--grid); background: none; color: var(--key-free); font: inherit; font-weight: 700; font-size: 15px; padding: 0; display: grid; place-items: center; cursor: default; }
+.key.in { border: 2px solid var(--key-in); color: var(--text-primary); cursor: pointer; }
+.key.pink { border: 2px solid var(--pink); background: var(--pink); color: #fff; cursor: pointer; }
+.key.red { border: 2px solid var(--bad); background: var(--bad); color: #fff; cursor: pointer; }
+.key.svc { border-style: dashed; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--text-secondary); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 4px; border: 1.5px solid var(--grid); }
+.legend i.in { border: 2px solid var(--key-in); } .legend i.pink { background: var(--pink); border-color: var(--pink); } .legend i.red { background: var(--bad); border-color: var(--bad); } .legend i.svc { border: 1.5px dashed var(--key-in); }
+.shade { position: fixed; inset: 0; background: var(--sheet-shade); z-index: 20; display: grid; align-items: end; }
+[hidden] { display: none !important; }
+.sheet { background: var(--surface-1); border-radius: 18px 18px 0 0; padding-block: 16px calc(18px + env(safe-area-inset-bottom, 0px)); padding-left: max(18px, env(safe-area-inset-left, 0px)); padding-right: max(18px, env(safe-area-inset-right, 0px)); max-width: 480px; width: 100%; margin: 0 auto; display: grid; gap: 12px; max-height: 85%; overflow-y: auto; }
+.sheet .hd { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.sheet .nm { font-size: 22px; font-weight: 800; }
+.x { border: 0; background: var(--page); color: var(--text-secondary); width: 34px; height: 34px; border-radius: 50%; font-size: 18px; cursor: pointer; }
+.kind { font-size: 12px; font-weight: 700; border-radius: 6px; padding: 2px 7px; background: var(--track); color: var(--accent); margin-left: 6px; vertical-align: 3px; }
+.kind.s { background: var(--page); color: var(--text-primary); border: 1.5px dashed var(--muted); }
+.phone { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.phone .p { font-size: 22px; font-weight: 700; user-select: all; }
+.call, .copy { border: 0; border-radius: 10px; padding: 8px 14px; font: inherit; font-weight: 700; cursor: pointer; text-decoration: none; }
+.call { background: var(--accent); color: var(--on-accent); }
+.copy { background: var(--page); color: var(--text-primary); }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 15px; margin: 0; }
+.kv dt { color: var(--text-secondary); }
+.kv dd { margin: 0; min-width: 0; }
+.chips { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.chip { font-size: 13px; font-weight: 700; border-radius: 6px; padding: 0 7px; border: 1.5px solid var(--key-in); }
+.chip.pink { background: var(--pink); border-color: var(--pink); color: #fff; } .chip.red { background: var(--bad); border-color: var(--bad); color: #fff; }
+.demo { font-size: 12px; color: var(--muted); text-align: center; }
+</style>
+
+<header class="wrap" style="padding-bottom:0">
+  <div class="top">
+    <button class="back" type="button" aria-label="첫 화면으로">‹ 첫 화면</button>
+    <h1>키즈 실시간</h1>
+    <button class="reload" type="button" id="reload" aria-label="새로고침">새로고침</button>
+    <div class="stamp" id="stamp"></div>
+  </div>
+</header>
+<div class="pull" id="pull" aria-live="polite"></div>
+<main class="wrap" id="main"></main>
+<div class="shade" id="shade" hidden></div>
+
+<script type="application/json" id="sample">{"type":"astanakiz-live","v":1,"day":"2026-10-05","at":"2026-10-05 13:50:00","build":"","dayKind":"비수기 휴일 · 시간제","golden":null,"rules":{"keys":45,"useMinutes":110,"pinkUntil":120,"overFee":5000,"overUnitMin":10},"naver":{"done":36,"conf":32,"left":132,"test":0,"slots":[{"t":"10:00","done":7,"conf":0,"left":3,"cap":10},{"t":"10:30","done":5,"conf":0,"left":5,"cap":10},{"t":"11:00","done":10,"conf":0,"left":0,"cap":10},{"t":"11:30","done":2,"conf":1,"left":7,"cap":10},{"t":"12:00","done":4,"conf":0,"left":6,"cap":10},{"t":"12:30","done":3,"conf":0,"left":7,"cap":10},{"t":"13:00","done":2,"conf":2,"left":6,"cap":10},{"t":"13:30","done":3,"conf":1,"left":6,"cap":10},{"t":"14:00","done":0,"conf":7,"left":3,"cap":10},{"t":"14:30","done":0,"conf":5,"left":5,"cap":10},{"t":"15:00","done":0,"conf":7,"left":3,"cap":10},{"t":"15:30","done":0,"conf":2,"left":8,"cap":10},{"t":"16:00","done":0,"conf":2,"left":8,"cap":10},{"t":"16:30","done":0,"conf":3,"left":7,"cap":10},{"t":"17:00","done":0,"conf":0,"left":10,"cap":10},{"t":"17:30","done":0,"conf":0,"left":10,"cap":10},{"t":"18:00","done":0,"conf":1,"left":9,"cap":10},{"t":"18:30","done":0,"conf":1,"left":9,"cap":10},{"t":"19:00","done":0,"conf":0,"left":10,"cap":10},{"t":"19:30","done":0,"conf":0,"left":10,"cap":10}],"products":[{"name":"4인 입장권","done":36}]},"people":{"naver":36,"walk":3,"total":39},"walk":{"tickets":3,"extra":0,"service":2},"over":{"paid":0,"count":0,"due":135000},"keys":{"total":45,"used":21,"free":24,"walkable":9,"flex":5,"map":{"1":{"c":"red","end":"13:20","h":0},"2":{"c":"pink","end":"13:50","h":1},"3":{"c":"in","end":"14:20","h":2},"4":{"c":"red","end":"11:50","h":3},"6":{"c":"in","end":"14:50","h":4},"7":{"c":"in","end":"14:50","h":5},"8":{"c":"in","end":"15:20","h":6},"9":{"c":"in","end":"15:20","h":7},"10":{"c":"in","end":"15:20","h":7},"17":{"c":"red","end":"12:50","h":8},"18":{"c":"red","end":"12:50","h":8},"24":{"c":"pink","end":"13:50","h":9},"25":{"c":"pink","end":"13:50","h":9},"26":{"c":"pink","end":"13:50","h":10},"27":{"c":"in","end":"14:20","h":11},"28":{"c":"in","end":"14:20","h":11},"29":{"c":"in","end":"14:20","h":12},"30":{"c":"in","end":"14:50","h":13},"31":{"c":"in","end":"14:50","h":13},"39":{"c":"in","end":"14:20","h":14},"40":{"c":"in","end":"14:50","h":15}},"holders":[{"kind":"n","name":"장시우","phone":"01020142542","visitor":"","keys":[1],"in":"11:28","slot":"11:30","no":"1371112347","pos":"","qty":1,"product":"4인 입장권","over":15000,"paid":0,"of":"","staff":false},{"kind":"n","name":"남궁민","phone":"01020174218","visitor":"","keys":[2],"in":"12:01","slot":"12:00","no":"1371141599","pos":"","qty":1,"product":"4인 입장권","over":0,"paid":0,"of":"","staff":false},{"kind":"n","name":"유채아","phone":"01020182137","visitor":"","keys":[3],"in":"12:28","slot":"12:30","no":"1371148912","pos":"","qty":1,"product":"4인 입장권","over":0,"paid":0,"of":"","staff":false},{"kind":"n","name":"찟재명","phone":"01020039595","visitor":"","keys":[4],"in":"09:59","slot":"10:00","no":"1371017278","pos":"","qty":1,"product":"4인 입장권","over":60000,"paid":0,"of":"","staff":false},{"kind":"n","name":"오유나","phone":"01020197975","visitor":"","keys":[6],"in":"12:58","slot":"13:00","no":"1371163538","pos":"","qty":1,"product":"4인 입장권","over":0,"paid":0,"of":"","staff":false},{"kind":"n","name":"서도현","phone":"01020205894","visitor":"","keys":[7],"in":"12:57","slot":"13:00","no":"1371170851","pos":"","qty":1,"product":"4인 입장권","over":0,"paid":0,"of":"","staff":false},{"kind":"n","name":"권이준","phone":"01020221732","visitor":"","keys":[8],"in":"13:27","slot":"13:30","no":"1371185477","pos":"","qty":1,"product":"4인 입장권","over":0,"paid":0,"of":"","staff":false},{"kind":"n","name":"황수아","phone":"01020229651","visitor":"","keys":[9,10],"in":"13:28","slot":"13:30","no":"1371192790","pos":"","qty":2,"product":"4인 입장권","over":0,"paid":0,"of":"","staff":false},{"kind":"n","name":"강민준","phone":"01020118785","visitor":"","keys":[17,18],"in":"11:01","slot":"11:00","no":"1371090408","pos":"","qty":2,"product":"4인 입장권","over":60000,"paid":0,"of":"","staff":false},{"kind":"n","name":"조아인","phone":"01020158380","visitor":"","keys":[24,25],"in":"11:57","slot":"12:00","no":"1371126973","pos":"","qty":2,"product":"4인 입장권","over":0,"paid":0,"of":"","staff":false},{"kind":"n","name":"한지안","phone":"01020166299","visitor":"","keys":[26],"in":"11:58","slot":"12:00","no":"1371134286","pos":"","qty":1,"product":"4인 입장권","over":0,"paid":0,"of":"","staff":false},{"kind":"n","name":"구본우","phone":"01020190056","visitor":"","keys":[27,28],"in":"12:29","slot":"12:30","no":"1371156225","pos":"","qty":2,"product":"4인 입장권","over":0,"paid":0,"of":"","staff":false},{"kind":"w","name":"현장구매자","phone":"01026659013","visitor":"","keys":[29],"in":"12:40","slot":"12:30","no":"","pos":"POS-0031","qty":1,"product":"","over":0,"paid":0,"of":"","staff":false},{"kind":"w","name":"현장구매자","phone":"01084430217","visitor":"","keys":[30,31],"in":"13:12","slot":"13:00","no":"","pos":"POS-0032","qty":2,"product":"","over":0,"paid":0,"of":"","staff":false},{"kind":"s","name":"현장구매자","phone":"01026659013","visitor":"","keys":[39],"in":"13:50","slot":"12:30","no":"","pos":"","qty":0,"product":"서비스 키","over":0,"paid":0,"of":"29번 현장 (010-2665-9013)님께 추가 서비스 지급된 열쇠","staff":false},{"kind":"s","name":"오유나","phone":"01020197975","visitor":"","keys":[40],"in":"13:50","slot":"13:00","no":"","pos":"","qty":0,"product":"서비스 키","over":0,"paid":0,"of":"6번 오유나님에게 추가 서비스 지급된 열쇠","staff":false}]}}</script>
+<script>
+(() => {
+  "use strict";
+  /* 자료: 실제 보고 앱은 Firestore boards/{열쇠}/deskLive/now 의 json 글을 읽음 (docs/LIVE.md)
+       GET https://firestore.googleapis.com/v1/projects/astana-report/databases/(default)/documents/boards/{열쇠}/deskLive/now
+       → fields.json.stringValue 를 JSON.parse
+     이 미리보기는 통합데스크 체험판(10/5 13:50)에서 만든 예시 글을 씀 */
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const won = (n) => `${Math.round(n).toLocaleString("ko-KR")}원`;
+  const fmtPhone = (p) => { const d = String(p || "").replace(/\D/g, ""); return d.length === 11 ? `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}` : d || "—"; };
+  const toMin = (t) => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ""); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+  // 단가: 보고 앱 kidsPrice(날짜) 를 씀 — 미리보기는 같은 값(평일 12,000 · 휴일 14,000)으로
+  const PRICE = { 평일: 12000, 휴일: 14000 };
+  const KIND = { n: "네이버", w: "현장", s: "서비스 키" };
+  const COLOR = { in: "이용 중", pink: "반납 시간 (10분 안)", red: "반납 시간 넘음" };
+  let D = null, showAll = false;
+
+  async function load() {
+    return JSON.parse($("sample").textContent);
+  }
+  function ago(at) {
+    // 미리보기: 예시 글이라 '방금' 으로 (실제 앱은 지금 시각 − at)
+    return "예시 자료";
+  }
+  function render() {
+    const d = D, p = d.people, n = d.naver, k = d.keys;
+    const kind = /휴일/.test(d.dayKind) ? "휴일" : "평일", price = PRICE[kind];
+    const tickets = p.total, fee = tickets * price, total = fee + d.over.paid;
+    const at = d.at.slice(11, 19), day = d.day.slice(5).replace("-", "/");
+    $("stamp").innerHTML = `<span>통합데스크 <b class="num">${esc(day)} ${esc(at)}</b> 기준</span><span class="pill">${esc(ago(d.at))}</span><span>아래로 당기면 새로고침</span>`;
+    const nowMin = toMin(d.at.slice(11));
+    const curSlot = n.slots.filter((x) => toMin(x.t) <= nowMin + 5).map((x) => x.t).pop();
+    const busy = n.slots.filter((x) => x.done || x.conf || x.t === curSlot);
+    const slots = showAll ? n.slots : busy;
+    $("main").innerHTML = `
+      <section class="card" aria-labelledby="h-people">
+        <h2 id="h-people">오늘 입장 <small>${esc(d.dayKind)}${d.golden ? ` · 골든벨 ${esc(d.golden)}~` : ""}</small></h2>
+        <div class="big"><span class="v num">${p.total}<small>장</small></span><span class="note">총 판매수 = 네이버 이용완료 + 현장</span></div>
+        <div class="split">
+          <div><span>네이버</span><b class="num">${p.naver}</b></div>
+          <div><span>현장${d.walk.extra ? ` (+1타임 ${d.walk.extra})` : ""}</span><b class="num">${p.walk}</b></div>
+          <div><span>서비스 키</span><b class="num">${d.walk.service}</b></div>
+        </div>
+        <div class="note">서비스 키는 판매가 아니라 총 판매수에 안 들어가요${n.test ? ` · 시험 기록 ${n.test}장 뺌` : ""}</div>
+      </section>
+      <section class="card" aria-labelledby="h-sales">
+        <h2 id="h-sales">입장료 매출 <small>${esc(at)} 기준 · ${kind} 단가</small></h2>
+        <div class="rows">
+          <div class="row"><span>입장권 ${tickets}장 × ${won(price)}</span><b class="num">${won(fee)}</b></div>
+          <div class="row"><span>초과요금 결제 ${d.over.count}건</span><b class="num">${won(d.over.paid)}</b></div>
+          <div class="row sum"><span>합계</span><b class="num">${won(total)}</b></div>
+        </div>
+        ${d.over.due ? `<div class="note">아직 받지 않은 초과요금 <span class="owed num">${won(d.over.due)}</span> (반납 전 손님 · 반납할 때 POS 결제)</div>` : ""}
+        <div class="note">장수 × 단가로 셈 · 할인 · 무료입장은 하루 마감 보고(POS · 네이버 정산)에서 맞춰져요</div>
+      </section>
+      <section class="card" aria-labelledby="h-naver">
+        <h2 id="h-naver">네이버 예약 <small>오늘 합</small></h2>
+        <div class="ntot">
+          <div class="dn"><span>완료</span><b class="num">${n.done}</b></div>
+          <div class="cf"><span>미입장</span><b class="num">${n.conf}</b></div>
+          <div><span>잔여</span><b class="num">${n.left}</b></div>
+        </div>
+        <div style="overflow-x:auto"><table class="slots num">
+          <thead><tr><th>시간</th><th>완료</th><th>미입장</th><th>잔여</th></tr></thead>
+          <tbody>${slots.map((x) => `<tr class="${x.t === curSlot ? "now" : ""}"><td>${esc(x.t)}</td><td class="${x.done ? "" : "z"}">${x.done}</td><td class="${x.conf ? "cf" : "z"}">${x.conf}</td><td class="${x.left ? "" : "z"}">${x.left}</td></tr>`).join("")}</tbody>
+        </table></div>
+        ${n.slots.length > busy.length ? `<button class="more" type="button" id="more">${showAll ? "예약 있는 시간만 보기" : `모든 시간 보기 (${n.slots.length}칸)`}</button>` : ""}
+        ${n.products.length > 1 ? `<div class="note">상품별 완료: ${n.products.map((x) => `${esc(x.name)} ${x.done}`).join(" · ")}</div>` : ""}
+      </section>
+      <section class="card" aria-labelledby="h-keys">
+        <h2 id="h-keys">열쇠 운용 <small>번호를 누르면 손님 · 전화</small></h2>
+        <div class="ksum"><span>사용 <b class="num">${k.used}</b>/${k.total}</span><span>빈 열쇠 <b class="num">${k.free}</b></span><span>현장 판매 가능 <b class="num">${k.walkable}</b>${k.flex ? ` +유동 ${k.flex}` : ""}</span></div>
+        <div class="keys">${Array.from({ length: k.total }, (_, i) => {
+          const no = i + 1, m = k.map[no];
+          if (!m) return `<button class="key num" type="button" disabled aria-label="${no}번 빈 열쇠">${no}</button>`;
+          const h = k.holders[m.h];
+          return `<button class="key num ${esc(m.c)}${h.kind === "s" ? " svc" : ""}" type="button" data-k="${no}" aria-label="${no}번 ${esc(KIND[h.kind])} ${esc(COLOR[m.c] || "")}">${no}</button>`;
+        }).join("")}</div>
+        <div class="legend"><span><i></i>빈 열쇠</span><span><i class="in"></i>이용 중</span><span><i class="pink"></i>반납 시간(10분 안)</span><span><i class="red"></i>반납 시간 넘음</span><span><i class="svc"></i>서비스 키</span></div>
+      </section>
+      <div class="demo">미리보기 · 통합데스크 체험판 예시 자료 (손님 이름 · 전화번호는 예시)</div>`;
+    const more = $("more"); if (more) more.onclick = () => { showAll = !showAll; render(); };
+    for (const b of document.querySelectorAll(".key[data-k]")) b.onclick = () => openKey(Number(b.dataset.k));
+  }
+  function openKey(no) {
+    const m = D.keys.map[no]; if (!m) return;
+    const h = D.keys.holders[m.h];
+    const chips = h.keys.map((x) => { const mm = D.keys.map[x]; return `<span class="chip num ${mm ? esc(mm.c) : ""}">${x}</span>`; }).join("");
+    const ends = [...new Set(h.keys.map((x) => (D.keys.map[x] || {}).end))];
+    const endText = ends.map((e) => (e == null ? "무제한" : e)).join(" · ");
+    const name = h.kind === "s" ? (h.staff ? `직원 ${h.name}` : h.name) : h.name;
+    $("shade").innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sh-nm">
+      <div class="hd"><span><span class="nm" id="sh-nm">${esc(name)}</span><span class="kind ${h.kind === "s" ? "s" : ""}">${esc(KIND[h.kind])}</span></span><button class="x" type="button" id="sh-x" aria-label="닫기">×</button></div>
+      <div class="phone"><span class="p num">${esc(fmtPhone(h.phone))}</span>${h.phone ? `<a class="call" href="tel:${esc(h.phone)}">전화 걸기</a><button class="copy" type="button" id="sh-copy">번호 복사</button>` : ""}</div>
+      <dl class="kv">
+        <dt>열쇠</dt><dd><span class="chips">${chips}</span></dd>
+        <dt>상태</dt><dd>${esc(COLOR[m.c] || "")}${h.over ? ` · <span class="owed num">초과요금 ${won(h.over)}</span>` : h.paid ? ` · 초과요금 ${won(h.paid)} 결제함` : ""}</dd>
+        <dt>입장</dt><dd class="num">${esc(h.in)}${h.kind === "n" ? ` (예약 ${esc(h.slot)})` : h.slot && h.slot !== h.in ? ` (입장 타임 ${esc(h.slot)})` : ""}</dd>
+        <dt>반납</dt><dd class="num">${esc(endText)}</dd>
+        ${h.kind === "s" ? `<dt>수령인</dt><dd>${esc(h.of || "서비스 키")} <span class="note">판매 아님 · 초과요금 없음</span></dd>` : `<dt>수량</dt><dd>${esc(h.product)} ${h.qty}장</dd>`}
+        ${h.visitor ? `<dt>방문자</dt><dd>${esc(h.visitor)} (대리예약)</dd>` : ""}
+        ${h.no ? `<dt>예약번호</dt><dd class="num">${esc(h.no)}</dd>` : h.pos ? `<dt>POS 번호</dt><dd class="num">${esc(h.pos)}</dd>` : ""}
+      </dl></div>`;
+    $("shade").hidden = false;
+    $("sh-x").onclick = closeKey; $("sh-x").focus();
+    const cp = $("sh-copy");
+    if (cp) cp.onclick = () => { const t = fmtPhone(h.phone); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => (cp.textContent = "복사함"), () => { const r = document.createRange(); r.selectNodeContents(document.querySelector(".sheet .p")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }); };
+  }
+  function closeKey() { $("shade").hidden = true; $("shade").innerHTML = ""; }
+  $("shade").addEventListener("click", (e) => { if (e.target === $("shade")) closeKey(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("shade").hidden) closeKey(); });
+
+  // 새로고침: 열 때 · 아래로 당겼다 놓을 때 · [새로고침] — 그때마다 deskLive/now 를 다시 읽음
+  let busyLoad = false;
+  async function refresh() {
+    if (busyLoad) return;
+    busyLoad = true;
+    $("pull").classList.add("on"); $("pull").innerHTML = `<span><span class="spin"></span>통합데스크 현황을 가져오는 중</span>`;
+    try { D = await load(); render(); $("pull").innerHTML = "가져왔어요"; }
+    catch (e) { $("pull").innerHTML = "가져오지 못했어요 — 인터넷을 확인하고 다시 당겨 주세요"; }
+    setTimeout(() => { $("pull").classList.remove("on"); busyLoad = false; }, 700);
+  }
+  let y0 = null;
+  addEventListener("touchstart", (e) => { y0 = scrollY <= 0 && $("shade").hidden ? e.touches[0].clientY : null; }, { passive: true });
+  addEventListener("touchmove", (e) => { if (y0 == null) return; const dy = e.touches[0].clientY - y0; if (dy > 10 && !busyLoad) { $("pull").classList.add("on"); $("pull").textContent = dy > 70 ? "놓으면 새로고침" : "아래로 당기면 새로고침"; } }, { passive: true });
+  addEventListener("touchend", (e) => { if (y0 == null) return; const dy = e.changedTouches[0].clientY - y0; y0 = null; if (dy > 70) refresh(); else if (!busyLoad) $("pull").classList.remove("on"); });
+  $("reload").onclick = refresh;
+  refresh();
+})();
+</script>

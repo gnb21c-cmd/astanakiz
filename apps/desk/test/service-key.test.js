@@ -1,6 +1,7 @@
 /* 서비스 키 (사장님 10/16)
    - 열쇠 창 [서비스 키] (+1타임 오른쪽): 빈 열쇠 중 하나를 골라 판매 아닌 열쇠로 더 줌 → 처음 누른 열쇠 손님(네이버 · 현장)과 연결
    - 원래 손님이 먼저 반납 · 퇴장해도 서비스 키에는 연결 정보가 그대로 · 서비스 키는 따로 반납 (원래 손님 [모두 반납]에 안 섞임)
+   - 열쇠판에는 점선 + 연결된 사람 이름(네이버 이름 · 현장 · 직원 이름) · 열쇠 창 수령인 "10번 김채원님에게 추가 서비스 지급된 열쇠" (사장님 10/16)
    - 현장입장 창 왼쪽 아래 [서비스 키]: 임직원 등 예약 없이 쓸 때 — 쓰는 사람(이름 · 전화)만 적고 등록 · 결제 · 입장권 · 설문 없음
    - 총 판매수 · 네이버/현장 인원(시간표 · 좌석 · 보고 파일 w)에 안 들어감 · 초과요금 없음 · 저장 파일 s 로 따로 */
 const test = require("node:test");
@@ -42,7 +43,7 @@ test("서비스 키: 열쇠 창에서 빈 열쇠를 골라 연결 · 판매수 �
     assert.strictEqual(await page.$("#sheet .svcpick"), null, "고르면 닫힘");
     const k40 = await keyText(page, 40);
     assert.match(k40.cls, /\bsvc\b/);
-    assert.strictEqual(k40.text, "40 서비스");
+    assert.strictEqual(k40.text, "40 오유나", "'서비스' 대신 연결된 사람 이름 (점선은 그대로)");
     assert.strictEqual(await sold(page), sold0, "총 판매수 그대로");
     assert.strictEqual((await page.evaluate(() => window.__deskTest.capPresent())).length, seats0, "네이버 · 현장 인원(좌석)에 안 셈");
     assert.strictEqual(await page.textContent("#sheet .rall"), "6번 반납 · 퇴장", "원래 손님 반납에 서비스 키는 안 섞임");
@@ -50,11 +51,11 @@ test("서비스 키: 열쇠 창에서 빈 열쇠를 골라 연결 · 판매수 �
     // 원래 손님이 먼저 반납 · 퇴장 → 서비스 키는 그대로 · 연결 정보 유지
     await page.click("#sheet .rall");
     assert.strictEqual((await keyText(page, 6)).text, "6", "6번은 빈 열쇠");
-    assert.match((await keyText(page, 40)).text, /서비스/, "40번은 아직 나가 있음");
+    assert.match((await keyText(page, 40)).cls, /\bsvc\b/, "40번은 아직 나가 있음");
     await page.click('.key[data-k="40"]');
     assert.match(await page.textContent("#sheet-title"), /40번 서비스 키\s*판매 아님/);
     const facts = (await page.textContent("#sheet .facts")).replace(/\s+/g, " ");
-    assert.match(facts, /연결 손님\s*오유나님 6번 열쇠 · 네이버 예약 \d+ 먼저 반납 · 퇴장함/);
+    assert.match(facts, /수령인\s*6번 오유나님에게 추가 서비스 지급된 열쇠 원래 손님 먼저 반납 · 퇴장함/);
     assert.match(facts, /판매수 · 인원에 안 셈 · 초과요금 없음/);
     assert.strictEqual(await page.$("#sheet [data-act=plusSlot]"), null, "서비스 키는 +1타임 없음 (판매가 생김)");
     assert.strictEqual(await page.$("#sheet [data-act=svcPick]"), null);
@@ -71,7 +72,7 @@ test("서비스 키: 열쇠 창에서 빈 열쇠를 골라 연결 · 판매수 �
     await page.click('.srow:has-text("서비스 키 · 오유나 6번")');
     const card = (await page.textContent("#sheet .reccard")).replace(/\s+/g, " ");
     assert.match(card, /수량\s*서비스 키 \(판매 아님\)/);
-    assert.match(card, /연결\s*오유나 6번 손님에게 준 서비스 키 · 예약 \d+/);
+    assert.match(card, /수령인\s*6번 오유나님에게 추가 서비스 지급된 열쇠 · 예약 \d+/);
     await page.click("#sheet [data-act=soldList]");
     await page.click('.srow:has-text("오유나") >> nth=-1');
     assert.match((await page.textContent("#sheet .reccard")).replace(/\s+/g, " "), /서비스 키\s*40 이 손님에게 줌 \(판매 아님\)/);
@@ -84,7 +85,7 @@ test("서비스 키: 열쇠 창에서 빈 열쇠를 골라 연결 · 판매수 �
     assert.deepStrictEqual(await page.$$eval("#sheet [data-act=returnKey]", (e) => e.map((b) => b.textContent)), ["24번만", "25번만"]);
     assert.strictEqual(await page.textContent("#sheet .rall"), "모두 반납 (2개)");
     await page.click("#sheet .rall");
-    assert.match((await keyText(page, 41)).text, /서비스/, "41번 서비스 키는 남음");
+    assert.strictEqual((await keyText(page, 41)).text, "41 조아인", "41번 서비스 키는 남음");
 
     // 초과요금 손님(1번)에게 준 서비스 키: 반납 시각 · 색은 같게 시작 · 초과요금은 없음 (바로 반납 가능)
     await page.click('.key[data-k="1"]');
@@ -96,6 +97,16 @@ test("서비스 키: 열쇠 창에서 빈 열쇠를 골라 연결 · 판매수 �
     await page.click('.key[data-k="42"]');
     assert.strictEqual((await page.textContent("#meter")).trim(), "", "초과요금 미터 없음");
     assert.ok(!(await page.isDisabled("#sheet .rall")));
+    await close(page);
+
+    // 현장 손님(29번)에게 준 서비스 키: 열쇠판 '현장' · 수령인 "29번 현장 (전화)님께 …"
+    await page.click('.key[data-k="29"]');
+    await page.click("#sheet [data-act=svcPick]");
+    await page.click('#sheet [data-act=svcGive][data-k="43"]');
+    await close(page);
+    assert.strictEqual((await keyText(page, 43)).text, "43 현장");
+    await page.click('.key[data-k="43"]');
+    assert.match((await page.textContent("#sheet .facts")).replace(/\s+/g, " "), /수령인\s*29번 현장 \(010-2665-9013\)님께 추가 서비스 지급된 열쇠 원래 손님 이용 중/);
     await close(page);
 
     // 일괄 반납 목록에는 서비스 키도 (다른 열쇠와 같게)
@@ -144,8 +155,8 @@ test("서비스 키: 현장입장 창 왼쪽 아래 — 임직원 등 예약 없
     const toast = await page.textContent("#toast");
     assert.match(toast, /서비스 키 32, 33번 · 직원 홍길동 매니저 등록/);
     assert.doesNotMatch(toast, /입장권/, "입장권 출력 없음");
-    assert.strictEqual((await keyText(page, 32)).text, "32 서비스");
-    assert.strictEqual((await keyText(page, 33)).text, "33 서비스");
+    assert.strictEqual((await keyText(page, 32)).text, "32 홍길동 매니저", "직원은 적은 이름");
+    assert.strictEqual((await keyText(page, 33)).text, "33 홍길동 매니저");
     assert.strictEqual(await sold(page), sold0, "총 판매수 그대로");
     const x = await page.evaluate(() => window.__deskTest.svcKeys().map((s) => ({ staff: s.staff, name: s.name, phone: s.phone, keys: s.keys, qty: s.qty, of: s.of })));
     assert.deepStrictEqual(x, [{ staff: true, name: "홍길동 매니저", phone: "", keys: [32, 33], qty: 0, of: null }]);
@@ -228,11 +239,11 @@ test("서비스 키(앱): 저장 파일 s 로 따로 (w 아님) · 다시 켜도
     await page.click("#sheet .rall");
     await page.goto(DESK);
     await ready();
-    assert.strictEqual((await keyText(page, 45)).text, "45 서비스");
-    assert.strictEqual((await keyText(page, 44)).text, "44 서비스");
+    assert.strictEqual((await keyText(page, 45)).text, "45 김연결");
+    assert.strictEqual((await keyText(page, 44)).text, "44 이직원");
     assert.strictEqual((await keyText(page, ks[0])).text, String(ks[0]));
     await page.click('.key[data-k="45"]');
-    assert.match((await page.textContent("#sheet .facts")).replace(/\s+/g, " "), new RegExp(`연결 손님\\s*김연결님 ${ks.join(", ")}번 열쇠 · 네이버 예약 N1 먼저 반납 · 퇴장함`));
+    assert.match((await page.textContent("#sheet .facts")).replace(/\s+/g, " "), new RegExp(`수령인\\s*${ks.join(", ")}번 김연결님에게 추가 서비스 지급된 열쇠 원래 손님 먼저 반납 · 퇴장함`));
     await close(page);
     assert.strictEqual(await sold(page), sold0, "다시 켜도 판매수 그대로");
     assert.deepStrictEqual(errs, []);
