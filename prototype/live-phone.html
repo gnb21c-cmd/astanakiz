@@ -3,7 +3,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
 /* 키즈 실시간 — 보고 앱(B) '입장권 판매 총 수량' → 세부 화면 미리보기 (통합데스크 deskLive/now 를 읽음 · docs/LIVE.md)
-   한 손 폰 보기: 위 기준 시각 띠 → 오늘 입장(총 = 네이버 + 현장) → 입장료 매출 → 네이버 시간 칸 → 열쇠 45칸(누르면 손님 · 전화)
+   한 손 폰 보기: 위 기준 시각 띠 → 오늘 입장(총 = 네이버 + 현장) → 열쇠 45칸(누르면 손님 · 전화) → 입장료 매출 → 네이버 시간 칸 (사장님 10/16 순서)
    색 이름은 보고 앱 styles.css 와 같게 (밝은 / 어두운 화면) */
 :root {
   --page: #f6f6f3; --surface-1: #fdfdfc; --text-primary: #0b0b0b; --text-secondary: #52514e; --muted: #898781;
@@ -169,6 +169,17 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
         </div>
         <div class="note">서비스 키는 판매가 아니라 총 판매수에 안 들어가요${n.test ? ` · 시험 기록 ${n.test}장 뺌` : ""}</div>
       </section>
+      <section class="card" aria-labelledby="h-keys">
+        <h2 id="h-keys">열쇠 운용 <small>번호를 누르면 손님 · 전화</small></h2>
+        <div class="ksum"><span>사용 <b class="num">${k.used}</b>/${k.total}</span><span>빈 열쇠 <b class="num">${k.free}</b></span><span>현장 판매 가능 <b class="num">${k.walkable}</b>${k.flex ? ` +유동 ${k.flex}` : ""}</span></div>
+        <div class="keys">${Array.from({ length: k.total }, (_, i) => {
+          const no = i + 1, m = k.map[no];
+          if (!m) return `<button class="key num" type="button" disabled aria-label="${no}번 빈 열쇠">${no}</button>`;
+          const h = k.holders[m.h];
+          return `<button class="key num ${esc(m.c)}${h.kind === "s" ? " svc" : ""}" type="button" data-k="${no}" aria-label="${no}번 ${esc(KIND[h.kind])} ${esc(COLOR[m.c] || "")}">${no}</button>`;
+        }).join("")}</div>
+        <div class="legend"><span><i></i>빈 열쇠</span><span><i class="in"></i>이용 중</span><span><i class="pink"></i>반납 시간(10분 안)</span><span><i class="red"></i>반납 시간 넘음</span><span><i class="svc"></i>서비스 키</span></div>
+      </section>
       <section class="card" aria-labelledby="h-sales">
         <h2 id="h-sales">입장료 매출 <small>${esc(at)} 기준 · ${kind} 단가</small></h2>
         <div class="rows">
@@ -192,17 +203,6 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
         </table></div>
         ${n.slots.length > busy.length ? `<button class="more" type="button" id="more">${showAll ? "예약 있는 시간만 보기" : `모든 시간 보기 (${n.slots.length}칸)`}</button>` : ""}
         ${n.products.length > 1 ? `<div class="note">상품별 완료: ${n.products.map((x) => `${esc(x.name)} ${x.done}`).join(" · ")}</div>` : ""}
-      </section>
-      <section class="card" aria-labelledby="h-keys">
-        <h2 id="h-keys">열쇠 운용 <small>번호를 누르면 손님 · 전화</small></h2>
-        <div class="ksum"><span>사용 <b class="num">${k.used}</b>/${k.total}</span><span>빈 열쇠 <b class="num">${k.free}</b></span><span>현장 판매 가능 <b class="num">${k.walkable}</b>${k.flex ? ` +유동 ${k.flex}` : ""}</span></div>
-        <div class="keys">${Array.from({ length: k.total }, (_, i) => {
-          const no = i + 1, m = k.map[no];
-          if (!m) return `<button class="key num" type="button" disabled aria-label="${no}번 빈 열쇠">${no}</button>`;
-          const h = k.holders[m.h];
-          return `<button class="key num ${esc(m.c)}${h.kind === "s" ? " svc" : ""}" type="button" data-k="${no}" aria-label="${no}번 ${esc(KIND[h.kind])} ${esc(COLOR[m.c] || "")}">${no}</button>`;
-        }).join("")}</div>
-        <div class="legend"><span><i></i>빈 열쇠</span><span><i class="in"></i>이용 중</span><span><i class="pink"></i>반납 시간(10분 안)</span><span><i class="red"></i>반납 시간 넘음</span><span><i class="svc"></i>서비스 키</span></div>
       </section>
       <div class="demo">미리보기 · 통합데스크 체험판 예시 자료 (손님 이름 · 전화번호는 예시)</div>`;
     const more = $("more"); if (more) more.onclick = () => { showAll = !showAll; render(); };
