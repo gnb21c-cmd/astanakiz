@@ -232,6 +232,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 /* 80mm 감열지 미리보기 (인쇄 폭 약 72mm) */
 .paper { width: 288px; max-width: 100%; justify-self: center; background: #fff; color: #111; border-radius: 4px; padding: 14px 12px 22px; box-shadow: 0 1px 6px rgba(0,0,0,.25); font-family: ui-monospace, Consolas, "D2Coding", monospace; font-size: 13px; line-height: 1.45; max-height: 300px; overflow: auto; }
 .paper .pl { white-space: pre-wrap; overflow-wrap: anywhere; }
+.pl .tall, .pl.tall { display: inline-block; transform: scaleY(2); transform-origin: top; margin-bottom: 1.35em; } /* + 세로 2배 (미리보기) */
 .paper .ctr { text-align: center; }
 .paper .big { text-align: center; font-size: 20px; font-weight: 700; }
 .paper .mid { text-align: center; font-size: 16px; font-weight: 700; }
@@ -2016,7 +2017,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
               <span class="help">Windows '설정 → 프린터 및 스캐너'에 등록된 프린터</span>
               <div class="plist">${PRINT.found ? (PRINT.list.length ? PRINT.list.map((p) => `<button class="${PRINT.sel === p.name ? "on" : ""}" data-act="pickPrinter" data-n="${esc(p.name)}" aria-pressed="${PRINT.sel === p.name}">${esc(p.name)}${p.isDefault ? " (기본)" : ""}${PRINT.sel === p.name ? " · 사용 중" : ""}</button>`).join("") : `<span class="help" style="color:var(--red)">Windows에 설치된 프린터가 없어요</span>`) : PRINT.sel ? `<span class="help">사용 중: <b>${esc(PRINT.sel)}</b> (다시 찾으려면 '프린터 찾기')</span>` : `<span class="help">아직 찾지 않았어요</span>`}</div>
               <div class="btns"><button class="btn btn-sm" data-act="findPrinters">프린터 찾기</button><button class="btn btn-sm" data-act="testPrint" ${PRINT.sel && !PRINT.busy ? "" : "disabled"}>테스트 출력</button><button class="btn btn-sm" data-act="testPrintDlg" ${PRINT.sel && !PRINT.busy && APP ? "" : "disabled"}>인쇄 창으로 출력</button></div>`}
-              <label class="chk"><input type="checkbox" id="print-cut" ${PRINT.cut ? "checked" : ""}> 출력 끝나면 종이 자르기 <span class="help">(두 번 잘리면 끄세요)</span></label>
+              <div class="btns" style="align-items:center;flex-wrap:nowrap"><label class="chk" title="프린터가 스스로 자르면 꺼 주세요 (두 번 잘림)"><input type="checkbox" id="print-cut" ${PRINT.cut ? "checked" : ""}> 출력 끝나면 종이 자르기</label><label class="evp" for="print-feed" title="다 찍은 뒤 자르기 전에 종이를 올리는 양 — 줄이면 영수증 아래 빈칸이 줄어요. 너무 줄이면 끝줄이 잘려요 (테스트 출력으로 확인). 위 빈칸은 프린터 안 칼 ~ 인쇄 위치 거리라 못 줄여요"><span>· 여백</span><input id="print-feed" class="evpn num" type="number" min="1" max="8" value="${PRINT.feed}" aria-label="자르기 전 여백 (줄)">줄</label><span class="help" id="print-feed-mm">${feedHelp()}</span></div>
               <div class="btns" style="align-items:center"><span class="help"><b>현금통 단자</b> (환전 오픈)</span>${[["auto", "자동 (2번 → 5번)"], ["2", "2번"], ["5", "5번"]].map(([v, t]) => `<button class="btn btn-sm ${PRINT.drawerPin === v ? "btn-ink" : ""}" data-act="drawerPin" data-v="${v}" aria-pressed="${PRINT.drawerPin === v}">${t}</button>`).join("")}<button class="btn btn-sm" data-act="drawer">현금통 열어 보기</button></div>
               <span class="help">2번 · 5번을 하나씩 골라 '열어 보기' → 열리는 쪽으로 두면 더 빨리 열려요</span>
               ${PRINT.msg ? `<span class="help">${esc(PRINT.msg)}</span>` : ""}</div>
@@ -2040,7 +2041,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
      양식 문법: 줄 앞 # 크게 가운데 · ^ 가운데 · --- 구분선 · [네이버] 네이버 예약만 · [현장] 현장입장만 · [사은권] 사은권 받는 회차만 */
   const PRINT_KEYS = ["구분", "고객", "전화뒤4", "열쇠", "입장시간", "퇴장시간", "누계", "기준회", "사은권", "날짜", "시각", "시작일", "종료일", "기한일수", "사은품", "다음기한", "지난방문"];
   /** 양식 쓰는 법 — 입장권 양식과 방문 이벤트 안내가 똑같음 (서로의 값 · 줄 표시 · 조건을 다 씀 · 사장님 10/14) */
-  const formHelp = () => `<span class="help formhelp">넣을 수 있는 값: ${PRINT_KEYS.map((k) => `{${k}}`).join(" ")} ({누계} = 마일리지)<br>줄 앞: <b>#</b> 2배 · <b>##</b> 3배 · <b>###</b> 4배 (가운데) · <b>^</b> 가운데 · <b>*</b> 굵게 (붙여 씀 <b>#*</b> <b>^*</b>) · <b>---</b> 구분선 · <b>===</b> 이중선<br>조건(줄 맨 앞): <b>[네이버]</b> 네이버 예약만 · <b>[현장]</b> 현장입장만 · <b>[사은권]</b> 사은권 회차만 · <b>[이벤트]</b> 이벤트 손님만 · <b>[기한]</b> 다음 기한이 있을 때만<br><b>[자르기]</b> 한 줄 = 그 자리에서 종이 자름 (쿠폰 떼기 · 예 <b>[이벤트][자르기]</b>)<br><b>[이벤트]</b> 한 줄 = 이벤트 안내(1번 · 2번) 자리 (없으면 <b>[네이버] · [사은권]</b> 줄 자리) · <b>[사은품]</b> 한 줄 = 2번 성공일 때 제공상품 자리</span>`;
+  const formHelp = () => `<span class="help formhelp">넣을 수 있는 값: ${PRINT_KEYS.map((k) => `{${k}}`).join(" ")}<br>줄 앞: <b>#</b> 2배 · <b>##</b> 3배 (가운데) · <b>+</b> 세로 2배(중간) · <b>^</b> 가운데 · <b>*</b> 굵게 (붙여 씀 <b>^+*</b>) · <b>---</b> <b>===</b> 줄<br>조건(줄 맨 앞): <b>[네이버]</b> 네이버 예약만 · <b>[현장]</b> 현장입장만 · <b>[사은권]</b> 사은권 회차만 · <b>[이벤트]</b> 이벤트 손님만 · <b>[기한]</b> 다음 기한이 있을 때만<br><b>[자르기]</b> 한 줄 = 그 자리에서 종이 자름 (쿠폰 떼기 · 예 <b>[이벤트][자르기]</b>)<br><b>[이벤트]</b> 한 줄 = 이벤트 안내(1번 · 2번) 자리 (없으면 <b>[네이버] · [사은권]</b> 줄 자리) · <b>[사은품]</b> 한 줄 = 2번 성공일 때 제공상품 자리</span>`;
   const SAMPLE_NAVER = { 구분: "네이버", 고객: "송*온", 전화뒤4: "5489", 열쇠: "3, 13", 입장시간: "오후 2시 00분", 퇴장시간: "오후 3시 50분", 누계: "8", 기준회: "10", 사은권: "2만원 사은권", 날짜: "2026-10-06", 시각: "13:55", _네이버: true, _현장: false, _사은권: false };
   const SAMPLE_WALK = { 구분: "현장", 고객: "   ", 전화뒤4: "9013", 열쇠: "30", 입장시간: "오후 12시 30분", 퇴장시간: "오후 2시 20분", 누계: "", 기준회: "10", 사은권: "2만원 사은권", 날짜: "2026-10-06", 시각: "12:40", _네이버: false, _현장: true, _사은권: false };
   let SAMPLE = SAMPLE_NAVER; // 미리보기 · 테스트 출력 예시 (네이버 / 현장)
@@ -2087,6 +2088,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   ].join("\n");
   const PRINT = {
     found: false, sel: null, cur: "enter", busy: false, msg: "", cut: true, // cut: 출력 끝나면 종이 자르기 (ESC/POS)
+    feed: 4, // 자르기 전 여백(줄) — 다 찍은 뒤 종이를 올리는 양 (1줄 ≈ 4.2mm · 처음 4줄 · 사장님 10/16 줄일 수 있게)
     // 연결 방식: com = POS 영수증 프린터에 COM 포트로 바로(OKPOS OK-50 등, 기본) · win = Windows 에 등록된 프린터
     mode: "com", port: null, baud: 115200, ports: [], portsFound: false,
     drawerPin: "auto", // 현금통 단자: auto = 2번 → 5번 차례로 · "2" · "5" (열리는 쪽 하나만 고르면 더 빠름 · 10/9)
@@ -2098,6 +2100,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (c && c.printer) PRINT.sel = c.printer;
     if (c && c.printForm) { Object.assign(PRINT.forms.enter, c.printForm); if (c.printForm.ver !== ENTER_FORM_VER) PRINT.forms.enter.text = ENTER_FORM; }
     if (c && c.printCut === false) PRINT.cut = false;
+    if (c && c.printFeed >= 1 && c.printFeed <= 8) PRINT.feed = Math.round(c.printFeed);
     if (c && c.printMode) PRINT.mode = c.printMode;
     if (c && c.comPort) PRINT.port = c.comPort;
     if (c && c.comBaud) PRINT.baud = c.comBaud;
@@ -2112,7 +2115,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c && Array.isArray(c.peaks) && c.peaks.length) { RULES.peaks = c.peaks; renderAll(); } if (c && c.capAuto) Object.assign(RULES.capAuto, c.capAuto); if (c && c.unpaidCancel) Object.assign(RULES.unpaidCancel, c.unpaidCancel); }).catch(() => {});
   else try { const v = JSON.parse(localStorage.getItem("astanakiz-peaks")); if (Array.isArray(v) && v.length) RULES.peaks = v; } catch (e) { /* 없음 */ }
   if (!APP) try { const v = JSON.parse(localStorage.getItem("astanakiz-capauto")); if (v) Object.assign(RULES.capAuto, v); } catch (e) { /* 없음 */ }
-  const savePrint = () => { if (APP && window.desk.config) window.desk.config.set({ printer: PRINT.sel, printCut: PRINT.cut, printMode: PRINT.mode, comPort: PRINT.port, comBaud: PRINT.baud, drawerPin: PRINT.drawerPin, printForm: { text: PRINT.forms.enter.text, auto: PRINT.forms.enter.auto, ver: ENTER_FORM_VER } }); };
+  const feedHelp = () => `약 ${Math.round(PRINT.feed * 4.2)}mm${PRINT.feed === 4 ? " (처음)" : ""}`; // 자르기 전 여백 (1줄 ≈ 4.2mm)
+  const savePrint = () => { if (APP && window.desk.config) window.desk.config.set({ printer: PRINT.sel, printCut: PRINT.cut, printFeed: PRINT.feed, printMode: PRINT.mode, comPort: PRINT.port, comBaud: PRINT.baud, drawerPin: PRINT.drawerPin, printForm: { text: PRINT.forms.enter.text, auto: PRINT.forms.enter.auto, ver: ENTER_FORM_VER } }); };
   // 영수증 프린터처럼 보이는 이름 (처음 찾을 때 자동으로 고름)
   const RECEIPT_RE = /pos|receipt|영수증|감열|thermal|80|srp|bixolon|빅솔론|sewoo|세우|lk-|tm-|epson|rongta|xprinter|hwasung|화성|hmk|star|citizen|okpos/i;
 
@@ -2135,36 +2139,38 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       if (l.trim() === "===") { out.push({ k: "hr2", t: "", ev: evl }); continue; }
       // 줄 앞 표시 (붙여 씀, 뒤에 띄어쓰기 하나는 없어도 됨):
       //   # 개수 = 크기 배수 (# 2배 · ## 3배 · ### 4배, 가운데) · ^ 가운데 · * 굵게   예) "#* 제목" = 2배 굵게, "^* 안내" = 가운데 굵게
-      const m = /^([#^*]+) ?/.exec(l);
+      //   + = 세로 2배 (중간 크기 · 폭은 그대로라 한 줄 42칸 그대로 · 사장님 10/16 — 영수증 프린터는 정수 배만 돼서 1.5배는 없음)  예) "^+* 안내"
+      const m = /^([#^*+]+) ?/.exec(l);
       const marks = m ? m[1] : "";
       if (m) l = l.slice(m[0].length);
       const size = Math.min(8, 1 + (marks.match(/#/g) || []).length);
       const ctr = size > 1 || marks.includes("^");
-      out.push({ k: size > 1 ? "big" : ctr ? "ctr" : "txt", size, t: fill(l), bold: marks.includes("*"), ev: evl });
+      const tall = size === 1 && marks.includes("+");
+      out.push({ k: size > 1 ? "big" : ctr ? "ctr" : "txt", size, t: fill(l), bold: marks.includes("*"), ev: evl, ...(tall ? { tall: true } : {}) });
     }
     return out;
   }
   function paperLines(text, v) { return linesHtml(receiptLines(text, v)); }
   function linesHtml(lines) {
     // 크기는 실제 출력 비율대로 (보통 1배 ≈ 8.5pt, n배 ≈ 8.5pt × n) · 자르는 자리는 미리보기에만 '✂ 여기서 자름'
-    return lines.map((x) => x.k === "cut" ? `<div class="pl cutl${x.ev ? " evl" : ""}">✂ 여기서 자름</div>` : x.k === "hr" || x.k === "hr2" ? `<div class="pl ${x.k === "hr2" ? "hr hr2" : "hr"}${x.ev ? " evl" : ""}"></div>` : `<div class="pl ${x.k === "txt" ? "" : x.k === "big" ? "ctr" : x.k}${x.bold ? " bd" : ""}${x.ev ? " evl" : ""}"${x.size > 1 ? ` style="font-size:${(x.size * 8.5).toFixed(1)}pt;line-height:1.2"` : ""}>${esc(x.t) || "&nbsp;"}</div>`).join("");
+    return lines.map((x) => x.k === "cut" ? `<div class="pl cutl${x.ev ? " evl" : ""}">✂ 여기서 자름</div>` : x.k === "hr" || x.k === "hr2" ? `<div class="pl ${x.k === "hr2" ? "hr hr2" : "hr"}${x.ev ? " evl" : ""}"></div>` : `<div class="pl ${x.k === "txt" ? "" : x.k === "big" ? "ctr" : x.k}${x.bold ? " bd" : ""}${x.ev ? " evl" : ""}"${x.size > 1 ? ` style="font-size:${(x.size * 8.5).toFixed(1)}pt;line-height:1.2"` : ""}>${x.tall ? `<span class="tall">${esc(x.t) || "&nbsp;"}</span>` : esc(x.t) || "&nbsp;"}</div>`).join("");
   }
   /** POS 영수증 프린터(ESC/POS)로 바로 보낼 조각: { b: [바이트] } 명령 · { t: "글" } 한글(CP949) — 80mm 글꼴 A 48칸 */
   const LINE_COLS = 42; // OK-50 한 줄 칸 수 (현장 출력으로 확인 10/6 — 48칸이면 넘침)
   function escposParts(text, v, cut) {
     const P = [{ b: [0x1b, 0x40] }, { b: [0x1c, 0x26] }]; // 초기화 · 한글 모드
     for (const x of receiptLines(text, v)) {
-      if (x.k === "cut") { P.push({ b: [0x1b, 0x61, 0, 0x1b, 0x64, 0x04, 0x1d, 0x56, 0x01] }); continue; } // [자르기]: 4줄 올리고 부분 자르기 (끝 자르기와 같은 명령)
+      if (x.k === "cut") { P.push({ b: [0x1b, 0x61, 0, 0x1b, 0x64, PRINT.feed, 0x1d, 0x56, 0x01] }); continue; } // [자르기]: 여백만큼 올리고 부분 자르기 (끝 자르기와 같은 명령)
       if (x.k === "hr" || x.k === "hr2") { P.push({ b: [0x1b, 0x61, 0] }, { t: (x.k === "hr2" ? "=" : "-").repeat(LINE_COLS) + "\n" }); continue; }
       P.push({ b: [0x1b, 0x61, x.k === "txt" ? 0 : 1] }); // 왼쪽 · 가운데
       // 크기: n배 → GS ! (가로 n-1 << 4 | 세로 n-1). 한글(FS !)은 2배까지만 → 2배 이상이면 한글도 2배 + GS ! 로 키움
       const n = x.size || 1;
-      const size = n > 1 ? [0x1d, 0x21, ((n - 1) << 4) | (n - 1), 0x1c, 0x21, 0x0c] : [];
+      const size = n > 1 ? [0x1d, 0x21, ((n - 1) << 4) | (n - 1), 0x1c, 0x21, 0x0c] : x.tall ? [0x1d, 0x21, 0x01, 0x1c, 0x21, 0x08] : []; // + = 세로 2배 (영문 GS ! 1 · 한글 FS ! 8)
       P.push({ b: [0x1b, 0x45, x.bold ? 1 : 0, ...size] });
       P.push({ t: x.t + "\n" });
       P.push({ b: [0x1b, 0x45, 0, 0x1d, 0x21, 0x00, 0x1c, 0x21, 0x00] });
     }
-    P.push({ b: [0x1b, 0x61, 0, 0x1b, 0x64, 0x04] }); // 4줄 올림
+    P.push({ b: [0x1b, 0x61, 0, 0x1b, 0x64, PRINT.feed] }); // 자르기 전 여백만큼 올림 (처음 4줄)
     if (cut) P.push({ b: [0x1d, 0x56, 0x01] }); // 부분 자르기
     return P;
   }
@@ -2179,8 +2185,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>
       @page { size: 80mm auto; margin: 0; }
       html, body { margin: 0; padding: 0; background: #fff; color: #000; }
-      body { width: 72mm; padding: 2mm 4mm 6mm; box-sizing: content-box; font-family: "GulimChe", "굴림체", "D2Coding", monospace; font-size: 10.5pt; line-height: 1.35; }
+      body { width: 72mm; padding: 2mm 4mm ${(PRINT.feed * 1.5).toFixed(1)}mm; box-sizing: content-box; font-family: "GulimChe", "굴림체", "D2Coding", monospace; font-size: 10.5pt; line-height: 1.35; }
       .pl { white-space: pre-wrap; overflow-wrap: anywhere; }
+      .tall { display: inline-block; transform: scaleY(2); transform-origin: top; margin-bottom: 1.35em; }
       .ctr { text-align: center; }
       .big { text-align: center; font-family: "Malgun Gothic", "맑은 고딕", sans-serif; font-size: 14pt; font-weight: 700; }
       .mid { text-align: center; font-family: "Malgun Gothic", "맑은 고딕", sans-serif; font-size: 12pt; font-weight: 700; }
@@ -2195,11 +2202,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (PRINT.mode === "com") return window.desk.print.escpos({ port: PRINT.port, baud: PRINT.baud, parts: escposParts(text, v, PRINT.cut) });
     // Windows 프린터: [자르기] 자리마다 조각을 차례로 출력하고 자름 (인쇄 창으로 확인할 때는 하나로)
     const docs = receiptDocs(text, v, !!opts.dialog);
-    if (docs.length === 1) return window.desk.print.html({ html: docs[0], deviceName: PRINT.sel, silent: !opts.dialog, cut: PRINT.cut && !opts.dialog });
+    if (docs.length === 1) return window.desk.print.html({ html: docs[0], deviceName: PRINT.sel, silent: !opts.dialog, cut: PRINT.cut && !opts.dialog, feed: PRINT.feed });
     return (async () => {
       for (let i = 0; i < docs.length; i++) {
         const last = i === docs.length - 1;
-        const r = await window.desk.print.html({ html: docs[i], deviceName: PRINT.sel, silent: true, cut: last ? PRINT.cut : true, minMm: 10 });
+        const r = await window.desk.print.html({ html: docs[i], deviceName: PRINT.sel, silent: true, cut: last ? PRINT.cut : true, minMm: 10, feed: PRINT.feed });
         if (!r || !r.ok || (!last && r.cutWhy)) return r && r.ok ? { ok: true, cutWhy: r.cutWhy } : r;
       }
       return { ok: true };
@@ -3127,6 +3134,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     if (t.id === "ev-text") { if (EV.cur === EV_BASE) EV.form = t.value; else EV.tpl[EV.cur] = t.value; $("ev-paper").innerHTML = evPrev(); if (EV.cur !== EV_BASE) evScroll("ev-paper"); $("ev-def").innerHTML = evDefText(); evSaveCfg(); }
     if (t.id === "form-auto") { PRINT.forms[PRINT.cur].auto = t.checked; savePrint(); }
     if (t.id === "print-cut") { PRINT.cut = t.checked; savePrint(); }
+    if (t.id === "print-feed" && t.value !== "") { PRINT.feed = Math.max(1, Math.min(8, Math.round(Number(t.value)) || 4)); savePrint(); $("print-feed-mm").textContent = feedHelp(); }
     if (t.id === "cap-t-day" && t.value) capTry.day = t.value;
     if (t.id === "cap-t-time") capTry.time = t.value;
     if (t.id === "cap-t-n" && t.value !== "") capTry.n = Math.max(0, Number(t.value) || 0);

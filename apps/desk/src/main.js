@@ -965,7 +965,7 @@ const CUT = [0x1b, 0x64, 0x03, 0x1d, 0x56, 0x01];
 ipcMain.handle("print:cut", (_e, deviceName) => rawSend(deviceName, CUT));
 
 // 영수증 HTML 을 그 프린터로 출력. silent=false 면 Windows 인쇄 창을 띄움 (드라이버 확인용)
-ipcMain.handle("print:html", async (_e, { html, deviceName, silent = true, widthMm = 80, cut = true, minMm = 50 }) => {
+ipcMain.handle("print:html", async (_e, { html, deviceName, silent = true, widthMm = 80, cut = true, minMm = 50, feed = 4 }) => {
   let w = null;
   try {
     const file = path.join(app.getPath("temp"), "astanakiz-receipt.html");
@@ -974,7 +974,9 @@ ipcMain.handle("print:html", async (_e, { html, deviceName, silent = true, width
     await w.loadFile(file);
     const hpx = await w.webContents.executeJavaScript("Math.ceil(document.documentElement.scrollHeight)");
     // 감열지는 길이가 정해져 있지 않음 → 내용 높이만큼 (+여백 10mm) · [자르기] 로 나눈 조각은 짧아도 됨(minMm)
-    const heightMicrons = Math.max(Math.max(10, Number(minMm) || 50) * 1000, Math.ceil((hpx / 96) * 25400) + 10000);
+    // 자르기 전 여백(feed 줄, 처음 4줄 = +10mm · 줄이면 그만큼 짧게 · 10/16)
+    const lines = Math.max(1, Math.min(8, Math.round(Number(feed)) || 4));
+    const heightMicrons = Math.max(Math.max(10, Number(minMm) || 50) * 1000, Math.ceil((hpx / 96) * 25400) + lines * 2500);
     const res = await new Promise((resolve) =>
       w.webContents.print(
         { silent, deviceName: deviceName || undefined, printBackground: true, margins: { marginType: "none" }, pageSize: { width: widthMm * 1000, height: heightMicrons } },
@@ -983,7 +985,7 @@ ipcMain.handle("print:html", async (_e, { html, deviceName, silent = true, width
     );
     // 출력이 끝나면 종이 자르기 (인쇄 대기열에서 출력 다음 차례로 들어감)
     if (res.ok && cut && deviceName) {
-      const c = await rawSend(deviceName, CUT);
+      const c = await rawSend(deviceName, [0x1b, 0x64, Math.max(0, lines - 1), 0x1d, 0x56, 0x01]); // 처음 4줄이면 CUT 과 같음 (3줄 올리고 자름)
       if (!c.ok) return { ok: true, cutWhy: c.why };
     }
     return res;

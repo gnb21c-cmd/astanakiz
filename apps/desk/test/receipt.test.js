@@ -121,3 +121,65 @@ test("[자르기]: 양식 한 줄로 그 자리에서 종이를 자름 (쿠폰 �
     await browser.close();
   }
 });
+
+test("자르기 전 여백(줄): 처음 4줄 · 프린터 탭에서 줄이면 끝 · [자르기] · Windows 프린터 모두 그만큼 (10/16)", async () => {
+  const browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK);
+    const run = () => page.evaluate(async () => {
+      const T = window.__deskTest, h = T.holders().find((x) => !x.walk), v = T.keyVals(h), f = "^위\n[자르기]\n^아래";
+      const flat = T.escposParts(f, v, true).flatMap((p) => (p.b ? p.b : []));
+      const feeds = []; for (let i = 0; i < flat.length - 2; i++) if (flat[i] === 0x1b && flat[i + 1] === 0x64) feeds.push(flat[i + 2]);
+      const calls = [];
+      window.desk = { print: { html: async (j) => { calls.push(j.feed); return { ok: true }; } } };
+      const mode = T.PRINT.mode; Object.assign(T.PRINT, { mode: "win", sel: "POS-80" });
+      await T.sendPrint(f, v); T.PRINT.mode = mode; delete window.desk;
+      return { feeds, calls, pad: /padding: 2mm 4mm ([\d.]+)mm/.exec(T.receiptDocs("^위", v)[0])[1] };
+    });
+    assert.deepStrictEqual(await run(), { feeds: [4, 4], calls: [4, 4], pad: "6.0" }, "처음 4줄 (예전과 같음)");
+    await page.click("text=운영 설정");
+    await page.click('[data-t="printer"]');
+    assert.strictEqual(await page.inputValue("#print-feed"), "4");
+    await page.fill("#print-feed", "2");
+    assert.match(await page.textContent("#print-feed-mm"), /약 8mm/);
+    assert.deepStrictEqual(await run(), { feeds: [2, 2], calls: [2, 2], pad: "3.0" }, "줄이면 [자르기] · 끝 · Windows 모두");
+    await page.fill("#print-feed", "99");
+    assert.strictEqual(await page.evaluate(() => window.__deskTest.PRINT.feed), 8, "1 ~ 8줄");
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("+ = 세로 2배 (기본과 2배 사이 중간 크기 · 폭 그대로 42칸) — ESC/POS GS ! 1 · FS ! 8 · 미리보기 (10/16)", async () => {
+  const browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK);
+    const r = await page.evaluate(() => {
+      const T = window.__deskTest, h = T.holders().find((x) => !x.walk), v = T.keyVals(h), f = "^+* 중간 크기\n# 두 배\n^보통";
+      const L = T.receiptLines(f, v).map((l) => [l.k, l.size, !!l.tall, !!l.bold, l.t]);
+      const parts = T.escposParts(f, v, false);
+      const before = (txt) => { const i = parts.findIndex((p) => p.t && p.t.startsWith(txt)); return parts[i - 1].b; };
+      return { L, mid: before("중간 크기"), big: before("두 배"), plain: before("보통") };
+    });
+    assert.deepStrictEqual(r.L, [["ctr", 1, true, true, "중간 크기"], ["big", 2, false, false, "두 배"], ["ctr", 1, false, false, "보통"]]);
+    assert.deepStrictEqual(r.mid, [0x1b, 0x45, 1, 0x1d, 0x21, 0x01, 0x1c, 0x21, 0x08], "굵게 + 세로 2배 (영문 · 한글)");
+    assert.deepStrictEqual(r.big, [0x1b, 0x45, 0, 0x1d, 0x21, 0x11, 0x1c, 0x21, 0x0c], "2배는 그대로");
+    assert.deepStrictEqual(r.plain, [0x1b, 0x45, 0], "보통은 그대로");
+    await page.click("text=운영 설정");
+    await page.click('[data-t="printer"]');
+    await page.fill("#form-text", "^+* 중간 크기\n^보통");
+    const hgt = await page.$$eval("#paper .pl", (e) => e.map((x) => x.getBoundingClientRect().height));
+    assert.ok(hgt[0] > hgt[1] * 1.6, `미리보기도 세로로 커짐 ${hgt}`);
+    assert.match(await page.textContent("#sheet .formhelp"), /\+ 세로 2배\(중간\)/);
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
