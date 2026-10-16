@@ -32,12 +32,18 @@ test("맨 위: 통합 데스크 · 포스 전환 · 환전 오픈(현금통 열�
     const line = await page.$$eval("#slots .slot.unl", (e) => e.map((x) => ({ t: x.dataset.s, bg: getComputedStyle(x, "::before").backgroundColor })));
     assert.deepStrictEqual(line.map((x) => x.t), ["1080"], "18:00 줄 위에만");
     assert.notStrictEqual(line[0].bg, "rgba(0, 0, 0, 0)");
-    // 예약 수량 2장 이상이면 숫자만 빨강 (10/9)
+    // 예약 수량 2장 이상이면 숫자만 표시 (10/9 빨강 글씨 → 10/16 미입장 스티커처럼 노랑 네모 · 흰 글씨)
     await page.click('.slot[data-s="840"]');
-    const q = await page.evaluate(() => [...document.querySelectorAll("#res .res")].map((c) => ({ name: c.querySelector(".name").firstChild.textContent.trim(), red: (c.querySelector(".qmany") || {}).textContent || "" })));
-    assert.strictEqual(q.find((x) => x.name === "류하린").red, "2", "2장 → 빨강");
-    assert.strictEqual(q.find((x) => x.name === "고은우").red, "", "1장 → 그대로");
-    assert.strictEqual(await page.$eval(".qmany", (e) => getComputedStyle(e).color), await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--red").trim()).then((v) => page.evaluate((c) => { const d = document.createElement("i"); d.style.color = c; document.body.appendChild(d); const r = getComputedStyle(d).color; d.remove(); return r; }, v)));
+    const q = await page.evaluate(() => [...document.querySelectorAll("#res .res")].map((c) => ({ name: c.querySelector(".name").firstChild.textContent.trim(), many: (c.querySelector(".qmany") || {}).textContent || "" })));
+    assert.strictEqual(q.find((x) => x.name === "류하린").many, "2", "2장 → 노랑 네모");
+    assert.strictEqual(q.find((x) => x.name === "고은우").many, "", "1장 → 그대로");
+    const asColor = (prop, v) => page.evaluate(([p, c]) => { const d = document.createElement("i"); d.style[p] = c; document.body.appendChild(d); const r = getComputedStyle(d)[p]; d.remove(); return r; }, [prop, v]);
+    const yellow = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--yellow").trim());
+    assert.ok(yellow, "--yellow 색");
+    const st = await page.$eval(".qmany", (e) => { const c = getComputedStyle(e); return { bg: c.backgroundColor, color: c.color, radius: c.borderRadius }; });
+    assert.strictEqual(st.bg, await asColor("backgroundColor", yellow), "노랑 네모");
+    assert.strictEqual(st.color, "rgb(255, 255, 255)", "흰 글씨");
+    assert.notStrictEqual(st.radius, "0px", "미입장 스티커처럼 둥근 네모");
 
     // 설치한 앱: 운영 설정의 프린터(COM3)로 현금통 열기
     await page.addInitScript(() => {
