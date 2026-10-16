@@ -236,6 +236,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 /* 80mm 감열지 미리보기 (인쇄 폭 약 72mm) */
 .paper { width: 288px; max-width: 100%; justify-self: center; background: #fff; color: #111; border-radius: 4px; padding: 14px 12px 22px; box-shadow: 0 1px 6px rgba(0,0,0,.25); font-family: ui-monospace, Consolas, "D2Coding", monospace; font-size: 13px; line-height: 1.45; max-height: 300px; overflow: auto; }
 .paper .pl { white-space: pre-wrap; overflow-wrap: anywhere; }
+.paper .seal img { display: block; width: 100%; image-rendering: pixelated; margin: 2px 0; } /* 쿠폰 보안 무늬 (찍히는 그대로) */
 .pl .tall, .pl.tall { display: inline-block; transform: scaleY(2); transform-origin: top; margin-bottom: 1.35em; } /* + 세로 2배 (미리보기) */
 .paper .ctr { text-align: center; }
 .paper .big { text-align: center; font-size: 20px; font-weight: 700; }
@@ -1976,7 +1977,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
             <div class="field evtpl"><span class="label">양식 <span class="help">손님 기록으로 안내 · 성공이 자동으로 골라짐</span></span>
               <div class="evrules">${evRow(EV_BASE)}${EV_NAMES.map((t, j) => evRow(j)).join("")}</div>
               <textarea id="ev-text" spellcheck="false" aria-label="${evName(i)} 문구">${esc(i === EV_BASE ? evBaseForm() : EV.tpl[i])}</textarea>
-              <div class="btns" style="align-items:center"><button class="btn btn-sm" data-act="evReset">${i === EV_BASE ? "원래 양식으로" : "예시 문구로"}</button><button class="btn btn-sm" data-act="evTest">${ro(evName(i))} 시험 출력</button></div>
+              <div class="btns" style="align-items:center"><button class="btn btn-sm" data-act="evReset">${i === EV_BASE ? "원래 양식으로" : "예시 문구로"}</button><button class="btn btn-sm" data-act="evTest">${ro(evName(i))} 시험 출력</button><label class="chk" title="제공상품(쿠폰)을 매장만 찍을 수 있는 무늬 그림으로 — 프린터가 그림을 못 찍으면 끄세요"><input type="checkbox" id="ev-seal" ${EV.seal ? "checked" : ""}> 쿠폰 보안 무늬</label></div>
               <span class="help" id="ev-def">${evDefText()}</span></div>
             <div class="field"><span class="label">미리보기 <span class="help">${i === EV_BASE ? "공통 양식 + 1번 안내" : EV_NAMES[i]} · 예시 값 · 칠한 줄이 이벤트 안내</span></span><div class="paper" id="ev-paper">${evPrev()}</div>${formHelp()}</div>
           </div>
@@ -2213,16 +2214,18 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     const out = [];
     for (let l of text.split("\n")) {
       const evl = l.startsWith("\u0001"); if (evl) l = l.slice(1);
+      const gl = l.startsWith("\u0002"); if (gl) l = l.slice(1); // 제공상품(쿠폰) 줄
       // [네이버] · [현장] · [사은권] · [이벤트] · [기한] 조건 (여러 개 붙여도 됨)
       let skip = false;
       l = l.replace(/^(\[(네이버|현장|사은권|이벤트|기한)\])+/, (m) => { for (const [, k] of m.matchAll(/\[(네이버|현장|사은권|이벤트|기한)\]/g)) if (!v["_" + k]) skip = true; return ""; });
       if (skip) continue;
       // [자르기] 한 줄 = 그 자리에서 종이를 자름 (쿠폰처럼 떼어 주기 · 사장님 10/15) — 조건과 같이: [이벤트][자르기]
       if (l.trim() === "[자르기]") { out.push({ k: "cut", t: "", ev: evl }); continue; }
+      const gf = gl ? { gift: true } : {};
       // 값이 비어 있는 칸이 든 줄은 뺌
       if ([...l.matchAll(/\{([^}]+)\}/g)].some(([, k]) => k in v && v[k] === "")) continue;
-      if (l.trim() === "---") { out.push({ k: "hr", t: "", ev: evl }); continue; }
-      if (l.trim() === "===") { out.push({ k: "hr2", t: "", ev: evl }); continue; }
+      if (l.trim() === "---") { out.push({ k: "hr", t: "", ev: evl, ...gf }); continue; }
+      if (l.trim() === "===") { out.push({ k: "hr2", t: "", ev: evl, ...gf }); continue; }
       // 줄 앞 표시 (붙여 씀, 뒤에 띄어쓰기 하나는 없어도 됨):
       //   # 개수 = 크기 배수 (# 2배 · ## 3배 · ### 4배, 가운데) · ^ 가운데 · * 굵게   예) "#* 제목" = 2배 굵게, "^* 안내" = 가운데 굵게
       //   + = 세로 2배 (중간 크기 · 폭은 그대로라 한 줄 42칸 그대로 · 사장님 10/16 — 영수증 프린터는 정수 배만 돼서 1.5배는 없음)  예) "^+* 안내"
@@ -2232,20 +2235,109 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       const size = Math.min(8, 1 + (marks.match(/#/g) || []).length);
       const ctr = size > 1 || marks.includes("^");
       const tall = size === 1 && marks.includes("+");
-      out.push({ k: size > 1 ? "big" : ctr ? "ctr" : "txt", size, t: fill(l), bold: marks.includes("*"), ev: evl, ...(tall ? { tall: true } : {}) });
+      out.push({ k: size > 1 ? "big" : ctr ? "ctr" : "txt", size, t: fill(l), bold: marks.includes("*"), ev: evl, ...(tall ? { tall: true } : {}), ...gf });
     }
     return out;
   }
-  function paperLines(text, v) { return linesHtml(receiptLines(text, v)); }
+  function paperLines(text, v) { return linesHtml(withSeal(receiptLines(text, v), v)); }
   function linesHtml(lines) {
     // 크기는 실제 출력 비율대로 (보통 1배 ≈ 8.5pt, n배 ≈ 8.5pt × n) · 자르는 자리는 미리보기에만 '✂ 여기서 자름'
-    return lines.map((x) => x.k === "cut" ? `<div class="pl cutl${x.ev ? " evl" : ""}">✂ 여기서 자름</div>` : x.k === "hr" || x.k === "hr2" ? `<div class="pl ${x.k === "hr2" ? "hr hr2" : "hr"}${x.ev ? " evl" : ""}"></div>` : `<div class="pl ${x.k === "txt" ? "" : x.k === "big" ? "ctr" : x.k}${x.bold ? " bd" : ""}${x.ev ? " evl" : ""}"${x.size > 1 ? ` style="font-size:${(x.size * 8.5).toFixed(1)}pt;line-height:1.2"` : ""}>${x.tall ? `<span class="tall">${esc(x.t) || "&nbsp;"}</span>` : esc(x.t) || "&nbsp;"}</div>`).join("");
+    return lines.map((x) => x.k === "seal" ? `<div class="pl seal${x.ev ? " evl" : ""}"><img src="${sealOf(x).url}" alt="보안 무늬 쿠폰"></div>` : x.k === "cut" ? `<div class="pl cutl${x.ev ? " evl" : ""}">✂ 여기서 자름</div>` : x.k === "hr" || x.k === "hr2" ? `<div class="pl ${x.k === "hr2" ? "hr hr2" : "hr"}${x.ev ? " evl" : ""}"></div>` : `<div class="pl ${x.k === "txt" ? "" : x.k === "big" ? "ctr" : x.k}${x.bold ? " bd" : ""}${x.ev ? " evl" : ""}"${x.size > 1 ? ` style="font-size:${(x.size * 8.5).toFixed(1)}pt;line-height:1.2"` : ""}>${x.tall ? `<span class="tall">${esc(x.t) || "&nbsp;"}</span>` : esc(x.t) || "&nbsp;"}</div>`).join("");
+  }
+  /* ── 쿠폰 보안 무늬 (사장님 10/16) ──────────────────────
+     제공상품(쿠폰) 줄은 글자로 보내지 않고 데스크가 그린 그림(1비트 래스터)으로 찍음 → POS · 감열지 프린터에 글자만 쳐서는 똑같이 못 만듦
+     - 물결 무늬(겹친 사인 곡선): 매장 비밀값(SEAL.key, 이 PC 에만) + 날짜로 매일 모양이 달라짐 → 미리 만들어 둘 수 없음
+     - 위아래 작은 글씨 띠 "ASTANAKIDS·월일" 반복 (사진으로 베껴 다시 찍으면 뭉개짐)
+     - 내용은 제공상품 양식에 쓴 그대로 (데스크에서 고치면 그대로) — 도장 · 번호 · 시각은 넣지 않음 (사장님 10/16)
+     - 이벤트 탭 [쿠폰 보안 무늬] 를 끄면 예전처럼 글자로 (프린터가 그림을 못 찍을 때) */
+  const SEAL = { key: "" };
+  const sealNewKey = () => { const a = new Uint8Array(16); crypto.getRandomValues(a); return [...a].map((x) => x.toString(16).padStart(2, "0")).join(""); };
+  if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c && /^[0-9a-f]{32}$/.test(c.sealKey || "")) SEAL.key = c.sealKey; else { SEAL.key = sealNewKey(); window.desk.config.set({ sealKey: SEAL.key }); } sealCache.clear(); }).catch(() => {});
+  else { try { SEAL.key = localStorage.getItem("astanakiz-sealkey") || ""; } catch (e) { /* 없음 */ } if (!SEAL.key) { SEAL.key = sealNewKey(); try { localStorage.setItem("astanakiz-sealkey", SEAL.key); } catch (e) { /* 저장 못 해도 동작 */ } } }
+  const sealCache = new Map();
+  /** 줄 목록에서 이어진 쿠폰 줄을 보안 무늬 하나로 묶음 (자르기 줄은 그대로) */
+  function withSeal(lines, v) {
+    if (!EV.seal || !lines.some((x) => x.gift)) return lines;
+    const meta = { day: v && /^\d{4}-\d{2}-\d{2}$/.test(v.날짜 || "") ? v.날짜 : TODAY };
+    const out = [];
+    for (const x of lines) {
+      const last = out[out.length - 1];
+      if (x.gift && x.k !== "cut") { if (last && last.k === "seal") last.lines.push(x); else out.push({ k: "seal", lines: [x], meta, ev: true }); }
+      else out.push(x);
+    }
+    return out;
+  }
+  /** 날짜 + 비밀값 → 늘 같은 난수 (그날 무늬) */
+  function sealRand(seed) {
+    let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+    for (let i = 0; i < seed.length; i++) { const c = seed.charCodeAt(i); h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677); }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    let a = h1 >>> 0;
+    return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+  const SEAL_W = 576; // 80mm 감열지 인쇄 폭 72mm = 576점 (8점/mm)
+  /** 보안 무늬 쿠폰 그림 → { url(미리보기 · Windows), raster(ESC/POS 바이트) } */
+  function sealOf(x) {
+    const key = JSON.stringify([SEAL.key, x.meta, x.lines.map((l) => [l.k, l.t, l.size, l.bold, l.tall])]);
+    if (sealCache.has(key)) return sealCache.get(key);
+    const W = SEAL_W, R = sealRand(`${SEAL.key}|${x.meta.day}`);
+    const md = `${x.meta.day.slice(5, 7)}${x.meta.day.slice(8, 10)}`; // 띠 글씨의 월일
+    const FONT = `"Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans CJK KR", sans-serif`;
+    const lh = (l) => (l.k === "hr" || l.k === "hr2" ? 16 : Math.round(24 * (l.size || 1) * (l.tall ? 2 : 1) * 1.25));
+    const top = 30, textH = x.lines.reduce((a, l) => a + lh(l), 0), H = top + textH + 28;
+    const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    const g = cv.getContext("2d");
+    g.fillStyle = "#fff"; g.fillRect(0, 0, W, H); g.fillStyle = "#000"; g.strokeStyle = "#000";
+    // ① 물결 무늬 (그날 모양) — 두 갈래가 엇갈려 그물처럼
+    const fam = [0, 1].map(() => ({ len: 46 + R() * 54, amp: 3 + R() * 4, ph: R() * 6.283, tilt: (R() - 0.5) * 0.08 }));
+    g.lineWidth = 1;
+    for (const [fi, f] of fam.entries()) for (let y0 = 22 + fi * 7; y0 < H - 14; y0 += 14) {
+      g.beginPath();
+      for (let px = 8; px <= W - 8; px += 3) { const py = y0 + f.amp * Math.sin((px / f.len) * 6.283 + f.ph + y0 * 0.07) + (px - W / 2) * f.tilt; px === 8 ? g.moveTo(px, py) : g.lineTo(px, py); }
+      g.stroke();
+    }
+    // ② 테두리 + 작은 글씨 띠 (위 · 아래)
+    g.lineWidth = 2; g.strokeRect(3, 3, W - 6, H - 6); g.lineWidth = 1; g.strokeRect(7, 7, W - 14, H - 14);
+    const micro = (y) => { g.save(); g.fillStyle = "#fff"; g.fillRect(9, y - 9, W - 18, 12); g.fillStyle = "#000"; g.font = `bold 9px ${FONT}`; g.textBaseline = "alphabetic"; let t = ""; while (g.measureText(t).width < W - 22) t += `ASTANAKIDS·${md}·`; g.fillText(t, 11, y); g.restore(); };
+    micro(19); micro(H - 10);
+    // ③ 쿠폰 글자 (흰 테를 둘러 무늬 위에서도 또렷하게)
+    let y = top;
+    for (const l of x.lines) {
+      const h = lh(l);
+      if (l.k === "hr" || l.k === "hr2") { g.save(); g.lineWidth = l.k === "hr2" ? 3 : 2; g.setLineDash(l.k === "hr" ? [6, 4] : []); g.beginPath(); g.moveTo(20, y + h / 2); g.lineTo(W - 20, y + h / 2); g.stroke(); g.restore(); y += h; continue; }
+      let px = 24 * (l.size || 1);
+      g.font = `${l.bold ? "bold " : ""}${px}px ${FONT}`;
+      while (px > 12 && g.measureText(l.t).width > W - 40) { px -= 2; g.font = `${l.bold ? "bold " : ""}${px}px ${FONT}`; }
+      const ctr = l.k !== "txt", tx = ctr ? W / 2 : 22;
+      g.textAlign = ctr ? "center" : "left"; g.textBaseline = "middle";
+      g.save(); g.translate(0, y + h / 2); if (l.tall) g.scale(1, 2);
+      g.lineJoin = "round"; g.lineWidth = 9; g.strokeStyle = "#fff"; g.strokeText(l.t, tx, 0); g.fillStyle = "#000"; g.fillText(l.t, tx, 0);
+      g.lineWidth = 0.9; g.strokeStyle = "#000"; g.strokeText(l.t, tx, 0); // 감열지에서 글자가 가늘게 끊기지 않게 살짝 두껍게
+      g.restore(); y += h;
+    }
+    // ⑤ 1비트로 (감열지는 검정 · 흰색만) → 미리보기도 찍히는 그대로
+    const im = g.getImageData(0, 0, W, H), d = im.data, bpr = W / 8, bits = new Uint8Array(bpr * H);
+    for (let yy = 0; yy < H; yy++) for (let xx = 0; xx < W; xx++) {
+      const i = (yy * W + xx) * 4, black = d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11 < 150;
+      if (black) bits[yy * bpr + (xx >> 3)] |= 0x80 >> (xx & 7);
+      d[i] = d[i + 1] = d[i + 2] = black ? 0 : 255; d[i + 3] = 255;
+    }
+    g.putImageData(im, 0, 0);
+    // GS v 0 래스터 — 프린터 버퍼를 넘지 않게 128줄씩 나눠 보냄
+    const raster = [];
+    for (let y0 = 0; y0 < H; y0 += 128) { const hh = Math.min(128, H - y0); raster.push(0x1d, 0x76, 0x30, 0, bpr & 255, bpr >> 8, hh & 255, hh >> 8); for (let i = y0 * bpr; i < (y0 + hh) * bpr; i++) raster.push(bits[i]); }
+    let bin = ""; for (let i = 0; i < raster.length; i += 8192) bin += String.fromCharCode.apply(null, raster.slice(i, i + 8192));
+    const out = { url: cv.toDataURL("image/png"), raster, r64: btoa(bin), w: W, h: H };
+    if (sealCache.size > 40) sealCache.clear();
+    sealCache.set(key, out);
+    return out;
   }
   /** POS 영수증 프린터(ESC/POS)로 바로 보낼 조각: { b: [바이트] } 명령 · { t: "글" } 한글(CP949) — 80mm 글꼴 A 48칸 */
   const LINE_COLS = 42; // OK-50 한 줄 칸 수 (현장 출력으로 확인 10/6 — 48칸이면 넘침)
   function escposParts(text, v, cut) {
     const P = [{ b: [0x1b, 0x40] }, { b: [0x1c, 0x26] }]; // 초기화 · 한글 모드
-    for (const x of receiptLines(text, v)) {
+    for (const x of withSeal(receiptLines(text, v), v)) {
+      if (x.k === "seal") { P.push({ b: [0x1b, 0x61, 0] }, { r: sealOf(x).r64 }); continue; } // 쿠폰 = 보안 무늬 그림 (GS v 0 래스터, base64)
       if (x.k === "cut") { P.push({ b: [0x1b, 0x61, 0, 0x1b, 0x64, PRINT.feed, 0x1d, 0x56, 0x01] }); continue; } // [자르기]: 여백만큼 올리고 부분 자르기 (끝 자르기와 같은 명령)
       if (x.k === "hr" || x.k === "hr2") { P.push({ b: [0x1b, 0x61, 0] }, { t: (x.k === "hr2" ? "=" : "-").repeat(LINE_COLS) + "\n" }); continue; }
       P.push({ b: [0x1b, 0x61, x.k === "txt" ? 0 : 1] }); // 왼쪽 · 가운데
@@ -2265,7 +2357,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   function receiptDocs(text, v, whole) {
     const segs = [[]];
     for (const x of receiptLines(text, v)) if (x.k !== "cut") segs[segs.length - 1].push(x); else if (!whole) segs.push([]);
-    return segs.filter((g, i) => g.length || i === 0).map(receiptDoc);
+    return segs.filter((g, i) => g.length || i === 0).map((g) => receiptDoc(withSeal(g, v)));
   }
   function receiptDoc(lines) {
     return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>
@@ -2280,6 +2372,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       .bd { font-weight: 700; }
       .hr { border-top: 1px dashed #000; margin: 2mm 0; }
       .hr2 { border-top: 3px double #000; }
+      .seal img { display: block; width: 72mm; image-rendering: pixelated; }
     </style></head><body>${linesHtml(lines)}</body></html>`;
   }
   /** 양식대로 출력. 돌려주는 글은 알림에 붙임. 출력 결과는 따로 알림 */
@@ -2360,7 +2453,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
      [사은품] 한 줄 = 2번 성공일 때만 '제공상품'이 들어갈 자리 — 공통 양식에 있으면 거기, 없으면 2번 성공 안의 [사은품], 둘 다 없으면 2번 바로 뒤 */
   const EV_TPL1_OLD = "#* 재방문 이벤트 성공!\n^*[ {사은품} 무료 증정 ]\n^이 영수증을 보여 주세요\n^*{다음기한}(포함)까지 또 오시면\n[기한]^*{사은품} 또 드려요"; // 1.39~1.41 예시
   const EV_DAYS = 20, EV_GIFT = "수제돈까스";
-  const EV = { on: false, from: "", to: "", days: EV_DAYS, gift: EV_GIFT, tpl: EV_TPL.slice(), form: null, past: [], onAt: null, cur: 0, q: "" };
+  const EV = { on: false, from: "", to: "", days: EV_DAYS, gift: EV_GIFT, tpl: EV_TPL.slice(), form: null, past: [], onAt: null, cur: 0, q: "", seal: true };
   /* 공통 양식 (사장님 10/14): 이벤트 동안 입장권의 나머지(열쇠 · 시간 · 안내 문구 — 프린터 탭 원래 양식에서 오던 줄)도 이벤트 탭에서 고침
      null = 프린터 탭의 원래 입장권 양식 그대로 · 고치면 이벤트 기간 동안 모든 입장권(네이버 · 현장)이 이 양식 · 끝나면 원래 양식 */
   const EV_BASE = 9; // EV.cur 가 9 = 공통 양식을 고치는 중
@@ -2393,14 +2486,14 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   const evKey = (b) => digits(b.phone || "") || (b.name ? "이름:" + b.name : "");
   const EV_LS = "astanakiz-visitlog-"; // 체험판 · 파일 저장이 없을 때: 브라우저 저장소 (시작일마다)
   function evSaveCfg() {
-    const v = { ver: 2, on: EV.on, from: EV.from, to: EV.to, days: EV.days, gift: EV.gift, tpl: EV.tpl, form: EV.form, past: EV.past, onAt: EV.onAt };
+    const v = { ver: 2, on: EV.on, from: EV.from, to: EV.to, days: EV.days, gift: EV.gift, tpl: EV.tpl, form: EV.form, past: EV.past, onAt: EV.onAt, seal: EV.seal };
     if (APP && window.desk.config) window.desk.config.set({ visitEvent: v });
     else try { localStorage.setItem("astanakiz-visitevent", JSON.stringify(v)); } catch (e) { /* 저장 못 해도 동작 */ }
   }
   function evLoadCfg(v) {
     if (!v) return;
     EV.on = !!v.on; EV.from = isDay(v.from) ? v.from : ""; EV.to = isDay(v.to) ? v.to : "";
-    EV.days = evDays(v.days) || EV_DAYS; EV.gift = typeof v.gift === "string" ? v.gift : EV_GIFT;
+    EV.days = evDays(v.days) || EV_DAYS; EV.gift = typeof v.gift === "string" ? v.gift : EV_GIFT; EV.seal = v.seal !== false;
     EV.form = typeof v.form === "string" ? v.form : null;
     // 1.37 · 1.38 의 a~e · 양식별 조건 문구는 버리고 새 예시 문구 (공통 양식 · 시작일 · 장부는 그대로)
     if (v.ver === 2 && Array.isArray(v.tpl)) EV.tpl = EV_TPL.map((d, i) => (typeof v.tpl[i] === "string" && !(i === 1 && v.tpl[i] === EV_TPL1_OLD) ? v.tpl[i] : d)); // 예전 예시 그대로면 새 예시(제공상품 분리)로
@@ -2563,7 +2656,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     const ph = (l) => { const t = l.trim(); return t === "[이벤트]" || t === "{이벤트안내}"; }, gp = (l) => l.trim() === "[사은품]"; // 자리 표시 한 줄
     if (!v._이벤트 && !v._멈춤) return lines.filter((l) => !ph(l) && !gp(l)).join("\n");
     const mark = (t) => String(t || "").split("\n").map((l) => "\u0001" + l); // \u0001 = 이벤트 안내 줄 (미리보기에서 칠함)
-    const gift = v._이벤트 && v._성공 ? mark(v._제공상품) : [], old = /^(\[(네이버|사은권)\])+/;
+    const gift = v._이벤트 && v._성공 ? mark(v._제공상품).map((l) => "\u0001\u0002" + l.slice(1)) : [], old = /^(\[(네이버|사은권)\])+/; // \u0002 = 제공상품(쿠폰) 줄 → 보안 무늬로 찍음
     let giftPut = false;
     const putGift = () => { if (giftPut) return []; giftPut = true; return gift; };
     const baseGift = lines.some(gp); // 공통 양식에 [사은품] 이 있으면 그 자리가 먼저
@@ -2601,7 +2694,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   /** 설정 화면 미리보기 · 시험 출력용 예시 (0 = 안내 · 1 = 성공 · 2 = 제공상품 → 성공 예시로) */
   const evSample = (i) => {
     const ok = i >= 1, d = evSampleDay(), ev = { st: ok ? "성공" : "안내", due: EV.days ? evDue(d) : "", last: ok ? shiftDay(d, -Math.min(EV.days || 7, 7)) : "" };
-    return Object.assign({}, SAMPLE_NAVER, evVals(ev, true), { _사은권: false });
+    return Object.assign({}, SAMPLE_NAVER, evVals(ev, true), { _사은권: false, 날짜: TODAY, 시각: hm(now) });
   };
 
   // ── 설문조사 (사장님 10/14) ───────────────────────
@@ -3352,6 +3445,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     const t = e.target;
     if (t.id === "form-text") { PRINT.forms[PRINT.cur].text = t.value; $("paper").innerHTML = paperHtml(t.value, SAMPLE); savePrint(); }
     if (t.id === "ev-days" && t.value !== "") { EV.days = evDays(t.value) || EV.days; evSaveCfg(); $("ev-paper").innerHTML = evPrev(); evScroll("ev-paper"); $("ev-dates").textContent = evDatesText(); renderAll(); }
+    if (t.id === "ev-seal") { EV.seal = t.checked; evSaveCfg(); $("ev-paper").innerHTML = evPrev(); evScroll("ev-paper"); toast(t.checked ? "쿠폰을 보안 무늬 그림으로 찍어요 — [시험 출력]으로 확인해 보세요" : "쿠폰을 예전처럼 글자로 찍어요"); }
     if (t.id === "ev-gift") { EV.gift = t.value.trim(); evSaveCfg(); $("ev-paper").innerHTML = evPrev(); evScroll("ev-paper"); $("ev-dates").textContent = evDatesText(); }
     if (t.id === "sv-from" || t.id === "sv-to") { SV[t.id === "sv-from" ? "from" : "to"] = t.value; svSaveCfg(); renderSheet(); }
     if (t.id === "sv-send") { SV.send = t.checked; svSaveCfg(); toast(t.checked ? "설문 누적을 매일 20:00 보고앱에 보내요" : "설문 보고앱 보내기를 껐어요"); }
@@ -3427,7 +3521,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 
   // 시험용: 입장권을 만드는 함수들 (자동 시험이 실제 입장 손님으로 출력 내용을 확인)
   document.addEventListener("change", (e) => { if (/^cap-(target|max|ceil)$/.test(e.target.id)) renderSheet(); }); // 숫자를 다 넣으면 계획 다시
-  window.__deskTest = { liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capPlan, capRun, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => enterText(), holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, evOf: (b) => evOf(b),
+  window.__deskTest = { sealOf, withSeal, SEAL, evSample: (i) => evSample(i), sealClear: () => sealCache.clear(), EV_: () => EV, liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capPlan, capRun, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => enterText(), holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, evOf: (b) => evOf(b),
     evLog: (from) => { const L = evLog(from); return { from: L.from, count: L.count, people: Object.fromEntries([...L.people].map(([k, p]) => [k, JSON.parse(JSON.stringify(p))])) }; },
     // 장부에 지난 방문 한 줄 넣기: o = { day, n(네이버 순번, 기본 = 지금 완료 수), base, st("안내" | "성공"), due, from(장부 · 기본 지금 이벤트), no }
     evInject: (name, o = {}) => {

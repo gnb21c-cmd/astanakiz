@@ -835,19 +835,21 @@ function rawSend(printer, bytes) {
 // 조각 [{ b: [바이트] } | { t: "한글" }] 을 CP949 로 바꿔 COM 포트(또는 Windows 프린터 RAW)로 보냄. PowerShell · .NET 만 씀 (설치할 것 없음)
 const ESC_PS = `
 $ErrorActionPreference = "Stop"
-# 한글이 깨지지 않게 UTF-8 JSON 을 base64 로 받음
-$parts = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:ASTANA_JSON)) | ConvertFrom-Json
+# 한글이 깨지지 않게 UTF-8 JSON 을 base64 로 받음 — 표준 입력으로 (쿠폰 보안 무늬 그림이 커서 환경 변수 3만 2천 자를 넘을 수 있음 · 10/16)
+$b64 = if ($env:ASTANA_JSON) { $env:ASTANA_JSON } else { [Console]::In.ReadToEnd().Trim() }
+$parts = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($b64)) | ConvertFrom-Json
 $enc = [System.Text.Encoding]::GetEncoding(949)
 $ms = New-Object System.IO.MemoryStream
 foreach ($p in $parts) {
   if ($p.t -ne $null) { $bytes = $enc.GetBytes([string]$p.t); $ms.Write($bytes, 0, $bytes.Length) }
   elseif ($p.b -ne $null) { foreach ($x in $p.b) { $ms.WriteByte([byte]$x) } }
+  elseif ($p.r -ne $null) { $bytes = [Convert]::FromBase64String([string]$p.r); $ms.Write($bytes, 0, $bytes.Length) }
 }
 $data = $ms.ToArray()
 try {
   if ($env:ASTANA_MODE -eq "com") {
     $sp = New-Object System.IO.Ports.SerialPort $env:ASTANA_PORT, ([int]$env:ASTANA_BAUD), "None", 8, "One"
-    $sp.Handshake = "None"; $sp.DtrEnable = $true; $sp.RtsEnable = $true; $sp.WriteTimeout = 8000
+    $sp.Handshake = "None"; $sp.DtrEnable = $true; $sp.RtsEnable = $true; $sp.WriteTimeout = 90000 # 쿠폰 그림(교환권 한 장 약 2만 ~ 4만 바이트)은 9600bps 면 30초 넘게 걸림 (115200bps 는 3초쯤)
     $sp.Open(); $sp.Write($data, 0, $data.Length); Start-Sleep -Milliseconds 400; $sp.Close()
     [Console]::Out.Write("ok")
   } else {
@@ -884,7 +886,8 @@ foreach ($n in [System.IO.Ports.SerialPort]::GetPortNames()) { if (-not ($l -mat
   return { ok: true, list };
 });
 ipcMain.handle("print:escpos", async (_e, { port, baud, parts }) => {
-  const r = await psRun(ESC_PS, { ASTANA_MODE: "com", ASTANA_PORT: port, ASTANA_BAUD: String(baud || 115200), ASTANA_JSON: Buffer.from(JSON.stringify(parts), "utf8").toString("base64") });
+  // 조각: { t: 글 } 한글(CP949) · { b: [바이트] } 명령 · { r: base64 } 큰 날 바이트(쿠폰 보안 무늬 래스터) — 표준 입력으로 넘김
+  const r = await psRun(ESC_PS, { ASTANA_MODE: "com", ASTANA_PORT: port, ASTANA_BAUD: String(baud || 115200) }, Buffer.from(JSON.stringify(parts), "utf8").toString("base64"), 120000);
   return r === "ok" ? { ok: true } : { ok: false, why: r || "응답 없음" };
 });
 

@@ -494,6 +494,8 @@ test("재방문 이벤트는 방문한 날 기준: 성공 영수증을 받은 �
     assert.match(await page.textContent("#toast"), /이벤트 성공 — 수제돈까스 드리세요/);
     // 영수증을 받은 뒤 같은 날 17:00 을 따로 또 예약 — 네이버를 다시 불러오기 전이라 '완료 10'(옛 숫자)
     await page.evaluate(() => { const T = window.__deskTest, h = T.holders().find((x) => x.name === "홍예준"); T.addBooking("2026-10-05", "17:00", "홍예준", h.phone, 2, { prevDone: 10 }); T.setNow(1015); });
+    // 16:55 로 옮기면 체험판 자동 불러오기(1초마다 확인)가 알림을 덮음 → 먼저 끝나게 기다림 (안 그러면 입장 뒤 알림이 가끔 덮임)
+    await page.waitForFunction(() => /자동 불러옴/.test(document.getElementById("toast").textContent));
     const c = await card(page, 1020, "홍예준");
     assert.match(c, /오늘 이미 방문/, "사은품 없음 (쿠폰은 그날 한 번)");
     assert.strictEqual(await tip(page, 1020, "홍예준"), "이벤트 안내 · 오늘 이미 방문 · 10/25까지");
@@ -537,7 +539,8 @@ test("양식 자리 (10/16): 공통 양식의 [이벤트] 줄 = 1번 · 2번 자
     await page.click("[data-act=evTpl][data-i='2']");
     assert.strictEqual(await page.inputValue("#ev-text"), "^*[ {사은품} 무료 증정 ]\n^이 영수증을 보여 주세요");
     await page.fill("#ev-text", "[자르기]\n#* 수제돈까스 쿠폰\n^이 쿠폰을 카페에 보여 주세요");
-    assert.match(await page.textContent("#ev-paper"), /재방문 이벤트 성공!.*✂ 여기서 자름수제돈까스 쿠폰/, "제공상품 미리보기 = 성공 예시");
+    assert.match(await page.textContent("#ev-paper"), /재방문 이벤트 성공!.*✂ 여기서 자름/, "제공상품 미리보기 = 성공 예시");
+    assert.ok(await page.$("#ev-paper .pl.cutl + .seal img"), "잘린 뒤 제공상품(쿠폰)은 보안 무늬 그림 (10/16)");
     await page.click("#sheet [data-act=close] >> nth=0");
 
     // 안내(1번): [이벤트] 자리에 · 제공상품 없음 · [사은품] 줄은 빠짐
