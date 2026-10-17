@@ -2392,6 +2392,17 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     })();
   }
   const printerReady = () => (PRINT.mode === "com" ? !!PRINT.port : !!PRINT.sel);
+  /** POS 프린터(COM)로 보내는 데 걸리는 초 어림 — 바이트 × 10비트 ÷ 속도 (글은 한글 2 · 그 밖 1 · 쿠폰 그림 base64) · Windows 프린터는 0 */
+  function printSecs(text, v) {
+    if (PRINT.mode !== "com") return 0;
+    let n = 0;
+    for (const p of escposParts(text, v, PRINT.cut)) {
+      if (p.t != null) for (const ch of String(p.t)) n += ch.charCodeAt(0) > 0x7f ? 2 : 1;
+      else if (p.b) n += p.b.length;
+      else if (p.r) n += Math.floor((p.r.length * 3) / 4);
+    }
+    return (n * 10) / (Number(PRINT.baud) || 115200);
+  }
   const printerName = () => (PRINT.mode === "com" ? `${PRINT.port} · ${PRINT.baud}` : PRINT.sel || "");
   function printForm(kind, v) {
     const f = PRINT.forms[kind];
@@ -3293,8 +3304,15 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     evReset() { if (EV.cur === EV_BASE) EV.form = null; else EV.tpl[EV.cur] = EV_TPL[EV.cur]; evSaveCfg(); renderSheet(); },
     async evTest() {
       if (!printerReady()) { toast("운영 설정 → 프린터에서 영수증 프린터를 먼저 정해 주세요"); return; }
-      if (!APP || !window.desk.print) { toast(`${ro(evName(EV.cur))} 시험 출력 (${printerName()}, 체험)`); return; }
-      const r = await sendPrint(evBaseForm(), evSample(EV.cur === EV_BASE ? 0 : EV.cur)).catch((e) => ({ ok: false, why: String(e) }));
+      const text = evBaseForm(), v = evSample(EV.cur === EV_BASE ? 0 : EV.cur), secs = printSecs(text, v);
+      const wait = secs >= 3 ? ` (쿠폰 그림이라 ${Math.ceil(secs)}초쯤 걸려요)` : "";
+      if (!APP || !window.desk.print) { toast(`${ro(evName(EV.cur))} 시험 출력 (${printerName()}, 체험)${wait}`); return; }
+      // 보내는 중에 또 누르면 같은 포트를 두 번 열게 됨 (현장 10/17 'COM1 액세스 거부') → 끝날 때까지 막음
+      if (PRINT.busy) { toast("앞 출력을 아직 보내는 중이에요 — 끝나면 다시 눌러 주세요"); return; }
+      PRINT.busy = true;
+      toast(`${ro(evName(EV.cur))} 시험 출력 보내는 중…${wait}`);
+      let r;
+      try { r = await sendPrint(text, v); } catch (e) { r = { ok: false, why: String(e) }; } finally { PRINT.busy = false; }
       toast(r && r.ok ? `${ro(evName(EV.cur))} 시험 출력을 보냈어요` : `출력 실패: ${(r && r.why) || "응답 없음"}`);
     },
     settings() { openSheet({ mode: "settings", tab: "rules" }); },
@@ -3521,7 +3539,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 
   // 시험용: 입장권을 만드는 함수들 (자동 시험이 실제 입장 손님으로 출력 내용을 확인)
   document.addEventListener("change", (e) => { if (/^cap-(target|max|ceil)$/.test(e.target.id)) renderSheet(); }); // 숫자를 다 넣으면 계획 다시
-  window.__deskTest = { sealOf, withSeal, SEAL, evSample: (i) => evSample(i), sealClear: () => sealCache.clear(), EV_: () => EV, liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capPlan, capRun, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => enterText(), holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, evOf: (b) => evOf(b),
+  window.__deskTest = { printSecs, PRINT_: () => PRINT, sealOf, withSeal, SEAL, evSample: (i) => evSample(i), sealClear: () => sealCache.clear(), EV_: () => EV, liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capPlan, capRun, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => enterText(), holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, evOf: (b) => evOf(b),
     evLog: (from) => { const L = evLog(from); return { from: L.from, count: L.count, people: Object.fromEntries([...L.people].map(([k, p]) => [k, JSON.parse(JSON.stringify(p))])) }; },
     // 장부에 지난 방문 한 줄 넣기: o = { day, n(네이버 순번, 기본 = 지금 완료 수), base, st("안내" | "성공"), due, from(장부 · 기본 지금 이벤트), no }
     evInject: (name, o = {}) => {

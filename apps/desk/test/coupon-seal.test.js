@@ -155,3 +155,36 @@ test("사장님 양식: 공통 양식 맨 앞 [사은품] → 제공상품(교�
     await browser.close();
   }
 });
+
+test("시험 출력 시간 어림 (현장 10/17 'COM1 액세스 거부'): 쿠폰 그림은 속도에 따라 몇 초 ~ 30초 넘게 → 보내는 중이라고 알림 · 글만이면 금방", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.addInitScript(() => { window.__from = "2026-10-05"; });
+    await page.addInitScript(EVENT());
+    await page.goto(DESK);
+    const r = await page.evaluate(() => {
+      const T = window.__deskTest, P = T.PRINT_(), E = T.EV_();
+      P.port = "COM1";
+      const s = (baud, seal) => { P.baud = baud; E.seal = seal; T.sealClear(); return T.printSecs(T.form(), T.evSample(1)); };
+      const out = { fast: s(115200, true), slow: s(9600, true), text: s(9600, false), guide: (() => { P.baud = 9600; E.seal = true; return T.printSecs(T.form(), T.evSample(0)); })() };
+      P.mode = "win"; out.win = T.printSecs(T.form(), T.evSample(1)); P.mode = "com"; P.baud = 9600; E.seal = true;
+      return out;
+    });
+    assert.ok(r.fast > 0.5 && r.fast < 4, "115200bps 쿠폰 그림 " + r.fast);
+    assert.ok(r.slow > 10, "9600bps 쿠폰 그림은 오래 " + r.slow);
+    assert.ok(r.text < 3 && r.guide < 3, "글만이면 금방 " + JSON.stringify(r));
+    assert.strictEqual(r.win, 0, "Windows 프린터는 어림 없음");
+    // 체험판 [2번 성공으로 시험 출력]: 걸리는 초를 알려 줌
+    await page.click("text=운영 설정");
+    await page.click('[data-t="event"]');
+    await page.click("[data-act=evTpl][data-i='1']");
+    await page.click("[data-act=evTest]");
+    assert.match(await page.textContent("#toast"), /시험 출력 \(COM1 · 9600, 체험\) \(쿠폰 그림이라 \d+초쯤 걸려요\)/);
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});

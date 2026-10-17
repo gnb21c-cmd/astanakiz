@@ -691,6 +691,7 @@ ipcMain.on("state:save", (_e, day, json) => {
 // 방문 이벤트 참여자 기록 (사장님 10/14): 앱 폴더 + 바탕화면 '아스타나키즈-이벤트' 두 곳에 같이 (ledger-store.js)
 // 이용완료(네이버 예약 1건)마다 두 곳에 한 줄 · 켤 때 두 곳을 합치고 빠진 쪽을 채움 · 바탕화면에 엑셀 정리본 · 지우지 않음
 const ledgerStore = require("./ledger-store");
+const { comTurn, partsBytes, comTimeouts, PORT_WAIT_MS } = require("./com-queue");
 const ledgerDirs = () => ({ app: path.join(app.getPath("userData"), "visit-ledger"), desk: path.join(app.getPath("desktop"), ledgerStore.DESK_FOLDER) });
 ipcMain.on("ledger:load", (e, from) => {
   try {
@@ -796,6 +797,8 @@ ipcMain.handle("print:list", async () => {
 });
 // 영수증 프린터에 날 바이트(ESC/POS)를 보냄 — Windows 인쇄 대기열에 RAW 로 (드라이버가 그대로 프린터에 넘김)
 // PowerShell 이 winspool.drv 를 불러 씀 (따로 설치할 것 없음)
+// PowerShell 이 내보내는 글을 UTF-8 로 (현장 10/17: 안 하면 한글 오류 문구가 '����' 로 깨져 보임 — 이 PC 기본은 CP949)
+const PS_UTF8 = "[Console]::OutputEncoding = [Text.Encoding]::UTF8\n";
 const RAW_LIB = `
 $code = @"
 using System; using System.Runtime.InteropServices;
@@ -824,7 +827,7 @@ const RAW_PS = RAW_LIB + `[Console]::Out.Write([RawPrn]::Send($env:ASTANA_PRN, [
 function rawSend(printer, bytes) {
   return new Promise((resolve) => {
     if (process.platform !== "win32") return resolve({ ok: false, why: "Windows 에서만 됨" });
-    const enc = Buffer.from(RAW_PS, "utf16le").toString("base64");
+    const enc = Buffer.from(PS_UTF8 + RAW_PS, "utf16le").toString("base64");
     execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", enc], { env: { ...process.env, ASTANA_PRN: printer, ASTANA_DATA: Buffer.from(bytes).toString("base64") }, timeout: 20000 }, (err, out) => {
       const r = String(out || "").trim();
       resolve(r === "ok" ? { ok: true } : { ok: false, why: r || (err && err.message) || "프린터 명령 실패" });
@@ -846,24 +849,35 @@ foreach ($p in $parts) {
   elseif ($p.r -ne $null) { $bytes = [Convert]::FromBase64String([string]$p.r); $ms.Write($bytes, 0, $bytes.Length) }
 }
 $data = $ms.ToArray()
+# 쓰기 대기: 앱이 크기 · 속도로 정해 줌 (입장권 8초쯤 · 쿠폰 그림은 9600bps 면 30초 넘게 걸려 더 길게)
+$wt = [int]$env:ASTANA_WT; if ($wt -le 0) { $wt = 8000 }
+$portWait = [int]$env:ASTANA_PORTWAIT; if ($portWait -le 0) { $portWait = 10000 }
 try {
   if ($env:ASTANA_MODE -eq "com") {
-    $sp = New-Object System.IO.Ports.SerialPort $env:ASTANA_PORT, ([int]$env:ASTANA_BAUD), "None", 8, "One"
-    $sp.Handshake = "None"; $sp.DtrEnable = $true; $sp.RtsEnable = $true; $sp.WriteTimeout = 90000 # 쿠폰 그림(교환권 한 장 약 2만 ~ 4만 바이트)은 9600bps 면 30초 넘게 걸림 (115200bps 는 3초쯤)
-    $sp.Open(); $sp.Write($data, 0, $data.Length); Start-Sleep -Milliseconds 400; $sp.Close()
+    # 포트를 다른 프로그램(OKPOS 출력 등)이 잠깐 쥐고 있으면 0.3초마다 다시 (현장 10/17 'COM1 액세스 거부')
+    $t0 = Get-Date
+    while ($true) {
+      $sp = New-Object System.IO.Ports.SerialPort $env:ASTANA_PORT, ([int]$env:ASTANA_BAUD), "None", 8, "One"
+      $sp.Handshake = "None"; $sp.DtrEnable = $true; $sp.RtsEnable = $true; $sp.WriteTimeout = $wt
+      try { $sp.Open(); break } catch {
+        $m = $_.Exception.Message
+        if (($m -match "denied|거부|in use|사용") -and (((Get-Date) - $t0).TotalMilliseconds -lt $portWait)) { $sp.Dispose(); Start-Sleep -Milliseconds 300 } else { throw }
+      }
+    }
+    try { $sp.Write($data, 0, $data.Length); Start-Sleep -Milliseconds 400 } finally { if ($sp.IsOpen) { $sp.Close() } }
     [Console]::Out.Write("ok")
   } else {
     [Console]::Out.Write("모드를 모름")
   }
 } catch {
   $m = $_.Exception.Message
-  if ($m -match "denied|거부|in use|사용") { [Console]::Out.Write("포트를 다른 프로그램(OKPOS)이 쓰는 중: " + $m) } else { [Console]::Out.Write($m) }
+  if ($m -match "denied|거부|in use|사용") { [Console]::Out.Write("포트를 다른 프로그램(OKPOS)이 쓰는 중 — " + $env:ASTANA_PORT + " 이 " + [int]($portWait / 1000) + "초 기다려도 비지 않음. 잠시 뒤 다시 해 보세요 (" + $m + ")") } else { [Console]::Out.Write($m) }
 }
 `;
 function psRun(script, env, input, ms = 25000) {
   return new Promise((resolve) => {
     if (process.platform !== "win32") return resolve("Windows 에서만 됨");
-    const enc = Buffer.from(script, "utf16le").toString("base64");
+    const enc = Buffer.from(PS_UTF8 + script, "utf16le").toString("base64");
     const child = execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", enc], { env: { ...process.env, ...env }, timeout: ms }, (err, out) =>
       resolve(String(out || "").trim() || (err && err.message) || ""),
     );
@@ -887,7 +901,10 @@ foreach ($n in [System.IO.Ports.SerialPort]::GetPortNames()) { if (-not ($l -mat
 });
 ipcMain.handle("print:escpos", async (_e, { port, baud, parts }) => {
   // 조각: { t: 글 } 한글(CP949) · { b: [바이트] } 명령 · { r: base64 } 큰 날 바이트(쿠폰 보안 무늬 래스터) — 표준 입력으로 넘김
-  const r = await psRun(ESC_PS, { ASTANA_MODE: "com", ASTANA_PORT: port, ASTANA_BAUD: String(baud || 115200) }, Buffer.from(JSON.stringify(parts), "utf8").toString("base64"), 120000);
+  // 같은 포트의 출력 · 현금통은 하나씩 차례로 (com-queue · 현장 10/17)
+  const input = Buffer.from(JSON.stringify(parts), "utf8").toString("base64");
+  const T = comTimeouts(partsBytes(parts), baud || 115200);
+  const r = await comTurn(port, () => psRun(ESC_PS, { ASTANA_MODE: "com", ASTANA_PORT: port, ASTANA_BAUD: String(baud || 115200), ASTANA_WT: String(T.write), ASTANA_PORTWAIT: String(PORT_WAIT_MS) }, input, T.total));
   return r === "ok" ? { ok: true } : { ok: false, why: r || "응답 없음" };
 });
 
@@ -902,7 +919,7 @@ const drawerBytes = (pin) => {
 };
 /* 프린터 도우미: 앱이 켜질 때 PowerShell 을 띄워 둠 (posAgent 와 같은 방식). 한 줄(base64 JSON { m: com|win, port, baud, prn, data })을 받으면
    COM 포트나 Windows 프린터(RAW)로 보내고 결과 한 줄("ok" 또는 까닭) */
-const PRN_AGENT_PS = RAW_LIB + `
+const PRN_AGENT_PS = PS_UTF8 + RAW_LIB + `
 while ($true) {
   $line = [Console]::In.ReadLine()
   if ($line -eq $null) { break }
@@ -912,9 +929,16 @@ while ($true) {
     $j = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($line.Trim())) | ConvertFrom-Json
     $data = [Convert]::FromBase64String([string]$j.data)
     if ($j.m -eq "com") {
-      $sp = New-Object System.IO.Ports.SerialPort ([string]$j.port), ([int]$j.baud), "None", 8, "One"
-      $sp.Handshake = "None"; $sp.DtrEnable = $true; $sp.RtsEnable = $true; $sp.WriteTimeout = 3000
-      try { $sp.Open(); $sp.Write($data, 0, $data.Length); Start-Sleep -Milliseconds 80 } finally { if ($sp.IsOpen) { $sp.Close() } }
+      # 포트를 다른 프로그램이 잠깐 쥐고 있으면 2초까지 0.2초마다 다시 (앱 쪽 답 기다림 6초 안)
+      $t0 = Get-Date
+      while ($true) {
+        $sp = New-Object System.IO.Ports.SerialPort ([string]$j.port), ([int]$j.baud), "None", 8, "One"
+        $sp.Handshake = "None"; $sp.DtrEnable = $true; $sp.RtsEnable = $true; $sp.WriteTimeout = 3000
+        try { $sp.Open(); break } catch {
+          if (($_.Exception.Message -match "denied|거부|in use|사용") -and (((Get-Date) - $t0).TotalMilliseconds -lt 2000)) { $sp.Dispose(); Start-Sleep -Milliseconds 200 } else { throw }
+        }
+      }
+      try { $sp.Write($data, 0, $data.Length); Start-Sleep -Milliseconds 80 } finally { if ($sp.IsOpen) { $sp.Close() } }
       $r = "ok"
     } else { $r = [RawPrn]::Send([string]$j.prn, $data) }
   } catch {
@@ -972,20 +996,24 @@ function prnAgentSend(job, ms = 6000) {
   });
 }
 ipcMain.handle("print:drawer", async (_e, { mode, port, baud, deviceName, pin }) => {
-  const bytes = drawerBytes(pin);
   if (mode === "com" && !port) return { ok: false, why: "영수증 프린터 COM 포트를 먼저 정해 주세요" };
   if (mode !== "com" && !deviceName) return { ok: false, why: "운영 설정 → 프린터에서 영수증 프린터를 먼저 정해 주세요" };
+  // COM 은 출력과 같은 포트 → 출력 중이면 끝난 뒤 바로 (com-queue · 현장 10/17)
+  return mode === "com" ? comTurn(port, () => drawerOpen(mode, port, baud, deviceName, pin)) : drawerOpen(mode, port, baud, deviceName, pin);
+});
+async function drawerOpen(mode, port, baud, deviceName, pin) {
+  const bytes = drawerBytes(pin);
   const fast = await prnAgentSend({ m: mode === "com" ? "com" : "win", port: port || "", baud: baud || 115200, prn: deviceName || "", data: Buffer.from(bytes).toString("base64") });
   if (fast === "ok") return { ok: true };
   if (/OKPOS/.test(fast)) return { ok: false, why: fast }; // 포트를 POS 가 쥐고 있음 — 다시 해도 같음
   startPrnAgent(); // 다음 번엔 빠르게
   // 예전 방식 (한 번 실행)
   if (mode === "com") {
-    const r = await psRun(ESC_PS, { ASTANA_MODE: "com", ASTANA_PORT: port, ASTANA_BAUD: String(baud || 115200), ASTANA_JSON: Buffer.from(JSON.stringify([{ b: bytes }]), "utf8").toString("base64") });
+    const r = await psRun(ESC_PS, { ASTANA_MODE: "com", ASTANA_PORT: port, ASTANA_BAUD: String(baud || 115200), ASTANA_PORTWAIT: "3000", ASTANA_JSON: Buffer.from(JSON.stringify([{ b: bytes }]), "utf8").toString("base64") });
     return r === "ok" ? { ok: true } : { ok: false, why: r || fast || "응답 없음" };
   }
   return rawSend(deviceName, bytes);
-});
+}
 
 // 종이 자르기: 3줄 올리고(ESC d 3) 부분 자르기(GS V 1) — 대부분의 80mm 영수증 프린터(ESC/POS)
 const CUT = [0x1b, 0x64, 0x03, 0x1d, 0x56, 0x01];
