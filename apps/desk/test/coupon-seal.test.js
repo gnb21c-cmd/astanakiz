@@ -5,7 +5,8 @@
    - 현장 10/18 (1.46): 128줄(9KB)씩 한꺼번에 보내니 프린터가 그림을 천천히 찍는 동안 버퍼가 넘쳐 첫 조각만 찍히고 나머지 · 자르기 · 입장권 앞부분이 사라짐
      → 24줄(1.7KB)씩 나누고 조각마다 '다 보내질 때까지 + 찍을 틈'을 기다림 (조각의 w)
    - 현장 10/18: 프린터가 9600bps 만 됨 → 교환권 전체 그림은 30초 넘게 → 사장님 고름 '위아래 띠만 그림': 물결 + 작은 글씨 띠를 위 · 아래 두 장으로,
-     가운데 내용은 제공상품 양식 그대로 프린터 글자 (9600bps 에서 10초 안) */
+     가운데 내용은 제공상품 양식 그대로 프린터 글자 (9600bps 에서 10초 안)
+   - 현장 10/18 (1.47): 그래도 느림 → 물결 · 세로 두 줄 빼고 가로 두 줄 + 작은 글씨 'ASTANAKIDS·월일' 띠만 (띠 한 장 16줄 · 두 장 2.3KB · 9600bps 2초 남짓 더) */
 const test = require("node:test");
 const assert = require("node:assert");
 const path = require("path");
@@ -59,7 +60,7 @@ test("쿠폰 보안 무늬: 성공 입장권의 쿠폰 줄만 그림(래스터)�
     assert.ok(ok.rasters.every((x) => x.bpr === 72 && x.h <= 24 && x.n === x.bpr * x.h && x.w >= 100), JSON.stringify(ok.rasters));
     assert.ok(r.ok.filter((p) => p.r).every((p) => Buffer.from(p.r, "base64").length <= 8 + 72 * 24), "조각 하나 = GS v 0 한 번 (1.7KB 이하)");
     const H = ok.rasters.reduce((a, x) => a + x.h, 0);
-    assert.ok(H >= 60 && H <= 100, `위아래 띠 두 장 높이 합 ${H}점 (9600bps 에서 빨리)`);
+    assert.ok(H >= 20 && H <= 40, `위아래 띠 두 장 높이 합 ${H}점 (9600bps 에서 빨리)`);
     assert.match(ok.text, /\[ 수제돈까스 무료 증정 \]/, "쿠폰 글은 프린터 글자로 (띠 사이)");
     // 순서: 위 띠 그림 → 쿠폰 글 → 아래 띠 그림
     const iGift = r.ok.findIndex((p) => p.t && p.t.includes("무료 증정")), iR = r.ok.map((p, i) => (p.r ? i : -1)).filter((i) => i >= 0);
@@ -87,7 +88,7 @@ test("쿠폰 보안 무늬: 성공 입장권의 쿠폰 줄만 그림(래스터)�
       const bot = T.sealOf({ k: "seal", part: "bot", meta: { day: "2026-10-05" } });
       return { same: a === a2, day: a !== b, key: a !== c, keyLen: key.length, botDiff: bot.url !== a, rows: [T.sealOf(mk("2026-10-05")).h, bot.h] };
     });
-    assert.ok(same.rows.every((h) => h >= 30 && h <= 48), "띠 한 장 높이 " + same.rows);
+    assert.ok(same.rows.every((h) => h >= 12 && h <= 20), "띠 한 장 높이 " + same.rows);
     delete same.rows;
     assert.deepStrictEqual(same, { same: true, day: true, key: true, keyLen: 32, botDiff: true });
     assert.match(await page.evaluate(() => localStorage.getItem("astanakiz-sealkey")), /^[0-9a-f]{32}$/, "체험판 비밀값은 이 브라우저에 (앱은 이 PC 설정에)");
@@ -158,8 +159,9 @@ test("사장님 양식: 공통 양식 맨 앞 [사은품] → 제공상품(교�
       const parts = T.escposParts(T.form(), v, true);
       const seq = parts.map((x) => (x.r ? "그림" : x.t ? x.t.trim() : x.b && x.b.length === 9 && x.b[7] === 0x56 ? "자르기" : null)).filter((x, i, a) => x != null && x !== "" && !(x === "그림" && a[i - 1] === "그림")); // 그림 조각들은 하나로
       const bytes = parts.reduce((a, p) => a + (p.r ? atob(p.r).length : p.b ? p.b.length : p.t ? [...p.t].reduce((n, ch) => n + (ch.charCodeAt(0) > 0x7f ? 2 : 1), 0) : 0), 0);
+      const rasterBytes = parts.reduce((a, p) => a + (p.r ? atob(p.r).length : 0), 0);
       const P = T.PRINT_(); P.port = "COM1"; P.baud = 9600;
-      return { seq, bytes, secs9600: T.printSecs(T.form(), v), docs: T.receiptDocs(T.form(), v).map((d) => (d.includes('class="pl seal') ? "그림" : "글자")) };
+      return { seq, bytes, rasterBytes, secs9600: T.printSecs(T.form(), v), docs: T.receiptDocs(T.form(), v).map((d) => (d.includes('class="pl seal') ? "그림" : "글자")) };
     });
     // 위 띠 그림 → 교환권 글(프린터 글자) → 아래 띠 그림 → 자르기 → 입장권
     assert.strictEqual(r.seq[0], "그림", "교환권 맨 앞은 위 띠");
@@ -167,7 +169,8 @@ test("사장님 양식: 공통 양식 맨 앞 [사은품] → 제공상품(교�
     assert.strictEqual(r.seq[iCut - 1], "그림", "아래 띠 바로 뒤 자르기");
     assert.deepStrictEqual(r.seq.slice(1, iCut - 1).filter((x) => !/^=+$/.test(x)), ["수제한돈까스", "1EA 교환권", "분실 시 이벤트 교환권 재발행 불가합니다.", "당일 준비량이 소진 되었을 수 있습니다.", "본 사은권의 사용기한은 없습니다."], "가운데는 사장님이 쓴 그대로 글자");
     assert.strictEqual(r.seq.filter((x) => x === "그림").length, 2, "그림은 위아래 띠 두 장");
-    assert.ok(r.bytes < 8500 && r.secs9600 < 10, "9600bps 에서 10초 안 " + JSON.stringify([r.bytes, r.secs9600]));
+    assert.ok(r.rasterBytes < 3000, "띠 두 장 3KB 안 " + r.rasterBytes);
+    assert.ok(r.secs9600 < 6, "교환권 + 입장권 9600bps 6초 안 " + JSON.stringify([r.bytes, r.secs9600]));
     const rest = r.seq.slice(iCut + 1).join("\n");
     assert.match(rest, /재방문 이벤트 성공!/, "2번 성공은 입장권 안에 글자로");
     assert.doesNotMatch(rest, /수제한돈까스|교환권 재발행/, "교환권 글은 그림 안에만");
@@ -194,8 +197,8 @@ test("시험 출력 시간 어림 (현장 10/17 'COM1 액세스 거부'): 쿠폰
       P.mode = "win"; out.win = T.printSecs(T.form(), T.evSample(1)); P.mode = "com"; P.baud = 9600; E.seal = true;
       return out;
     });
-    assert.ok(r.fast > 0.3 && r.fast < 3, "115200bps 쿠폰 띠 (조각마다 기다림 포함) " + r.fast);
-    assert.ok(r.slow > 3 && r.slow < 10, "9600bps 도 10초 안 (위아래 띠만 그림) " + r.slow);
+    assert.ok(r.fast > 0.3 && r.fast < 1.5, "115200bps 쿠폰 띠 (조각마다 기다림 포함) " + r.fast);
+    assert.ok(r.slow - r.text > 0.5 && r.slow - r.text < 3, "9600bps 띠 때문에 더 걸리는 시간 3초 안 " + JSON.stringify(r));
     assert.ok(r.text < 3 && r.guide < 3, "글만이면 금방 " + JSON.stringify(r));
     assert.strictEqual(r.win, 0, "Windows 프린터는 어림 없음");
     // 체험판 [2번 성공으로 시험 출력]: 걸리는 초를 알려 줌
