@@ -2255,6 +2255,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c && /^[0-9a-f]{32}$/.test(c.sealKey || "")) SEAL.key = c.sealKey; else { SEAL.key = sealNewKey(); window.desk.config.set({ sealKey: SEAL.key }); } sealCache.clear(); }).catch(() => {});
   else { try { SEAL.key = localStorage.getItem("astanakiz-sealkey") || ""; } catch (e) { /* 없음 */ } if (!SEAL.key) { SEAL.key = sealNewKey(); try { localStorage.setItem("astanakiz-sealkey", SEAL.key); } catch (e) { /* 저장 못 해도 동작 */ } } }
   const sealCache = new Map();
+  /* POS 프린터(COM)로 그림을 보낼 때 (현장 10/18 OK-50): 감열 프린터는 빽빽한 그림을 천천히 찍는데 데스크는 흐름 제어 없이 보냄
+     → 한 번에 SEAL_ROWS 줄(72바이트 × 24 = 1.7KB)씩 · 조각마다 다 보내진 뒤 SEAL_WAIT ms 더 쉬어 프린터가 찍을 틈 (3mm 에 0.15초) */
+  const SEAL_ROWS = 24, SEAL_WAIT = 150;
   /** 줄 목록에서 이어진 쿠폰 줄을 보안 무늬 하나로 묶음 (자르기 줄은 그대로) */
   function withSeal(lines, v) {
     if (!EV.seal || !lines.some((x) => x.gift)) return lines;
@@ -2323,11 +2326,15 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       d[i] = d[i + 1] = d[i + 2] = black ? 0 : 255; d[i + 3] = 255;
     }
     g.putImageData(im, 0, 0);
-    // GS v 0 래스터 — 프린터 버퍼를 넘지 않게 128줄씩 나눠 보냄
-    const raster = [];
-    for (let y0 = 0; y0 < H; y0 += 128) { const hh = Math.min(128, H - y0); raster.push(0x1d, 0x76, 0x30, 0, bpr & 255, bpr >> 8, hh & 255, hh >> 8); for (let i = y0 * bpr; i < (y0 + hh) * bpr; i++) raster.push(bits[i]); }
-    let bin = ""; for (let i = 0; i < raster.length; i += 8192) bin += String.fromCharCode.apply(null, raster.slice(i, i + 8192));
-    const out = { url: cv.toDataURL("image/png"), raster, r64: btoa(bin), w: W, h: H };
+    // GS v 0 래스터 — SEAL_ROWS 줄씩 조각내 조각마다 따로 (현장 10/18: 128줄 9KB 씩 몰아 보내니 프린터 버퍼가 넘쳐 첫 조각만 찍힘)
+    const raster = [], chunks = [];
+    for (let y0 = 0; y0 < H; y0 += SEAL_ROWS) {
+      const hh = Math.min(SEAL_ROWS, H - y0), one = [0x1d, 0x76, 0x30, 0, bpr & 255, bpr >> 8, hh & 255, hh >> 8];
+      for (let i = y0 * bpr; i < (y0 + hh) * bpr; i++) one.push(bits[i]);
+      raster.push(...one);
+      chunks.push(btoa(String.fromCharCode.apply(null, one)));
+    }
+    const out = { url: cv.toDataURL("image/png"), raster, chunks, w: W, h: H };
     if (sealCache.size > 40) sealCache.clear();
     sealCache.set(key, out);
     return out;
@@ -2337,7 +2344,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   function escposParts(text, v, cut) {
     const P = [{ b: [0x1b, 0x40] }, { b: [0x1c, 0x26] }]; // 초기화 · 한글 모드
     for (const x of withSeal(receiptLines(text, v), v)) {
-      if (x.k === "seal") { P.push({ b: [0x1b, 0x61, 0] }, { r: sealOf(x).r64 }); continue; } // 쿠폰 = 보안 무늬 그림 (GS v 0 래스터, base64)
+      // 쿠폰 = 보안 무늬 그림 (GS v 0 래스터, base64) — 조각마다 w: 다 보내질 때까지 + 프린터가 찍을 틈만큼 기다림 (main.js ESC_PS)
+      if (x.k === "seal") { P.push({ b: [0x1b, 0x61, 0] }); for (const c of sealOf(x).chunks) P.push({ r: c, w: SEAL_WAIT }); continue; }
       if (x.k === "cut") { P.push({ b: [0x1b, 0x61, 0, 0x1b, 0x64, PRINT.feed, 0x1d, 0x56, 0x01] }); continue; } // [자르기]: 여백만큼 올리고 부분 자르기 (끝 자르기와 같은 명령)
       if (x.k === "hr" || x.k === "hr2") { P.push({ b: [0x1b, 0x61, 0] }, { t: (x.k === "hr2" ? "=" : "-").repeat(LINE_COLS) + "\n" }); continue; }
       P.push({ b: [0x1b, 0x61, x.k === "txt" ? 0 : 1] }); // 왼쪽 · 가운데
@@ -2392,16 +2400,17 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     })();
   }
   const printerReady = () => (PRINT.mode === "com" ? !!PRINT.port : !!PRINT.sel);
-  /** POS 프린터(COM)로 보내는 데 걸리는 초 어림 — 바이트 × 10비트 ÷ 속도 (글은 한글 2 · 그 밖 1 · 쿠폰 그림 base64) · Windows 프린터는 0 */
+  /** POS 프린터(COM)로 보내는 데 걸리는 초 어림 — 바이트 × 10비트 ÷ 속도 (글은 한글 2 · 그 밖 1 · 쿠폰 그림 base64) + 그림 조각 사이 기다림 · Windows 프린터는 0 */
   function printSecs(text, v) {
     if (PRINT.mode !== "com") return 0;
-    let n = 0;
+    let n = 0, w = 0;
     for (const p of escposParts(text, v, PRINT.cut)) {
       if (p.t != null) for (const ch of String(p.t)) n += ch.charCodeAt(0) > 0x7f ? 2 : 1;
       else if (p.b) n += p.b.length;
       else if (p.r) n += Math.floor((p.r.length * 3) / 4);
+      w += p.w || 0;
     }
-    return (n * 10) / (Number(PRINT.baud) || 115200);
+    return (n * 10) / (Number(PRINT.baud) || 115200) + w / 1000;
   }
   const printerName = () => (PRINT.mode === "com" ? `${PRINT.port} · ${PRINT.baud}` : PRINT.sel || "");
   function printForm(kind, v) {

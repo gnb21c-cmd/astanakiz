@@ -39,7 +39,9 @@ test("바이트 어림 · 보내는 시간 · 기다림 한도: 글만 있는 �
   assert.strictEqual(Q.partsBytes([{ t: "아스타나 A1" }, { b: [0x1b, 0x40] }, { r: raster }]), 4 * 2 + 3 + 2 + 30000);
   assert.ok(Math.abs(Q.sendSecs(30000, 115200) - 2.6) < 0.01, "115200bps 면 3초쯤");
   assert.ok(Math.abs(Q.sendSecs(30000, 9600) - 31.25) < 0.01, "9600bps 면 30초 넘게");
+  assert.strictEqual(Q.partsPause([{ r: raster, w: 150 }, { r: raster, w: 150 }, { b: [0x1d, 0x56, 1] }]), 300, "그림 조각 뒤 기다림 합");
   const small = Q.comTimeouts(1500, 115200), big = Q.comTimeouts(30000, 9600);
+  assert.strictEqual(Q.comTimeouts(30000, 9600, 2700).total, big.total + 2700, "조각 기다림만큼 전체 한도도 늘림");
   assert.ok(small.write >= 8000 && small.write < 8500, "입장권은 예전처럼 8초쯤 " + small.write);
   assert.ok(big.write > 31250 * 2, "그림은 보내는 시간의 두 배 넘게 " + big.write);
   assert.strictEqual(big.total, big.write + Q.PORT_WAIT_MS + 15000, "전체 = 쓰기 + 포트 빌 때까지 + 여유");

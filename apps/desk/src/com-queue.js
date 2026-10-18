@@ -29,12 +29,14 @@ function partsBytes(parts) {
   }
   return n;
 }
+/** 그림 조각 뒤 기다림(w, ms) 합 — 쿠폰 보안 무늬는 조각마다 프린터가 찍을 틈을 줌 (현장 10/18) */
+const partsPause = (parts) => (parts || []).reduce((a, p) => a + (Number(p.w) > 0 ? Number(p.w) : 0), 0);
 /** 보내는 데 걸리는 초 (바이트 × 10비트 ÷ 속도) */
 const sendSecs = (bytes, baud) => (bytes * 10) / (Number(baud) || 115200);
-/** 기다림 한도(ms): write = 포트 쓰기 (작은 출력은 예전처럼 8초 · 그림은 보내는 시간의 두 배를 더함) · total = PowerShell 전체 (포트 빌 때까지 기다림 포함) */
-function comTimeouts(bytes, baud) {
+/** 기다림 한도(ms): write = 포트 쓰기 (작은 출력은 예전처럼 8초 · 그림은 보내는 시간의 두 배를 더함) · total = PowerShell 전체 (조각 사이 기다림 · 포트 빌 때까지 기다림 포함) */
+function comTimeouts(bytes, baud, pauseMs = 0) {
   const write = Math.round(8000 + sendSecs(bytes, baud) * 2000);
-  return { write, total: write + PORT_WAIT_MS + 15000 };
+  return { write, total: write + pauseMs + PORT_WAIT_MS + 15000 };
 }
 
-module.exports = { comTurn, comBusy, partsBytes, sendSecs, comTimeouts, PORT_WAIT_MS };
+module.exports = { comTurn, comBusy, partsBytes, partsPause, sendSecs, comTimeouts, PORT_WAIT_MS };

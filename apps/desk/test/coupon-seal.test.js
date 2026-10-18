@@ -1,7 +1,9 @@
 /* 쿠폰 보안 무늬 (사장님 10/16) — 재방문 이벤트 성공 입장권의 제공상품(쿠폰) 줄만 데스크가 그린 그림으로 찍음
    - 바리스타는 따로 확인 없이 받아 폐기 → POS · 감열지 프린터에 글자만 쳐서 찍어 낸 가짜와 한눈에 구별되게
    - 물결 무늬(매장 비밀값 + 날짜) · 위아래 작은 글씨 띠만 — 내용은 제공상품 양식 그대로 (도장 · 번호 · 시각은 빼기로 · 사장님 10/16)
-   - ESC/POS(COM) = GS v 0 래스터 · Windows 프린터 = 그림 · 미리보기도 찍히는 그대로 · [쿠폰 보안 무늬] 끄면 예전처럼 글자 */
+   - ESC/POS(COM) = GS v 0 래스터 · Windows 프린터 = 그림 · 미리보기도 찍히는 그대로 · [쿠폰 보안 무늬] 끄면 예전처럼 글자
+   - 현장 10/18 (1.46): 128줄(9KB)씩 한꺼번에 보내니 프린터가 그림을 천천히 찍는 동안 버퍼가 넘쳐 첫 조각만 찍히고 나머지 · 자르기 · 입장권 앞부분이 사라짐
+     → 24줄(1.7KB)씩 나누고 조각마다 '다 보내질 때까지 + 찍을 틈'을 기다림 (조각의 w) */
 const test = require("node:test");
 const assert = require("node:assert");
 const path = require("path");
@@ -15,18 +17,19 @@ const DESK = "file://" + path.join(__dirname, "..", "..", "..", "prototype", "de
 const launch = () => chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
 const EVENT = (from) => () => { if (!localStorage.getItem("astanakiz-visitevent")) localStorage.setItem("astanakiz-visitevent", JSON.stringify({ ver: 2, on: true, from: window.__from, to: "2026-10-31", days: 20, gift: "수제돈까스" })); };
 
-/** escpos 조각 → { text, rasters: [{ bpr, h, n }] } */
+/** escpos 조각 → { text, rasters: [{ bpr, h, n, w }] } (w = 그 조각 뒤 기다림 ms) */
 const parse = (parts) => {
   let text = "";
   const rasters = [];
   for (const p of parts) {
+    if (p.r && !(p.w > 0)) throw new Error("그림 조각에 기다림(w)이 없음");
     if (p.t) text += p.t;
     if (!p.b && !p.r) continue;
     const b = p.r ? [...Buffer.from(p.r, "base64")] : p.b;
     for (let i = 0; i + 7 < b.length; i++) {
       if (b[i] === 0x1d && b[i + 1] === 0x76 && b[i + 2] === 0x30) {
         const bpr = b[i + 4] | (b[i + 5] << 8), h = b[i + 6] | (b[i + 7] << 8);
-        rasters.push({ bpr, h, n: Math.min(bpr * h, b.length - i - 8) });
+        rasters.push({ bpr, h, n: Math.min(bpr * h, b.length - i - 8), w: p.w || 0 });
         i += 7 + bpr * h;
       }
     }
@@ -49,9 +52,10 @@ test("쿠폰 보안 무늬: 성공 입장권의 쿠폰 줄만 그림(래스터)�
       return { ok: T.escposParts(T.form(), ok, true), guide: T.escposParts(T.form(), guide, true), docs: T.receiptDocs(T.form(), ok), docsGuide: T.receiptDocs(T.form(), guide) };
     });
     const ok = parse(r.ok), guide = parse(r.guide);
-    // 성공: 쿠폰 줄은 글자로 안 보냄 · 그림(576점 = 72바이트 폭, 128줄씩 나눔)
-    assert.ok(ok.rasters.length >= 1, "래스터가 있어야 함");
-    assert.ok(ok.rasters.every((x) => x.bpr === 72 && x.h <= 128 && x.n === x.bpr * x.h), JSON.stringify(ok.rasters));
+    // 성공: 쿠폰 줄은 글자로 안 보냄 · 그림(576점 = 72바이트 폭, 24줄씩 나누고 조각마다 기다림 · 현장 10/18)
+    assert.ok(ok.rasters.length >= 4, "래스터 조각 여러 개 " + ok.rasters.length);
+    assert.ok(ok.rasters.every((x) => x.bpr === 72 && x.h <= 24 && x.n === x.bpr * x.h && x.w >= 100), JSON.stringify(ok.rasters));
+    assert.ok(r.ok.filter((p) => p.r).every((p) => Buffer.from(p.r, "base64").length <= 8 + 72 * 24), "조각 하나 = GS v 0 한 번 (1.7KB 이하)");
     const H = ok.rasters.reduce((a, x) => a + x.h, 0);
     assert.ok(H >= 80 && H <= 400, `쿠폰 높이 ${H}점`);
     assert.doesNotMatch(ok.text, /무료 증정 \]|이 영수증을 보여 주세요/, "쿠폰 글은 그림 안에만");
@@ -142,7 +146,7 @@ test("사장님 양식: 공통 양식 맨 앞 [사은품] → 제공상품(교�
       E.form = "[사은품]\n" + T.form();
       const v = T.evSample(1);
       const parts = T.escposParts(T.form(), v, true);
-      const seq = parts.map((x) => (x.r ? "그림" : x.t ? x.t.trim() : x.b && x.b.length === 9 && x.b[7] === 0x56 ? "자르기" : null)).filter((x) => x != null && x !== "");
+      const seq = parts.map((x) => (x.r ? "그림" : x.t ? x.t.trim() : x.b && x.b.length === 9 && x.b[7] === 0x56 ? "자르기" : null)).filter((x, i, a) => x != null && x !== "" && !(x === "그림" && a[i - 1] === "그림")); // 그림 조각들은 하나로
       return { seq, docs: T.receiptDocs(T.form(), v).map((d) => (d.includes('class="pl seal') ? "그림" : "글자")) };
     });
     assert.deepStrictEqual(r.seq.slice(0, 2), ["그림", "자르기"], "교환권 그림이 맨 앞 · 바로 잘림");
@@ -173,7 +177,7 @@ test("시험 출력 시간 어림 (현장 10/17 'COM1 액세스 거부'): 쿠폰
       P.mode = "win"; out.win = T.printSecs(T.form(), T.evSample(1)); P.mode = "com"; P.baud = 9600; E.seal = true;
       return out;
     });
-    assert.ok(r.fast > 0.5 && r.fast < 4, "115200bps 쿠폰 그림 " + r.fast);
+    assert.ok(r.fast > 1 && r.fast < 8, "115200bps 쿠폰 그림 (조각마다 기다림 포함) " + r.fast);
     assert.ok(r.slow > 10, "9600bps 쿠폰 그림은 오래 " + r.slow);
     assert.ok(r.text < 3 && r.guide < 3, "글만이면 금방 " + JSON.stringify(r));
     assert.strictEqual(r.win, 0, "Windows 프린터는 어림 없음");

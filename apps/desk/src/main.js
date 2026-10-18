@@ -691,7 +691,7 @@ ipcMain.on("state:save", (_e, day, json) => {
 // 방문 이벤트 참여자 기록 (사장님 10/14): 앱 폴더 + 바탕화면 '아스타나키즈-이벤트' 두 곳에 같이 (ledger-store.js)
 // 이용완료(네이버 예약 1건)마다 두 곳에 한 줄 · 켤 때 두 곳을 합치고 빠진 쪽을 채움 · 바탕화면에 엑셀 정리본 · 지우지 않음
 const ledgerStore = require("./ledger-store");
-const { comTurn, partsBytes, comTimeouts, PORT_WAIT_MS } = require("./com-queue");
+const { comTurn, partsBytes, partsPause, comTimeouts, PORT_WAIT_MS } = require("./com-queue");
 const ledgerDirs = () => ({ app: path.join(app.getPath("userData"), "visit-ledger"), desk: path.join(app.getPath("desktop"), ledgerStore.DESK_FOLDER) });
 ipcMain.on("ledger:load", (e, from) => {
   try {
@@ -842,13 +842,17 @@ $ErrorActionPreference = "Stop"
 $b64 = if ($env:ASTANA_JSON) { $env:ASTANA_JSON } else { [Console]::In.ReadToEnd().Trim() }
 $parts = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($b64)) | ConvertFrom-Json
 $enc = [System.Text.Encoding]::GetEncoding(949)
+# 보낼 덩어리들: 조각에 w(ms)가 있으면(쿠폰 그림 조각) 거기서 끊고, 그 덩어리를 다 보낸 뒤 w 만큼 쉼 (현장 10/18: 그림을 몰아 보내면 프린터 버퍼가 넘침)
+$segs = New-Object System.Collections.ArrayList
 $ms = New-Object System.IO.MemoryStream
 foreach ($p in $parts) {
   if ($p.t -ne $null) { $bytes = $enc.GetBytes([string]$p.t); $ms.Write($bytes, 0, $bytes.Length) }
   elseif ($p.b -ne $null) { foreach ($x in $p.b) { $ms.WriteByte([byte]$x) } }
   elseif ($p.r -ne $null) { $bytes = [Convert]::FromBase64String([string]$p.r); $ms.Write($bytes, 0, $bytes.Length) }
+  if ($p.w -ne $null -and [int]$p.w -gt 0) { [void]$segs.Add(@{ d = $ms.ToArray(); w = [int]$p.w }); $ms = New-Object System.IO.MemoryStream }
 }
-$data = $ms.ToArray()
+[void]$segs.Add(@{ d = $ms.ToArray(); w = 0 })
+$baud = [int]$env:ASTANA_BAUD; if ($baud -le 0) { $baud = 115200 }
 # 쓰기 대기: 앱이 크기 · 속도로 정해 줌 (입장권 8초쯤 · 쿠폰 그림은 9600bps 면 30초 넘게 걸려 더 길게)
 $wt = [int]$env:ASTANA_WT; if ($wt -le 0) { $wt = 8000 }
 $portWait = [int]$env:ASTANA_PORTWAIT; if ($portWait -le 0) { $portWait = 10000 }
@@ -864,7 +868,36 @@ try {
         if (($m -match "denied|거부|in use|사용") -and (((Get-Date) - $t0).TotalMilliseconds -lt $portWait)) { $sp.Dispose(); Start-Sleep -Milliseconds 300 } else { throw }
       }
     }
-    try { $sp.Write($data, 0, $data.Length); Start-Sleep -Milliseconds 400 } finally { if ($sp.IsOpen) { $sp.Close() } }
+    # 프린터가 '바쁨'을 선으로 알려 주면(처음 열 때 올라와 있던 CTS · DSR 이 내려감) 덩어리 보내기 전에 기다림 — 선이 없으면 그냥 지나감
+    $cts0 = $false; $dsr0 = $false
+    try { $cts0 = $sp.CtsHolding; $dsr0 = $sp.DsrHolding } catch {}
+    try {
+      foreach ($s in $segs) {
+        $tw = Get-Date
+        if ($s.d.Length -gt 0) {
+          while ((((Get-Date) - $tw).TotalMilliseconds -lt $wt)) {
+            $busy = $false
+            try { $busy = ($cts0 -and -not $sp.CtsHolding) -or ($dsr0 -and -not $sp.DsrHolding) } catch {}
+            if (-not $busy) { break }
+            Start-Sleep -Milliseconds 10
+          }
+          $tw = Get-Date
+          $sp.Write($s.d, 0, $s.d.Length)
+        }
+        if ($s.w -gt 0) {
+          # 다 보내질 때까지(보내는 시간만큼 · 포트에 남은 바이트 0) 기다린 뒤 프린터가 찍을 틈을 더 줌
+          $need = [int]($s.d.Length * 10000 / $baud)
+          while ($true) {
+            $el = ((Get-Date) - $tw).TotalMilliseconds
+            $left = 0; try { $left = $sp.BytesToWrite } catch {}
+            if (($el -ge $need -and $left -le 0) -or $el -ge $wt) { break }
+            Start-Sleep -Milliseconds 5
+          }
+          Start-Sleep -Milliseconds $s.w
+        }
+      }
+      Start-Sleep -Milliseconds 400
+    } finally { if ($sp.IsOpen) { $sp.Close() } }
     [Console]::Out.Write("ok")
   } else {
     [Console]::Out.Write("모드를 모름")
@@ -903,7 +936,7 @@ ipcMain.handle("print:escpos", async (_e, { port, baud, parts }) => {
   // 조각: { t: 글 } 한글(CP949) · { b: [바이트] } 명령 · { r: base64 } 큰 날 바이트(쿠폰 보안 무늬 래스터) — 표준 입력으로 넘김
   // 같은 포트의 출력 · 현금통은 하나씩 차례로 (com-queue · 현장 10/17)
   const input = Buffer.from(JSON.stringify(parts), "utf8").toString("base64");
-  const T = comTimeouts(partsBytes(parts), baud || 115200);
+  const T = comTimeouts(partsBytes(parts), baud || 115200, partsPause(parts));
   const r = await comTurn(port, () => psRun(ESC_PS, { ASTANA_MODE: "com", ASTANA_PORT: port, ASTANA_BAUD: String(baud || 115200), ASTANA_WT: String(T.write), ASTANA_PORTWAIT: String(PORT_WAIT_MS) }, input, T.total));
   return r === "ok" ? { ok: true } : { ok: false, why: r || "응답 없음" };
 });
