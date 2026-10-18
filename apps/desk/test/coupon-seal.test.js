@@ -3,7 +3,9 @@
    - 물결 무늬(매장 비밀값 + 날짜) · 위아래 작은 글씨 띠만 — 내용은 제공상품 양식 그대로 (도장 · 번호 · 시각은 빼기로 · 사장님 10/16)
    - ESC/POS(COM) = GS v 0 래스터 · Windows 프린터 = 그림 · 미리보기도 찍히는 그대로 · [쿠폰 보안 무늬] 끄면 예전처럼 글자
    - 현장 10/18 (1.46): 128줄(9KB)씩 한꺼번에 보내니 프린터가 그림을 천천히 찍는 동안 버퍼가 넘쳐 첫 조각만 찍히고 나머지 · 자르기 · 입장권 앞부분이 사라짐
-     → 24줄(1.7KB)씩 나누고 조각마다 '다 보내질 때까지 + 찍을 틈'을 기다림 (조각의 w) */
+     → 24줄(1.7KB)씩 나누고 조각마다 '다 보내질 때까지 + 찍을 틈'을 기다림 (조각의 w)
+   - 현장 10/18: 프린터가 9600bps 만 됨 → 교환권 전체 그림은 30초 넘게 → 사장님 고름 '위아래 띠만 그림': 물결 + 작은 글씨 띠를 위 · 아래 두 장으로,
+     가운데 내용은 제공상품 양식 그대로 프린터 글자 (9600bps 에서 10초 안) */
 const test = require("node:test");
 const assert = require("node:assert");
 const path = require("path");
@@ -52,34 +54,42 @@ test("쿠폰 보안 무늬: 성공 입장권의 쿠폰 줄만 그림(래스터)�
       return { ok: T.escposParts(T.form(), ok, true), guide: T.escposParts(T.form(), guide, true), docs: T.receiptDocs(T.form(), ok), docsGuide: T.receiptDocs(T.form(), guide) };
     });
     const ok = parse(r.ok), guide = parse(r.guide);
-    // 성공: 쿠폰 줄은 글자로 안 보냄 · 그림(576점 = 72바이트 폭, 24줄씩 나누고 조각마다 기다림 · 현장 10/18)
-    assert.ok(ok.rasters.length >= 4, "래스터 조각 여러 개 " + ok.rasters.length);
+    // 성공: 쿠폰 위아래 띠만 그림(576점 = 72바이트 폭, 24줄씩 나누고 조각마다 기다림 · 현장 10/18) · 쿠폰 글은 프린터 글자
+    assert.ok(ok.rasters.length >= 2, "래스터 조각 " + ok.rasters.length);
     assert.ok(ok.rasters.every((x) => x.bpr === 72 && x.h <= 24 && x.n === x.bpr * x.h && x.w >= 100), JSON.stringify(ok.rasters));
     assert.ok(r.ok.filter((p) => p.r).every((p) => Buffer.from(p.r, "base64").length <= 8 + 72 * 24), "조각 하나 = GS v 0 한 번 (1.7KB 이하)");
     const H = ok.rasters.reduce((a, x) => a + x.h, 0);
-    assert.ok(H >= 80 && H <= 400, `쿠폰 높이 ${H}점`);
-    assert.doesNotMatch(ok.text, /무료 증정 \]|이 영수증을 보여 주세요/, "쿠폰 글은 그림 안에만");
+    assert.ok(H >= 60 && H <= 100, `위아래 띠 두 장 높이 합 ${H}점 (9600bps 에서 빨리)`);
+    assert.match(ok.text, /\[ 수제돈까스 무료 증정 \]/, "쿠폰 글은 프린터 글자로 (띠 사이)");
+    // 순서: 위 띠 그림 → 쿠폰 글 → 아래 띠 그림
+    const iGift = r.ok.findIndex((p) => p.t && p.t.includes("무료 증정")), iR = r.ok.map((p, i) => (p.r ? i : -1)).filter((i) => i >= 0);
+    assert.ok(iR[0] < iGift && iR[iR.length - 1] > iGift, "띠 · 글 · 띠 순서 " + JSON.stringify({ iGift, iR }));
+    assert.ok(iR.some((i) => i > iGift) && iR.some((i) => i < iGift));
     assert.match(ok.text, /재방문 이벤트 성공!/, "2번 성공 글은 그대로 글자");
     assert.match(ok.text, /또 드려요/);
     // 안내(1번): 쿠폰 없음 → 그림 없음
     assert.strictEqual(guide.rasters.length, 0);
     // Windows 프린터 · 미리보기: 그림 한 장
     assert.match(r.docs.join(""), /<div class="pl seal[^"]*"><img src="data:image\/png;base64,/);
+    assert.strictEqual((r.docs.join("").match(/class="pl seal/g) || []).length, 2, "Windows 프린터 · 미리보기도 위아래 띠 두 장");
     assert.doesNotMatch(r.docsGuide.join(""), /class="pl seal/);
 
     // 같은 날 · 같은 비밀값이면 늘 같은 그림 · 날짜나 비밀값이 바뀌면 다른 무늬
     const same = await page.evaluate(() => {
       const T = window.__deskTest;
-      const mk = (day) => ({ k: "seal", lines: [{ k: "ctr", t: "[ 수제돈까스 무료 증정 ]", size: 1, bold: true }], meta: { day } });
+      const mk = (day) => ({ k: "seal", part: "top", meta: { day } });
       const a = T.sealOf(mk("2026-10-05")).url;
       T.sealClear();
       const a2 = T.sealOf(mk("2026-10-05")).url, b = T.sealOf(mk("2026-10-06")).url;
       const key = T.SEAL.key; T.SEAL.key = "0123456789abcdef0123456789abcdef"; T.sealClear();
       const c = T.sealOf(mk("2026-10-05")).url;
       T.SEAL.key = key; T.sealClear();
-      return { same: a === a2, day: a !== b, key: a !== c, keyLen: key.length };
+      const bot = T.sealOf({ k: "seal", part: "bot", meta: { day: "2026-10-05" } });
+      return { same: a === a2, day: a !== b, key: a !== c, keyLen: key.length, botDiff: bot.url !== a, rows: [T.sealOf(mk("2026-10-05")).h, bot.h] };
     });
-    assert.deepStrictEqual(same, { same: true, day: true, key: true, keyLen: 32 });
+    assert.ok(same.rows.every((h) => h >= 30 && h <= 48), "띠 한 장 높이 " + same.rows);
+    delete same.rows;
+    assert.deepStrictEqual(same, { same: true, day: true, key: true, keyLen: 32, botDiff: true });
     assert.match(await page.evaluate(() => localStorage.getItem("astanakiz-sealkey")), /^[0-9a-f]{32}$/, "체험판 비밀값은 이 브라우저에 (앱은 이 PC 설정에)");
 
     // 운영 설정 → 방문 이벤트 → 2번 성공 미리보기에 그림 · [쿠폰 보안 무늬] 끄면 글자
@@ -147,11 +157,18 @@ test("사장님 양식: 공통 양식 맨 앞 [사은품] → 제공상품(교�
       const v = T.evSample(1);
       const parts = T.escposParts(T.form(), v, true);
       const seq = parts.map((x) => (x.r ? "그림" : x.t ? x.t.trim() : x.b && x.b.length === 9 && x.b[7] === 0x56 ? "자르기" : null)).filter((x, i, a) => x != null && x !== "" && !(x === "그림" && a[i - 1] === "그림")); // 그림 조각들은 하나로
-      return { seq, docs: T.receiptDocs(T.form(), v).map((d) => (d.includes('class="pl seal') ? "그림" : "글자")) };
+      const bytes = parts.reduce((a, p) => a + (p.r ? atob(p.r).length : p.b ? p.b.length : p.t ? [...p.t].reduce((n, ch) => n + (ch.charCodeAt(0) > 0x7f ? 2 : 1), 0) : 0), 0);
+      const P = T.PRINT_(); P.port = "COM1"; P.baud = 9600;
+      return { seq, bytes, secs9600: T.printSecs(T.form(), v), docs: T.receiptDocs(T.form(), v).map((d) => (d.includes('class="pl seal') ? "그림" : "글자")) };
     });
-    assert.deepStrictEqual(r.seq.slice(0, 2), ["그림", "자르기"], "교환권 그림이 맨 앞 · 바로 잘림");
-    assert.strictEqual(r.seq.filter((x) => x === "그림").length, 1, "그림은 교환권 한 장");
-    const rest = r.seq.slice(2).join("\n");
+    // 위 띠 그림 → 교환권 글(프린터 글자) → 아래 띠 그림 → 자르기 → 입장권
+    assert.strictEqual(r.seq[0], "그림", "교환권 맨 앞은 위 띠");
+    const iCut = r.seq.indexOf("자르기");
+    assert.strictEqual(r.seq[iCut - 1], "그림", "아래 띠 바로 뒤 자르기");
+    assert.deepStrictEqual(r.seq.slice(1, iCut - 1).filter((x) => !/^=+$/.test(x)), ["수제한돈까스", "1EA 교환권", "분실 시 이벤트 교환권 재발행 불가합니다.", "당일 준비량이 소진 되었을 수 있습니다.", "본 사은권의 사용기한은 없습니다."], "가운데는 사장님이 쓴 그대로 글자");
+    assert.strictEqual(r.seq.filter((x) => x === "그림").length, 2, "그림은 위아래 띠 두 장");
+    assert.ok(r.bytes < 8500 && r.secs9600 < 10, "9600bps 에서 10초 안 " + JSON.stringify([r.bytes, r.secs9600]));
+    const rest = r.seq.slice(iCut + 1).join("\n");
     assert.match(rest, /재방문 이벤트 성공!/, "2번 성공은 입장권 안에 글자로");
     assert.doesNotMatch(rest, /수제한돈까스|교환권 재발행/, "교환권 글은 그림 안에만");
     assert.deepStrictEqual(r.docs, ["그림", "글자"], "Windows 프린터: 교환권 장 · 입장권 장");
@@ -177,8 +194,8 @@ test("시험 출력 시간 어림 (현장 10/17 'COM1 액세스 거부'): 쿠폰
       P.mode = "win"; out.win = T.printSecs(T.form(), T.evSample(1)); P.mode = "com"; P.baud = 9600; E.seal = true;
       return out;
     });
-    assert.ok(r.fast > 1 && r.fast < 8, "115200bps 쿠폰 그림 (조각마다 기다림 포함) " + r.fast);
-    assert.ok(r.slow > 10, "9600bps 쿠폰 그림은 오래 " + r.slow);
+    assert.ok(r.fast > 0.3 && r.fast < 3, "115200bps 쿠폰 띠 (조각마다 기다림 포함) " + r.fast);
+    assert.ok(r.slow > 3 && r.slow < 10, "9600bps 도 10초 안 (위아래 띠만 그림) " + r.slow);
     assert.ok(r.text < 3 && r.guide < 3, "글만이면 금방 " + JSON.stringify(r));
     assert.strictEqual(r.win, 0, "Windows 프린터는 어림 없음");
     // 체험판 [2번 성공으로 시험 출력]: 걸리는 초를 알려 줌
@@ -187,6 +204,7 @@ test("시험 출력 시간 어림 (현장 10/17 'COM1 액세스 거부'): 쿠폰
     await page.click("[data-act=evTpl][data-i='1']");
     await page.click("[data-act=evTest]");
     assert.match(await page.textContent("#toast"), /시험 출력 \(COM1 · 9600, 체험\) \(쿠폰 그림이라 \d+초쯤 걸려요\)/);
+    assert.strictEqual(await page.$$eval("#ev-paper .seal img", (a) => a.length), 2, "미리보기도 위아래 띠 두 장");
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();
