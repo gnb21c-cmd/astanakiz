@@ -2258,9 +2258,6 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c && /^[0-9a-f]{32}$/.test(c.sealKey || "")) SEAL.key = c.sealKey; else { SEAL.key = sealNewKey(); window.desk.config.set({ sealKey: SEAL.key }); } sealCache.clear(); }).catch(() => {});
   else { try { SEAL.key = localStorage.getItem("astanakiz-sealkey") || ""; } catch (e) { /* 없음 */ } if (!SEAL.key) { SEAL.key = sealNewKey(); try { localStorage.setItem("astanakiz-sealkey", SEAL.key); } catch (e) { /* 저장 못 해도 동작 */ } } }
   const sealCache = new Map();
-  /* POS 프린터(COM)로 그림을 보낼 때 (현장 10/18 OK-50): 감열 프린터는 빽빽한 그림을 천천히 찍는데 데스크는 흐름 제어 없이 보냄
-     → 한 번에 SEAL_ROWS 줄(72바이트 × 24 = 1.7KB)씩 · 조각마다 다 보내진 뒤 SEAL_WAIT ms 더 쉬어 프린터가 찍을 틈 (3mm 에 0.15초) */
-  const SEAL_ROWS = 24, SEAL_WAIT = 150;
   /** 이어진 쿠폰 줄 앞뒤에 보안 무늬 띠(위 · 아래)를 끼움 — 쿠폰 줄은 그대로 글자 (자르기 줄은 띠 밖) */
   function withSeal(lines, v) {
     if (!EV.seal || !lines.some((x) => x.gift)) return lines;
@@ -2284,46 +2281,50 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     let a = h1 >>> 0;
     return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
   }
-  const SEAL_W = 576; // 80mm 감열지 인쇄 폭 72mm = 576점 (8점/mm)
-  const SEAL_H = 16; // 띠 한 장 높이(점) = 2mm — 가로 두 줄 + 작은 글씨 (두 장 2.3KB · 9600bps 2.4초)
-  /** 보안 띠 그림 (x.part: top = 가로 두 줄 위 · 작은 글씨 아래 / bot = 작은 글씨 위 · 가로 두 줄 아래 — 둘이 쿠폰 글을 감쌈) → { url(미리보기 · Windows), chunks(ESC/POS 조각) } */
+  /* 띠 = 사용자 정의 문자 (현장 10/18 1.48 사진: 그림(GS v 0) 바로 앞뒤로 보낸 것이 사라짐 — 교환권 '===' · 자르기 전 여백(그래서 너무 일찍 잘림) · 입장권 열쇠 · 이름 · 전화)
+     → 그림을 안 씀: 가로 두 줄 + 작은 글씨를 글꼴 A 한 칸(12×24점) 모양 k 개로 나눠 프린터에 등록(ESC &)하고, 보통 글자처럼 한 줄(42칸)로 찍음 (ESC % 1)
+     - 글자 출력은 이 프린터에서 늘 잘 됨 · 띠 한 줄 = 모양 등록 약 300바이트 + 42칸 → 두 줄 0.7KB · 9600bps 0.7초
+     - 위 띠 = 'A'~ 자리 · 아래 띠 = 'a'~ 자리에 따로 등록 (앞 줄을 찍는 중에 모양이 바뀌지 않게) · ESC @ 하면 지워지므로 찍을 때마다 다시 등록 */
+  const UDC_W = 12, UDC_H = 24; // 글꼴 A 한 칸 (점)
+  /** 보안 띠 (x.part: top = 가로 두 줄 위 · 작은 글씨 아래 / bot = 작은 글씨 위 · 가로 두 줄 아래 — 둘이 쿠폰 글을 감쌈) → { url(미리보기 · Windows), bytes(ESC/POS), w, h } */
   function sealOf(x) {
     const key = JSON.stringify([SEAL.key, x.meta, x.part]);
     if (sealCache.has(key)) return sealCache.get(key);
-    const W = SEAL_W, H = SEAL_H, R = sealRand(`${SEAL.key}|${x.meta.day}`), bot = x.part === "bot";
+    const R = sealRand(`${SEAL.key}|${x.meta.day}`), bot = x.part === "bot";
     const md = `${x.meta.day.slice(5, 7)}${x.meta.day.slice(8, 10)}`; // 띠 글씨의 월일
     const FONT = `"Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans CJK KR", sans-serif`;
-    const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
-    const g = cv.getContext("2d");
-    g.fillStyle = "#fff"; g.fillRect(0, 0, W, H); g.fillStyle = "#000"; g.strokeStyle = "#000";
-    // ① 가로 두 줄 (굵은 줄이 바깥)
-    const edge = (yy, wd) => { g.lineWidth = wd; g.beginPath(); g.moveTo(3, yy); g.lineTo(W - 3, yy); g.stroke(); };
-    if (bot) { edge(H - 1.5, 2); edge(H - 4.5, 1); } else { edge(1.5, 2); edge(4.5, 1); }
-    // ② 작은 글씨 'ASTANAKIDS·월일·' 반복 — 시작 위치는 그날 · 매장마다 다름 (위 띠 · 아래 띠도 서로 다름)
-    const shift = Math.floor(R() * 90) + (bot ? 37 : 0);
-    g.save(); g.beginPath(); g.rect(3, 0, W - 6, H); g.clip();
+    const unit = `ASTANAKIDS·${md}·`;
+    // ① 한 벌('ASTANAKIDS·월일·')을 칸 k 개 너비(K)에 맞춰 그림 — 가로 두 줄 + 작은 글씨
+    const cv = document.createElement("canvas"), g = cv.getContext("2d");
+    g.font = `bold 9px ${FONT}`;
+    const k = Math.max(1, Math.min(12, Math.ceil(g.measureText(unit).width / UDC_W))), K = k * UDC_W;
+    cv.width = K; cv.height = UDC_H;
+    g.fillStyle = "#fff"; g.fillRect(0, 0, K, UDC_H); g.fillStyle = "#000";
+    if (bot) { g.fillRect(0, 15, K, 1); g.fillRect(0, 18, K, 2); } else { g.fillRect(0, 0, K, 2); g.fillRect(0, 4, K, 1); }
     g.font = `bold 9px ${FONT}`; g.textBaseline = "alphabetic";
-    const unit = `ASTANAKIDS·${md}·`, uw = g.measureText(unit).width;
-    let t = ""; while (g.measureText(t).width < W + uw * 2) t += unit;
-    g.fillText(t, 3 - (shift % Math.ceil(uw)), bot ? 9 : H - 1);
-    g.restore();
-    // ③ 1비트로 (감열지는 검정 · 흰색만) → 미리보기도 찍히는 그대로
-    const im = g.getImageData(0, 0, W, H), d = im.data, bpr = W / 8, bits = new Uint8Array(bpr * H);
-    for (let yy = 0; yy < H; yy++) for (let xx = 0; xx < W; xx++) {
-      const i = (yy * W + xx) * 4, black = d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11 < 150;
-      if (black) bits[yy * bpr + (xx >> 3)] |= 0x80 >> (xx & 7);
-      d[i] = d[i + 1] = d[i + 2] = black ? 0 : 255; d[i + 3] = 255;
+    const uw = g.measureText(unit).width;
+    g.save(); g.scale(K / uw, 1); g.fillText(unit, 0, bot ? 11 : 17); g.restore(); // 칸에 딱 맞게 살짝 늘림 → 띠가 끊김 없이 이어짐
+    const d = g.getImageData(0, 0, K, UDC_H).data, black = (xx, yy) => { const i = (yy * K + xx) * 4; return d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11 < 150; };
+    // ② 칸마다 글자 모양 — 세로 3바이트(위가 높은 비트) × 가로 12줄
+    const glyphs = [];
+    for (let c = 0; c < k; c++) {
+      const gl = [];
+      for (let xx = 0; xx < UDC_W; xx++) for (let by = 0; by < 3; by++) { let v = 0; for (let bit = 0; bit < 8; bit++) if (black(c * UDC_W + xx, by * 8 + bit)) v |= 0x80 >> bit; gl.push(v); }
+      glyphs.push(gl);
     }
-    g.putImageData(im, 0, 0);
-    // GS v 0 래스터 — SEAL_ROWS 줄씩 조각내 조각마다 따로 (현장 10/18: 128줄 9KB 씩 몰아 보내니 프린터 버퍼가 넘쳐 첫 조각만 찍힘)
-    const raster = [], chunks = [];
-    for (let y0 = 0; y0 < H; y0 += SEAL_ROWS) {
-      const hh = Math.min(SEAL_ROWS, H - y0), one = [0x1d, 0x76, 0x30, 0, bpr & 255, bpr >> 8, hh & 255, hh >> 8];
-      for (let i = y0 * bpr; i < (y0 + hh) * bpr; i++) one.push(bits[i]);
-      raster.push(...one);
-      chunks.push(btoa(String.fromCharCode.apply(null, one)));
-    }
-    const out = { url: cv.toDataURL("image/png"), raster, chunks, w: W, h: H };
+    // ③ 한 줄 42칸: 시작 칸은 매장 비밀값 + 날짜로 (위 · 아래 띠도 다름)
+    const shift = Math.floor(R() * k) + (bot ? Math.floor(k / 2) : 0);
+    const seq = Array.from({ length: LINE_COLS }, (_, i) => (i + shift) % k);
+    const base = bot ? 0x61 : 0x41; // 'a'~ · 'A'~
+    const bytes = [0x1b, 0x61, 0, 0x1b, 0x26, 3, base, base + k - 1];
+    for (const gl of glyphs) bytes.push(UDC_W, ...gl);
+    bytes.push(0x1b, 0x25, 1, ...seq.map((i) => base + i), 0x0a, 0x1b, 0x25, 0);
+    // 미리보기 · Windows 프린터: 찍히는 그대로 (42칸 × 12점)
+    const pv = document.createElement("canvas"); pv.width = LINE_COLS * UDC_W; pv.height = UDC_H;
+    const pg = pv.getContext("2d"), im = pg.createImageData(pv.width, UDC_H);
+    seq.forEach((gi, col) => { for (let xx = 0; xx < UDC_W; xx++) for (let yy = 0; yy < UDC_H; yy++) { const on = black(gi * UDC_W + xx, yy), j = (yy * pv.width + col * UDC_W + xx) * 4; im.data[j] = im.data[j + 1] = im.data[j + 2] = on ? 0 : 255; im.data[j + 3] = 255; } });
+    pg.putImageData(im, 0, 0);
+    const out = { url: pv.toDataURL("image/png"), bytes, w: pv.width, h: UDC_H, k };
     if (sealCache.size > 40) sealCache.clear();
     sealCache.set(key, out);
     return out;
@@ -2333,8 +2334,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   function escposParts(text, v, cut) {
     const P = [{ b: [0x1b, 0x40] }, { b: [0x1c, 0x26] }]; // 초기화 · 한글 모드
     for (const x of withSeal(receiptLines(text, v), v)) {
-      // 쿠폰 = 보안 무늬 그림 (GS v 0 래스터, base64) — 조각마다 w: 다 보내질 때까지 + 프린터가 찍을 틈만큼 기다림 (main.js ESC_PS)
-      if (x.k === "seal") { P.push({ b: [0x1b, 0x61, 0] }); for (const c of sealOf(x).chunks) P.push({ r: c, w: SEAL_WAIT }); continue; }
+      if (x.k === "seal") { P.push({ b: sealOf(x).bytes }); continue; } // 쿠폰 보안 띠 = 등록한 글자 한 줄 (그림 아님 · 현장 10/18)
       if (x.k === "cut") { P.push({ b: [0x1b, 0x61, 0, 0x1b, 0x64, PRINT.feed, 0x1d, 0x56, 0x01] }); continue; } // [자르기]: 여백만큼 올리고 부분 자르기 (끝 자르기와 같은 명령)
       if (x.k === "hr" || x.k === "hr2") { P.push({ b: [0x1b, 0x61, 0] }, { t: (x.k === "hr2" ? "=" : "-").repeat(LINE_COLS) + "\n" }); continue; }
       P.push({ b: [0x1b, 0x61, x.k === "txt" ? 0 : 1] }); // 왼쪽 · 가운데
@@ -2369,7 +2369,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       .bd { font-weight: 700; }
       .hr { border-top: 1px dashed #000; margin: 2mm 0; }
       .hr2 { border-top: 3px double #000; }
-      .seal img { display: block; width: 72mm; image-rendering: pixelated; }
+      .seal img { display: block; width: 63mm; image-rendering: pixelated; } /* 띠 = 42칸 × 12점 (글자 줄 폭) */
     </style></head><body>${linesHtml(lines)}</body></html>`;
   }
   /** 양식대로 출력. 돌려주는 글은 알림에 붙임. 출력 결과는 따로 알림 */
@@ -3303,7 +3303,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     async evTest() {
       if (!printerReady()) { toast("운영 설정 → 프린터에서 영수증 프린터를 먼저 정해 주세요"); return; }
       const text = evBaseForm(), v = evSample(EV.cur === EV_BASE ? 0 : EV.cur), secs = printSecs(text, v);
-      const wait = secs >= 3 ? ` (쿠폰 그림이라 ${Math.ceil(secs)}초쯤 걸려요)` : "";
+      const wait = secs >= 3 ? ` (${Math.ceil(secs)}초쯤 걸려요)` : "";
       if (!APP || !window.desk.print) { toast(`${ro(evName(EV.cur))} 시험 출력 (${printerName()}, 체험)${wait}`); return; }
       // 보내는 중에 또 누르면 같은 포트를 두 번 열게 됨 (현장 10/17 'COM1 액세스 거부') → 끝날 때까지 막음
       if (PRINT.busy) { toast("앞 출력을 아직 보내는 중이에요 — 끝나면 다시 눌러 주세요"); return; }
