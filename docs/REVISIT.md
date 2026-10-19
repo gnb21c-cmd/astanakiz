@@ -9,7 +9,7 @@
 
 날마다의 누계는 안 남김 (사장님: 없어도 됨). **매일 20:00 (POS 가 꺼져 있지 않은 때 — 사장님 10/19) 키즈 데스크가 보내 줌** — 지금까지 모은 것을 덮어씀.
 
-**보고 앱 쪽은 끝남 (2026-10-19, gnb21c-cmd/Report main `30b4a11`)**: 화면 `apps/view/src/screens/KidsDetail.tsx RevisitCard` · 검사 `packages/core/src/deskRevisit.ts` · 규칙 `firebase/firestore.rules deskStats` · 안내 report `docs/KIDS_REVISIT.md`. 남은 것: ① Firebase 콘솔 규칙 붙여 넣기(사장님 한 번) ② 통합데스크 새 판 설치 · 보고 열쇠 (그 뒤로는 20:00 마다 저절로)
+**보고 앱 쪽은 끝남 (2026-10-19, gnb21c-cmd/Report main `30b4a11`)**: 화면 `apps/view/src/screens/KidsDetail.tsx RevisitCard` · 검사 `packages/core/src/deskRevisit.ts` · 규칙 `firebase/firestore.rules deskStats` · 안내 report `docs/KIDS_REVISIT.md`. 남은 것: ① Firebase 콘솔 규칙 붙여 넣기(사장님 한 번) ② 통합데스크 1.50 설치 · 보고 열쇠 (그 뒤로는 20:00 마다 저절로)
 
 ## 무엇을 '방문'으로 세나
 - **방문 = 그날 네이버 이용완료** (같은 날 여러 장 · 여러 건 = 한 번) · 현장구매(이름 · 전화번호 없음)는 안 셈
