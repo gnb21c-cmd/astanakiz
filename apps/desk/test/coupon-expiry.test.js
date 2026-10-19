@@ -62,16 +62,17 @@ test("쿠폰 사용기한: 처음 1개월 · 일로 바꾸면 그날 + n일 · �
     const box = await page.evaluate(() => document.getElementById("sheet").getBoundingClientRect().bottom);
     assert.ok(box <= 768, "설정 화면 안 " + box);
 
-    // 다시 켜도 그대로 · 실제 손님 입장권(오늘 날짜 기준)
+    // 다시 켜도 그대로 (저장한 설정을 켤 때처럼 다시 읽음 — 체험판 저장소는 새로고침 순간 아직 안 써졌을 수 있어 새로고침 대신) · 실제 손님 입장권(오늘 날짜 기준)
     await page.fill("#ev-use", "2");
     await page.selectOption("#ev-useu", "개월");
-    await page.reload();
     const real = await page.evaluate(() => {
-      const T = window.__deskTest, E = T.EV_();
+      const T = window.__deskTest, E = T.EV_(), saved = JSON.parse(localStorage.getItem("astanakiz-visitevent"));
+      E.useN = 9; E.useUnit = "일"; T.evLoadCfg(saved);
+      const old = Object.assign({}, saved); delete old.useN; delete old.useUnit; T.evLoadCfg(old); const was = [E.useN, E.useUnit]; T.evLoadCfg(saved);
       const t = (v) => T.receiptLines("^*사용기한 {사용기한}까지", v).map((l) => l.t.trim()).join("|");
-      return { n: E.useN, u: E.useUnit, today: t({ 날짜: "2026-10-05" }), other: t({ 날짜: "2026-10-20" }), given: t({ 날짜: "2026-10-05", 사용기한: "직접" }) };
+      return { was, n: E.useN, u: E.useUnit, today: t({ 날짜: "2026-10-05" }), other: t({ 날짜: "2026-10-20" }), given: t({ 날짜: "2026-10-05", 사용기한: "직접" }) };
     });
-    assert.deepStrictEqual(real, { n: 2, u: "개월", today: "사용기한 12월 5일까지", other: "사용기한 12월 20일까지", given: "사용기한 직접까지" }, "입장권 날짜(쿠폰 나간 날) 기준");
+    assert.deepStrictEqual(real, { was: [1, "개월"], n: 2, u: "개월", today: "사용기한 12월 5일까지", other: "사용기한 12월 20일까지", given: "사용기한 직접까지" }, "입장권 날짜(쿠폰 나간 날) 기준 · 예전 설정(사용기한 없음)은 1개월");
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();

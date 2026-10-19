@@ -122,7 +122,7 @@ test("재방문 이벤트: 시작일 ~ 종료일 · 켜는 순간부터 마일�
     assert.ok(t.some((l) => /네이버 예약 9번/.test(l)) && !t.includes("재방문 이벤트"), t.join(" | "));
     assert.match(await card(page, 840, "전시윤"), /10번째 예약완료 · 이벤트 기간 방문 \(마일리지 9\)/, "이벤트 기간에 온 예약은 마일리지에 안 들어감");
     assert.doesNotMatch(await card(page, 840, "전시윤"), /사은권/);
-    assert.match(await card(page, 990, "전시윤"), /완료 10 − 이벤트 1 → 10번 완료 예정 2만원 사은권 증정/, "끝난 뒤 다음 방문: 네이버 11번째 · 마일리지 10번째");
+    assert.match(await card(page, 990, "전시윤"), /완료 9 → 10번 완료 예정 2만원 사은권 증정 \(네이버 완료 10 − 이벤트 1\)/, "끝난 뒤 다음 방문: 네이버 11번째 · 마일리지 10번째");
     assert.match(await card(page, 840, "홍예준"), /완료 10 → 11번 완료 예정/, "장부에 없는 손님은 네이버 완료 그대로");
     assert.strictEqual(await page.evaluate(() => window.__deskTest.evSub("전시윤")), 1);
 
@@ -228,9 +228,9 @@ test("이벤트가 끝나면: 명단에 있는 손님은 네이버 완료 − �
       localStorage.setItem("astanakiz-visitlog-2026-09-01", [L("E1", "2026-09-02", "01020261327", "전시윤", 7, 6, "안내"), L("E2", "2026-09-10", "01020261327", "전시윤", 8, 6, "성공"), L("E3", "2026-09-25", "01020261327", "전시윤", 9, 6, "안내"), L("E4", "2026-09-20", "01020269246", "홍예준", 10, 9, "안내")].join("\n") + "\n");
     });
     await page.goto(DESK);
-    assert.match(await card(page, 840, "전시윤"), /완료 9 · 취소 1 − 이벤트 3 → 7번 완료 예정/);
+    assert.match(await card(page, 840, "전시윤"), /완료 6 · 취소 1 → 7번 완료 예정 \(네이버 완료 9 − 이벤트 3\)/, "끝나면 원래 모양 · 완료 = 마일리지 (사장님 10/19)");
     assert.doesNotMatch(await card(page, 840, "전시윤"), /사은권|멈춤|이벤트 안내/, "네이버로는 10번째지만 마일리지 7번째 → 사은권 아님");
-    assert.match(await card(page, 840, "홍예준"), /완료 10 − 이벤트 1 → 10번 완료 예정 2만원 사은권 증정/, "네이버로는 11번째 · 마일리지 10번째 → 사은권");
+    assert.match(await card(page, 840, "홍예준"), /완료 9 → 10번 완료 예정 2만원 사은권 증정 \(네이버 완료 10 − 이벤트 1\)/, "네이버로는 11번째 · 마일리지 10번째 → 사은권");
     assert.match(await card(page, 840, "류하린"), /완료 9 → 10번 완료 예정 2만원 사은권 증정/, "이벤트 기간에 안 온 손님은 그대로");
     await openEvent(page);
     assert.match(await page.textContent("#sheet .evstate"), /끝남 — 9월 1일 ~ 9월 30일 · 기간 동안 이용완료는 마일리지에서 빼고 셈/);
