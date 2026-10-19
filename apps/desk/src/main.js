@@ -630,7 +630,7 @@ function surveyKey() {
   try { return settings.surveyKeyEnc ? safeStorage.decryptString(Buffer.from(settings.surveyKeyEnc, "base64")) : ""; } catch (e) { return ""; }
 }
 ipcMain.handle("config:get", () => {
-  const { amanoPwEnc, surveyKeyEnc, ...rest } = settings;
+  const { amanoPwEnc, surveyKeyEnc, visitSalt, ...rest } = settings; // visitSalt(방문 기록 해시 비밀값)는 화면에 안 줌
   const k = surveyKey();
   return { ...rest, hasAmanoPw: !!amanoPwEnc, hasSurveyKey: !!k, surveyKeyTail: k ? k.slice(-4) : "", build: BUILD };
 });
@@ -653,6 +653,7 @@ ipcMain.handle("config:set", (_e, patch) => {
   }
   delete patch.surveyKey;
   delete patch.surveyKeyEnc;
+  delete patch.visitSalt; // 바꾸면 지난 방문 기록과 이어지지 않음
   settings = { ...settings, ...patch };
   saveSettings();
   if (urlChanged) openAmano();
@@ -784,6 +785,95 @@ async function liveSend(json, at) {
   }
 }
 ipcMain.handle("live:send", (_e, job) => liveSend(String((job && job.json) || ""), job && job.at));
+
+// ── 재방문 간격 (사장님 10/19): 네이버 예약 손님이 며칠 만에 다시 오는지 → 보고 앱 '네이버 판매 수' 맨 위 ──
+//   이 PC 앱 폴더 visit-history.json 에 날마다 네이버 이용완료한 손님만 (전화번호(없으면 이름)를 이 PC 비밀값 visitSalt 와 섞은 해시 · visit-history.js)
+//   ① 데스크 입장 처리 때마다 그날 손님을 더함 (history:add)
+//   ② 지난 방문 기록 읽기 (매일 20:00 보낸 뒤 데스크가 저절로 · 또는 [지난 방문 기록 읽기]): 네이버 예약현황을 어제부터 거꾸로 하루씩 [이용완료] 칸만 읽음 (history:backfill) — 네이버 일 줄에 하루씩 끼워
+//      데스크 불러오기 · 이용완료가 막히지 않게 · 이미 네이버로 읽은 날은 건너뜀(멈췄다 다시 눌러도 이어서) · 다 읽으면 네이버를 오늘로 돌려놓음
+//   ③ 매일 20:00 데스크가 일수 모음(손님 정보 없음 · astanakiz-revisit)을 같은 보고 열쇠로 boards/{열쇠}/deskStats/revisit 에 덮어씀 (history:send)
+const visitHistory = require("./visit-history");
+let visitHist = null;
+const histDir = () => app.getPath("userData");
+const histGet = () => visitHist || (visitHist = visitHistory.load(histDir()));
+function histSalt() {
+  if (!/^[0-9a-f]{32}$/.test(settings.visitSalt || "")) { settings.visitSalt = require("crypto").randomBytes(16).toString("hex"); saveSettings(); }
+  return settings.visitSalt;
+}
+const histKeys = (keys) => (Array.isArray(keys) ? keys : []).map((k) => String(k || "").trim()).filter(Boolean).map((k) => visitHistory.hashKey(histSalt(), k));
+/** 네이버 카드 → 손님 키 (데스크 장부와 같게: 전화번호 숫자, 없으면 '이름:…') */
+const visitKey = (v) => { const d = String(v.phone || "").replace(/\D/g, ""); return d || (v.name ? "이름:" + v.name : ""); };
+const isDayKey = (d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d || ""));
+const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+ipcMain.handle("history:add", (_e, job) => {
+  try {
+    const h = histGet();
+    if (visitHistory.setDay(h, String((job && job.day) || ""), histKeys(job && job.keys), "desk")) visitHistory.save(histDir(), h);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, why: String(e.message || e) };
+  }
+});
+ipcMain.handle("history:stats", (_e, opts) => {
+  try { return { ok: true, stats: visitHistory.stats(histGet(), opts || {}) }; } catch (e) { return { ok: false, why: String(e.message || e) }; }
+});
+let histJob = null; // { running, from, to, day, done, total, visits, why, stop }
+const histJobView = () => {
+  const h = histGet(), days = Object.keys(h.days).sort();
+  return { ok: true, job: histJob ? { running: histJob.running, from: histJob.from, to: histJob.to, day: histJob.day, done: histJob.done, total: histJob.total, visits: histJob.visits, why: histJob.why } : null,
+    history: { from: days[0] || "", to: days[days.length - 1] || "", days: days.length, naver: days.filter((d) => h.days[d].src === "naver").length } };
+};
+ipcMain.handle("history:job", () => histJobView());
+ipcMain.handle("history:stop", () => { if (histJob && histJob.running) histJob.stop = true; return histJobView(); });
+ipcMain.handle("history:backfill", (_e, job) => {
+  const from = String((job && job.from) || ""), to = String((job && job.to) || "");
+  if (histJob && histJob.running) return histJobView();
+  if (!isDayKey(from) || !isDayKey(to) || from > to) return { ok: false, why: "기간이 틀림" };
+  if (!naver) return { ok: false, why: "네이버 창이 아직 열리지 않음" };
+  const h = histGet(), days = [];
+  for (let d = to; d >= from; d = visitHistory.shiftDay(d, -1)) if (!(h.days[d] && h.days[d].src === "naver")) days.push(d); // 어제부터 거꾸로
+  histJob = { running: true, from, to, day: "", done: 0, total: days.length, visits: 0, why: "", stop: false };
+  const me = histJob;
+  (async () => {
+    for (const d of days) {
+      if (me.stop) { me.why = "멈춤 — 다시 누르면 이어서"; break; }
+      me.day = d;
+      const r = await serial("naver", () => timed(naver.loadDone(d), 300000, "네이버 응답이 5분 넘게 없음")).catch((e) => ({ ok: false, why: String(e.message || e) }));
+      if (!r || !r.ok) { me.why = `${d.slice(5).replace("-", "/")} 못 읽음: ${(r && r.why) || "응답 없음"} — 다시 누르면 이어서`; break; }
+      visitHistory.setDay(h, d, histKeys(r.visits.map(visitKey)), r.warn ? "desk" : "naver"); // 못 읽은 칸이 있으면 다음에 다시 읽음
+      try { visitHistory.save(histDir(), h); } catch (e) { me.why = `기록 파일을 못 씀: ${e.message || e}`; break; }
+      me.done++;
+      me.visits += r.visits.length;
+    }
+    // 네이버 예약현황을 오늘로 돌려놓음 (데스크 불러오기는 오늘 근처에서 하루씩 움직임)
+    await serial("naver", () => timed(naver.goView("calendar").then((g) => (g.ok ? naver.goDate(localToday()) : g)), 300000, "")).catch(() => {});
+    me.running = false;
+  })();
+  return histJobView();
+});
+ipcMain.handle("history:send", async (_e, job) => {
+  const json = String((job && job.json) || "");
+  if (!/^[{][\s\S]*astanakiz-revisit/.test(json)) return { ok: false, code: 0, why: "모양이 틀림" };
+  if (json.length >= 20000) return { ok: false, code: 0, why: "글이 너무 길어요" };
+  return boardPatch("deskStats/revisit", json, job && job.at, "deskStats");
+});
+/** 보고 시스템 클라우드 boards/{보고 열쇠}/{문서} 에 { json, at } 덮어쓰기 — 200 = 보냄 / 403 = 열쇠나 모양이 틀림(규칙이 아직 없을 때도) */
+async function boardPatch(doc, json, at, rule) {
+  const key = surveyKey();
+  if (!key) return { ok: false, code: 0, why: "보고 열쇠 없음" };
+  const body = JSON.stringify({ fields: { json: { stringValue: json }, at: { stringValue: String(at || "").slice(0, 39) } } });
+  try {
+    const { net } = require("electron");
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(), 15000);
+    const r = await net.fetch(`${INBOX_BASE}/boards/${encodeURIComponent(key)}/${doc}`, { method: "PATCH", headers: { "content-type": "application/json; charset=utf-8" }, body, signal: ac.signal });
+    clearTimeout(t);
+    if (r.status === 200) return { ok: true, code: 200 };
+    return { ok: false, code: r.status, why: r.status === 403 ? `열쇠나 모양이 틀림 (403) — 보고 시스템 규칙에 ${rule} 가 있는지` : `응답 ${r.status}` };
+  } catch (err) {
+    return { ok: false, code: 0, why: `인터넷 오류: ${err && err.name === "AbortError" ? "응답 없음" : err && err.message ? err.message : err}` };
+  }
+}
 
 // ── 영수증 프린터 (80mm 감열지) ──
 // Windows 에 설치된 프린터 목록 (POS 프린터도 Windows 에 드라이버가 깔려 있어야 보임 — '설정 → 프린터 및 스캐너' 에 있는 것)

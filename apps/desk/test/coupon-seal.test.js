@@ -100,11 +100,12 @@ test("쿠폰 보안 띠: 성공 입장권의 쿠폰 위아래에 등록 글자(E
       const a = T.sealOf(mk("2026-10-05")).url;
       T.sealClear();
       const a2 = T.sealOf(mk("2026-10-05")).url, b = T.sealOf(mk("2026-10-06")).url;
-      const key = T.SEAL.key; T.SEAL.key = "0123456789abcdef0123456789abcdef"; T.sealClear();
-      const c = T.sealOf(mk("2026-10-05")).url;
+      // 비밀값마다 시작 칸이 다름 — 칸이 k(6~12)개뿐이라 두 비밀값이 우연히 같을 수 있어 정해 둔 비밀값 넷으로 (무작위 비밀값 하나와 견주면 1/k 쯤 같게 나와 시험이 흔들림)
+      const key = T.SEAL.key, urls = new Set();
+      for (const k of ["0123456789abcdef0123456789abcdef", "fedcba9876543210fedcba9876543210", "00112233445566778899aabbccddeeff", "a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5"]) { T.SEAL.key = k; T.sealClear(); urls.add(T.sealOf(mk("2026-10-05")).url); }
       T.SEAL.key = key; T.sealClear();
       const bot = T.sealOf({ k: "seal", part: "bot", meta: { day: "2026-10-05" } });
-      return { same: a === a2, day: a !== b, key: a !== c, keyLen: key.length, botDiff: bot.url !== a, size: [T.sealOf(mk("2026-10-05")).w, T.sealOf(mk("2026-10-05")).h, bot.w, bot.h] };
+      return { same: a === a2, day: a !== b, key: urls.size >= 2, keyLen: key.length, botDiff: bot.url !== a, size: [T.sealOf(mk("2026-10-05")).w, T.sealOf(mk("2026-10-05")).h, bot.w, bot.h] };
     });
     assert.deepStrictEqual(same.size, [504, 24, 504, 24], "띠 미리보기 = 42칸 × 12점 · 24줄");
     delete same.size;

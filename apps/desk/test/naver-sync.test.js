@@ -154,3 +154,49 @@ test("로그인이 풀린 화면이면 로그인하라고 알려 줌", async () 
     await browser.close();
   }
 });
+
+test("지난 방문 기록 읽기(사장님 10/19): 그날 [이용완료] 칸만 열어 입장권 이용완료 손님만 · 기억 안 남김 · 열흘 전 날짜로 갔다가 돌아옴", async () => {
+  const { browser, page, sync } = await open();
+  try {
+    // 열흘 전(9/25) 이용완료 2건(같은 손님 두 시간 칸) · 확정 1건 · 단체 완료 1건
+    await page.evaluate(() => {
+      const d0 = JSON.parse(localStorage.getItem("mockNaver3") || "null") || JSON.parse(JSON.stringify(db)); // 가짜 화면의 10/5 예약은 그대로 두고 더함
+      d0["2026-09-25"] = [
+        { no: "9001", name: "김지난", phone: "010-1234-0001", time: "10:00", product: 0, qty: 1, status: "완료", done: 3, cancel: 0 },
+        { no: "9002", name: "김지난", phone: "010-1234-0001", time: "12:00", product: 0, qty: 1, status: "완료", done: 4, cancel: 0 },
+        { no: "9003", name: "박확정", phone: "010-1234-0002", time: "12:00", product: 0, qty: 1, status: "확정", done: 1, cancel: 0 },
+        { no: "9004", name: "단체", phone: "010-1234-0003", time: "10:00", product: 2, qty: 1, status: "완료", done: 0, cancel: 0 },
+      ];
+      localStorage.setItem("mockNaver3", JSON.stringify(d0));
+    });
+    const r = await sync.loadDone("2026-10-05");
+    assert.ok(r.ok, r.why);
+    assert.deepStrictEqual(r.visits.map((v) => [v.no, v.name, v.phone]).sort(), [["1367156204", "송나라", "010-6687-3285"], ["1368411002", "엄효정", "010-5358-6288"]], "10/5: 이용완료 입장권만 (확정 · 단체 · 취소 뺌)");
+    assert.strictEqual(sync.days.size, 0, "기억(days)에 안 남김 — 200일을 읽어도 메모리가 늘지 않게");
+    const old = await sync.loadDone("2026-09-25");
+    assert.ok(old.ok, old.why);
+    assert.deepStrictEqual(old.visits.map((v) => v.no).sort(), ["9001", "9002"]);
+    assert.strictEqual(old.cells, 2, "이용완료가 있는 입장권 칸만 엶");
+    const back = await sync.loadDay("2026-10-05");
+    assert.ok(back.ok, "지난 날 읽은 뒤 오늘로 돌아옴: " + back.why);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("날짜 이동 한도: 처음 본 날짜에서 떨어진 날 수만큼 (+10) — 62일 전(예전 한도 60 넘음)도 하루씩 가서 맞춤 · 하루씩 안 움직이면 멈춤", async () => {
+  // 가짜 화면: 바로 반응하는 예약현황 (진짜 화면 이동 없이 한도만 봄)
+  const st = { date: "2026-10-05" };
+  const shift = (k, n) => { const d = new Date(k + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  let steps = 0;
+  const exec = async (code) => {
+    const m = /stepDate\((-?\d+)\)/.exec(code);
+    if (m) { steps++; st.date = shift(st.date, Number(m[1])); return { ok: true }; }
+    return { page: "calendar", date: st.date, slots: [], cards: [] };
+  };
+  const sync = new NaverSync(exec, { timeout: 3000 });
+  const r = await sync.goDate("2026-08-04");
+  assert.ok(r.ok, r.why);
+  assert.strictEqual(steps, 62);
+  assert.strictEqual(st.date, "2026-08-04");
+});

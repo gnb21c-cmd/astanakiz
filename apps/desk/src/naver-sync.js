@@ -94,12 +94,14 @@ class NaverSync {
   async goDate(day) {
     let lastDir = 0;
     let flips = 0;
-    for (let i = 0; i < 60; i++) {
+    // 하루씩 움직임 — 처음 본 날짜에서 떨어진 날 수만큼 (+10) 까지 (지난 방문 기록 읽기는 200일 전까지 · 사장님 10/19)
+    for (let i = 0, max = 60; i < max; i++) {
       const s = await this.read();
       if (s.needLogin) return { ok: false, why: "네이버에 로그인해 주세요 (로그인할 때 '로그인 상태 유지'를 꼭 체크)" };
       if (!s.date) return { ok: false, why: "네이버 화면에서 날짜를 못 찾음" };
       if (s.dateRange) return { ok: false, why: "네이버 예약현황이 '일간'이 아님 — 네이버 화면에서 '일간'으로 바꿔 주세요" };
       if (s.date === day) return { ok: true, state: s };
+      if (i === 0) max = Math.max(60, Math.abs(Math.round((Date.parse(day) - Date.parse(s.date)) / 86400000)) + 10);
       const dir = s.date < day ? 1 : -1;
       this.step(`네이버 날짜 맞추는 중: ${s.date.slice(5)} → ${day.slice(5)}`);
       // 넘었다 돌아왔다를 되풀이하면 (한 번에 하루씩 움직이지 않는 화면) 멈춤
@@ -192,6 +194,25 @@ class NaverSync {
           proxy: !!x.proxy, visitor: x.visitor || "", unpaid: c.status === "확정" && !x.canComplete && !!x.canCancel && !/결제완료/.test(x.pay || "") }); // 대리예약 · 입금대기
       }
     return { ok: true, day, warn: warn.length ? `카드를 못 읽은 칸: ${warn.join(", ")}` : "", slots: slots.map((s) => ({ time: s.time, product: s.product, cap: s.avail + s.conf + s.done + s.apply, conf: s.conf + s.apply, done: s.done })), bookings };
+  }
+  /** 그날 이용완료한 입장권 예약만 { no, name, phone, time, qty } — 지난 방문 기록 읽기(재방문 간격 · 사장님 10/19)
+      [이용완료] 칸만 열고(확정은 안 엶) 기억(days)에 안 남김 → 200일을 읽어도 메모리가 늘지 않음 · 못 읽은 칸이 있으면 warn */
+  async loadDone(day) {
+    let g = await this.goView("calendar");
+    if (!g.ok) return g;
+    g = await this.goDate(day);
+    if (!g.ok) return g;
+    const slots = g.state.slots.filter((s) => this.isTicket(s.product) && s.done > 0);
+    this.step(`지난 기록 ${day.slice(5)} · 이용완료 칸 ${slots.length}개`);
+    const got = new Map(), warn = [];
+    for (const s of slots) {
+      const r = await this.readSlotCards(s.product, s.time, "이용완료");
+      if (!r.ok) return r;
+      if (!r.cards.length) { warn.push(s.time); continue; }
+      for (const c of r.cards) if (c.no && !got.has(c.no)) got.set(c.no, { no: c.no, name: c.name, phone: c.phone, time: s.time, qty: c.qty });
+    }
+    if (slots.length) await this.act("window.__naver.closePanel()");
+    return { ok: true, day, cells: slots.length, visits: [...got.values()], warn: warn.length ? `카드를 못 읽은 칸: ${warn.join(", ")}` : "" };
   }
   /** 이용완료 처리하고 실제로 완료로 바뀌었는지 확인 */
   async complete(b) {

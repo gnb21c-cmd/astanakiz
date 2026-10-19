@@ -43,6 +43,15 @@ contextBridge.exposeInMainWorld("desk", {
   survey: { send: (job) => ipcRenderer.invoke("survey:send", job) },
   // 폰 실시간 현황 (10/16) — 보고 열쇠로 클라우드 deskLive/now 에 덮어씀 → { ok, code, why }
   live: { send: (job) => ipcRenderer.invoke("live:send", job) },
+  // 재방문 간격 (사장님 10/19): 이 PC 방문 기록(해시) · 지난 기록 읽기 · 일수 모음 · 보고 앱으로
+  history: {
+    add: (job) => ipcRenderer.invoke("history:add", job),
+    stats: (opts) => ipcRenderer.invoke("history:stats", opts),
+    backfill: (job) => ipcRenderer.invoke("history:backfill", job),
+    job: () => ipcRenderer.invoke("history:job"),
+    stop: () => ipcRenderer.invoke("history:stop"),
+    send: (job) => ipcRenderer.invoke("history:send", job),
+  },
   // 방문 이벤트 참여자 기록 (이용완료마다 한 줄 · 10/14) — 앱 폴더 + 바탕화면 '아스타나키즈-이벤트' 두 곳 · 지우지 않음
   ledger: {
     load: (from) => ipcRenderer.sendSync("ledger:load", from), // 두 곳을 합친 글 (빠진 쪽은 채움)
