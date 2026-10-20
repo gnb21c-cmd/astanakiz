@@ -654,6 +654,7 @@ ipcMain.handle("config:set", (_e, patch) => {
   delete patch.surveyKey;
   delete patch.surveyKeyEnc;
   delete patch.visitSalt; // 바꾸면 지난 방문 기록과 이어지지 않음
+  if (patch.stockAuto && patch.stockAuto.on && !stockCfg().on) stockArm();
   settings = { ...settings, ...patch };
   saveSettings();
   if (urlChanged) openAmano();
@@ -896,12 +897,12 @@ ipcMain.handle("notes:set", (_e, job) => {
 //   예약 > 예약상품 > 상품 > [일정/가격] > [재고수정] > 날짜 > [다음] > [모든 회차] > 10 > [저장] (naver-stock.js · 실제 화면 사진 10/20)
 //   하루 네 번 기회: 10:30 → 실패하면 12:00 → 16:00 → 20:20 (어느 때든 성공하면 그날 남은 것은 안 함 · 그날 안에 끝내는 것이 목표)
 //   - 아직 안 연 날(모든 회차 0/0개)만 · 이미 연 날은 안 건드림 · 꺼져서 못 연 날은 마지막으로 연 날 뒤부터 이어서 (앞쪽에 비워 둔 날은 그대로)
-//   - 설정 settings.stockAuto { on, qty, ahead, products, skip } (데스크 운영 설정) · 결과 stockLast · 성공한 날 stockDoneDay · 그날 써 본 때 stockTried
+//   - 설정 settings.stockAuto { on(설치하면 켜짐), qty, ahead, products, skip } (데스크 운영 설정) · 결과 stockLast · 성공한 날 stockDoneDay · 그날 써 본 때 stockTried
 const { NaverStock, stockPlan, stockDue, shiftDay: stockShift } = require("./naver-stock");
 const STOCK_PRODUCTS = ["평일 무제한 / 휴일 1시간 50분 입장권", "야간자유 입장권"];
 const STOCK_TIMES = [[10, 30], [12, 0], [16, 0], [20, 20]];
 const stockCfg = () => {
-  const c = Object.assign({ on: false, qty: 10, ahead: 30, products: STOCK_PRODUCTS, skip: [] }, settings.stockAuto || {});
+  const c = Object.assign({ on: true, qty: 10, ahead: 30, products: STOCK_PRODUCTS, skip: [] }, settings.stockAuto || {}); // 설치하면 켜짐 (사장님 10/20)
   c.qty = Math.max(1, Math.min(99, Math.round(Number(c.qty)) || 10));
   c.ahead = Math.max(1, Math.min(90, Math.round(Number(c.ahead)) || 30));
   c.products = (Array.isArray(c.products) && c.products.length ? c.products : STOCK_PRODUCTS).map(String).filter(Boolean).slice(0, 5);
@@ -957,6 +958,13 @@ function stockRun(opts) {
   })();
   return stockView();
 }
+/** 재고 자동 오픈을 켤 때 (사장님 10/20): 오늘 이미 지난 때는 써 본 것으로 → 켜자마자 돌지 않고 다음 때에 처음 (18:40 에 켜면 20:20)
+    앱(POS)을 늦게 켠 날은 그대로 지난 때 것을 바로 한 번 */
+function stockArm() {
+  const today = localToday(), d = new Date();
+  const tried = settings.stockTried && settings.stockTried.day === today ? settings.stockTried.slots : [];
+  settings.stockTried = { day: today, slots: tried.concat(stockDue({ minutes: d.getHours() * 60 + d.getMinutes(), tried, times: STOCK_TIMES })) };
+}
 /** 30초마다: 켜져 있고 그날 아직 성공 못 했으면 10:30 · 12:00 · 16:00 · 20:20 중 지난 때(아직 안 써 본 것)에 한 번 — 늦게 켜도 지난 때 것을 바로 */
 function stockTick() {
   try {
@@ -964,6 +972,7 @@ function stockTick() {
     if (!c.on || !naver || (stockJob && stockJob.running)) return;
     const today = localToday();
     if (settings.stockDoneDay === today) return;
+    if (!settings.stockTried) { stockArm(); saveSettings(); return; } // 설치한 날: 켜자마자 돌지 않고 그날 남은 다음 때부터 (19시에 설치 → 20:20)
     const tried = settings.stockTried && settings.stockTried.day === today ? settings.stockTried.slots : [];
     const d = new Date();
     const due = stockDue({ minutes: d.getHours() * 60 + d.getMinutes(), tried, times: STOCK_TIMES });

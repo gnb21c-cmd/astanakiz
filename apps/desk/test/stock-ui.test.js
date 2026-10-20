@@ -51,6 +51,7 @@ test("재고 자동 오픈(앱): 켜기 · 확인만 · 지금 한 번(묻고) �
     await page.waitForFunction(() => /켜짐/.test(document.querySelector("[data-act=stToggle]").textContent));
     assert.deepStrictEqual((await page.evaluate(() => window.__st.cfgSets)).filter((p) => p.stockAuto).map((p) => p.stockAuto.on), [true]);
     assert.match(await page.textContent("#st-text"), /다음 12:00/, "10:30 은 써 봤고 지금 11:00 → 다음 12:00");
+    assert.match(await page.textContent("#toast"), /켰어요[\s\S]*오늘은 12:00에 처음/, "켜자마자 돌지 않음");
     // 확인만 해 보기 → 진행 → 끝 알림 (열 날)
     await page.click("[data-act=stDry]");
     assert.deepStrictEqual(await page.evaluate(() => window.__st.runs), [{ dry: true }]);

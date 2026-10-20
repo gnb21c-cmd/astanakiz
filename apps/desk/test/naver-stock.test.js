@@ -61,6 +61,11 @@ test("하루 네 번 기회: 10:30 → 실패하면 12:00 → 16:00 → 20:20 ·
   assert.deepStrictEqual(stockDue({ minutes: at(23, 0), tried: [0, 1, 2, 3] }), [], "네 번 다 써 보면 그날은 끝");
   assert.deepStrictEqual(stockDue({ minutes: at(13, 10) }), [0, 1], "13:10 에 켬 → 지난 10:30 · 12:00 을 한 번에 (한 번만 함) · 다음은 16:00");
   assert.deepStrictEqual(stockDue({ minutes: at(15, 0), tried: [0, 1] }), []);
+  // 스위치를 켤 때는 지난 때를 써 본 것으로 남김 (앱 본체 stockArm) → 18:40 에 켜면 바로 안 하고 20:20 에 처음
+  const armed = stockDue({ minutes: at(18, 40) });
+  assert.deepStrictEqual(armed, [0, 1, 2]);
+  assert.deepStrictEqual(stockDue({ minutes: at(20, 19), tried: armed }), [], "20:20 전엔 안 함");
+  assert.deepStrictEqual(stockDue({ minutes: at(20, 20), tried: armed }), [3], "20:20 에 처음");
 });
 
 test("재고 열기: 두 상품 같은 날짜(오늘 + 30일 = 11/19) · 0/0 → 0/10 · 이미 연 날은 그대로 · 저장한 것은 그 날짜 하나", async () => {
