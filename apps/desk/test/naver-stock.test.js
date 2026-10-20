@@ -159,3 +159,21 @@ test("현장 10/20 (1.52): 스마트플레이스 첫 화면 · 가게 사진 링
     await browser.close();
   }
 });
+
+test("재고 수 칸: 커서를 놓고 키보드로 쳐야 [저장]이 켜지는 칸 (사장님 10/20 사진) — 키보드로 10 · 키보드가 없으면 못 넣었다고 알리고 저장 안 함", async () => {
+  const browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
+  try {
+    const { page, saves } = await setup(browser, "&strict=1");
+    const { st: noKeys } = mkStock(page);
+    const bad = await noKeys.openDay({ product: P1, day: "2026-11-19", qty: 10 });
+    assert.ok(!bad.ok && /재고 칸에 10이 안 들어감/.test(bad.why), JSON.stringify(bad));
+    assert.deepStrictEqual(await saves(), [], "저장 안 누름");
+    assert.strictEqual((await noKeys.read(P1)).pop, null, "창은 [취소]로 닫음");
+    const { st } = mkStock(page, { type: (t) => page.keyboard.type(t) });
+    const r = await st.openDay({ product: P1, day: "2026-11-19", qty: 10 });
+    assert.ok(r.ok && r.done, r.why);
+    assert.deepStrictEqual(await saves(), [{ id: 1, from: "2026-11-19", to: "2026-11-19", n: 10 }]);
+  } finally {
+    await browser.close();
+  }
+});

@@ -44,6 +44,9 @@
   const TODAY = P.get("today") || localStorage.getItem("mockStockToday") || "2026-10-20";
   if (P.get("today")) localStorage.setItem("mockStockToday", P.get("today"));
   const SLOW = P.get("slow") === "1" || localStorage.getItem("mockStockSlow") === "1";
+  // &strict=1: 재고 수 칸이 실제 키보드로 친 글자만 받음 (스크립트로 넣은 값은 [저장]이 안 켜짐 — 사장님 10/20 사진: 커서를 놓고 써야 켜짐)
+  const STRICT = P.get("strict") === "1" || localStorage.getItem("mockStockStrict") === "1";
+  if (P.get("strict") === "1") localStorage.setItem("mockStockStrict", "1");
   const PRODUCTS = [
     { name: "평일 무제한 / 휴일 1시간 50분 입장권", times: ["10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30"] },
     { name: "야간자유 입장권", times: ["18:00", "18:30", "19:00", "19:30"] },
@@ -132,7 +135,7 @@
       const e = app.querySelector("[data-act=edit]"); if (e) e.addEventListener("click", () => { pop = { kind: "period", month: TODAY.slice(0, 7), pick: null }; draw(); });
       app.querySelectorAll("[data-pm]").forEach((b) => b.addEventListener("click", () => { const d = new Date(dayMs(pop.month + "-01")); d.setUTCMonth(d.getUTCMonth() + +b.dataset.pm); pop.month = d.toISOString().slice(0, 7); draw(); }));
       app.querySelectorAll(".dd").forEach((b) => b.addEventListener("click", () => { if (pop.pick && !pop.end && b.dataset.d > pop.pick) pop.end = b.dataset.d; else { pop.pick = b.dataset.d; pop.end = null; } draw(); }));
-      const q = app.querySelector("#q"); if (q) q.addEventListener("input", () => { pop.val = q.value.replace(/\D/g, ""); const s = app.querySelector("[data-pop=save]"); if (s) s.disabled = !pop.val; });
+      const q = app.querySelector("#q"); if (q) q.addEventListener("input", (e) => { if (STRICT && !e.isTrusted) return; pop.val = q.value.replace(/\D/g, ""); const s = app.querySelector("[data-pop=save]"); if (s) s.disabled = !pop.val; });
       app.querySelectorAll("[data-pop]").forEach((b) => b.addEventListener("click", () => {
         const a = b.dataset.pop;
         if (a === "cancel") { pop = null; return draw(); }

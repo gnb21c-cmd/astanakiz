@@ -208,7 +208,19 @@ function installNaverStockDriver() {
       if (!press(Number(d) >= 15 ? els[els.length - 1] : els[0])) return { ok: false, why: `${d}일: ${OUT}` };
       return { ok: true };
     },
-    /** 재고 수 넣기 (네이버 화면은 React → 값 넣는 함수로 넣고 input 알림) */
+    /** 재고 수 칸에 커서를 두고 안의 글을 다 고름 — 글자는 Node 가 실제 키보드로 침
+        (사장님 10/20: 칸에 흐린 0 · 커서를 놓고 수를 써야 [저장]이 켜짐 · 비우면 "필수 입력 값입니다.") */
+    focusQty() {
+      const pop = popup();
+      const inp = pop && pop.kind === "qty" && $$("input", pop.root).filter((i) => vis(i) && !/^(hidden|checkbox|radio)$/.test(i.type))[0];
+      if (!inp) return { ok: false, why: "재고 수 입력칸을 못 찾음" };
+      inp.scrollIntoView({ block: "center" });
+      press(inp);
+      inp.focus();
+      try { inp.select(); } catch (e) { /* 고를 수 없는 칸 */ }
+      return { ok: document.activeElement === inp };
+    },
+    /** 재고 수 넣기 — 키보드를 못 쓸 때 (네이버 화면은 React → 값 넣는 함수로 넣고 input 알림) */
     setQty(n) {
       const pop = popup();
       const inp = pop && $$("input", pop.root).filter((i) => vis(i) && !/^(hidden|checkbox|radio)$/.test(i.type))[0];
@@ -216,7 +228,7 @@ function installNaverStockDriver() {
       inp.focus();
       const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
       set.call(inp, String(n));
-      inp.dispatchEvent(new Event("input", { bubbles: true }));
+      inp.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: String(n) }));
       inp.dispatchEvent(new Event("change", { bubbles: true }));
       return { ok: true };
     },
@@ -283,6 +295,7 @@ class NaverStock {
     this.pat = opts.pat || null; // 시험: 가짜 화면의 목록 · 상품 번호 주소 모양
     this.ids = Object.assign({}, opts.ids || {}); // 상품 이름 → 번호 (목록에서 찾은 것 · 앱은 settings.stockItems 에 남김)
     this.onLearn = opts.onLearn || (() => {});
+    this.type = opts.type || null; // 실제 키보드로 글자 치기 (앱: 네이버 창 insertText · 시험: page.keyboard.type)
     this.slow = opts.slow || 1; // 시험에서 기다림을 줄일 때
   }
   call(expr) {
@@ -431,9 +444,18 @@ class NaverStock {
     if (!k.ok) return this.cancel(product, "stock-scope", k.why);
     r = await this.until(product, (x) => x.pop && x.pop.kind === "qty", 10000, "재고 수 입력 창이 안 나옴");
     if (!r.ok) return this.cancel(product, "stock-qty", r.why);
-    k = await this.act(`window.__naverStock.setQty(${Number(qty)})`);
-    if (!k.ok) return this.cancel(product, "stock-qty", k.why);
-    r = await this.until(product, (x) => x.pop && x.pop.kind === "qty" && x.pop.qty === String(qty) && x.pop.save, 5000, `재고 칸에 ${qty}이 안 들어감`);
+    // 사람처럼: 칸을 누르고 키보드로 10 → [저장]이 켜졌는지 · 안 되면 값 넣는 함수로 한 번 더
+    const okQty = (x) => x.pop && x.pop.kind === "qty" && x.pop.qty === String(qty) && x.pop.save;
+    r = { ok: false };
+    if (this.type) {
+      const f = await this.act("window.__naverStock.focusQty()");
+      if (f.ok) { await this.type(String(Number(qty))); r = await this.until(product, okQty, 4000, ""); }
+    }
+    if (!r.ok) {
+      k = await this.act(`window.__naverStock.setQty(${Number(qty)})`);
+      if (!k.ok) return this.cancel(product, "stock-qty", k.why);
+      r = await this.until(product, okQty, 5000, `재고 칸에 ${qty}이 안 들어감 ([저장]이 안 켜짐)`);
+    }
     if (!r.ok) return this.cancel(product, "stock-qty", r.why);
     k = await this.act(`window.__naverStock.click("저장")`);
     if (!k.ok) return this.cancel(product, "stock-qty", k.why);

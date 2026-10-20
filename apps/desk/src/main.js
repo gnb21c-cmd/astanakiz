@@ -923,6 +923,7 @@ function stockRun(opts) {
     urls: naverUrls(settings.naverUrl),
     ids: settings.stockItems || {}, // 상품 이름 → 번호 (처음엔 예약상품 목록에서 이름으로 찾아 이 PC 에만 남김)
     onLearn: (name, id) => { settings.stockItems = { ...(settings.stockItems || {}), [name]: String(id) }; saveSettings(); },
+    type: (text) => naverWin.webContents.insertText(text), // 재고 수 칸: 실제 키 입력처럼 (커서를 둔 칸에)
     pat: process.env.DESK_STOCK_PAT ? JSON.parse(process.env.DESK_STOCK_PAT) : null, // 시험(가짜 화면)만
     onStep: (msg) => { me.step = msg; if (deskWin && !deskWin.isDestroyed()) deskWin.webContents.send("naver:step", msg); },
     onSnap: (label) => dumpNaver(label),
