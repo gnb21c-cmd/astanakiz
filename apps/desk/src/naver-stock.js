@@ -1,21 +1,16 @@
-/* 네이버 재고 자동 오픈 (사장님 10/20) — 매일 오늘 + 30일 날짜를 회차마다 재고 10개로 연다 (두 상품 같은 날짜)
-   사장님이 보내 준 실제 화면 사진(10/20) 순서 그대로:
-     예약 > [예약상품] → 상품 사진(정글짐 · '가격형') → [일정/가격] → (네이버가 시간 · 재고를 불러오는 딜레이) → 달력 "< 2026.10 >"
-       날마다 "10:00" + "n/N개" (n = 예약 · N = 재고 · 아직 안 연 날은 모든 회차 "0/0개" 가운데 줄)
-     → [재고수정] → "회차 정보를 수정할 기간을 선택해주세요." 작은 달력(▶) → 날짜 한 번 → 아래 "2026.10.30" → [다음]
-     → "10.30(금) 날짜의 모든 회차를 수정하나요?" → [모든 회차]
-     → "변경할 재고 수를 입력해주세요." 칸에 10 → [저장](켜짐) → "수정되었습니다" 알림 → 달력 "0/10개"
-   안전: 그 날 회차가 하나라도 재고가 있으면(사람이 이미 열었거나 바꿈) 건드리지 않음 · 날짜 칸 · 확인 창 글자가 그 날짜인지 보고 누름
-         · 저장 뒤 달력에서 모든 회차가 10개가 된 것을 다시 읽어 확인
-   현장 10/20 20:24 (1.52): 상품 사진을 찾다 화면 왼쪽 위 가게 사진(스마트플레이스로 가는 링크)을 눌러 스마트플레이스 첫 화면으로 →
-     그 화면 리뷰의 '야간자유 입장권' 옆 작성자 사진을 눌러 MY플레이스 새 창 — 재고는 안 바뀜
-     → 1.53: 누르지 않고 주소로 감 — 예약상품 목록 …/bizes/{업체번호}/biz-items · 상품 일정/가격 …/biz-items/{상품번호}/schedules
-       상품 번호는 처음에 목록에서 이름으로 찾아(카드 링크 · 링크가 없으면 이름을 누름) 이 PC 설정에만 남김 (코드에 주소 · 번호 없음)
-       네이버 예약관리 밖으로 가는 링크 · 새 창 링크는 절대 누르지 않음
+/* 네이버 재고 자동 오픈 (사장님 10/20) — 매일 오늘 + 30일 날짜를 회차마다 재고 10개로 (두 상품 같은 날짜)
+   1.54 (사장님 10/20 21:1x): 큰 달력을 읽어 확인하지 않고 바로 진행 — 이미 넣은 날이어도 그대로 10개로
+     상품 일정/가격 주소 → [재고수정] → 작은 달력 "2026. 10." ▶ 로 그 달 → 날짜(버튼 data-tst_date="2026-11-19") → 아래 "2026.11.19" 확인
+     → [다음] → "11.19(목) 날짜의 모든 회차를 수정하나요?" 확인 → [모든 회차] → "변경할 재고 수를 입력해주세요." 칸을 누르고 키보드로 10
+     → [저장](켜졌는지 보고) → 창이 닫히고 다른 경고 창이 없으면 끝 ("수정되었습니다" 알림)
+   지난 기록: 1.53 은 큰 달력을 먼저 읽어 0/0 인 날만 열었는데 달을 넘기자마자 읽어 10월 19일을 11월 19일로 알고 '이미 열려 있음' (현장 10/20 20:55)
+             1.52 는 상품 사진을 찾다 가게 사진 링크를 눌러 스마트플레이스 → 리뷰 작성자 MY플레이스 새 창 (현장 10/20 20:24)
+   안전: 주소로만 움직임(예약상품 목록 …/bizes/{업체}/biz-items · 상품 …/biz-items/{번호}/schedules — 번호는 처음에 목록에서 이름으로 찾아 이 PC 설정에만)
+         · 네이버 예약관리 밖 링크 · 새 창 링크는 안 누름 · 날짜 칸 · 확인 창 글자가 그 날짜일 때만 다음으로 · [저장]은 칸에 10이 들어가 켜졌을 때만
    installNaverStockDriver = 네이버 페이지 안에서 실행 (window.__naverStock) · NaverStock = Node 쪽 (앱: 숨은 네이버 창 · 시험: 가짜 화면) */
 
 function installNaverStockDriver() {
-  if (window.__naverStock && window.__naverStock.v === 2) return true;
+  if (window.__naverStock && window.__naverStock.v === 3) return true;
   const norm = (s) => String(s || "").replace(/\s+/g, "");
   const vis = (el) => !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== "hidden");
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -63,43 +58,6 @@ function installNaverStockDriver() {
   }
   const ym = (txt) => { const m = norm(txt).match(/^(\d{4})\.(\d{1,2})\.?$/); return m ? `${m[1]}-${m[2].padStart(2, "0")}` : ""; };
 
-  /** 큰 달력: 날짜 → [{ t: "10:00", n: 예약, cap: 재고 }] (재고수정 창 안은 빼고) */
-  function calDays(pop) {
-    const inPop = (e) => !!(pop && pop.root.contains(e));
-    const stocks = deep(/^\d+\/\d+개$/).filter((e) => !inPop(e));
-    const nums = deep(/^\d{1,2}$/).filter((e) => !inPop(e) && !e.closest("button, a, [role=button]"));
-    const out = {};
-    for (const s of stocks) {
-      let slot = null, m = null;
-      for (let p = s; p && p !== document.body; p = p.parentElement) {
-        const t = norm(p.textContent);
-        if ((m = t.match(/^(\d{1,2}:\d{2})(\d+)\/(\d+)개$/))) { slot = p; break; }
-        if (/개.*개/.test(t)) break; // 두 회차를 품으면 그만
-      }
-      if (!slot) continue;
-      // 날짜: 회차 칸을 품은 위 칸 중 날짜 숫자가 하나뿐인 칸 → 안 되면 같은 세로 줄 위쪽의 가장 가까운 날짜 숫자
-      let day = null;
-      for (let p = slot.parentElement; p && p !== document.body; p = p.parentElement) {
-        const ds = nums.filter((d) => p.contains(d));
-        if (ds.length === 1) { day = +norm(ds[0].textContent); break; }
-        if (ds.length > 1) break;
-      }
-      if (day == null) {
-        const r = slot.getBoundingClientRect(), cx = (r.left + r.right) / 2;
-        let best = null, bt = -Infinity;
-        for (const d of nums) {
-          let col = d;
-          while (col.parentElement && col.getBoundingClientRect().width < 40) col = col.parentElement;
-          const q = col.getBoundingClientRect(), dq = d.getBoundingClientRect();
-          if (dq.bottom <= r.top + 2 && cx >= q.left && cx <= q.right && dq.top > bt) { bt = dq.top; best = d; }
-        }
-        if (best) day = +norm(best.textContent);
-      }
-      if (day == null) continue;
-      (out[day] = out[day] || []).push({ t: m[1].padStart(5, "0"), n: +m[2], cap: +m[3] });
-    }
-    return out;
-  }
   /** 예약상품 목록의 그 상품 카드: 이름에서 위로 올라가며 상품 링크(…/biz-items/번호)가 한 가지뿐인 칸 → { id, href } · 링크가 없으면 { el: 이름 }
       (사진은 보지 않음 — 1.52 는 사진을 찾다 가게 사진 링크를 눌렀음) */
   function cardOf(name) {
@@ -115,8 +73,8 @@ function installNaverStockDriver() {
   }
 
   window.__naverStock = {
-    v: 2,
-    /** name: 지금 보는 상품이 이 상품인지 · 이 상품 카드가 있는지 */
+    v: 3,
+    /** name: 지금 보는 상품이 이 상품인지 · 이 상품 카드가 있는지 · 재고수정 창 단계 */
     read(name) {
       const pop = popup();
       const inPop = (e) => !!(pop && pop.root.contains(e));
@@ -124,9 +82,8 @@ function installNaverStockDriver() {
       const want = name ? norm(name) : "";
       const named = want ? deep(new RegExp(`^${escRe(want)}$`)).length : 0;
       const tabOn = has("일정/가격");
-      const stockOn = has("재고수정");
-      const monthEl = deep(/^\d{4}\.\d{1,2}$/).find((e) => !inPop(e));
-      const days = stockOn ? calDays(pop) : {};
+      // 재고수정 창이 아닌 다른 창(저장 뒤 경고 등) — 글이 있는 보이는 대화 창
+      const modal = pop ? "" : ($$("[role=dialog], .modal-dialog").filter((e) => vis(e) && norm(e.textContent)).map((e) => e.textContent.replace(/\s+/g, " ").trim())[0] || "").slice(0, 80);
       const st = {
         needLogin: !!document.querySelector("input[type=password]") && !tabOn && !has("예약상품"),
         url: location.href,
@@ -135,11 +92,9 @@ function installNaverStockDriver() {
         onList: onList(),
         card: !!(want && named === 1 && !tabOn && onList()), // 예약상품 목록(주소로 확인)에 이 상품 이름
         itemId: idOf(location.href), // 상품 화면이면 그 상품 번호
-        stockOn,
-        month: monthEl ? ym(monthEl.textContent) : "",
-        days,
-        nDays: Object.keys(days).length,
+        stockOn: has("재고수정"),
         pop: null,
+        modal,
         toast: (deep(/(수정|저장|변경)되었습니다/)[0] || { textContent: "" }).textContent.trim(),
       };
       if (pop) {
@@ -183,13 +138,6 @@ function installNaverStockDriver() {
       if (!press(c.el)) return { ok: false, why: `'${name}': ${OUT}` };
       return { ok: true, pressed: true };
     },
-    /** 큰 달력 달 넘기기 (dir 1 = 다음 달) */
-    monthNav(dir) {
-      const pop = popup();
-      const lab = deep(/^\d{4}\.\d{1,2}$/).find((e) => !(pop && pop.root.contains(e)));
-      if (!lab) return { ok: false, why: "달력의 달(2026.10)을 못 찾음" };
-      return navNear(lab, dir);
-    },
     /** 재고수정 창의 작은 달력 달 넘기기 */
     popNav(dir) {
       const pop = popup();
@@ -197,10 +145,13 @@ function installNaverStockDriver() {
       if (!lab) return { ok: false, why: "작은 달력의 달을 못 찾음" };
       return navNear(lab, dir);
     },
-    /** 재고수정 창의 작은 달력에서 그 달의 날짜 누르기 (앞뒤 달의 흐린 날짜는 빼고 · 같은 숫자가 둘이면 15일부터는 뒤의 것) */
-    popPick(d) {
+    /** 재고수정 창의 작은 달력에서 그 날짜 누르기 — 실제 네이버 날짜 버튼에는 data-tst_date="2026-11-19" (10/20 화면 저장본) · 없으면 숫자로
+        (앞뒤 달의 흐린 날짜는 빼고 · 같은 숫자가 둘이면 15일부터는 뒤의 것) */
+    popPick(d, full) {
       const pop = popup();
       if (!pop || pop.kind !== "period") return { ok: false, why: "기간 선택 창이 아님" };
+      const exact = full && $$(`[data-tst_date="${String(full).replace(/[^0-9-]/g, "")}"]`, pop.root).filter((e) => vis(e) && !off(e))[0];
+      if (exact) return press(exact) ? { ok: true, exact: true } : { ok: false, why: `${d}일: ${OUT}` };
       const re = new RegExp(`^${Number(d)}$`);
       let els = clickables(pop.root).filter((b) => textOf(b) === String(Number(d)) && !off(b));
       if (!els.length) els = deep(re, pop.root).filter((e) => !off(e) && !(e.closest("[class]") && off(e.closest("[class]"))));
@@ -258,26 +209,20 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const LOGIN = "네이버에 로그인해 주세요 (로그인할 때 '로그인 상태 유지'를 꼭 체크)";
 const dayMs = (d) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
 const shiftDay = (d, n) => new Date(dayMs(d) + n * 86400000).toISOString().slice(0, 10);
-const nextYm = (m) => { const d = new Date(dayMs(m + "-01")); d.setUTCMonth(d.getUTCMonth() + 1); return d.toISOString().slice(0, 7); };
 const DOW = ["일", "월", "화", "수", "목", "금", "토"];
 
-/** 어느 날을 열지 (상품 하나): days = { "YYYY-MM-DD": [{ t, n, cap }] } (오늘 + 1 ~ 오늘 + ahead 를 읽은 것)
-    - 연 날 = 회차 중 하나라도 재고 > 0 · 안 연 날 = 회차가 있고 모두 0/0
-    - 마지막으로 연 날(L) 뒤 ~ 오늘 + ahead 의 안 연 날만 (앞쪽에 비워 둔 날 = 사람이 닫아 둔 날일 수 있어 건드리지 않음) · L 이 없으면 오늘 + ahead 하루만
-    - 건너뛸 날(skip) 빼고 · 한 번에 max 일까지 */
-function stockPlan({ today, ahead = 30, days = {}, skip = [], max = 7 }) {
-  const D = shiftDay(today, ahead), from = shiftDay(today, 1);
-  const inWin = Object.keys(days).filter((d) => d >= from && d <= D).sort();
-  const opened = inWin.filter((d) => days[d].length && days[d].some((c) => c.cap > 0));
-  const L = opened.length ? opened[opened.length - 1] : null;
-  const fresh = (d) => days[d] && days[d].length && days[d].every((c) => c.cap === 0);
-  const cand = (L ? inWin.filter((d) => d > L) : inWin.filter((d) => d === D)).filter(fresh);
-  const skipped = cand.filter((d) => skip.includes(d));
-  const plan = cand.filter((d) => !skip.includes(d));
-  // 오늘 + ahead 를 못 읽었으면(회차가 하나도 안 잡힘) '할 것 없음'이 아니라 못 읽음 — 1.53 현장 10/20 20:55: 11/19 가 0/0 인데 '이미 열려 있음'으로 끝남
-  const cells = days[D] && days[D].length ? days[D] : null;
-  return { target: D, last: L, plan: plan.slice(0, max), later: plan.slice(max), skipped, noSlots: inWin.filter((d) => d > (L || shiftDay(D, -1)) && !(days[d] && days[d].length)),
-    unread: !cells, seen: cells ? `${cells.length}회차 재고 ${[...new Set(cells.map((c) => c.cap))].join("·")}` : "" };
+/** 어느 날을 열지 (상품 하나) — 확인하지 않고 바로 진행 (사장님 10/20 · 이미 넣은 날도 10개로)
+    - 오늘 + ahead 하루 · 이 PC 가 마지막으로 연 날(last)이 있으면 그 다음 날부터 이어서 (POS 를 꺼서 못 연 날)
+    - 한 번에 max 일까지 (더 오래 비었으면 앞쪽은 missed — 사람이 확인) · 지난 날은 안 함 · 건너뛸 날(skip) 빼고 */
+function stockDays({ today, ahead = 30, last = "", skip = [], max = 7 }) {
+  const D = shiftDay(today, ahead);
+  if (last && last >= D) return { target: D, plan: [], missed: [], skipped: [] };
+  let from = last ? shiftDay(last, 1) : D;
+  if (from <= today) from = shiftDay(today, 1);
+  const all = [];
+  for (let d = from; d <= D; d = shiftDay(d, 1)) all.push(d);
+  const keep = all.slice(-max);
+  return { target: D, plan: keep.filter((d) => !skip.includes(d)), missed: all.slice(0, all.length - keep.length), skipped: keep.filter((d) => skip.includes(d)) };
 }
 
 /** 하루 네 번 기회(사장님 10/20: 10:30 → 실패하면 12:00 → 16:00 → 20:20) 중 지금 써야 할 것: 지난 때 중 아직 안 써 본 것 (늦게 켜면 지난 것들을 한 번에 — 한 번만 함)
@@ -364,8 +309,8 @@ class NaverStock {
     if (id && this.ids[product] !== id) { this.ids[product] = id; try { this.onLearn(product, id); } catch (e) { /* 남기기 실패는 다음에 다시 찾음 */ } }
     return r;
   }
-  /** 그 상품의 일정/가격 달력을 그 달(YYYY-MM)로 */
-  async toMonth(product, month) {
+  /** 그 상품 일정/가격 화면에서 [재고수정]이 보일 때까지 */
+  async toStock(product) {
     let s = await this.read(product);
     if (s.needLogin) return { ok: false, why: LOGIN };
     if (!s.onItem) {
@@ -373,73 +318,49 @@ class NaverStock {
       if (!r.ok) return r;
       s = r.state;
     }
-    if (!s.stockOn || !s.nDays) {
-      this.step("네이버 [일정/가격] — 시간 · 재고 불러오는 중");
-      if (!s.stockOn) { const r = await this.act(`window.__naverStock.click("일정/가격")`); if (!r.ok) return this.fail("stock-tab", r.why); }
-      const r = await this.until(product, (x) => x.stockOn && x.nDays > 0 && !!x.month, 60000, "일정/가격 달력이 안 나옴 (네이버가 너무 느림)");
+    if (!s.stockOn) {
+      this.step("네이버 [일정/가격]");
+      const r0 = await this.act(`window.__naverStock.click("일정/가격")`);
+      if (!r0.ok) return this.fail("stock-tab", r0.why);
+      const r = await this.until(product, (x) => x.stockOn, 60000, "[재고수정] 버튼이 안 나옴 (네이버가 너무 느림)");
       if (!r.ok) return this.fail("stock-tab", r.why);
       s = r.state;
     }
-    for (let i = 0; i < 4 && s.month !== month; i++) {
-      const dir = s.month < month ? 1 : -1, was = s.month;
-      this.step(`네이버 달력 ${was} → ${month}`);
-      const r0 = await this.act(`window.__naverStock.monthNav(${dir})`);
-      if (!r0.ok) return this.fail("stock-month", r0.why);
-      const r = await this.until(product, (x) => x.month && x.month !== was && x.nDays > 0, 45000, `달력을 ${month}로 못 넘김`);
-      if (!r.ok) {
-        // 그 달에 회차가 하나도 없으면 날짜 칸이 비어 있음
-        const s2 = await this.read(product);
-        if (s2.month === month) return { ok: true, state: s2 };
-        return this.fail("stock-month", r.why);
-      }
-      s = r.state;
-    }
-    if (s.month !== month) return this.fail("stock-month", `달력을 ${month}로 못 넘김 (지금 ${s.month})`);
     return { ok: true, state: s };
   }
-  /** 그 상품의 from ~ to 날짜 재고 읽기 → { ok, days: { "YYYY-MM-DD": [{ t, n, cap }] } } */
-  async scan(product, from, to) {
-    const days = {};
-    for (let m = from.slice(0, 7); m <= to.slice(0, 7); m = nextYm(m)) {
-      const r = await this.toMonth(product, m);
-      if (!r.ok) return r;
-      for (const [d, cells] of Object.entries(r.state.days)) { const k = `${m}-${String(d).padStart(2, "0")}`; if (k >= from && k <= to) days[k] = cells; }
-    }
-    return { ok: true, days };
-  }
-  /** 그 날짜를 회차마다 재고 qty 개로 (모든 회차가 0/0 일 때만) → { ok, done | already | why } */
-  async openDay({ product, day, qty = 10 }) {
-    const month = day.slice(0, 7), d = +day.slice(8), dot = day.replace(/-/g, ".");
-    let r = await this.toMonth(product, month);
+  /** 그 날짜를 회차마다 재고 qty 개로 — 확인하지 않고 바로 진행 (이미 넣은 날도) → { ok, done | dry | why }
+      dry = 바꾸지 않고 '모든 회차' 확인 창(그 날짜)까지 가 보고 [취소] */
+  async setDay({ product, day, qty = 10, dry = false }) {
+    const month = day.slice(0, 7), d = +day.slice(8), dot = day.replace(/-/g, "."), md = `${day.slice(5, 7)}.${day.slice(8)}`;
+    let r = await this.toStock(product);
     if (!r.ok) return r;
-    const cells = r.state.days[d] || [];
-    if (!cells.length) return { ok: false, why: `${day} 회차가 없음` };
-    if (cells.some((c) => c.cap > 0)) return { ok: true, already: true, cells: cells.length };
-    this.step(`네이버 [재고수정] ${product} ${day} → ${qty}개`);
-    r = await this.act(`window.__naverStock.click("재고수정")`);
-    if (!r.ok) return this.fail("stock-edit", r.why);
+    const base = r.state.modal; // 원래 떠 있던 창(공지 등)은 저장 뒤 경고로 안 봄
+    this.step(`네이버 [재고수정] ${product} ${day}${dry ? " (확인만)" : ` → ${qty}개`}`);
+    let k = await this.act(`window.__naverStock.click("재고수정")`);
+    if (!k.ok) return this.fail("stock-edit", k.why);
     r = await this.until(product, (x) => x.pop && x.pop.kind === "period" && !!x.pop.month, 15000, "기간 선택 창이 안 열림");
     if (!r.ok) return this.fail("stock-edit", r.why);
+    // 작은 달력: 이번 달로 열림 → ▶ 로 그 달까지 (보통 한 번)
     let s = r.state;
     for (let i = 0; i < 4 && s.pop.month !== month; i++) {
       const was = s.pop.month;
-      const k = await this.act(`window.__naverStock.popNav(${s.pop.month < month ? 1 : -1})`);
+      k = await this.act(`window.__naverStock.popNav(${s.pop.month < month ? 1 : -1})`);
       if (!k.ok) return this.cancel(product, "stock-period", k.why);
       r = await this.until(product, (x) => x.pop && x.pop.kind === "period" && x.pop.month !== was, 5000, "작은 달력이 안 넘어감");
       if (!r.ok) return this.cancel(product, "stock-period", r.why);
       s = r.state;
     }
     if (s.pop.month !== month) return this.cancel(product, "stock-period", `작은 달력을 ${month}로 못 넘김`);
-    let k = await this.act(`window.__naverStock.popPick(${d})`);
+    k = await this.act(`window.__naverStock.popPick(${d}, ${JSON.stringify(day)})`);
     if (!k.ok) return this.cancel(product, "stock-period", k.why);
     r = await this.until(product, (x) => x.pop && x.pop.kind === "period" && x.pop.field === dot && x.pop.next, 5000, `날짜 칸이 ${dot} 가 아님`);
     if (!r.ok) return this.cancel(product, "stock-period", `${r.why} (${(r.state && r.state.pop && r.state.pop.field) || "빈칸"})`);
     k = await this.act(`window.__naverStock.click("다음")`);
     if (!k.ok) return this.cancel(product, "stock-period", k.why);
-    const md = `${day.slice(5, 7)}.${day.slice(8)}`;
     r = await this.until(product, (x) => x.pop && x.pop.kind === "scope", 10000, "'모든 회차' 창이 안 나옴");
     if (!r.ok) return this.cancel(product, "stock-scope", r.why);
     if (!r.state.pop.title.includes(md) || !/날짜의모든회차/.test(r.state.pop.title)) return this.cancel(product, "stock-scope", `확인 창 날짜가 다름: ${r.state.pop.title}`);
+    if (dry) { await this.cancel(product, null, ""); return { ok: true, dry: true }; }
     k = await this.act(`window.__naverStock.click("모든 회차")`);
     if (!k.ok) return this.cancel(product, "stock-scope", k.why);
     r = await this.until(product, (x) => x.pop && x.pop.kind === "qty", 10000, "재고 수 입력 창이 안 나옴");
@@ -461,16 +382,10 @@ class NaverStock {
     if (!k.ok) return this.cancel(product, "stock-qty", k.why);
     r = await this.until(product, (x) => !x.pop, 15000, "저장 뒤 창이 안 닫힘");
     if (!r.ok) return this.fail("stock-save", r.why);
-    // 달력에서 다시 확인 (안 바뀌어 보이면 다시 불러와 한 번 더)
-    const okDay = (x) => x.month === month && x.days[d] && x.days[d].length === cells.length && x.days[d].every((c) => c.cap === Math.max(qty, c.n));
-    r = await this.until(product, okDay, 25000, "");
-    if (!r.ok) {
-      await this.act("window.__naverStock.reload()");
-      await this.until(product, (x) => x.onItem || x.card || x.itemsTab, 30000, "");
-      const t = await this.toMonth(product, month);
-      if (!t.ok || !okDay(t.state)) return this.fail("stock-verify", `저장했는데 ${day} 재고가 ${qty}개로 안 보임 — 바탕화면 '아스타나키즈-진단' 폴더의 사진을 보내 주세요`);
-    }
-    return { ok: true, done: true, cells: cells.length };
+    // 저장 뒤 경고 창(네이버가 거절)이 뜨면 실패 · "수정되었습니다" 알림은 보이면 남김
+    const t = await this.until(product, (x) => !!x.toast || (!!x.modal && x.modal !== base), 3000, "");
+    if (t.ok && !t.state.toast && t.state.modal && t.state.modal !== base) return this.fail("stock-save", `저장 뒤 네이버 알림: ${t.state.modal}`);
+    return { ok: true, done: true, toast: !!(t.ok && t.state.toast) };
   }
   /** 끝나면 예약현황으로 (주소를 알면 주소로 · 아니면 [예약현황] 탭) — 데스크 불러오기 · 이용완료는 예약현황에서 */
   async back() {
@@ -478,12 +393,13 @@ class NaverStock {
     await sleep(1500);
     return r;
   }
-  /** 창을 닫고 실패로 (취소 버튼이 없는 창이면 페이지를 다시 불러옴 — 저장 전이라 바뀐 것 없음) */
+  /** 창을 닫고 실패로 (취소 버튼이 없는 창이면 페이지를 다시 불러옴 — 저장 전이라 바뀐 것 없음) · label 이 없으면 닫기만 */
   async cancel(product, label, why) {
     const c = await this.act(`window.__naverStock.click("취소")`);
     if (!c.ok) await this.act("window.__naverStock.reload()");
+    if (!label) { await this.until(product, (x) => !x.pop, 5000, ""); return { ok: true }; }
     return this.fail(label, why);
   }
 }
 
-module.exports = { NaverStock, NAVER_STOCK_SOURCE, installNaverStockDriver, stockPlan, stockDue, shiftDay, DOW };
+module.exports = { NaverStock, NAVER_STOCK_SOURCE, installNaverStockDriver, stockDays, stockDue, shiftDay, DOW };

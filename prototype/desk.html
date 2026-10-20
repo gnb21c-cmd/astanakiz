@@ -3036,8 +3036,8 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 
   // ── 네이버 재고 자동 오픈 (사장님 10/20) ─────────────────────
   /* 매일 오늘 + 30일 날짜를 두 상품(평일 무제한 / 휴일 1시간 50분 · 야간자유) 모두 회차마다 재고 10개로 — 앱 본체(main.js stockTick · naver-stock.js)가
-     10:30 → 실패하면 12:00 → 16:00 → 20:20 에 (어느 때든 성공하면 그날 남은 것은 안 함). 아직 안 연 날(모든 회차 0/0개)만 · 이미 연 날은 안 건드림
-     데스크는 운영 설정 → 수량 자동조절 맨 위에서 켜기 · 끄기 · [확인만 해 보기](바꾸지 않고 열 날만) · [지금 한 번 열기] · 결과 */
+     10:30 → 실패하면 12:00 → 16:00 → 20:20 에 (어느 때든 성공하면 그날 남은 것은 안 함). 1.54: 확인하지 않고 바로 [재고수정] (이미 넣은 날도 10개로)
+     데스크는 운영 설정 → 수량 자동조절 맨 위에서 켜기 · 끄기 · [확인만 해 보기](그 날짜 '모든 회차' 확인 창까지 가 보고 취소 · 바꾸지 않음) · [지금 한 번 열기] · 결과 */
   const ST = { view: null };
   const ST_APP = () => APP && !!(window.desk && window.desk.stock);
   const stShort = (n) => String(n || "").replace(/\s*입장권$/, "").split(" / ")[0];
@@ -3052,12 +3052,14 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       if (!j) return;
       const opened = j.products.flatMap((p) => p.done.map((d) => `${stShort(p.name)} ${stMd(d)}`));
       if (j.dry) toast(`재고 확인만: ${stPlanText(j)}`, 8000);
-      else if (j.ok) toast(opened.length ? `네이버 재고를 열었어요 — ${opened.join(" · ")} (회차마다 ${j.qty}개)` : `네이버 재고 확인 — ${stMd(j.target)}까지 이미 열려 있어요${j.products.some((p) => p.seen) ? ` (${j.products.filter((p) => p.seen).map((p) => `${stShort(p.name)} ${p.seen}`).join(" · ")})` : ""}`, opened.length ? 8000 : 0);
+      else if (j.ok) toast(opened.length ? `네이버 재고를 열었어요 — ${opened.join(" · ")} (회차마다 ${j.qty}개)` : `네이버 재고 — ${stMd(j.target)}까지 이 PC 가 이미 열었어요`, opened.length ? 8000 : 0);
       else toast(`네이버 재고 열기 실패: ${stWhy(j)}${j.auto ? ` — ${stNext(v) ? stNext(v) + " 다시" : "오늘 남은 때 없음 · [지금 한 번 열기]로"}` : ""}`, 10000);
     });
   }
   const stWhy = (j) => j.why || (j.products.find((p) => p.why) || {}).why || "알 수 없음";
-  const stPlanText = (j) => j.products.map((p) => `${stShort(p.name)} ${p.why ? `못 읽음(${p.why})` : p.plan.length ? `열 날 ${p.plan.map(stMd).join(", ")}${p.later && p.later.length ? ` 외 ${p.later.length}일` : ""}` : `열 날 없음 (${stMd(j.target)}까지 열려 있음)`}${p.skipped.length ? ` · 건너뜀 ${p.skipped.map(stMd).join(", ")}` : ""}${p.noSlots && p.noSlots.length ? ` · 회차를 못 읽은 날 ${p.noSlots.map(stMd).join(", ")} (네이버에서 확인)` : ""}`).join(" · ");
+  // 확인만: 열 날마다 [재고수정] → 그 날짜 → '모든 회차' 확인 창까지 가 보고 [취소] (바꾸지 않음)
+  const stMissed = (p) => (p.missed && p.missed.length ? ` · 못 연 날 ${stMd(p.missed[0])}${p.missed.length > 1 ? `~${stMd(p.missed[p.missed.length - 1])}` : ""} (직접 확인)` : "");
+  const stPlanText = (j) => j.products.map((p) => `${stShort(p.name)} ${p.why ? `못 함(${p.why})` : (p.checked || []).length ? `${p.checked.map(stMd).join(", ")} 재고수정 창까지 됨` : p.plan.length ? `열 날 ${p.plan.map(stMd).join(", ")}` : `할 것 없음 (${stMd(j.target)}까지 엶)`}${p.skipped.length ? ` · 건너뜀 ${p.skipped.map(stMd).join(", ")}` : ""}${stMissed(p)}`).join(" · ");
   /** 그날 다음 기회 (못 했으면) */
   function stNext(v) {
     if (!v || !v.cfg.on || v.doneDay === TODAY) return "";
@@ -3074,7 +3076,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     const out = [];
     if (v.doneDay === TODAY) out.push(`오늘 끝남 (→ ${stMd(shiftDay(TODAY, v.cfg.ahead))})`);
     if (j && j.dry) out.push(`확인만 ${j.at.slice(11)}: ${stPlanText(j)}`);
-    if (L) out.push(`마지막 ${L.at.slice(0, 10) === TODAY ? "" : stMd(L.at.slice(0, 10)) + " "}${L.at.slice(11)} ${L.auto ? "자동" : "직접"} ${L.ok ? `성공${L.products.some((p) => p.done.length) ? ` (${L.products.filter((p) => p.done.length).map((p) => `${stShort(p.name)} ${p.done.map(stMd).join(", ")}`).join(" · ")})` : ` (이미 열려 있음${L.products.some((p) => p.seen) ? `: ${L.products.filter((p) => p.seen).map((p) => `${stShort(p.name)} ${stMd(L.target)} ${p.seen}`).join(" · ")}` : ""})`}` : `실패: ${L.why || (L.products.find((p) => p.why) || {}).why || ""}`}`);
+    if (L) out.push(`마지막 ${L.at.slice(0, 10) === TODAY ? "" : stMd(L.at.slice(0, 10)) + " "}${L.at.slice(11)} ${L.auto ? "자동" : "직접"} ${L.ok ? `성공${L.products.some((p) => p.done.length) ? ` (${L.products.filter((p) => p.done.length).map((p) => `${stShort(p.name)} ${p.done.map(stMd).join(", ")}`).join(" · ")})` : ` (${stMd(L.target)}까지 이미 엶)`}${L.products.map(stMissed).join("")}` : `실패: ${L.why || (L.products.find((p) => p.why) || {}).why || ""}`}`);
     const nx = stNext(v);
     if (v.cfg.on && v.doneDay !== TODAY) out.push(nx ? `다음 ${nx}` : "오늘 남은 때 없음");
     return out.join(" · ") || "아직 안 함";
@@ -3083,7 +3085,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     const c = (ST.view && ST.view.cfg) || { on: false, qty: 10, ahead: 30 }, run = !!(ST.view && ST.view.job && ST.view.job.running);
     const bad = !!(ST.view && ST.view.last && !ST.view.last.ok && ST.view.doneDay !== TODAY);
     return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><button type="button" class="svswitch ${c.on ? "on" : ""}" role="switch" aria-checked="${!!c.on}" data-act="stToggle" ${ST_APP() ? "" : "disabled"}><span class="knob"></span><b>네이버 재고 자동 오픈 ${c.on ? "켜짐" : "꺼짐"}</b></button>
-      <span class="help">매일 10:30 (실패하면 12:00 · 16:00 · 20:20) <b>오늘 + ${c.ahead}일</b>을 두 상품 회차마다 <b>${c.qty}개</b> — 아직 안 연 날(0/0개)만</span>
+      <span class="help">매일 10:30 (실패하면 12:00 · 16:00 · 20:20) <b>오늘 + ${c.ahead}일</b>을 두 상품 회차마다 <b>${c.qty}개</b>로 (이미 넣은 날도)</span>
       <button class="btn btn-sm" data-act="stDry" ${run ? "disabled" : ""}>확인만 해 보기</button><button class="btn btn-sm" data-act="stNow" ${run ? "disabled" : ""}>지금 한 번 열기</button></div>
       <span class="help ${bad ? "evwarn" : ""}" id="st-text">${esc(stText())}</span>`;
   };
@@ -3622,7 +3624,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     stDry() { if (!ST_APP()) { toast("체험판: 설치한 앱에서 네이버 예약상품 재고를 확인해요"); return; } window.desk.stock.run({ dry: true }).then((v) => { if (v && v.ok) { ST.view = v; stPollAt = Date.now(); stShow(); } else toast(`못 했어요: ${(v && v.why) || "응답 없음"}`); }); toast("네이버 예약상품에서 열 날을 확인해요 (바꾸지 않음 · 1 ~ 2분)"); },
     stNow() {
       if (!ST_APP()) { toast("체험판: 설치한 앱에서 네이버 예약상품 재고를 열어요"); return; }
-      if (!confirm(`네이버 예약상품에서 오늘 + ${((ST.view && ST.view.cfg) || {}).ahead || 30}일(아직 안 연 날)을 두 상품 모두 회차마다 재고 ${((ST.view && ST.view.cfg) || {}).qty || 10}개로 열어요.\n그동안(몇 분) 데스크의 네이버 불러오기 · 이용완료가 잠깐 늦어져요. 지금 할까요?`)) return;
+      if (!confirm(`네이버 예약상품에서 오늘 + ${((ST.view && ST.view.cfg) || {}).ahead || 30}일 날짜를 두 상품 모두 회차마다 재고 ${((ST.view && ST.view.cfg) || {}).qty || 10}개로 열어요.\n그동안(몇 분) 데스크의 네이버 불러오기 · 이용완료가 잠깐 늦어져요. 지금 할까요?`)) return;
       window.desk.stock.run({}).then((v) => { if (v && v.ok) { ST.view = v; stPollAt = Date.now(); stShow(); } else toast(`못 했어요: ${(v && v.why) || "응답 없음"}`); });
     },
     // 재방문 간격 (사장님 10/19) — 지난 방문 기록 읽기 (영업 중엔 한 번 더 눌러야) · 멈춤 · 지금 보내기

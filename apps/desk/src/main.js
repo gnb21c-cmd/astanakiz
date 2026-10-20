@@ -898,9 +898,9 @@ ipcMain.handle("notes:set", (_e, job) => {
 // ── 네이버 재고 자동 오픈 (사장님 10/20): 매일 오늘 + 30일 날짜를 두 상품 모두 회차마다 재고 10개로 ──
 //   예약 > 예약상품 > 상품 > [일정/가격] > [재고수정] > 날짜 > [다음] > [모든 회차] > 10 > [저장] (naver-stock.js · 실제 화면 사진 10/20)
 //   하루 네 번 기회: 10:30 → 실패하면 12:00 → 16:00 → 20:20 (어느 때든 성공하면 그날 남은 것은 안 함 · 그날 안에 끝내는 것이 목표)
-//   - 아직 안 연 날(모든 회차 0/0개)만 · 이미 연 날은 안 건드림 · 꺼져서 못 연 날은 마지막으로 연 날 뒤부터 이어서 (앞쪽에 비워 둔 날은 그대로)
-//   - 설정 settings.stockAuto { on(설치하면 켜짐), qty, ahead, products, skip } · 상품 번호 stockItems { 이름: 번호 } (1.53~ 목록에서 찾아 남김) (데스크 운영 설정) · 결과 stockLast · 성공한 날 stockDoneDay · 그날 써 본 때 stockTried
-const { NaverStock, stockPlan, stockDue, shiftDay: stockShift } = require("./naver-stock");
+//   - 1.54: 큰 달력을 읽지 않고 바로 [재고수정] (이미 넣은 날도 10개로) · 꺼져서 못 연 날은 이 PC 가 마지막으로 연 날(stockOpened) 뒤부터 이어서 (7일까지)
+//   - 설정 settings.stockAuto { on(설치하면 켜짐), qty, ahead, products, skip } · 상품 번호 stockItems { 이름: 번호 } (1.53~ 목록에서 찾아 남김) · 마지막으로 연 날 stockOpened { 이름: 날짜 } (1.54~) (데스크 운영 설정) · 결과 stockLast · 성공한 날 stockDoneDay · 그날 써 본 때 stockTried
+const { NaverStock, stockDays, stockDue, shiftDay: stockShift } = require("./naver-stock");
 const STOCK_PRODUCTS = ["평일 무제한 / 휴일 1시간 50분 입장권", "야간자유 입장권"];
 const STOCK_TIMES = [[10, 30], [12, 0], [16, 0], [20, 20]];
 const stockCfg = () => {
@@ -918,7 +918,7 @@ function stockRun(opts) {
   if (!naverWin || naverWin.isDestroyed() || !naver) return { ok: false, why: "네이버 창이 아직 열리지 않음" };
   const c = stockCfg(), dry = !!(opts && opts.dry), today = localToday();
   const me = (stockJob = { running: true, dry, auto: !!(opts && opts.auto), today, target: stockShift(today, c.ahead), qty: c.qty, at: localNow(), step: "", why: "", ok: false,
-    products: c.products.map((name) => ({ name, plan: [], done: [], already: [], failed: [], skipped: [], noSlots: [], last: null, why: "" })) });
+    products: c.products.map((name) => ({ name, plan: [], done: [], checked: [], failed: [], skipped: [], missed: [], why: "" })) });
   const st = new NaverStock((code) => timed(naverWin.webContents.executeJavaScript(code, true), 8000, "네이버 화면이 응답하지 않음"), {
     urls: naverUrls(settings.naverUrl),
     ids: settings.stockItems || {}, // 상품 이름 → 번호 (처음엔 예약상품 목록에서 이름으로 찾아 이 PC 에만 남김)
@@ -931,20 +931,17 @@ function stockRun(opts) {
   (async () => {
     try {
       await serial("naver", () => timed((async () => {
+        // 사장님 10/20: 큰 달력을 읽어 확인하지 않고 바로 — 오늘 + 30일 (이 PC 가 마지막으로 연 날 뒤부터 이어서) 을 [재고수정]으로 10개
         for (const p of me.products) {
-          const sc = await st.scan(p.name, stockShift(today, 1), me.target);
-          if (!sc.ok) { p.why = sc.why; continue; }
-          const pl = stockPlan({ today, ahead: c.ahead, days: sc.days, skip: c.skip });
-          Object.assign(p, { plan: pl.plan, skipped: pl.skipped, noSlots: pl.noSlots, last: pl.last, later: pl.later, seen: pl.seen });
-          // 진단: 직접 누른 때 · 못 읽었을 때는 읽은 달력 화면 + 읽은 것(날짜별 회차 · 재고)을 바탕화면 '아스타나키즈-진단'에 (손님 정보 없음)
-          if (!me.auto || pl.unread) await dumpWin(naverWin, `stock-scan-${me.products.indexOf(p) + 1}-${stampNow()}`, { product: p.name, target: me.target, last: pl.last, plan: pl.plan, url: naverWin.webContents.getURL(), read: Object.fromEntries(Object.entries(sc.days).map(([d, cs]) => [d, cs.map((x) => `${x.t} ${x.n}/${x.cap}`).join(" ")])) }).catch(() => {});
-          if (pl.unread) { p.why = `${+me.target.slice(5, 7)}/${+me.target.slice(8)} 회차를 네이버 달력에서 못 읽음 (회차가 없는 날이면 네이버에서 확인)`; continue; }
-          if (dry) continue;
+          const pl = stockDays({ today, ahead: c.ahead, last: (settings.stockOpened || {})[p.name] || "", skip: c.skip });
+          Object.assign(p, { plan: pl.plan, missed: pl.missed, skipped: pl.skipped });
           for (const day of pl.plan) {
-            const r = await st.openDay({ product: p.name, day, qty: c.qty });
-            if (r.ok && r.done) p.done.push(day);
-            else if (r.ok && r.already) p.already.push(day);
-            else { p.failed.push(day); p.why = r.why || "알 수 없음"; break; }
+            const r = await st.setDay({ product: p.name, day, qty: c.qty, dry });
+            if (!r.ok) { p.failed.push(day); p.why = r.why || "알 수 없음"; break; }
+            if (dry) { p.checked.push(day); continue; }
+            p.done.push(day);
+            settings.stockOpened = { ...(settings.stockOpened || {}), [p.name]: day };
+            saveSettings();
           }
         }
         // 네이버 창을 예약현황(오늘)으로 돌려놓음 (데스크 불러오기는 예약현황에서)
@@ -959,7 +956,7 @@ function stockRun(opts) {
     me.running = false;
     me.end = localNow();
     if (!dry) {
-      settings.stockLast = { at: me.at, end: me.end, auto: me.auto, ok: me.ok, target: me.target, why: me.why, products: me.products.map((p) => ({ name: p.name, done: p.done, failed: p.failed, why: p.why, seen: p.seen || "" })) };
+      settings.stockLast = { at: me.at, end: me.end, auto: me.auto, ok: me.ok, target: me.target, why: me.why, products: me.products.map((p) => ({ name: p.name, done: p.done, failed: p.failed, missed: p.missed, why: p.why })) };
       if (me.ok) settings.stockDoneDay = today;
       saveSettings();
     }

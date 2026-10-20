@@ -47,6 +47,12 @@
   // &strict=1: 재고 수 칸이 실제 키보드로 친 글자만 받음 (스크립트로 넣은 값은 [저장]이 안 켜짐 — 사장님 10/20 사진: 커서를 놓고 써야 켜짐)
   const STRICT = P.get("strict") === "1" || localStorage.getItem("mockStockStrict") === "1";
   if (P.get("strict") === "1") localStorage.setItem("mockStockStrict", "1");
+  // &stale=1: 달을 넘기면 달 글자(2026.11)만 먼저 바뀌고 달력 · 회차는 잠깐 앞 달 그대로 (현장 10/20 20:55 — 그 사이에 읽으면 10월을 11월로 읽음)
+  const STALE = P.get("stale") === "1" || localStorage.getItem("mockStockStale") === "1";
+  if (P.get("stale") === "1") localStorage.setItem("mockStockStale", "1");
+  // &reject=1: [저장]을 누르면 네이버가 거절하는 경고 창 (재고 안 바뀜)
+  const REJECT = P.get("reject") === "1" || localStorage.getItem("mockStockReject") === "1";
+  if (P.get("reject") === "1") localStorage.setItem("mockStockReject", "1");
   const PRODUCTS = [
     { name: "평일 무제한 / 휴일 1시간 50분 입장권", times: ["10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30"] },
     { name: "야간자유 입장권", times: ["18:00", "18:30", "19:00", "19:30"] },
@@ -88,14 +94,16 @@
     app.querySelectorAll(".card[data-i]").forEach((el) => el.addEventListener("click", () => { location.href = `naver-stock.html?view=item&id=${el.dataset.i}`; }));
   } else {
     const id = +P.get("id"), prod = PRODUCTS[id];
+    let gridMonth = null;
     let tab = P.get("tab") === "schedules" ? "stock" : "info", month = TODAY.slice(0, 7), loaded = false, pop = null; // pop = { kind, month, pick, val }
     function draw() {
       const head = `<div><a href="naver-stock.html?view=items">←</a> <b class="title">${esc(prod.name)}</b></div>
         <div class="pills"><button data-tab="info">기본정보</button><button data-tab="stock">일정/가격</button><button>옵션 연결</button><button>예약자 정보 요청</button></div>`;
       if (tab === "info") { app.innerHTML = head + `<p>예매 상품명을 입력해 주세요.</p>`; return wire(); }
       if (!loaded) { app.innerHTML = head + `<p class="wait"></p>`; return wire(); } // 네이버가 시간 · 재고를 불러오는 중 (빈 화면)
-      const first = month + "-01", start = new Date(dayMs(first)).getUTCDay();
-      const days = []; for (let d = first; d.slice(0, 7) === month; d = shift(d, 1)) days.push(d);
+      const gm = gridMonth || month; // 달력 칸은 gm (STALE 이면 잠깐 앞 달) · 달 글자는 month
+      const first = gm + "-01", start = new Date(dayMs(first)).getUTCDay();
+      const days = []; for (let d = first; d.slice(0, 7) === gm; d = shift(d, 1)) days.push(d);
       const cells = Array(start).fill(null).concat(days);
       while (cells.length % 7) cells.push(null);
       let rows = "";
@@ -111,7 +119,7 @@
         const first = pop.month + "-01", start = new Date(dayMs(first)).getUTCDay();
         const prevLast = shift(first, -1), btns = [];
         for (let k = start - 1; k >= 0; k--) btns.push(`<button class="other" disabled>${+shift(prevLast, -k).slice(8)}</button>`);
-        for (let d = first; d.slice(0, 7) === pop.month; d = shift(d, 1)) btns.push(`<button class="dd ${pop.pick === d ? "on" : ""}" data-d="${d}" ${d < TODAY ? "disabled" : ""}>${+d.slice(8)}</button>`);
+        for (let d = first; d.slice(0, 7) === pop.month; d = shift(d, 1)) btns.push(`<button class="dd ${pop.pick === d ? "on" : ""}" data-d="${d}" data-tst_date="${d}" ${d < TODAY ? "disabled" : ""}>${+d.slice(8)}</button>`);
         for (let k = 1; btns.length % 7; k++) btns.push(`<button class="other" disabled>${k}</button>`);
         return `<div class="layer"><p>회차 정보를 수정할 기간을 선택해주세요.</p>
           <div>${pop.month > TODAY.slice(0, 7) ? `<button data-pm="-1">◀</button>` : ""}<b>${pop.month.slice(0, 4)}. ${+pop.month.slice(5)}.</b><button data-pm="1">▶</button></div>
@@ -129,7 +137,9 @@
         if (tab === "stock") setTimeout(() => { loaded = true; draw(); }, SLOW ? 2500 : 900); // 네이버 딜레이
       }));
       app.querySelectorAll("[data-m]").forEach((b) => b.addEventListener("click", () => {
-        const d = new Date(dayMs(month + "-01")); d.setUTCMonth(d.getUTCMonth() + +b.dataset.m); month = d.toISOString().slice(0, 7);
+        const d = new Date(dayMs(month + "-01")); d.setUTCMonth(d.getUTCMonth() + +b.dataset.m);
+        const prev = month; month = d.toISOString().slice(0, 7);
+        if (STALE) { gridMonth = prev; draw(); setTimeout(() => { gridMonth = null; draw(); }, SLOW ? 2500 : 1200); return; }
         loaded = false; draw(); setTimeout(() => { loaded = true; draw(); }, SLOW ? 1500 : 500);
       }));
       const e = app.querySelector("[data-act=edit]"); if (e) e.addEventListener("click", () => { pop = { kind: "period", month: TODAY.slice(0, 7), pick: null }; draw(); });
@@ -141,6 +151,11 @@
         if (a === "cancel") { pop = null; return draw(); }
         if (a === "next") { pop.kind = "scope"; return draw(); }
         if (a === "all") { pop.kind = "qty"; pop.val = ""; return draw(); }
+        if (a === "save" && REJECT) {
+          pop = null; draw();
+          const w = document.createElement("div"); w.setAttribute("role", "dialog"); w.innerHTML = `<p>재고 수량은 예약된 수량보다 적게 설정할 수 없습니다.</p><button onclick="this.parentNode.remove()">확인</button>`; document.body.appendChild(w);
+          return;
+        }
         if (a === "save") {
           const n = +pop.val, from = pop.pick, to = pop.end || pop.pick;
           for (let d = from; d <= to; d = shift(d, 1)) for (const s of S.stock[id][d] || []) s.cap = Math.max(n, s.n);
