@@ -52,6 +52,11 @@ contextBridge.exposeInMainWorld("desk", {
     stop: () => ipcRenderer.invoke("history:stop"),
     send: (job) => ipcRenderer.invoke("history:send", job),
   },
+  // 고객 메모 (사장님 10/20): 손님(전화번호)마다 메모 2줄 · 3자녀가정 · 블랙컨슈머 — 이 PC 에만 (해시로 찾음)
+  notes: {
+    get: (job) => ipcRenderer.invoke("notes:get", job),
+    set: (job) => ipcRenderer.invoke("notes:set", job),
+  },
   // 방문 이벤트 참여자 기록 (이용완료마다 한 줄 · 10/14) — 앱 폴더 + 바탕화면 '아스타나키즈-이벤트' 두 곳 · 지우지 않음
   ledger: {
     load: (from) => ipcRenderer.sendSync("ledger:load", from), // 두 곳을 합친 글 (빠진 쪽은 채움)

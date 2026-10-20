@@ -857,6 +857,41 @@ ipcMain.handle("history:send", async (_e, job) => {
   if (json.length >= 20000) return { ok: false, code: 0, why: "글이 너무 길어요" };
   return boardPatch("deskStats/revisit", json, job && job.at, "deskStats");
 });
+// ── 고객 메모 (사장님 10/20): 네이버 예약 손님마다 근무자가 적는 메모(2줄) · 3자녀가정 · 블랙컨슈머 → 이 PC 앱 폴더 customer-notes.json 에만 ──
+//   손님 = 전화번호(없으면 '이름:…') — 재방문 기록과 같은 비밀값으로 섞은 해시로만 찾음 (파일에 전화번호 · 이름 없음) · 클라우드로 안 보냄
+const customerNotes = require("./customer-notes");
+let custNotes = null;
+const notesGet = () => custNotes || (custNotes = customerNotes.load(histDir()));
+const localNow = () => { const d = new Date(); return `${localToday()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+/** 손님 키들 → { 키: { m, k3, bl, at } } (없는 손님은 빠짐) */
+ipcMain.handle("notes:get", (_e, job) => {
+  try {
+    const d = notesGet(), out = {};
+    for (const k of (Array.isArray(job && job.keys) ? job.keys : []).slice(0, 2000)) {
+      const key = String(k || "").trim();
+      if (!key) continue;
+      const n = customerNotes.get(d, visitHistory.hashKey(histSalt(), key));
+      if (n) out[key] = n;
+    }
+    return { ok: true, notes: out };
+  } catch (e) {
+    return { ok: false, why: String(e.message || e) };
+  }
+});
+/** 한 손님 메모 · 표시 저장 → 남은 것 (모두 비면 null) */
+ipcMain.handle("notes:set", (_e, job) => {
+  try {
+    const key = String((job && job.key) || "").trim();
+    if (!key) return { ok: false, why: "손님 전화번호 · 이름이 없음" };
+    const d = notesGet();
+    const note = customerNotes.set(d, visitHistory.hashKey(histSalt(), key), job, localNow());
+    customerNotes.save(histDir(), d);
+    return { ok: true, note };
+  } catch (e) {
+    return { ok: false, why: String(e.message || e) };
+  }
+});
+
 /** 보고 시스템 클라우드 boards/{보고 열쇠}/{문서} 에 { json, at } 덮어쓰기 — 200 = 보냄 / 403 = 열쇠나 모양이 틀림(규칙이 아직 없을 때도) */
 async function boardPatch(doc, json, at, rule) {
   const key = surveyKey();

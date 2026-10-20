@@ -27,6 +27,7 @@
   --pink: #F2A7BC;
   --pink-fg: #7A1F3A;
   --red: #D23A3A;
+  --nm-k3: #A87400; /* 3자녀가정 이름 (사장님 10/20 — 밝은 화면은 짙은 노랑, 어두운 화면은 노랑) */
   --yellow: #FFD23F; --yellow-fg: #C81E1E; /* 예약 수량 2장 이상 스티커: 노랑 네모 · 빨강 글씨 (사장님 10/16) */
   --ochre: #E8CB8E; /* 이벤트 쿠폰 지급 네모 (옅은 황토색 · 밝은 · 어두운 화면 같음) */
   --ok: #1D7F52;
@@ -39,7 +40,7 @@
     --sky-bg: #16324A; --sky-line: #2F6A96; --done-bg: #262C35;
     --bg: #0F141C; --surface: #18202B; --surface-2: #1F2834; --fg: #E8ECF2; --muted: #9AA4B5; --faint: #4A5566; --line: #2C3645;
     --ink: #E8ECF2; --on-ink: #10151D; --accent: #82A3F2; --accent-bg: #1E2B4A; --naver: #4CC788; --naver-bg: #163126;
-    --pink: #E58FA8; --pink-fg: #3A0E1B; --red: #EF6B6B; --yellow: #FFD23F; --yellow-fg: #C81E1E; --ok: #5BCB92; --warn-bg: #43201F;
+    --pink: #E58FA8; --pink-fg: #3A0E1B; --red: #EF6B6B; --yellow: #FFD23F; --yellow-fg: #C81E1E; --nm-k3: #FFD23F; --ok: #5BCB92; --warn-bg: #43201F;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 3px 12px rgba(0,0,0,.25);
     color-scheme: dark;
   }
@@ -48,7 +49,7 @@
     --sky-bg: #16324A; --sky-line: #2F6A96; --done-bg: #262C35;
   --bg: #0F141C; --surface: #18202B; --surface-2: #1F2834; --fg: #E8ECF2; --muted: #9AA4B5; --faint: #4A5566; --line: #2C3645;
   --ink: #E8ECF2; --on-ink: #10151D; --accent: #82A3F2; --accent-bg: #1E2B4A; --naver: #4CC788; --naver-bg: #163126;
-  --pink: #E58FA8; --pink-fg: #3A0E1B; --red: #EF6B6B; --yellow: #FFD23F; --yellow-fg: #C81E1E; --ok: #5BCB92; --warn-bg: #43201F;
+  --pink: #E58FA8; --pink-fg: #3A0E1B; --red: #EF6B6B; --yellow: #FFD23F; --yellow-fg: #C81E1E; --nm-k3: #FFD23F; --ok: #5BCB92; --warn-bg: #43201F;
   --shadow: 0 1px 2px rgba(0,0,0,.3), 0 3px 12px rgba(0,0,0,.25);
   color-scheme: dark;
 }
@@ -275,6 +276,17 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .btn-red:hover { background: var(--red); opacity: .9; }
 .res .head { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
 .res .name { font-size: 15.5px; font-weight: 700; }
+/* 고객 메모 (사장님 10/20): 이름 색 블랙컨슈머 = 빨강 · 3자녀가정 = 노랑 · 이름 옆 체크 두 개 · 메모 2줄(스크롤 없음) */
+.nm-k3 { color: var(--nm-k3) !important; }
+.nm-bl { color: var(--red) !important; }
+.badge.memo { background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); font-weight: 600; vertical-align: 2px; }
+.notechk { display: inline-flex; gap: 12px; margin-left: 12px; vertical-align: 2px; }
+.notechk label { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.notechk input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+.notechk .k3 { color: var(--nm-k3); } .notechk .bl { color: var(--red); }
+.notecell { display: grid; gap: 2px; }
+textarea.notein { width: 100%; box-sizing: border-box; height: calc(2 * 1.4em + 10px); line-height: 1.4; font: inherit; font-size: 14px; font-weight: 500; padding: 4px 8px; resize: none; overflow: hidden; border: 1.5px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); }
+textarea.notein:focus { outline: none; border-color: var(--accent); }
 .visits { font-size: 12px; color: var(--ok); font-weight: 600; margin-top: -2px; }
 .visits b { color: var(--fg); }
 .visits.big { font-size: 14px; margin: 0; }
@@ -1222,7 +1234,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       else if (b.chainHead) act = `<span class="help num">연속예약 — ${hm(b.enteredAt)} 첫 예약으로 입장</span>`;
       if (b.naverPending) act += `<span class="npend">${b.naverBusy ? "네이버 이용완료 처리 중…" : `네이버 이용완료 대기${b.naverWhy ? ` — ${esc(b.naverWhy)}` : ""} (자동으로 다시)`}</span>`;
       return `<article class="res ${b.status === "완료" ? "done" : ""}" data-act="openRes" data-id="${b.id}" tabindex="0" role="button" aria-label="${esc(b.name)} 예약 열기">
-        <div class="head"><span class="name">${esc(b.name)}${b.proxy ? ` <span class="badge proxy">대리예약</span>` : ""}</span>${b.unpaid && b.status === "확정" ? `<span class="badge unpaid">입금대기</span>` : `<span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span>`}</div>
+        <div class="head"><span class="name">${nameHtml(b)}${b.proxy ? ` <span class="badge proxy">대리예약</span>` : ""}${noteOf(b) && noteOf(b).m ? ` <span class="badge memo" title="${esc(noteOf(b).m)}">메모</span>` : ""}</span>${b.unpaid && b.status === "확정" ? `<span class="badge unpaid">입금대기</span>` : `<span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span>`}</div>
         ${partyTag}${chainTag}<div class="visits num">${visitText(b)}</div>
         <dl class="kv">
           <dt>전화번호</dt><dd class="phone num">${fmtPhone(b.phone)}</dd>${visitorRow(b)}
@@ -1679,13 +1691,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     $("golden").hidden = false;
     renderAll();
   }
-  function renderAll() { saveState(); evSync(); hvSync(); $("now").textContent = hm(now); $("refresh-at").textContent = refreshText(); $("refresh-at").style.color = (naverErr || (bookings[TODAY] || []).some((b) => b.naverPending && b.naverWhy)) && !naverBusy ? "var(--red)" : ""; renderSlots(); renderRes(); renderKeys(); renderCars(); goldenCheck(); }
+  function renderAll() { saveState(); evSync(); hvSync(); notesSync(); $("now").textContent = hm(now); $("refresh-at").textContent = refreshText(); $("refresh-at").style.color = (naverErr || (bookings[TODAY] || []).some((b) => b.naverPending && b.naverWhy)) && !naverBusy ? "var(--red)" : ""; renderSlots(); renderRes(); renderKeys(); renderCars(); goldenCheck(); }
 
   // ── 팝업 ─────────────────────────────────────────
   const sheet = { mode: null };
   function openSheet(s) { for (const k of Object.keys(sheet)) delete sheet[k]; Object.assign(sheet, s); $("overlay").hidden = false; renderSheet(); focusFirst(); }
   function focusFirst() { setTimeout(() => { const f = $("sheet").querySelector("[data-autofocus]"); if (f) f.focus(); }, 30); }
-  function closeSheet() { sheet.mode = null; $("overlay").hidden = true; setTimeout(() => { if (typeof extShowNext === "function") extShowNext(); }, 300); }
+  function closeSheet() { noteFlush(); sheet.mode = null; $("overlay").hidden = true; setTimeout(() => { if (typeof extShowNext === "function") extShowNext(); }, 300); }
 
   function walkState() {
     const { base, all } = projection();
@@ -1742,13 +1754,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
       el.innerHTML = `
         <h3 id="sheet-title">네이버 예약자 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
         <div class="${sv ? "svgrid" : ""}"><dl class="facts">
-          <dt>예약자</dt><dd style="font-size:18px">${esc(b.name)} <span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span></dd>
+          <dt>예약자</dt><dd style="font-size:18px">${nameHtml(b)} <span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span>${noteChecks(b)}</dd>
           <dt>${evActive() && evIn(b.day) ? "이벤트" : "이용완료"}</dt><dd class="num visits big">${visitText(b)}</dd>
           <dt>전화번호</dt><dd class="num">${fmtPhone(b.phone)}</dd>${visitorRow(b)}
           <dt>이용일시</dt><dd class="num">${hm(b.slot)} ${m == null ? "· 무제한" : `~ ${hm(b.slot + m)} (${dur(m)})`}${b.naverSlot != null && b.naverSlot !== b.slot ? ` <span class="moved">네이버 ${hm(b.naverSlot)}</span>` : ""}${b.day === TODAY && b.no ? `
             <span class="mvrow" aria-label="예약시간 변경">→ <button class="btn btn-sm" data-act="mvSlot" data-d="-30" aria-label="앞 시간" ${(sheet.mv ?? b.slot) <= SLOTS[0] ? "disabled" : ""}>◀</button><b class="num">${hm(sheet.mv ?? b.slot)}</b><button class="btn btn-sm" data-act="mvSlot" data-d="30" aria-label="뒤 시간" ${(sheet.mv ?? b.slot) >= SLOTS[SLOTS.length - 1] ? "disabled" : ""}>▶</button><button class="btn btn-sm btn-ink" data-act="mvDo" ${(sheet.mv ?? b.slot) === b.slot ? "disabled" : ""}>변경</button></span>` : ""}</dd>
           <dt>수량</dt><dd>${b.product} ${qtyNum(b.qty)}</dd>
-          <dt>결제상태</dt><dd>${b.pay}</dd>
+          <dt>결제상태</dt><dd>${b.pay}</dd>${noteRow(b)}
           ${b.status === "완료" ? `<dt>열쇠</dt><dd>${b.keys.length ? `<div class="bigkeys">${b.keys.map((k) => `<span class="bigkey num">${k}</span>`).join("")}</div>` : b.outAt != null ? `<span class="num">${b.enteredAt != null ? hm(b.enteredAt) + " 입장 · " : ""}${hm(b.outAt)} 퇴장 (반납함)</span>` : "-"}</dd>` : ""}
         </dl>${sv ? `<div class="svbox ${svLock ? "need" : "ok"}">${svButtons(sv)}</div>` : ""}</div>
         ${note}${pickHtml}
@@ -1931,7 +1943,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
         <h3 id="sheet-title">${h.svc ? `<span>${h.keys.join(", ")}번 서비스 키 <span class="badge svcb">판매 아님</span></span>` : `${h.keys.join(", ")}번 열쇠`} <button class="x" data-act="close" aria-label="닫기">×</button></h3>
         <div class="${e ? "extgrid" : ""}"><div>
         <dl class="facts">
-          ${h.svc ? svcFacts(h) : `<dt>${h.walk ? "고객명" : "예약자"}</dt><dd>${esc(h.name)}${h.walk ? ` · ${h.posNo}` : ""}</dd>`}
+          ${h.svc ? svcFacts(h) : `<dt>${h.walk ? "고객명" : "예약자"}</dt><dd>${h.walk ? esc(h.name) : nameHtml(h)}${h.walk ? ` · ${h.posNo}` : noteChecks(h)}</dd>`}
           <dt>전화번호</dt><dd class="num">${h.phone ? fmtPhone(h.phone) : "—"}</dd>
           <dt>입장</dt><dd class="num">${hm(h.enteredAt)}${h.walk ? "" : ` (예약 ${hm(h.slot)})`}</dd>
           <dt>이용</dt><dd class="num">${m == null ? "무제한" : `${used < 0 ? `예약 ${hm(h.slot)}부터 셈` : `${Math.floor(used / 60)}시간 ${used % 60}분째`} · ${h.keyUse && new Set(h.keys.map((k) => useOf(h, k))).size > 1 ? h.keys.map((k) => { const mk = useOf(h, k); return `${k}번 ${mk == null ? "무제한" : hm(h.slot + mk)}`; }).join(" · ") + " 반납" : `${hm(h.slot + m)} 반납`}`}${(() => {
@@ -1943,7 +1955,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
           })()}</dd>
           <dt>열쇠</dt><dd class="num">${h.keys.length}개${h.svc ? " · 판매수 · 인원에 안 셈 · 초과요금 없음" : ""}</dd>
           ${!h.svc && svcOf(h).length ? `<dt>서비스 키</dt><dd class="num svcgiven">${svcOf(h).map((x) => `<span class="kchip num">${(x.keys.length ? x.keys : x.keysTaken || []).join(", ")}</span>${x.keys.length ? "" : " 반납"}`).join(" ")} <span class="help">판매 아님</span></dd>` : ""}
-        </dl>
+        ${noteRow(h)}</dl>
         ${sheet.svcPick ? svcPickHtml(h) : ""}
         <div id="meter">${meterHtml(h)}</div>
         <div class="field"><span class="label">반납 ${lock ? `<span class="help">초과요금을 결제한 뒤 반납하세요</span>` : ""}</span>
@@ -2515,6 +2527,76 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
     return { st: ok ? "성공" : "안내", due: evDue(day), last: last ? last.day : "" };
   }
   const evKey = (b) => digits(b.phone || "") || (b.name ? "이름:" + b.name : "");
+
+  // ── 고객 메모 · 3자녀가정 · 블랙컨슈머 (사장님 10/20) ─────────────────────
+  /* 네이버 예약자 창(입장 전 · 뒤)과 열쇠 창에서 손님마다 메모 2줄 · [3자녀가정] · [블랙컨슈머] — 이 PC 에만 저장, 다음 방문에도 보임
+     - 손님 = 장부와 같은 키(전화번호, 없으면 '이름:…') · 네이버 예약 메모는 불러오지 않음 (손님마다 읽으면 점점 느려짐 — 이제부터 직접 적음)
+     - 이름 색: 블랙컨슈머 = 빨강 · 3자녀가정 = 노랑 (둘 다면 빨강) — 예약 카드 · 예약자 창 · 열쇠 창 · 메모가 있으면 카드에 [메모]
+     - 설치한 앱: 앱 본체 customer-notes.json (해시로 찾음 · 전화번호 없음 · 클라우드로 안 보냄) · 체험판: 브라우저 저장소 */
+  const NOTES = new Map(); // 손님 키 → { m, k3, bl, at } · null = 물어봤는데 없음
+  const NOTE_MAX = 120, NOTE_LS = "astanakiz-notes";
+  const NOTE_APP = () => APP && !!(window.desk && window.desk.notes);
+  if (!APP) try { for (const [k, n] of Object.entries(JSON.parse(localStorage.getItem(NOTE_LS)) || {})) NOTES.set(k, n); } catch (e) { /* 없음 */ }
+  const noteKey = (b) => (b && !b.walk && !b.svc ? evKey(b) : "");
+  const noteOf = (b) => { const k = noteKey(b); return (k && NOTES.get(k)) || null; };
+  /** 이름 색 (블랙컨슈머가 먼저) */
+  const nameCls = (b) => { const n = noteOf(b); return !n ? "" : n.bl ? "nm-bl" : n.k3 ? "nm-k3" : ""; };
+  const nameHtml = (b) => { const c = nameCls(b); return c ? `<span class="${c}" title="${c === "nm-bl" ? "BC" : "3자녀"}">${esc(b.name)}</span>` : esc(b.name); };
+  const noteAtText = (at) => (!at ? "" : at.slice(0, 10) === TODAY ? at.slice(11, 16) : `${+at.slice(5, 7)}/${+at.slice(8, 10)}`);
+  let notesAsking = false;
+  /** 화면을 그릴 때마다: 보이는 날 · 오늘 예약 손님 중 아직 안 물어본 손님의 메모를 앱 본체에 한 번에 물음 */
+  function notesSync() {
+    if (!NOTE_APP() || notesAsking) return;
+    const keys = [...new Set((bookings[viewDay] || []).concat(bookings[TODAY] || []).map(noteKey).filter((k) => k && !NOTES.has(k)))];
+    if (!keys.length) return;
+    notesAsking = true;
+    window.desk.notes.get({ keys }).then((r) => {
+      notesAsking = false;
+      if (!r || !r.ok) return; // 다음에 그릴 때 다시
+      let any = false;
+      for (const k of keys) if (!NOTES.has(k)) { const n = r.notes[k] || null; NOTES.set(k, n); if (n) any = true; }
+      if (any) { renderRes(); if (sheet.mode === "enter" || sheet.mode === "key") renderSheet(); }
+    }, () => { notesAsking = false; });
+  }
+  const noteTimers = new Map();
+  /** 메모 · 표시를 바꿈 → 화면은 바로 · 저장은 메모면 0.6초 뒤(쓰는 중) · 표시는 바로 */
+  function noteChange(b, patch, soon) {
+    const k = noteKey(b);
+    if (!k) return;
+    NOTES.set(k, Object.assign({ m: "", k3: false, bl: false, at: "" }, NOTES.get(k) || {}, patch));
+    clearTimeout(noteTimers.get(k));
+    if (soon) noteSave(k); else noteTimers.set(k, setTimeout(() => noteSave(k), 600));
+  }
+  /** 쓰던 메모를 바로 저장 (창을 닫거나 칸을 떠날 때) */
+  function noteFlush() { for (const [k, t] of [...noteTimers]) { clearTimeout(t); noteSave(k); } }
+  function noteSave(k) {
+    noteTimers.delete(k);
+    const n = NOTES.get(k) || { m: "", k3: false, bl: false };
+    renderRes(); // 카드의 [메모] · 이름 색
+    const show = (ok, text) => { const el = $("note-at"); if (el) { el.textContent = text; el.classList.toggle("evwarn", !ok); } };
+    if (!NOTE_APP()) {
+      const at = `${TODAY} ${hm(now)}`, gone = !String(n.m || "").trim() && !n.k3 && !n.bl;
+      try { const o = JSON.parse(localStorage.getItem(NOTE_LS)) || {}; if (gone) delete o[k]; else o[k] = { m: n.m, k3: !!n.k3, bl: !!n.bl, at }; localStorage.setItem(NOTE_LS, JSON.stringify(o)); } catch (e) { /* 저장 못 해도 화면은 그대로 */ }
+      n.at = gone ? "" : at; show(true, gone ? "" : `${hm(now)} 저장`); return;
+    }
+    window.desk.notes.set({ key: k, m: n.m, k3: !!n.k3, bl: !!n.bl }).then((r) => {
+      if (!r || !r.ok) { show(false, `저장 못 함: ${(r && r.why) || "응답 없음"}`); return; }
+      const cur = NOTES.get(k); if (cur) cur.at = r.note ? r.note.at : ""; // 쓰는 중인 글은 화면 것을 그대로
+      show(true, r.note ? `${noteAtText(r.note.at)} 저장` : "");
+    }, (e) => show(false, `저장 못 함: ${e}`));
+  }
+  /** 지금 창의 네이버 손님 (예약자 창 · 열쇠 창) */
+  const noteTarget = () => (sheet.mode === "enter" ? findB(sheet.id) : sheet.mode === "key" ? holderById(sheet.hid) : null);
+  /** 이름 옆 체크 두 개 — [3자녀] [BC](블랙컨슈머) (사장님 10/20) */
+  const noteChecks = (b) => { if (!noteKey(b)) return ""; const n = noteOf(b) || {}; return `<span class="notechk"><label class="k3"><input type="checkbox" id="note-k3" ${n.k3 ? "checked" : ""}> 3자녀</label><label class="bl" title="블랙컨슈머"><input type="checkbox" id="note-bl" ${n.bl ? "checked" : ""}> BC</label></span>`; };
+  /** 메모 2줄 (스크롤 없이 · 2줄을 넘으면 더 안 써짐) */
+  const noteRow = (b) => { if (!noteKey(b)) return ""; const n = noteOf(b) || {}; return `<dt>메모</dt><dd class="notecell"><textarea id="note-m" class="notein" rows="2" maxlength="${NOTE_MAX}" spellcheck="false" aria-label="고객 메모" placeholder="고객 메모 (2줄) — 이 PC에 저장 · 다음 방문에도 보여요">${esc(n.m || "")}</textarea><span class="help" id="note-at">${n.at ? `${noteAtText(n.at)} 저장` : ""}</span></dd>`; };
+  /** 2줄 칸에 맞춤: 줄바꿈은 한 번까지 · 칸을 넘는 글자는 뒤에서 뺌 (스크롤 없음) */
+  function noteFit(t) {
+    const p = t.value.split("\n");
+    if (p.length > 2) t.value = p[0] + "\n" + p.slice(1).join(" ");
+    for (let i = 0; i < 400 && t.value && t.scrollHeight > t.clientHeight + 1; i++) t.value = t.value.slice(0, -1);
+  }
   const EV_LS = "astanakiz-visitlog-"; // 체험판 · 파일 저장이 없을 때: 브라우저 저장소 (시작일마다)
   function evSaveCfg() {
     const v = { ver: 2, on: EV.on, from: EV.from, to: EV.to, days: EV.days, gift: EV.gift, tpl: EV.tpl, form: EV.form, past: EV.past, onAt: EV.onAt, seal: EV.seal, useN: EV.useN, useUnit: EV.useUnit };
@@ -3616,6 +3698,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   });
   document.addEventListener("input", (e) => {
     const t = e.target;
+    // 고객 메모 (사장님 10/20): 메모는 2줄에 맞춰 0.6초 뒤 저장 · 체크는 바로 저장하고 이름 색을 바꿈
+    if (t.id === "note-m") { const b = noteTarget(); if (b) { noteFit(t); noteChange(b, { m: t.value }); } }
+    if (t.id === "note-k3" || t.id === "note-bl") {
+      const b = noteTarget();
+      if (b) { const f = t.id === "note-k3" ? "k3" : "bl"; noteChange(b, { [f]: t.checked }, true); renderRes(); renderSheet(); toast(`${b.name}님 ${f === "k3" ? "3자녀" : "BC"} ${t.checked ? "표시 — 이름이 " + (f === "k3" ? "노랑" : "빨강") + "으로 보여요" : "표시를 뺐어요"}`); }
+    }
     if (t.id === "form-text") { PRINT.forms[PRINT.cur].text = t.value; $("paper").innerHTML = paperHtml(t.value, SAMPLE); savePrint(); }
     if (t.id === "ev-days" && t.value !== "") { EV.days = evDays(t.value) || EV.days; evSaveCfg(); $("ev-paper").innerHTML = evPrev(); evScroll("ev-paper"); $("ev-dates").textContent = evDatesText(); renderAll(); }
     if (t.id === "ev-seal") { EV.seal = t.checked; evSaveCfg(); $("ev-paper").innerHTML = evPrev(); evScroll("ev-paper"); toast(t.checked ? "쿠폰을 보안 무늬 그림으로 찍어요 — [시험 출력]으로 확인해 보세요" : "쿠폰을 예전처럼 글자로 찍어요"); }
@@ -3694,8 +3782,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
   }
 
   // 시험용: 입장권을 만드는 함수들 (자동 시험이 실제 입장 손님으로 출력 내용을 확인)
-  document.addEventListener("change", (e) => { if (/^cap-(target|max|ceil)$/.test(e.target.id)) renderSheet(); }); // 숫자를 다 넣으면 계획 다시
-  window.__deskTest = { evLoadCfg, today: () => TODAY, useDueText, printSecs, PRINT_: () => PRINT, sealOf, withSeal, SEAL, evSample: (i) => evSample(i), sealClear: () => sealCache.clear(), EV_: () => EV, liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capPlan, capRun, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => enterText(), holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, evOf: (b) => evOf(b),
+  document.addEventListener("change", (e) => { if (/^cap-(target|max|ceil)$/.test(e.target.id)) renderSheet(); if (e.target.id === "note-m") noteFlush(); }); // 숫자를 다 넣으면 계획 다시
+  window.__deskTest = { notes: () => Object.fromEntries(NOTES), evLoadCfg, today: () => TODAY, useDueText, printSecs, PRINT_: () => PRINT, sealOf, withSeal, SEAL, evSample: (i) => evSample(i), sealClear: () => sealCache.clear(), EV_: () => EV, liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capPlan, capRun, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => enterText(), holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, evOf: (b) => evOf(b),
     evLog: (from) => { const L = evLog(from); return { from: L.from, count: L.count, people: Object.fromEntries([...L.people].map(([k, p]) => [k, JSON.parse(JSON.stringify(p))])) }; },
     // 장부에 지난 방문 한 줄 넣기: o = { day, n(네이버 순번, 기본 = 지금 완료 수), base, st("안내" | "성공"), due, from(장부 · 기본 지금 이벤트), no }
     evInject: (name, o = {}) => {
