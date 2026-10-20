@@ -21,11 +21,11 @@
 | `apps/desk/src/naver-driver.js` · `naver-sync.js` | 네이버 예약현황 읽기 · 이용완료 · 판매 수량(회차당 수량) 바꾸기 |
 | `apps/desk/src/talk-driver.js` | 네이버 톡톡 상담 목록의 새 메시지 수 읽기 (키즈상담 · 카페상담 버튼) |
 | `apps/desk/src/visit-history.js` | 재방문 간격: 방문 기록(해시) · 일수 모음 (`docs/REVISIT.md`) |
-| `apps/desk/src/naver-stock.js` | 네이버 재고 자동 오픈: 예약상품 · 일정/가격 · 재고수정 화면 읽고 누르기 · 어느 날을 열지 · 하루 네 번 기회 |
+| `apps/desk/src/naver-stock.js` | 네이버 재고 자동 오픈: 예약상품 · 일정/가격은 주소로 (상품 번호는 목록에서 이름으로) · 재고수정 화면 읽고 누르기 (예약관리 밖 · 새 창 링크는 안 누름) · 어느 날을 열지 · 하루 네 번 기회 |
 | `apps/desk/src/customer-notes.js` | 고객 메모 · 3자녀 · BC: 손님(해시)마다 메모 2줄 · 표시 저장 |
 | `apps/desk/src/amano-*.js` | 아마노 주차 할인 등록 |
 | `apps/desk/mock/` | 시험용 가짜 네이버 · 아마노 화면 |
-| `apps/desk/test/` | 자동 시험 102개 (`node --test test/*.test.js`) |
+| `apps/desk/test/` | 자동 시험 103개 (`node --test test/*.test.js`) |
 
 ## 3. 데이터 — POS PC 에 남는 것 (보고 시스템이 가져다 쓸 수 있음)
 폴더: `%APPDATA%\아스타나키즈 입장 데스크\`
@@ -71,7 +71,7 @@
   "options": [ { "no": 1, "label": "네이버 검색", "today": 3, "total": 12 }, … ],   // 번호별 오늘 · 기간 누적
   "excluded": { "today": 2, "total": 5 }, "answered": { "today": 10, "total": 40 } } // 제외 · 응답 수 (손님 정보 없음)
 ```
-- `settings.json` — 프린터 · 아마노 주소(비밀번호는 Windows 암호화) · 성수기 기간 · 수량 자동조절 설정 · 톡톡 상담 목록 주소(`talkUrls`) · 현금통 단자(`drawerPin`) · 설문조사(`survey: { on, from, to, send, naverNew, walkin, all, opts: [선택지], sentDay, sentSig, last: { at, ok, why, auto, inbox: { ok, code, why } }, retry: { day, m } }` — 1.38 ~ 1.39 의 `url` 은 안 씀) · 네이버 재고 자동 오픈(`stockAuto: { on, qty, ahead, products, skip }` — 설치하면 켜짐 · 결과 `stockLast` · 성공한 날 `stockDoneDay` · 그날 써 본 때 `stockTried` — 1.52~) · 설문 보고 열쇠(`surveyKeyEnc` — Windows 암호화, 화면에는 끝 4자리만) · 재방문 이벤트(`visitEvent: { ver: 2, on, from: "시작일", to: "종료일", days: 20, gift: "수제돈까스", tpl: ["1번 안내", "2번 성공", "제공상품"], form: null | "이벤트 기간 입장권 공통 양식", past: [{ from, to }], onAt: { day, at, done: [켜기 전 이용완료한 예약번호] } }` — past = 지난 이벤트(그 장부도 계속 마일리지에서 뺌). 1.37 · 1.38 의 `mode` · `stamp` · `rules` 는 안 씀)
+- `settings.json` — 프린터 · 아마노 주소(비밀번호는 Windows 암호화) · 성수기 기간 · 수량 자동조절 설정 · 톡톡 상담 목록 주소(`talkUrls`) · 현금통 단자(`drawerPin`) · 설문조사(`survey: { on, from, to, send, naverNew, walkin, all, opts: [선택지], sentDay, sentSig, last: { at, ok, why, auto, inbox: { ok, code, why } }, retry: { day, m } }` — 1.38 ~ 1.39 의 `url` 은 안 씀) · 네이버 재고 자동 오픈(`stockAuto: { on, qty, ahead, products, skip }` — 설치하면 켜짐 · 결과 `stockLast` · 성공한 날 `stockDoneDay` · 그날 써 본 때 `stockTried` — 1.52~ · 상품 번호 `stockItems: { 이름: 번호 }` — 1.53~ 목록에서 찾아 남김) · 설문 보고 열쇠(`surveyKeyEnc` — Windows 암호화, 화면에는 끝 4자리만) · 재방문 이벤트(`visitEvent: { ver: 2, on, from: "시작일", to: "종료일", days: 20, gift: "수제돈까스", tpl: ["1번 안내", "2번 성공", "제공상품"], form: null | "이벤트 기간 입장권 공통 양식", past: [{ from, to }], onAt: { day, at, done: [켜기 전 이용완료한 예약번호] } }` — past = 지난 이벤트(그 장부도 계속 마일리지에서 뺌). 1.37 · 1.38 의 `mode` · `stamp` · `rules` 는 안 씀)
 - **`visit-ledger\시작일.jsonl`** + **바탕화면 `아스타나키즈-이벤트\이벤트기록_시작일.jsonl`** (같은 내용 두 곳 · 켤 때 합치고 빠진 쪽 채움, `src/ledger-store.js`) — 재방문 이벤트 손님 기록 (1.37~, 지우지 않음 · **이벤트가 끝난 뒤에도 마일리지 = 네이버 완료 − (n − base) 에 씀**). 바탕화면에는 엑셀 정리본 `이벤트참여자_시작일.csv`(손님마다 한 줄 · BOM)도. 이벤트 기간 이용완료(네이버 예약 1건)마다 한 줄 덧붙임:
 ```jsonc
 { "at": "2026-10-15 14:02", "day": "2026-10-15", "no": "1370988026",   // 이용완료 시각 · 날짜 · 네이버 예약번호 (같은 예약은 한 번만)
@@ -118,6 +118,7 @@
 ## 7. 바뀐 기록 (최근)
 | 버전 | 내용 |
 |---|---|
+| 다음(모으는 중) | **재고 자동 오픈 — 누르지 않고 주소로**(현장 10/20 20:24 · 1.52 는 상품 사진 대신 가게 사진 링크를 눌러 스마트플레이스 → 리뷰 작성자 MY플레이스 새 창, 재고 안 바뀜): 예약상품 목록 `…/bizes/{업체}/biz-items` · 상품 `…/biz-items/{번호}/schedules` (번호는 처음에 목록에서 이름으로 찾아 이 PC `stockItems`에만) · 목록이 아니면 아무것도 안 누름 · 예약관리 밖 링크 · 새 창 링크는 안 누름 · 재고 오픈 중 새 창 막음 |
 | 1.52 | **네이버 재고 자동 오픈**(사장님 10/20): 매일 오늘 + 30일을 두 상품(평일 무제한 / 휴일 1시간 50분 · 야간자유) 회차마다 재고 10개로 — 10:30 → 실패하면 12:00 · 16:00 · 20:20 (성공하면 그날 끝) · 아직 안 연 날(0/0개)만 · 예약상품 → 일정/가격 → 재고수정 → 날짜 → 다음 → 모든 회차 → 10 → 저장 (`naver-stock.js` · `docs/NAVER.md`) · 운영 설정 → 수량 자동조절 맨 위 켜짐/꺼짐(설치하면 켜짐 · 설치한 날 · 켤 때는 바로 안 하고 오늘 남은 다음 때부터 — `stockArm`) · [확인만 해 보기] · [지금 한 번 열기] · 설정 `stockAuto` · `stockLast` · `stockDoneDay` · `stockTried` |
 | 1.51 | **10회 사은권 — 같은 날 여러 건 · 추가 예약**(사장님 10/20 · 현장 10/16 19:00 나눠 예약한 '완료 8' 손님 사은권 표시 없음): 입장 전 카드 · 예약자 창 회차 = 완료 n + 1 + 그날 먼저 이용완료될 미입장 예약 수 ("완료 8 → 9 · 10번 완료 예정 · 함께 2건 2만원 사은권 증정" · 둘째 카드 "→ 10번" · "(오늘 앞 예약 1건 포함)") · 사은권 입장 알림 8초 · 추가 예약이 10번째면 알림에 '사은권 · 손님께 연락' → 저장 파일 `b[].giftDue` · `giftGiven` · [사은권 전달함]까지 열쇠 창 · 열쇠판 · 카드에 남고 반납 전에 물음 |
 | 1.51 | **고객 메모 · 3자녀 · BC**(사장님 10/20): 네이버 예약자 창(입장 전 · 뒤) · 열쇠 창의 결제상태 밑 메모 2줄(스크롤 없음) · 이름 옆 [3자녀](이름 노랑) · [BC](블랙컨슈머 · 이름 빨강) — 예약 카드 · 예약자 창 · 열쇠 창 색 · 카드에 [메모] · 손님(전화번호)마다 다음 방문에도 · 네이버 예약 메모는 안 불러옴 · 이 PC `customer-notes.json`(해시)에만 |

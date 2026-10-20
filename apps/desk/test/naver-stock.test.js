@@ -1,7 +1,8 @@
 /* 네이버 재고 자동 오픈 (사장님 10/20) — 가짜 예약상품 화면(mock/naver-stock.html, 사장님 사진 본뜸)에서
    예약상품 → 상품 사진 → [일정/가격] → [재고수정] → 날짜 → [다음] → [모든 회차] → 10 → [저장] → 달력 0/10개
    - 아직 안 연 날(모든 회차 0/0개)만 · 이미 연 날은 건드리지 않음 · 두 상품 같은 날짜
-   - 어느 날을 열지(stockPlan): 오늘 + 30일 · 꺼져 있어 못 연 날은 마지막으로 연 날 뒤부터 이어서 · 앞쪽에 비워 둔 날(사람이 닫음)은 안 건드림 */
+   - 어느 날을 열지(stockPlan): 오늘 + 30일 · 꺼져 있어 못 연 날은 마지막으로 연 날 뒤부터 이어서 · 앞쪽에 비워 둔 날(사람이 닫음)은 안 건드림
+   - 1.53 (현장 10/20 20:24): 누르지 않고 주소로 — 예약상품 목록 · 상품 일정/가격(번호는 목록에서 이름으로 찾아 남김) · 바깥 링크 · 새 창 링크는 안 누름 */
 const test = require("node:test");
 const assert = require("node:assert");
 const path = require("path");
@@ -17,14 +18,22 @@ const MOCK = "file://" + path.join(__dirname, "..", "mock", "naver-stock.html");
 const CAL = "file://" + path.join(__dirname, "..", "mock", "naver.html") + "?view=calendar";
 const P0 = "평일 무제한 / 휴일 1시간 50분 입장권", P1 = "야간자유 입장권";
 
-async function setup(browser, q = "") {
+// 가짜 화면 주소 모양 (실제: …/bizes/{업체}/biz-items · …/biz-items/{상품}/schedules)
+const URLS = { calendar: CAL, items: MOCK + "?view=items", schedule: MOCK + "?view=item&id={id}&tab=schedules" };
+const PAT = { list: "[?&]view=items(?:&|$)", id: "[?&]view=item&id=(\\d+)" };
+const mkStock = (page, o = {}) => {
+  const learned = {};
+  const st = new NaverStock((code) => page.evaluate(code), Object.assign({ urls: URLS, pat: PAT, onLearn: (n, id) => { learned[n] = id; } }, o));
+  return { st, learned };
+};
+async function setup(browser, q = "", o = {}) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   await page.goto(MOCK + "?view=items");
   await page.evaluate(() => localStorage.clear());
   await page.goto(MOCK + "?view=items&today=2026-10-20" + q);
-  const st = new NaverStock((code) => page.evaluate(code), { urls: { calendar: CAL } });
+  const { st, learned } = mkStock(page, o);
   const saves = () => page.evaluate(() => JSON.parse(localStorage.getItem("mockStockSaves") || "[]"));
-  return { page, st, saves };
+  return { page, st, saves, learned };
 }
 
 test("어느 날을 열지: 오늘 + 30일 · 꺼져서 못 연 날 이어서 · 앞쪽에 비워 둔 날 · 건너뛸 날 · 회차 없는 날", () => {
@@ -71,7 +80,7 @@ test("하루 네 번 기회: 10:30 → 실패하면 12:00 → 16:00 → 20:20 ·
 test("재고 열기: 두 상품 같은 날짜(오늘 + 30일 = 11/19) · 0/0 → 0/10 · 이미 연 날은 그대로 · 저장한 것은 그 날짜 하나", async () => {
   const browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
   try {
-    const { page, st, saves } = await setup(browser);
+    const { page, st, saves, learned } = await setup(browser);
     // 열기 전: 11/19 는 모든 회차 0/0
     const before = await st.scan(P0, "2026-11-17", "2026-11-19");
     assert.ok(before.ok, before.why);
@@ -82,13 +91,15 @@ test("재고 열기: 두 상품 같은 날짜(오늘 + 30일 = 11/19) · 0/0 →
       assert.ok(r.ok && r.done, `${p}: ${r.why}`);
     }
     assert.deepStrictEqual(await saves(), [{ id: 0, from: "2026-11-19", to: "2026-11-19", n: 10 }, { id: 1, from: "2026-11-19", to: "2026-11-19", n: 10 }]);
+    assert.deepStrictEqual(learned, { [P0]: "0", [P1]: "1" }, "상품 번호: 카드 링크(0) · 링크 없는 카드는 이름을 눌러 간 주소(1)");
     const after = await st.scan(P1, "2026-11-19", "2026-11-19");
     assert.deepStrictEqual(after.days["2026-11-19"].map((c) => [c.t, c.cap]), [["18:00", 10], ["18:30", 10], ["19:00", 10], ["19:30", 10]]);
     // 이미 연 날(11/18)은 누르지 않음
     const r = await st.openDay({ product: P0, day: "2026-11-18", qty: 10 });
     assert.ok(r.ok && r.already);
     assert.strictEqual((await saves()).length, 2);
-    assert.ok(/view=item/.test(page.url()));
+    assert.ok(/view=item&id=0&tab=schedules/.test(page.url()), "아는 번호는 일정/가격 주소로 바로 " + page.url());
+    assert.strictEqual(browser.contexts()[0].pages().length, 1, "새 창 없음");
   } finally {
     await browser.close();
   }
@@ -105,6 +116,40 @@ test("재고 열기: 예약현황 화면에서 시작 · 달을 넘겨야 하는
     await page.goto(MOCK + "?login=need");
     const l = await st.openDay({ product: P0, day: "2026-11-19", qty: 10 });
     assert.match(l.why, /로그인/);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("현장 10/20 (1.52): 스마트플레이스 첫 화면 · 가게 사진 링크 · 리뷰 작성자 새 창 링크 — 안 누르고 주소로 예약상품 · 상품 · 번호가 틀리면 다시 찾음", async () => {
+  const browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
+  try {
+    const { page, saves } = await setup(browser);
+    const ctx = page.context();
+    // 1.52 가 간 곳: 스마트플레이스 첫 화면 (리뷰에 '야간자유 입장권' · 작성자 사진 = 새 창 링크)
+    await page.goto(MOCK + "?view=home");
+    const { st, learned } = mkStock(page);
+    assert.deepStrictEqual(await st.call(`window.__naverStock.openItem(${JSON.stringify(P1)})`), { ok: false, why: "예약상품 목록 화면이 아님" }, "목록이 아니면 아무것도 안 누름");
+    assert.strictEqual((await st.read(P1)).card, false);
+    const r = await st.openDay({ product: P1, day: "2026-11-19", qty: 10 });
+    assert.ok(r.ok && r.done, r.why);
+    assert.deepStrictEqual(await saves(), [{ id: 1, from: "2026-11-19", to: "2026-11-19", n: 10 }]);
+    assert.deepStrictEqual(learned, { [P1]: "1" });
+    assert.strictEqual(ctx.pages().length, 1, "새 창(MY플레이스) 없음");
+    // 바깥 링크 · 새 창 링크는 눌러도 안 눌림 (가게 사진 → 스마트플레이스 · 리뷰 작성자)
+    await page.goto(MOCK + "?view=items");
+    const out = await st.call(`window.__naverStock.click("아스타나키즈")`);
+    assert.ok(!out.ok && /밖/.test(out.why), JSON.stringify(out));
+    assert.ok(/view=items/.test(page.url()), "그대로 예약상품 목록");
+    await page.goto(MOCK + "?view=home");
+    assert.ok(!(await st.call(`window.__naverStock.click("리뷰어A")`)).ok || ctx.pages().length === 1);
+    assert.strictEqual(ctx.pages().length, 1);
+    // 남겨 둔 번호가 틀리면(상품이 바뀜) → 목록에서 다시 찾아 고침
+    const w = mkStock(page, { ids: { [P0]: "1" } });
+    const r2 = await w.st.openDay({ product: P0, day: "2026-11-19", qty: 10 });
+    assert.ok(r2.ok && r2.done, r2.why);
+    assert.deepStrictEqual((await saves()).slice(-1), [{ id: 0, from: "2026-11-19", to: "2026-11-19", n: 10 }], "다른 상품(1)을 바꾸지 않음");
+    assert.deepStrictEqual(w.learned, { [P0]: "0" });
   } finally {
     await browser.close();
   }

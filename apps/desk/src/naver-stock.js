@@ -7,18 +7,39 @@
      → "변경할 재고 수를 입력해주세요." 칸에 10 → [저장](켜짐) → "수정되었습니다" 알림 → 달력 "0/10개"
    안전: 그 날 회차가 하나라도 재고가 있으면(사람이 이미 열었거나 바꿈) 건드리지 않음 · 날짜 칸 · 확인 창 글자가 그 날짜인지 보고 누름
          · 저장 뒤 달력에서 모든 회차가 10개가 된 것을 다시 읽어 확인
+   현장 10/20 20:24 (1.52): 상품 사진을 찾다 화면 왼쪽 위 가게 사진(스마트플레이스로 가는 링크)을 눌러 스마트플레이스 첫 화면으로 →
+     그 화면 리뷰의 '야간자유 입장권' 옆 작성자 사진을 눌러 MY플레이스 새 창 — 재고는 안 바뀜
+     → 1.53: 누르지 않고 주소로 감 — 예약상품 목록 …/bizes/{업체번호}/biz-items · 상품 일정/가격 …/biz-items/{상품번호}/schedules
+       상품 번호는 처음에 목록에서 이름으로 찾아(카드 링크 · 링크가 없으면 이름을 누름) 이 PC 설정에만 남김 (코드에 주소 · 번호 없음)
+       네이버 예약관리 밖으로 가는 링크 · 새 창 링크는 절대 누르지 않음
    installNaverStockDriver = 네이버 페이지 안에서 실행 (window.__naverStock) · NaverStock = Node 쪽 (앱: 숨은 네이버 창 · 시험: 가짜 화면) */
 
 function installNaverStockDriver() {
-  if (window.__naverStock && window.__naverStock.v === 1) return true;
+  if (window.__naverStock && window.__naverStock.v === 2) return true;
   const norm = (s) => String(s || "").replace(/\s+/g, "");
   const vis = (el) => !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== "hidden");
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
   const textOf = (e) => norm(e.value || e.textContent);
   const clickables = (root = document) => $$("button, a, [role=button], [role=tab]", root).filter(vis);
-  const press = (el) => {
-    for (const type of ["mousedown", "mouseup", "click"]) el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
+  // 상품 번호 · 예약상품 목록 주소 모양 (Node 가 window.__naverStockPat 로 넣을 수 있음 — 시험의 가짜 화면은 다른 모양)
+  const PAT = () => window.__naverStockPat || { list: "/bizes/\\d+/biz-items/?(?:[?#]|$)", id: "/biz-items/(\\d+)" };
+  const onList = () => new RegExp(PAT().list).test(location.href);
+  const idOf = (href) => { const m = String(href || "").match(new RegExp(PAT().id)); return m ? m[1] : ""; };
+  /** 네이버 예약관리 안에서 움직이는 것만: 다른 곳(스마트플레이스 · MY플레이스 …)으로 가는 링크 · 새 창 링크는 안 누름 */
+  const inside = (el) => {
+    const a = el.closest("a[href], [target]");
+    if (!a) return true;
+    if (String(a.getAttribute("target") || "").toLowerCase() === "_blank") return false;
+    const h = a.getAttribute("href");
+    if (!h || /^(#|javascript:)/i.test(h)) return true;
+    try { const u = new URL(h, location.href); return u.protocol === location.protocol && u.host === location.host; } catch (e) { return false; }
   };
+  const press = (el) => {
+    if (!inside(el)) return false;
+    for (const type of ["mousedown", "mouseup", "click"]) el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
+    return true;
+  };
+  const OUT = "네이버 예약관리 밖으로 가는 링크라 안 누름";
   const off = (b) => !!(b.disabled || b.getAttribute("aria-disabled") === "true" || /(^|[\s_-])(disabled|dimmed)/i.test(String(b.getAttribute("class") || "")));
   /** 글이 re 에 맞는 가장 깊은 요소 (글이 여러 칸으로 나뉘어 있어도) */
   const deep = (re, root = document) => $$("*", root).filter((e) => vis(e) && re.test(norm(e.textContent)) && ![...e.children].some((c) => re.test(norm(c.textContent))));
@@ -79,22 +100,22 @@ function installNaverStockDriver() {
     }
     return out;
   }
-  /** 상품 카드: 이름에서 위로 올라가 사진(img · '가격형' 표 · 배경 그림)이 하나뿐인 칸 → 누를 것 */
-  function cardPhoto(name) {
-    const want = norm(name), t = deep(new RegExp(`^${escRe(want)}$`))[0];
-    if (!t) return null;
-    const photos = (p) => $$("img", p).filter(vis).concat(deep(/^가격형$/, p)).concat($$("*", p).filter((e) => vis(e) && /url\(/.test(getComputedStyle(e).backgroundImage || "")));
-    for (let p = t.parentElement; p && p !== document.body; p = p.parentElement) {
-      const ph = photos(p);
-      if (!ph.length) continue;
-      if (deep(new RegExp(`^${escRe(want)}$`), p).length !== 1) break;
-      return ph[0];
+  /** 예약상품 목록의 그 상품 카드: 이름에서 위로 올라가며 상품 링크(…/biz-items/번호)가 한 가지뿐인 칸 → { id, href } · 링크가 없으면 { el: 이름 }
+      (사진은 보지 않음 — 1.52 는 사진을 찾다 가게 사진 링크를 눌렀음) */
+  function cardOf(name) {
+    const ts = deep(new RegExp(`^${escRe(norm(name))}$`));
+    if (ts.length !== 1) return null; // 없거나 같은 이름이 둘이면 안 누름
+    for (let p = ts[0]; p && p !== document.body; p = p.parentElement) {
+      const links = $$("a[href]", p).concat(p.matches("a[href]") ? [p] : []).filter((a) => idOf(a.href) && inside(a));
+      const ids = [...new Set(links.map((a) => idOf(a.href)))];
+      if (ids.length === 1) return { id: ids[0], href: links[0].href, el: ts[0] };
+      if (ids.length > 1) break; // 다른 카드까지 올라옴
     }
-    return null; // 사진이 없으면 카드가 아님 (예약현황 머리의 상품 이름 등)
+    return { id: "", href: "", el: ts[0] };
   }
 
   window.__naverStock = {
-    v: 1,
+    v: 2,
     /** name: 지금 보는 상품이 이 상품인지 · 이 상품 카드가 있는지 */
     read(name) {
       const pop = popup();
@@ -111,7 +132,9 @@ function installNaverStockDriver() {
         url: location.href,
         itemsTab: has("예약상품"),
         onItem: !!(want && named && tabOn), // 이 상품 설정 화면
-        card: !!(want && named && !tabOn && cardPhoto(name)), // 예약상품 목록에 이 상품 카드 (사진이 붙은 이름)
+        onList: onList(),
+        card: !!(want && named === 1 && !tabOn && onList()), // 예약상품 목록(주소로 확인)에 이 상품 이름
+        itemId: idOf(location.href), // 상품 화면이면 그 상품 번호
         stockOn,
         month: monthEl ? ym(monthEl.textContent) : "",
         days,
@@ -147,15 +170,18 @@ function installNaverStockDriver() {
       const b = clickables(root).find((x) => textOf(x) === norm(txt) && !(pop && root === document && pop.root.contains(x)));
       if (!b) return { ok: false, why: `[${txt}] 버튼을 못 찾음` };
       if (off(b)) return { ok: false, why: `[${txt}] 버튼이 꺼져 있음` };
-      press(b);
+      if (!press(b)) return { ok: false, why: `[${txt}]: ${OUT}` };
       return { ok: true };
     },
+    /** 예약상품 목록에서 그 상품: 카드 링크가 있으면 번호만 알려 줌(Node 가 주소로 감) · 없으면 이름을 누름 — 목록 화면이 아니면 아무것도 안 누름 */
     openItem(name) {
-      const el = cardPhoto(name);
-      if (!el) return { ok: false, why: `예약상품에서 '${name}' 상품을 못 찾음` };
-      el.scrollIntoView({ block: "center" });
-      press(el);
-      return { ok: true };
+      if (!onList()) return { ok: false, why: "예약상품 목록 화면이 아님" };
+      const c = cardOf(name);
+      if (!c) return { ok: false, why: `예약상품에서 '${name}' 상품을 못 찾음` };
+      if (c.id) return { ok: true, id: c.id, href: c.href };
+      c.el.scrollIntoView({ block: "center" });
+      if (!press(c.el)) return { ok: false, why: `'${name}': ${OUT}` };
+      return { ok: true, pressed: true };
     },
     /** 큰 달력 달 넘기기 (dir 1 = 다음 달) */
     monthNav(dir) {
@@ -179,7 +205,7 @@ function installNaverStockDriver() {
       let els = clickables(pop.root).filter((b) => textOf(b) === String(Number(d)) && !off(b));
       if (!els.length) els = deep(re, pop.root).filter((e) => !off(e) && !(e.closest("[class]") && off(e.closest("[class]"))));
       if (!els.length) return { ok: false, why: `작은 달력에서 ${d}일을 못 찾음` };
-      press(Number(d) >= 15 ? els[els.length - 1] : els[0]);
+      if (!press(Number(d) >= 15 ? els[els.length - 1] : els[0])) return { ok: false, why: `${d}일: ${OUT}` };
       return { ok: true };
     },
     /** 재고 수 넣기 (네이버 화면은 React → 값 넣는 함수로 넣고 input 알림) */
@@ -207,7 +233,7 @@ function installNaverStockDriver() {
       const b = dir > 0 ? after[0] : before[before.length - 1];
       if (!b) continue;
       if (off(b)) return { ok: false, why: "달 넘기는 버튼이 꺼져 있음" };
-      press(b);
+      if (!press(b)) return { ok: false, why: `달 넘기기: ${OUT}` };
       return { ok: true };
     }
     return { ok: false, why: "달 넘기는 버튼을 못 찾음" };
@@ -217,6 +243,7 @@ function installNaverStockDriver() {
 const NAVER_STOCK_SOURCE = installNaverStockDriver.toString();
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const LOGIN = "네이버에 로그인해 주세요 (로그인할 때 '로그인 상태 유지'를 꼭 체크)";
 const dayMs = (d) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
 const shiftDay = (d, n) => new Date(dayMs(d) + n * 86400000).toISOString().slice(0, 10);
 const nextYm = (m) => { const d = new Date(dayMs(m + "-01")); d.setUTCMonth(d.getUTCMonth() + 1); return d.toISOString().slice(0, 7); };
@@ -249,12 +276,18 @@ class NaverStock {
     this.exec = exec;
     this.onStep = opts.onStep || (() => {});
     this.onSnap = opts.onSnap || null;
-    this.urls = opts.urls || null; // { calendar } — 예약상품 탭이 안 보이면 예약현황을 거쳐
+    this.urls = opts.urls || null; // { calendar, items, schedule: "…/biz-items/{id}/schedules" } — 이 PC 네이버 예약관리 시작 주소에서 (코드에 주소 없음)
+    this.pat = opts.pat || null; // 시험: 가짜 화면의 목록 · 상품 번호 주소 모양
+    this.ids = Object.assign({}, opts.ids || {}); // 상품 이름 → 번호 (목록에서 찾은 것 · 앱은 settings.stockItems 에 남김)
+    this.onLearn = opts.onLearn || (() => {});
     this.slow = opts.slow || 1; // 시험에서 기다림을 줄일 때
   }
   call(expr) {
-    return this.exec(`(() => { (${NAVER_STOCK_SOURCE})(); return ${expr}; })()`);
+    const pat = this.pat ? `window.__naverStockPat = ${JSON.stringify(this.pat)}; ` : "";
+    return this.exec(`(() => { ${pat}(${NAVER_STOCK_SOURCE})(); return ${expr}; })()`);
   }
+  go(url) { return this.act(`window.__naverStock.go(${JSON.stringify(url)})`); }
+  schedUrl(id) { return id && this.urls && this.urls.schedule ? this.urls.schedule.replace("{id}", encodeURIComponent(id)) : ""; }
   step(msg) { try { this.onStep(msg); } catch (e) { /* 무시 */ } }
   async read(name) {
     for (let i = 0; i < 40; i++) {
@@ -280,28 +313,49 @@ class NaverStock {
     if (this.onSnap) try { await this.onSnap(label); } catch (e) { /* 진단 저장 실패는 무시 */ }
     return { ok: false, why };
   }
+  /** 그 상품의 설정(일정/가격) 화면으로: 아는 번호면 주소로 바로 → 아니면 예약상품 목록(주소로)에서 이름으로 찾아 카드 링크 주소로 (링크가 없으면 이름을 누름) */
+  async openProduct(product) {
+    const known = this.schedUrl(this.ids[product]);
+    if (known) {
+      this.step(`네이버 상품 열기: ${product}`);
+      await this.go(known);
+      const r = await this.until(product, (x) => x.onItem || x.needLogin, 20000, "");
+      if (r.ok && r.state.needLogin) return { ok: false, why: LOGIN };
+      if (r.ok) return r;
+      delete this.ids[product]; // 번호가 바뀌었으면 목록에서 다시 찾음
+    }
+    this.step("네이버 예약상품 열기");
+    if (this.urls && this.urls.items) await this.go(this.urls.items);
+    else {
+      // 예약관리 주소를 모름 (처음 설치) → 예약현황의 [예약상품] 탭 (예약관리 안 링크만 누름)
+      const s = await this.read(product);
+      if (!s.onList) {
+        if (!s.itemsTab && this.urls && this.urls.calendar) { await this.go(this.urls.calendar); await this.until(product, (x) => x.itemsTab || x.needLogin, 20000, ""); }
+        const k = await this.act(`window.__naverStock.click("예약상품")`);
+        if (!k.ok) return this.fail("stock-items", `네이버 [예약상품]을 못 찾음 — ${k.why}`);
+      }
+    }
+    let r = await this.until(product, (x) => x.card || x.needLogin, 30000, `예약상품에서 '${product}'이 안 보임`);
+    if (r.ok && r.state.needLogin) return { ok: false, why: LOGIN };
+    if (!r.ok) return this.fail("stock-items", r.why);
+    this.step(`네이버 상품 열기: ${product}`);
+    const k = await this.act(`window.__naverStock.openItem(${JSON.stringify(product)})`);
+    if (!k.ok) return this.fail("stock-item", k.why);
+    if (k.id) await this.go(this.schedUrl(k.id) || k.href);
+    r = await this.until(product, (x) => x.onItem, 30000, `'${product}' 설정 화면이 안 열림`);
+    if (!r.ok) return this.fail("stock-item", r.why);
+    const id = k.id || r.state.itemId;
+    if (id && this.ids[product] !== id) { this.ids[product] = id; try { this.onLearn(product, id); } catch (e) { /* 남기기 실패는 다음에 다시 찾음 */ } }
+    return r;
+  }
   /** 그 상품의 일정/가격 달력을 그 달(YYYY-MM)로 */
   async toMonth(product, month) {
     let s = await this.read(product);
-    if (s.needLogin) return { ok: false, why: "네이버에 로그인해 주세요 (로그인할 때 '로그인 상태 유지'를 꼭 체크)" };
+    if (s.needLogin) return { ok: false, why: LOGIN };
     if (!s.onItem) {
-      if (!s.card) {
-        if (!s.itemsTab && this.urls && this.urls.calendar) { await this.act(`window.__naverStock.go(${JSON.stringify(this.urls.calendar)})`); await this.until(product, (x) => x.itemsTab, 20000, ""); }
-        this.step("네이버 예약상품 열기");
-        let r = await this.act(`window.__naverStock.click("예약상품")`);
-        if (!r.ok) return this.fail("stock-items", `네이버 [예약상품]을 못 찾음 — ${r.why}`);
-        r = await this.until(product, (x) => x.card || x.onItem, 30000, `예약상품에서 '${product}'이 안 보임`);
-        if (!r.ok) return this.fail("stock-items", r.why);
-        s = r.state;
-      }
-      if (!s.onItem) {
-        this.step(`네이버 상품 열기: ${product}`);
-        let r = await this.act(`window.__naverStock.openItem(${JSON.stringify(product)})`);
-        if (!r.ok) return this.fail("stock-item", r.why);
-        r = await this.until(product, (x) => x.onItem, 30000, `'${product}' 설정 화면이 안 열림`);
-        if (!r.ok) return this.fail("stock-item", r.why);
-        s = r.state;
-      }
+      const r = await this.openProduct(product);
+      if (!r.ok) return r;
+      s = r.state;
     }
     if (!s.stockOn || !s.nDays) {
       this.step("네이버 [일정/가격] — 시간 · 재고 불러오는 중");

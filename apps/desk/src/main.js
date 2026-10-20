@@ -131,6 +131,8 @@ function openNaver() {
   if (naverWin && !naverWin.isDestroyed()) naverWin.destroy();
   naverWin = new BrowserWindow({ width: 1280, height: 800, show: false, skipTaskbar: true, title: "네이버 예약관리 (입장 데스크가 읽는 중)", webPreferences: { partition: "persist:naver", backgroundThrottling: false } });
   naverWin.setMenuBarVisibility(false);
+  // 재고 자동 오픈 중에는 새 창을 열지 않음 (10/20 현장 1.52: 리뷰 작성자 MY플레이스 창이 열림)
+  naverWin.webContents.setWindowOpenHandler(() => (stockJob && stockJob.running ? { action: "deny" } : { action: "allow" }));
   naverWin.loadURL(settings.naverUrl);
   naverWin.once("ready-to-show", () => {
     naverWin.showInactive();
@@ -897,7 +899,7 @@ ipcMain.handle("notes:set", (_e, job) => {
 //   예약 > 예약상품 > 상품 > [일정/가격] > [재고수정] > 날짜 > [다음] > [모든 회차] > 10 > [저장] (naver-stock.js · 실제 화면 사진 10/20)
 //   하루 네 번 기회: 10:30 → 실패하면 12:00 → 16:00 → 20:20 (어느 때든 성공하면 그날 남은 것은 안 함 · 그날 안에 끝내는 것이 목표)
 //   - 아직 안 연 날(모든 회차 0/0개)만 · 이미 연 날은 안 건드림 · 꺼져서 못 연 날은 마지막으로 연 날 뒤부터 이어서 (앞쪽에 비워 둔 날은 그대로)
-//   - 설정 settings.stockAuto { on(설치하면 켜짐), qty, ahead, products, skip } (데스크 운영 설정) · 결과 stockLast · 성공한 날 stockDoneDay · 그날 써 본 때 stockTried
+//   - 설정 settings.stockAuto { on(설치하면 켜짐), qty, ahead, products, skip } · 상품 번호 stockItems { 이름: 번호 } (1.53~ 목록에서 찾아 남김) (데스크 운영 설정) · 결과 stockLast · 성공한 날 stockDoneDay · 그날 써 본 때 stockTried
 const { NaverStock, stockPlan, stockDue, shiftDay: stockShift } = require("./naver-stock");
 const STOCK_PRODUCTS = ["평일 무제한 / 휴일 1시간 50분 입장권", "야간자유 입장권"];
 const STOCK_TIMES = [[10, 30], [12, 0], [16, 0], [20, 20]];
@@ -919,6 +921,9 @@ function stockRun(opts) {
     products: c.products.map((name) => ({ name, plan: [], done: [], already: [], failed: [], skipped: [], noSlots: [], last: null, why: "" })) });
   const st = new NaverStock((code) => timed(naverWin.webContents.executeJavaScript(code, true), 8000, "네이버 화면이 응답하지 않음"), {
     urls: naverUrls(settings.naverUrl),
+    ids: settings.stockItems || {}, // 상품 이름 → 번호 (처음엔 예약상품 목록에서 이름으로 찾아 이 PC 에만 남김)
+    onLearn: (name, id) => { settings.stockItems = { ...(settings.stockItems || {}), [name]: String(id) }; saveSettings(); },
+    pat: process.env.DESK_STOCK_PAT ? JSON.parse(process.env.DESK_STOCK_PAT) : null, // 시험(가짜 화면)만
     onStep: (msg) => { me.step = msg; if (deskWin && !deskWin.isDestroyed()) deskWin.webContents.send("naver:step", msg); },
     onSnap: (label) => dumpNaver(label),
   });

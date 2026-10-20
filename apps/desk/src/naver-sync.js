@@ -18,7 +18,8 @@ const isKidsTicket = (name) => /입장권/.test(name) && !/단체/.test(name);
 function naverUrls(anyUrl) {
   const m = String(anyUrl || "").match(/^(https?:\/\/[^/]+\/bizes\/\d+)/);
   if (!m) return null;
-  return { list: `${m[1]}/booking-list-view`, calendar: `${m[1]}/booking-calendar-view` };
+  // items · schedule = 재고 자동 오픈 (예약상품 목록 · 상품 일정/가격 — {id} = 상품 번호, 이 PC 설정 stockItems 에만)
+  return { list: `${m[1]}/booking-list-view`, calendar: `${m[1]}/booking-calendar-view`, items: `${m[1]}/biz-items`, schedule: `${m[1]}/biz-items/{id}/schedules` };
 }
 
 class NaverSync {
