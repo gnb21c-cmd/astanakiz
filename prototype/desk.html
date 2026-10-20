@@ -3052,7 +3052,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       if (!j) return;
       const opened = j.products.flatMap((p) => p.done.map((d) => `${stShort(p.name)} ${stMd(d)}`));
       if (j.dry) toast(`재고 확인만: ${stPlanText(j)}`, 8000);
-      else if (j.ok) toast(opened.length ? `네이버 재고를 열었어요 — ${opened.join(" · ")} (회차마다 ${j.qty}개)` : `네이버 재고 확인 — ${stMd(j.target)}까지 이미 열려 있어요`, opened.length ? 8000 : 0);
+      else if (j.ok) toast(opened.length ? `네이버 재고를 열었어요 — ${opened.join(" · ")} (회차마다 ${j.qty}개)` : `네이버 재고 확인 — ${stMd(j.target)}까지 이미 열려 있어요${j.products.some((p) => p.seen) ? ` (${j.products.filter((p) => p.seen).map((p) => `${stShort(p.name)} ${p.seen}`).join(" · ")})` : ""}`, opened.length ? 8000 : 0);
       else toast(`네이버 재고 열기 실패: ${stWhy(j)}${j.auto ? ` — ${stNext(v) ? stNext(v) + " 다시" : "오늘 남은 때 없음 · [지금 한 번 열기]로"}` : ""}`, 10000);
     });
   }
@@ -3074,7 +3074,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     const out = [];
     if (v.doneDay === TODAY) out.push(`오늘 끝남 (→ ${stMd(shiftDay(TODAY, v.cfg.ahead))})`);
     if (j && j.dry) out.push(`확인만 ${j.at.slice(11)}: ${stPlanText(j)}`);
-    if (L) out.push(`마지막 ${L.at.slice(0, 10) === TODAY ? "" : stMd(L.at.slice(0, 10)) + " "}${L.at.slice(11)} ${L.auto ? "자동" : "직접"} ${L.ok ? `성공${L.products.some((p) => p.done.length) ? ` (${L.products.filter((p) => p.done.length).map((p) => `${stShort(p.name)} ${p.done.map(stMd).join(", ")}`).join(" · ")})` : " (이미 열려 있음)"}` : `실패: ${L.why || (L.products.find((p) => p.why) || {}).why || ""}`}`);
+    if (L) out.push(`마지막 ${L.at.slice(0, 10) === TODAY ? "" : stMd(L.at.slice(0, 10)) + " "}${L.at.slice(11)} ${L.auto ? "자동" : "직접"} ${L.ok ? `성공${L.products.some((p) => p.done.length) ? ` (${L.products.filter((p) => p.done.length).map((p) => `${stShort(p.name)} ${p.done.map(stMd).join(", ")}`).join(" · ")})` : ` (이미 열려 있음${L.products.some((p) => p.seen) ? `: ${L.products.filter((p) => p.seen).map((p) => `${stShort(p.name)} ${stMd(L.target)} ${p.seen}`).join(" · ")}` : ""})`}` : `실패: ${L.why || (L.products.find((p) => p.why) || {}).why || ""}`}`);
     const nx = stNext(v);
     if (v.cfg.on && v.doneDay !== TODAY) out.push(nx ? `다음 ${nx}` : "오늘 남은 때 없음");
     return out.join(" · ") || "아직 안 함";

@@ -262,7 +262,10 @@ function stockPlan({ today, ahead = 30, days = {}, skip = [], max = 7 }) {
   const cand = (L ? inWin.filter((d) => d > L) : inWin.filter((d) => d === D)).filter(fresh);
   const skipped = cand.filter((d) => skip.includes(d));
   const plan = cand.filter((d) => !skip.includes(d));
-  return { target: D, last: L, plan: plan.slice(0, max), later: plan.slice(max), skipped, noSlots: inWin.filter((d) => d > (L || shiftDay(D, -1)) && !(days[d] && days[d].length)) };
+  // 오늘 + ahead 를 못 읽었으면(회차가 하나도 안 잡힘) '할 것 없음'이 아니라 못 읽음 — 1.53 현장 10/20 20:55: 11/19 가 0/0 인데 '이미 열려 있음'으로 끝남
+  const cells = days[D] && days[D].length ? days[D] : null;
+  return { target: D, last: L, plan: plan.slice(0, max), later: plan.slice(max), skipped, noSlots: inWin.filter((d) => d > (L || shiftDay(D, -1)) && !(days[d] && days[d].length)),
+    unread: !cells, seen: cells ? `${cells.length}회차 재고 ${[...new Set(cells.map((c) => c.cap))].join("·")}` : "" };
 }
 
 /** 하루 네 번 기회(사장님 10/20: 10:30 → 실패하면 12:00 → 16:00 → 20:20) 중 지금 써야 할 것: 지난 때 중 아직 안 써 본 것 (늦게 켜면 지난 것들을 한 번에 — 한 번만 함)

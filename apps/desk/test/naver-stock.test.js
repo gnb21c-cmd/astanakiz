@@ -56,6 +56,11 @@ test("어느 날을 열지: 오늘 + 30일 · 꺼져서 못 연 날 이어서 ·
   all["2026-11-19"] = [];
   const q = stockPlan({ today: "2026-10-20", days: all });
   assert.deepStrictEqual([q.plan, q.noSlots], [[], ["2026-11-19"]]);
+  assert.strictEqual(q.unread, true, "오늘 + 30일 회차를 못 읽으면 '할 것 없음'이 아니라 못 읽음 (현장 10/20 20:55)");
+  // 오늘 + 30일이 아예 안 읽힘 (달력 모양이 다름) → 못 읽음 · 읽혔으면 무엇을 봤는지
+  const miss = Object.fromEntries(Object.keys(days).filter((d) => d !== "2026-11-19").map((d) => [d, set(10)]));
+  assert.deepStrictEqual((({ plan, unread }) => ({ plan, unread }))(stockPlan({ today: "2026-10-20", days: miss })), { plan: [], unread: true });
+  assert.deepStrictEqual((({ unread, seen }) => ({ unread, seen }))(stockPlan({ today: "2026-10-20", days: Object.assign({}, miss, { "2026-11-19": set(10) }) })), { unread: false, seen: "2회차 재고 10" });
 });
 
 test("하루 네 번 기회: 10:30 → 실패하면 12:00 → 16:00 → 20:20 · 늦게 켜면 지난 것 한 번 · 다 써 보면 그날은 끝", () => {

@@ -934,7 +934,10 @@ function stockRun(opts) {
           const sc = await st.scan(p.name, stockShift(today, 1), me.target);
           if (!sc.ok) { p.why = sc.why; continue; }
           const pl = stockPlan({ today, ahead: c.ahead, days: sc.days, skip: c.skip });
-          Object.assign(p, { plan: pl.plan, skipped: pl.skipped, noSlots: pl.noSlots, last: pl.last, later: pl.later });
+          Object.assign(p, { plan: pl.plan, skipped: pl.skipped, noSlots: pl.noSlots, last: pl.last, later: pl.later, seen: pl.seen });
+          // 진단: 직접 누른 때 · 못 읽었을 때는 읽은 달력 화면 + 읽은 것(날짜별 회차 · 재고)을 바탕화면 '아스타나키즈-진단'에 (손님 정보 없음)
+          if (!me.auto || pl.unread) await dumpWin(naverWin, `stock-scan-${me.products.indexOf(p) + 1}-${stampNow()}`, { product: p.name, target: me.target, last: pl.last, plan: pl.plan, url: naverWin.webContents.getURL(), read: Object.fromEntries(Object.entries(sc.days).map(([d, cs]) => [d, cs.map((x) => `${x.t} ${x.n}/${x.cap}`).join(" ")])) }).catch(() => {});
+          if (pl.unread) { p.why = `${+me.target.slice(5, 7)}/${+me.target.slice(8)} 회차를 네이버 달력에서 못 읽음 (회차가 없는 날이면 네이버에서 확인)`; continue; }
           if (dry) continue;
           for (const day of pl.plan) {
             const r = await st.openDay({ product: p.name, day, qty: c.qty });
@@ -955,7 +958,7 @@ function stockRun(opts) {
     me.running = false;
     me.end = localNow();
     if (!dry) {
-      settings.stockLast = { at: me.at, end: me.end, auto: me.auto, ok: me.ok, target: me.target, why: me.why, products: me.products.map((p) => ({ name: p.name, done: p.done, failed: p.failed, why: p.why })) };
+      settings.stockLast = { at: me.at, end: me.end, auto: me.auto, ok: me.ok, target: me.target, why: me.why, products: me.products.map((p) => ({ name: p.name, done: p.done, failed: p.failed, why: p.why, seen: p.seen || "" })) };
       if (me.ok) settings.stockDoneDay = today;
       saveSettings();
     }
