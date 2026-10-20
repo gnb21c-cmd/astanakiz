@@ -294,6 +294,12 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 .chain.sub { color: var(--muted); background: var(--surface-2); font-weight: 700; }
 .chain.bad { color: #fff; background: var(--red); }
 .npend { font-size: 11.5px; color: var(--red); font-weight: 700; }
+/* 추가 예약이 10번째 (사장님 10/20): 손님은 이용 중 → 연락해 사은권 전달 · [사은권 전달함] 까지 열쇠 칸 · 열쇠 창 · 카드에 남김 */
+.banner.giftwarn, .banner.giftdue { background: var(--yellow); color: #3a2a00; border: 2px solid #c79a00; }
+.banner.giftdue { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: space-between; }
+.banner.giftwarn .help, .banner.giftdue .help { color: #5a4500; }
+.key.giftdue { position: relative; outline: 3px solid var(--yellow); outline-offset: -3px; }
+.key.giftdue::after { content: "사은권"; position: absolute; top: 1px; right: 1px; font-size: 9.5px; font-weight: 800; line-height: 1.2; background: var(--yellow); color: #3a2a00; border-radius: 4px; padding: 0 3px; }
 .gift { display: inline-block; font-size: 11px; font-weight: 700; color: #fff; background: var(--red); border-radius: 5px; padding: 0 6px; margin-left: 2px; }
 .badge { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
 .badge.conf { background: var(--red); color: #fff; } /* 미입장 = 빨강 스티커 */
@@ -900,7 +906,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
      - 앱: 저장 폴더(%APPDATA%\아스타나키즈 입장 데스크\desk-state\날짜.json)에 바로 씀 (갑자기 꺼져도 남게) + 브라우저 저장소에도 한 벌
      - 켜자마자 빈 화면으로 저장본을 덮어쓰지 않게: 저장본을 먼저 읽어 들인 뒤부터 저장 */
   const STATE_KEY = "astanakiz-desk-" + TODAY;
-  const SAVE_FIELDS = ["id", "day", "no", "slot", "name", "phone", "qty", "product", "naverProduct", "pay", "cancels", "prevDone", "visitNo", "visitEnd", "proxy", "visitor", "status", "keys", "enteredAt", "outAt", "overPaid", "naverPending", "naverWhy", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut", "naverSlot", "sv"];
+  const SAVE_FIELDS = ["id", "day", "no", "slot", "name", "phone", "qty", "product", "naverProduct", "pay", "cancels", "prevDone", "visitNo", "visitEnd", "proxy", "visitor", "status", "keys", "enteredAt", "outAt", "overPaid", "naverPending", "naverWhy", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut", "naverSlot", "sv", "giftDue", "giftGiven"];
   let stateReady = !APP; // 저장본을 읽기 전에는 저장하지 않음
   let svExtra = {}; // 설문: 오늘 근무자가 [+]로 직접 더한 수 { 번호: 건수 } — 예약 없이 이벤트로 들어온 손님 등 (사장님 10/15 · 따로 기록은 없음)
   let pendingSaved = []; // 예전 형식(예약번호만 있는) 저장본 — 네이버에서 그 예약을 불러오면 합침
@@ -1084,6 +1090,22 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     const nsl = (naverSlots[x.day] || {})[x.slot]; if (nsl) { nsl.conf = Math.max(0, nsl.conf - x.qty); nsl.done += x.qty; }
     if (APP) setTimeout(naverFlush, 0);
   }
+  /* 추가 예약이 10번째 (사장님 10/20): 이용 중인 손님의 뒤 타임 예약을 이용완료하면 마일리지 10 · 20 …번째가 되는지
+     → 알림에 '사은권을 드려야 해요 · 손님은 이용 중 — 연락해 전달' · 확인하면 그 예약에 giftDue (전달하면 giftGiven 시각) — [사은권 전달함]까지 열쇠 칸 · 열쇠 창 · 카드에 남고 반납 전에 물음 */
+  const extGift = (e) => { const x = e.x; if (!x || x.prevDone == null || evFrozen(x)) return 0; const n = doneSoFar(x) + 1 - evSub(x); return isGift(n) ? n : 0; };
+  const extGiftHtml = (e) => { const n = extGift(e); return n ? `<div class="banner giftwarn"><b>이 예약을 이용완료하면 ${n}번째 예약완료 — ${RULES.giftName}을 드려야 해요</b><br>손님은 이용 중 — <b class="num">${fmtPhone(e.x.phone || e.h.phone)}</b> 로 연락해 전달하세요</div>` : ""; };
+  /** 이 열쇠 손님이 아직 못 받은 사은권 (본인 · 함께 이용완료한 추가 예약) */
+  const giftPend = (h) => (h ? (bookings[TODAY] || []).filter((x) => x.giftDue && !x.giftGiven && (x === h || x.chainHead === h.id)) : []);
+  const giftDueHtml = (h) => giftPend(h).map((x) => `<div class="banner giftdue"><span><b>사은권 전달 전</b> — ${x.giftDue}번째 예약완료 ${RULES.giftName} · <b class="num">${fmtPhone(x.phone)}</b> <span class="help">(손님께 연락해 전달)</span></span><button class="btn btn-sm btn-ink" data-act="giftGiven" data-no="${esc(x.no)}">사은권 전달함</button></div>`).join("");
+  /** 반납 · 일괄 반납 전에: 사은권을 못 받은 손님이 있으면 물음 — [확인] = 드렸음(전달함으로 남김) · [취소] = 반납 안 함 */
+  function giftAsk(hs) {
+    const p = hs.flatMap(giftPend);
+    if (!p.length) return true;
+    if (!confirm(`${p.map((x) => `${x.name}님 ${x.giftDue}번째 예약완료 ${RULES.giftName}을 아직 전달하지 않았어요.`).join("\n")}\n\n지금 드렸으면 [확인] — 전달함으로 남기고 반납\n아직이면 [취소] — 반납하지 않고 돌아가요 (먼저 드리세요)`)) return false;
+    for (const x of p) x.giftGiven = hm(now);
+    saveState();
+    return true;
+  }
   const extSeen = new Set(); // 이번에 알린 예약번호 (같은 걸 계속 띄우지 않게)
   /** 네이버를 불러온 뒤: 추가 예약 찾기 → 딱 2시간이면 자동 연장 → 알림 (다른 창이 열려 있으면 닫힐 때) */
   function extScan() {
@@ -1193,9 +1215,44 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     }
     const sub = evSub(b);
     if (done && evWas(b)) return `<b>${b.visitNo}번째 예약완료</b> · 이벤트 기간 방문 <span class="help">(마일리지 ${(b.visitEnd || b.visitNo) - sub})</span>`; // 마일리지에 안 들어간 방문
-    const n = (done ? b.visitNo : b.prevDone + 1) - sub;
-    const gift = isGift(n) ? ` <span class="gift">${RULES.giftName} 증정</span>` : "";
-    return done ? `<b>${n}번째 예약완료</b>${gift}${sub ? ` <span class="help">(네이버 ${b.visitNo} − 이벤트 ${sub})</span>` : ""}` : `완료 ${b.prevDone - sub}${c} → <b>${n}번 완료 예정</b>${gift}${sub ? ` <span class="help">(네이버 완료 ${b.prevDone} − 이벤트 ${sub})</span>` : ""}`;
+    /* 같은 날 여러 건 (사장님 10/20: '완료 8' 손님이 같은 시간 1장 + 1장 → 함께 입장하면 10번째인데 입장 전 카드에 사은권 표시가 없었음)
+       입장 전: 그날 이 손님 예약 중 먼저 이용완료될 미입장 예약까지 셈 — 대표 카드는 함께 처리하는 묶음 전체 '9 · 10번' · 입장 뒤 대표 카드도 '9 · 10번째' */
+    const P = done ? null : planOf(b);
+    const n = (done ? b.visitNo : P.n) - sub, last = (done ? b.visitEnd || b.visitNo : P.n + P.group - 1) - sub;
+    let g = 0;
+    for (let k = n; k <= last && !g; k++) if (isGift(k)) g = k;
+    const gift = g ? ` <span class="gift">${RULES.giftName} 증정</span>` : "";
+    const nums = last <= n ? `${n}` : last === n + 1 ? `${n} · ${last}` : `${n} ~ ${last}`;
+    return done ? `<b>${nums}번째 예약완료</b>${gift}${sub ? ` <span class="help">(네이버 ${b.visitNo} − 이벤트 ${sub})</span>` : ""}`
+      : `완료 ${b.prevDone - sub}${c} → <b>${nums}번 완료 예정</b>${last > n ? ` · 함께 ${last - n + 1}건` : ""}${gift}${P.sep ? ` <span class="help">(오늘 앞 예약 ${P.sep}건 포함)</span>` : ""}${sub ? ` <span class="help">(네이버 완료 ${b.prevDone} − 이벤트 ${sub})</span>` : ""}`;
+  }
+  /** 이 카드(대표)에서 입장하면 함께 이용완료되는 미입장 예약 — 입장 처리(doEnter)와 같은 순서: 같은 시간 나눈 예약 → 연속예약 뒤 타임 (사람이 늘면 거기서 끊음) */
+  function entryGroup(b) {
+    const out = partyOpen(b).slice(), ch = chainOf(b);
+    if (ch.length > 1 && ch[0] === b) {
+      let prevQty = partyNeed(b);
+      for (const y of ch.slice(1)) { if (y.status !== "확정") continue; if (slotQty(y) > prevQty) break; prevQty = slotQty(y); out.push(...partyOpen(y)); }
+    }
+    return out;
+  }
+  /** 미입장 예약의 이번 회차 = '완료 n' + 1 + 그날 이 손님 예약 중 먼저 이용완료될 미입장 예약 수 (시간 → 예약번호 순 = 입장 처리 순서)
+      → { n, group(대표 카드면 함께 처리하는 건수, 아니면 1), sep(따로 입장할 앞 예약 수 — 오늘 그 시간 1시간 50분이 다 지나도록 안 온 예약은 안 셈) } */
+  function planOf(b) {
+    const order = samePerson(b).slice().sort((x, y) => x.slot - y.slot || String(x.no || x.id).localeCompare(String(y.no || y.id)));
+    let h = b;
+    if (partyOpen(h).indexOf(h) > 0) h = partyOpen(h)[0];
+    const hc = chainOf(h);
+    if (hc.indexOf(h) > 0 && hc[0].status === "확정") h = hc[0];
+    const hg = entryGroup(h), grp = hg.includes(b) ? hg : [b];
+    let ahead = 0, sep = 0;
+    for (const x of order) {
+      if (x === b) break;
+      if (x.status !== "확정") continue;
+      if (grp.includes(x)) { ahead++; continue; }
+      if (x.day === TODAY && x.slot + RULES.useMinutes <= now) continue; // 그 시간이 다 지나도록 안 옴
+      ahead++; sep++;
+    }
+    return { n: b.prevDone + 1 + ahead, group: h === b ? grp.length : 1, sep };
   }
   /** 이번 입장으로 함께 이용완료되는 예약들 중 사은권 회차가 있는지 (예: 8 → 같은 시간 2건이면 9, 10) — 마일리지 기준(이벤트 기간 이용완료는 뺌) · 이벤트 기간엔 없음 */
   const giftIn = (h) => { if (!h.visitNo || evFrozen(h)) return 0; const s = evSub(h), a = h.visitNo - s, z = (h.visitEnd || h.visitNo) - s; for (let n = Math.max(1, a); n <= z; n++) if (isGift(n)) return n; return 0; };
@@ -1232,6 +1289,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       } else if (b.keys.length) act = `<span class="kchips">${b.keys.map((k) => `<span class="kchip num">${k}</span>`).join("")}</span><span class="help num">${hm(b.enteredAt)} 입장</span>`;
       else if (b.outAt != null) act = `<span class="help num">${hm(b.enteredAt)} 입장 · ${hm(b.outAt)} 퇴장</span>`;
       else if (b.chainHead) act = `<span class="help num">연속예약 — ${hm(b.enteredAt)} 첫 예약으로 입장</span>`;
+      if (b.giftDue) act += b.giftGiven ? `<span class="help num">${RULES.giftName} ${b.giftGiven} 전달</span>` : `<span class="npend">${b.giftDue}번째 ${RULES.giftName} 전달 전 — 손님께 연락해 전달 (열쇠 창 [사은권 전달함])</span>`;
       if (b.naverPending) act += `<span class="npend">${b.naverBusy ? "네이버 이용완료 처리 중…" : `네이버 이용완료 대기${b.naverWhy ? ` — ${esc(b.naverWhy)}` : ""} (자동으로 다시)`}</span>`;
       return `<article class="res ${b.status === "완료" ? "done" : ""}" data-act="openRes" data-id="${b.id}" tabindex="0" role="button" aria-label="${esc(b.name)} 예약 열기">
         <div class="head"><span class="name">${nameHtml(b)}${b.proxy ? ` <span class="badge proxy">대리예약</span>` : ""}${noteOf(b) && noteOf(b).m ? ` <span class="badge memo" title="${esc(noteOf(b).m)}">메모</span>` : ""}</span>${b.unpaid && b.status === "확정" ? `<span class="badge unpaid">입금대기</span>` : `<span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span>`}</div>
@@ -1255,7 +1313,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       if (k > RULES.keys) break; // 남는 칸(46~50)은 비워 둠
       const h = holderOf(k);
       if (!h) { html += `<button class="key free" data-act="key" data-k="${k}" aria-label="${k}번 빈 열쇠"><b class="num">${k}</b><span>&nbsp;</span></button>`; continue; }
-      html += `<button class="key ${keyColor(h, k)}${h.svc ? " svc" : ""}" data-act="key" data-k="${k}" aria-label="${k}번 ${h.svc ? "서비스 키 " : ""}${esc(h.name)}"><b class="num">${k}</b><span>${esc(h.svc ? svcBoard(h) : h.walk ? "현장" : h.name)}</span></button>`;
+      html += `<button class="key ${keyColor(h, k)}${h.svc ? " svc" : ""}${giftPend(h).length ? " giftdue" : ""}" data-act="key" data-k="${k}" aria-label="${k}번 ${h.svc ? "서비스 키 " : ""}${esc(h.name)}"><b class="num">${k}</b><span>${esc(h.svc ? svcBoard(h) : h.walk ? "현장" : h.name)}</span></button>`;
     }
     // 설명은 45번 오른쪽 빈 칸에 (사장님이 정한 순서 10/8)
     if (RULES.keys > 40 && RULES.keys <= 45) html += `<div class="legend" style="grid-column: ${RULES.keys - 39} / -1">
@@ -1928,7 +1986,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
         const opt = (k, label, v) => `<button class="btn extopt ${sheet.extPick === k ? "btn-ink" : ""}" data-act="extPick" data-k="${k}" aria-pressed="${sheet.extPick === k}">${label}<br><b class="num">${v}</b></button>`;
         const head = `<div class="exthead">⚠ 추가 예약 발견</div>
           <div class="extinfo">네이버 <b>${esc(x.name)}</b> · <b class="num">${hm(x.slot)}</b> 예약 ${x.qty}장<br><span class="help num">${x.extAuto ? `자동 연장 뒤 반납 ${t(e.end)}` : `지금 반납 ${t(e.end)} (마지막 타임 ${hm(e.L)}) → 새 예약 ${hm(x.slot)}`}</span></div>
-          ${x.qty > h.keys.length ? `<div class="banner bad">예약 ${x.qty}장 — 지금 열쇠(${h.keys.length}개)보다 많아요. 늘어난 인원은 열쇠를 더 드려야 해요</div>` : ""}`;
+          ${x.qty > h.keys.length ? `<div class="banner bad">예약 ${x.qty}장 — 지금 열쇠(${h.keys.length}개)보다 많아요. 늘어난 인원은 열쇠를 더 드려야 해요</div>` : ""}${extGiftHtml(e)}`;
         if (e.type === "auto") return head + `<div class="banner">딱 2시간 뒤 예약이라 열쇠 반납 시각을 <b class="num">${t(x.extAuto ? e.end : e.endBooking)}</b>으로 <b>자동 연장</b>했어요</div>
           <button class="btn btn-ink extok" data-act="extOk">확인 · 이 예약 네이버 이용완료</button>`;
         if (e.type === "covered") return head + `<div class="banner">이미 지금 반납 시각 안에 있는 예약이에요</div><button class="btn btn-ink extok" data-act="extOk">확인 · 이 예약 네이버 이용완료</button>`;
@@ -1941,7 +1999,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       })();
       el.innerHTML = `
         <h3 id="sheet-title">${h.svc ? `<span>${h.keys.join(", ")}번 서비스 키 <span class="badge svcb">판매 아님</span></span>` : `${h.keys.join(", ")}번 열쇠`} <button class="x" data-act="close" aria-label="닫기">×</button></h3>
-        <div class="${e ? "extgrid" : ""}"><div>
+        <div class="${e ? "extgrid" : ""}"><div>${giftDueHtml(h)}
         <dl class="facts">
           ${h.svc ? svcFacts(h) : `<dt>${h.walk ? "고객명" : "예약자"}</dt><dd>${h.walk ? esc(h.name) : nameHtml(h)}${h.walk ? ` · ${h.posNo}` : noteChecks(h)}</dd>`}
           <dt>전화번호</dt><dd class="num">${h.phone ? fmtPhone(h.phone) : "—"}</dd>
@@ -3197,7 +3255,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 
   // ── 동작 ─────────────────────────────────────────
   let toastTimer;
-  function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 2600); }
+  function toast(msg, ms) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), ms || 2600); }
   function nextFree(from, exclude) {
     const free = freeKeys().filter((k) => !exclude.includes(k));
     return free.filter((k) => k >= from).concat(free.filter((k) => k < from))[0];
@@ -3297,7 +3355,9 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       b.visitEnd = b.prevDone == null ? null : b.prevDone + doneNow; // 이번에 함께 이용완료한 뒤의 네이버 '완료' 수 (입장권 {누계})
       const waitVisit = APP && b.prevDone == null && PRINT.forms.enter.auto;
       if (waitVisit) b.printWaiting = true;
-      toast(`${b.name}님 입장 · 열쇠 ${b.keys.join(", ")}번${APP ? " · 네이버 이용완료는 뒤에서 처리 중" : " · 네이버 이용완료"}${doneNow > 1 ? ` · 네이버 ${doneNow}건 함께 이용완료` : ""}${evOf(b) ? ` · ${evOf(b).st === "성공" ? `이벤트 성공 — ${EV.gift || "사은품"} 드리세요` : evLabel(evOf(b))}` : giftIn(b) ? ` · ${giftIn(b)}번째 예약완료, ${RULES.giftName}을 드리세요` : ""}${waitVisit ? " · 입장권은 방문 횟수를 확인한 뒤 출력" : printForm("enter", keyVals(b))}`);
+      // 10회 사은권 · 이벤트 성공 알림은 오래 (사장님 10/20: 바쁠 때 2.6초 알림을 놓침)
+      const giftNote = !evOf(b) && giftIn(b), evOk = !!evOf(b) && evOf(b).st === "성공";
+      toast(`${b.name}님 입장 · 열쇠 ${b.keys.join(", ")}번${APP ? " · 네이버 이용완료는 뒤에서 처리 중" : " · 네이버 이용완료"}${doneNow > 1 ? ` · 네이버 ${doneNow}건 함께 이용완료` : ""}${evOf(b) ? ` · ${evOk ? `이벤트 성공 — ${EV.gift || "사은품"} 드리세요` : evLabel(evOf(b))}` : giftNote ? ` · ${giftNote}번째 예약완료, ${RULES.giftName}을 드리세요` : ""}${waitVisit ? " · 입장권은 방문 횟수를 확인한 뒤 출력" : printForm("enter", keyVals(b))}`, giftNote || evOk ? 8000 : 0);
       renderAll();
     },
     qty(btn) {
@@ -3426,16 +3486,20 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       const h = holderById(sheet.hid), e = extFor(h); if (!e) return;
       const pick = e.type === "auto" || e.type === "covered" ? "keep" : sheet.extPick;
       if (!pick) return;
+      let gn = 0;
       if (pick === "ignore") { extIgnored.add(e.x.no); toast(`${hm(e.x.slot)} 예약은 그대로 둬요 — 그 시간에 따로 입장 처리`); }
       else {
         if (pick === "booking") extApply(e, e.endBooking);
         if (pick === "chain" || pick === "pull") extApply(e, e.endChain);
+        gn = extGift(e);
         extComplete(e);
-        toast(`${e.h.walk ? "현장" : e.h.name} 열쇠 ${h.keys.join(", ")}번 반납 ${extEnd(h) == null ? "무제한" : hm(extEnd(h))} · ${hm(e.x.slot)} 예약 네이버 이용완료${APP ? "는 뒤에서" : ""}`);
+        const done = `${e.h.walk ? "현장" : e.h.name} 열쇠 ${h.keys.join(", ")}번 반납 ${extEnd(h) == null ? "무제한" : hm(extEnd(h))} · ${hm(e.x.slot)} 예약 네이버 이용완료${APP ? "는 뒤에서" : ""}`;
+        if (gn) { e.x.giftDue = gn; toast(`${e.x.name}님 ${gn}번째 예약완료 — ${RULES.giftName}을 드려야 해요. 손님께 연락(${fmtPhone(e.x.phone)})해 전달하고 [사은권 전달함]을 누르세요 · ${done}`, 10000); }
+        else toast(done);
       }
       sheet.extPick = null;
       saveState(); renderAll();
-      if (extFor(h)) renderSheet(); else closeSheet();
+      if (extFor(h) || gn) renderSheet(); else closeSheet(); // 사은권이면 열쇠 창에 '사은권 전달 전'을 바로 보여 줌
     },
     // 입장권 목록 (고객 카드에서 '목록으로' 누르면 보던 날짜 · 열쇠 그대로)
     soldList() { const back = sheet.mode === "rec" ? { day: sheet.listDay, key: sheet.listKey } : {}; openSheet({ mode: "sold", day: back.day || viewDay, key: back.key || "" }); },
@@ -3463,12 +3527,15 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     bulkDo() {
       const hs = holders().slice();
       const n = hs.reduce((a, h) => a + h.keys.length, 0);
+      if (!giftAsk(hs)) return;
       for (const h of hs) { noteKeys(h); h.keys = []; h.outAt = now; h.bulkOut = true; }
       closeSheet(); renderAll(); toast(`열쇠 ${n}개 일괄 반납 · ${hs.length}명 퇴장 처리`);
     },
-    returnAll() { const h = holderById(sheet.hid); returnKeys(h, h.keys.slice()); closeSheet(); renderAll(); },
+    returnAll() { const h = holderById(sheet.hid); if (!giftAsk([h])) return; returnKeys(h, h.keys.slice()); closeSheet(); renderAll(); },
+    // 사은권 전달함 (추가 예약이 10번째 · 사장님 10/20)
+    giftGiven(btn) { const x = (bookings[TODAY] || []).find((y) => y.no === btn.dataset.no); if (!x) return; x.giftGiven = hm(now); saveState(); renderAll(); renderSheet(); toast(`${x.name}님 ${x.giftDue}번째 ${RULES.giftName} 전달함`); },
     returnKey(btn) {
-      const h = holderById(sheet.hid); returnKeys(h, [Number(btn.dataset.k)]); renderAll();
+      const h = holderById(sheet.hid); if (!giftAsk([h])) return; returnKeys(h, [Number(btn.dataset.k)]); renderAll();
       if (h.keys.length) renderSheet(); else closeSheet();
     },
     // 설문조사 (10/14)

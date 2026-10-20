@@ -1,5 +1,5 @@
 /* 같은 사람이 같은 시간에 예약을 나눠 한 경우 (1장 + 1장): 한 번에 입장 · 열쇠 합친 수 · 둘 다 이용완료 · 입장권 누계는 함께 완료한 뒤의 수 (사용자 지시 10/7)
-   카드 문구: 완료 = "N번째 예약완료", 입장 전 = "완료 8 → 9번 완료 예정" */
+   카드 문구: 완료 = "N번째 예약완료", 입장 전 = "완료 8 → 9번 완료 예정" (같은 시간 나눈 예약의 대표 카드 = "완료 8 → 9 · 10번 완료 예정 · 함께 2건" — 10/20) */
 const test = require("node:test");
 const assert = require("node:assert");
 const path = require("path");
@@ -21,7 +21,8 @@ test("같은 시간 나눠 한 예약은 함께 입장 · 카드 문구", async 
     await page.click('.slot[data-s="900"]');
     const cards = page.locator('.res:has-text("나분할")');
     assert.strictEqual(await cards.count(), 2);
-    assert.match(await cards.nth(0).textContent(), /완료 8 · .*→ 9번 완료 예정|완료 8 → 9번 완료 예정/);
+    // 대표 카드는 함께 처리하는 두 건을 같이 셈 (사장님 10/20: 입장 전에도 10번째 사은권이 보여야)
+    assert.match((await cards.nth(0).textContent()).replace(/\s+/g, " "), /완료 8( · 취소 \d+)? → 9 · 10번 완료 예정 · 함께 2건 2만원 사은권 증정/);
     assert.match(await cards.nth(1).textContent(), /같은 시간 첫 카드에서 함께 입장 처리/);
     // 두 번째 카드는 입장 못 함
     await cards.nth(1).click();
@@ -42,7 +43,7 @@ test("같은 시간 나눠 한 예약은 함께 입장 · 카드 문구", async 
     assert.strictEqual(kv._사은권, true, "9 · 10 중 10번째 → 사은권");
     const txt = await page.$$eval('.res', (e) => e.filter((x) => /나분할/.test(x.textContent)).map((x) => x.textContent));
     assert.ok(txt.every((t) => /이용완료/.test(t)), "둘 다 이용완료");
-    assert.ok(txt.some((t) => /9번째 예약완료/.test(t)) && txt.some((t) => /10번째 예약완료/.test(t)), txt.join(" | "));
+    assert.ok(txt.some((t) => /9 · 10번째 예약완료/.test(t)) && txt.some((t) => /10번째 예약완료/.test(t) && !/9 · 10번째/.test(t)), txt.join(" | ")); // 대표 카드는 함께 완료한 두 건 (10/20)
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();
