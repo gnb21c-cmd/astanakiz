@@ -158,7 +158,7 @@
             <div class="Summary__item__stsVC"><span class="Summary__item-title__bzqwu">결제상태</span><span class="Summary__item-dsc__5aGv2"><span class="label">${b.unpaid ? "입금대기" : "결제완료"}</span></span></div>
           </div>${b.status === "확정" ? `<div class="Summary__btn-area">${b.unpaid ? `<button type="button" class="btn wide" data-cancel="${b.no}">예약취소</button>` : `<button type="button" class="btn" data-cancel="${b.no}">예약취소</button><button type="button" class="btn btn-dark" data-complete="${b.no}">이용완료</button>`}</div>` : ""}</div></div>`; }).join("")}</div>`;
     }
-    document.body.innerHTML = `<div class="bar">${dateNav(label)}</div><div class="wrap"><div class="Calendar__inner-contents__px333">
+    document.body.innerHTML = `<div class="bar">${dateNav(label)} <a href="naver-stock.html?view=items">예약상품</a></div><div class="wrap"><div class="Calendar__inner-contents__px333">
       <div class="Calendar__inner-header__y3esS"><div class="d-flex Calendar__week-row__JWB4z">${PRODUCTS.map((x) => `<div class="Calendar__week-cell__ntFou"><span class="Calendar__day-header__6caUi">${x}</span></div>`).join("")}</div></div>
       <div class="Calendar__row-wrap__8dvIt">${times.map((t) => `<div class="d-flex Calendar__week-cell-daily-row__5WVtA">${PRODUCTS.map((_, p) => cell(p, t)).join("")}</div>`).join("")}</div>
       </div><aside>${panel}</aside></div>`;

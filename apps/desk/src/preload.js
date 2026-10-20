@@ -52,6 +52,12 @@ contextBridge.exposeInMainWorld("desk", {
     stop: () => ipcRenderer.invoke("history:stop"),
     send: (job) => ipcRenderer.invoke("history:send", job),
   },
+  // 네이버 재고 자동 오픈 (사장님 10/20): 매일 오늘 + 30일 · 10:30 / 12:00 / 16:00 / 20:20 · [확인만] dry · [지금 한 번]
+  stock: {
+    run: (opts) => ipcRenderer.invoke("stock:run", opts),
+    job: () => ipcRenderer.invoke("stock:job"),
+    onDone: (cb) => ipcRenderer.on("stock:done", (_e, v) => cb(v)),
+  },
   // 고객 메모 (사장님 10/20): 손님(전화번호)마다 메모 2줄 · 3자녀가정 · 블랙컨슈머 — 이 PC 에만 (해시로 찾음)
   notes: {
     get: (job) => ipcRenderer.invoke("notes:get", job),

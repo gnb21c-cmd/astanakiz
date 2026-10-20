@@ -892,6 +892,93 @@ ipcMain.handle("notes:set", (_e, job) => {
   }
 });
 
+// ── 네이버 재고 자동 오픈 (사장님 10/20): 매일 오늘 + 30일 날짜를 두 상품 모두 회차마다 재고 10개로 ──
+//   예약 > 예약상품 > 상품 > [일정/가격] > [재고수정] > 날짜 > [다음] > [모든 회차] > 10 > [저장] (naver-stock.js · 실제 화면 사진 10/20)
+//   하루 네 번 기회: 10:30 → 실패하면 12:00 → 16:00 → 20:20 (어느 때든 성공하면 그날 남은 것은 안 함 · 그날 안에 끝내는 것이 목표)
+//   - 아직 안 연 날(모든 회차 0/0개)만 · 이미 연 날은 안 건드림 · 꺼져서 못 연 날은 마지막으로 연 날 뒤부터 이어서 (앞쪽에 비워 둔 날은 그대로)
+//   - 설정 settings.stockAuto { on, qty, ahead, products, skip } (데스크 운영 설정) · 결과 stockLast · 성공한 날 stockDoneDay · 그날 써 본 때 stockTried
+const { NaverStock, stockPlan, stockDue, shiftDay: stockShift } = require("./naver-stock");
+const STOCK_PRODUCTS = ["평일 무제한 / 휴일 1시간 50분 입장권", "야간자유 입장권"];
+const STOCK_TIMES = [[10, 30], [12, 0], [16, 0], [20, 20]];
+const stockCfg = () => {
+  const c = Object.assign({ on: false, qty: 10, ahead: 30, products: STOCK_PRODUCTS, skip: [] }, settings.stockAuto || {});
+  c.qty = Math.max(1, Math.min(99, Math.round(Number(c.qty)) || 10));
+  c.ahead = Math.max(1, Math.min(90, Math.round(Number(c.ahead)) || 30));
+  c.products = (Array.isArray(c.products) && c.products.length ? c.products : STOCK_PRODUCTS).map(String).filter(Boolean).slice(0, 5);
+  c.skip = (Array.isArray(c.skip) ? c.skip : []).filter(isDayKey);
+  return c;
+};
+let stockJob = null;
+const stockView = () => ({ ok: true, job: stockJob, last: settings.stockLast || null, doneDay: settings.stockDoneDay || "", tried: settings.stockTried || null, cfg: stockCfg(), times: STOCK_TIMES.map(([h, m]) => `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`) });
+function stockRun(opts) {
+  if (stockJob && stockJob.running) return stockView();
+  if (!naverWin || naverWin.isDestroyed() || !naver) return { ok: false, why: "네이버 창이 아직 열리지 않음" };
+  const c = stockCfg(), dry = !!(opts && opts.dry), today = localToday();
+  const me = (stockJob = { running: true, dry, auto: !!(opts && opts.auto), today, target: stockShift(today, c.ahead), qty: c.qty, at: localNow(), step: "", why: "", ok: false,
+    products: c.products.map((name) => ({ name, plan: [], done: [], already: [], failed: [], skipped: [], noSlots: [], last: null, why: "" })) });
+  const st = new NaverStock((code) => timed(naverWin.webContents.executeJavaScript(code, true), 8000, "네이버 화면이 응답하지 않음"), {
+    urls: naverUrls(settings.naverUrl),
+    onStep: (msg) => { me.step = msg; if (deskWin && !deskWin.isDestroyed()) deskWin.webContents.send("naver:step", msg); },
+    onSnap: (label) => dumpNaver(label),
+  });
+  (async () => {
+    try {
+      await serial("naver", () => timed((async () => {
+        for (const p of me.products) {
+          const sc = await st.scan(p.name, stockShift(today, 1), me.target);
+          if (!sc.ok) { p.why = sc.why; continue; }
+          const pl = stockPlan({ today, ahead: c.ahead, days: sc.days, skip: c.skip });
+          Object.assign(p, { plan: pl.plan, skipped: pl.skipped, noSlots: pl.noSlots, last: pl.last, later: pl.later });
+          if (dry) continue;
+          for (const day of pl.plan) {
+            const r = await st.openDay({ product: p.name, day, qty: c.qty });
+            if (r.ok && r.done) p.done.push(day);
+            else if (r.ok && r.already) p.already.push(day);
+            else { p.failed.push(day); p.why = r.why || "알 수 없음"; break; }
+          }
+        }
+        // 네이버 창을 예약현황(오늘)으로 돌려놓음 (데스크 불러오기는 예약현황에서)
+        await st.back().catch(() => {});
+        await naver.goView("calendar").then((g) => (g.ok ? naver.goDate(today) : g)).catch(() => {});
+      })(), 20 * 60000, "재고 오픈이 20분 넘게 안 끝남"));
+    } catch (e) {
+      me.why = String((e && e.message) || e);
+    }
+    // 성공 = 두 상품 모두 읽기 · 열기에 실패 없음 (오늘 + 30일이 이미 열려 있거나 새로 엶 · 그날 회차가 없으면 열 것 없음)
+    me.ok = !me.why && me.products.every((p) => !p.why && !p.failed.length);
+    me.running = false;
+    me.end = localNow();
+    if (!dry) {
+      settings.stockLast = { at: me.at, end: me.end, auto: me.auto, ok: me.ok, target: me.target, why: me.why, products: me.products.map((p) => ({ name: p.name, done: p.done, failed: p.failed, why: p.why })) };
+      if (me.ok) settings.stockDoneDay = today;
+      saveSettings();
+    }
+    if (deskWin && !deskWin.isDestroyed()) deskWin.webContents.send("stock:done", stockView());
+  })();
+  return stockView();
+}
+/** 30초마다: 켜져 있고 그날 아직 성공 못 했으면 10:30 · 12:00 · 16:00 · 20:20 중 지난 때(아직 안 써 본 것)에 한 번 — 늦게 켜도 지난 때 것을 바로 */
+function stockTick() {
+  try {
+    const c = stockCfg();
+    if (!c.on || !naver || (stockJob && stockJob.running)) return;
+    const today = localToday();
+    if (settings.stockDoneDay === today) return;
+    const tried = settings.stockTried && settings.stockTried.day === today ? settings.stockTried.slots : [];
+    const d = new Date();
+    const due = stockDue({ minutes: d.getHours() * 60 + d.getMinutes(), tried, times: STOCK_TIMES });
+    if (!due.length) return;
+    settings.stockTried = { day: today, slots: tried.concat(due) };
+    saveSettings();
+    stockRun({ auto: true });
+  } catch (e) {
+    /* 다음에 다시 */
+  }
+}
+setInterval(stockTick, 30000);
+ipcMain.handle("stock:job", () => stockView());
+ipcMain.handle("stock:run", (_e, opts) => stockRun({ dry: !!(opts && opts.dry) }));
+
 /** 보고 시스템 클라우드 boards/{보고 열쇠}/{문서} 에 { json, at } 덮어쓰기 — 200 = 보냄 / 403 = 열쇠나 모양이 틀림(규칙이 아직 없을 때도) */
 async function boardPatch(doc, json, at, rule) {
   const key = surveyKey();

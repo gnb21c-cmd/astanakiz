@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>네이버 스마트플레이스 (시험용 가짜 예약상품 · 재고수정 화면)</title>
+<!-- 사장님이 보내 준 실제 화면 사진(2026-10-20)을 본뜬 시험용 페이지 — 예약 > 예약상품 > 상품 > 일정/가격 > 재고수정
+     ?view=items        예약상품: 상품 카드(정글짐 사진 · 이름 · 예약받기 운영중) — 사진을 누르면 그 상품 설정 화면
+     ?view=item&id=0    상품 설정: ← 상품 이름 · [기본정보] [일정/가격] [옵션 연결] [예약자 정보 요청]
+                        [일정/가격] → (네이버가 시간 · 재고를 불러오는 딜레이) → 달력 "< 2026.10 >" · 날마다 "10:00" + "n/N개" (N = 재고, 0/0개는 가운데 줄)
+                        [재고수정] → "회차 정보를 수정할 기간을 선택해주세요." 작은 달력(▶) → 날짜 → 아래 "2026.10.30" → [다음]
+                        → "10.30(금) 날짜의 모든 회차를 수정하나요?" [모든 회차] [특정회차 선택]
+                        → "변경할 재고 수를 입력해주세요." 칸(0) [취소] [저장](칸에 넣어야 켜짐) → "수정되었습니다." 알림 → 달력 "0/10개"
+     &today=2026-10-20  가짜 오늘 (재고는 오늘 + 29일까지 10개, 그 뒤는 0/0개 — 아직 안 엶)
+     &slow=1            일정/가격 · 저장 뒤 달력이 늦게 바뀜
+     상태는 브라우저 저장소 mockStock1 (시험이 지우고 시작) -->
+<style>
+  body { margin: 0; font-family: "Malgun Gothic", sans-serif; font-size: 13px; }
+  .tabs a { margin-right: 16px; }
+  .cards { display: flex; gap: 16px; padding: 16px; }
+  .card { width: 220px; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
+  .card .ph { height: 100px; background: #8a9; display: flex; align-items: flex-end; padding: 4px; cursor: pointer; }
+  .pills button { margin-right: 6px; }
+  .tool button { margin-right: 4px; }
+  table.cal { border-collapse: collapse; }
+  table.cal td { vertical-align: top; width: 90px; border: 1px solid #eee; }
+  .slot { padding: 2px 4px; }
+  .off { text-decoration: line-through; }
+  .layer { position: fixed; top: 15%; left: 50%; width: 330px; background: #fff; border: 2px solid #333; padding: 16px; }
+  .mini button { width: 36px; }
+  .mini button.other { color: #aaa; }
+  .mini button.on { background: #0a5; color: #fff; }
+  .toast { position: fixed; bottom: 20px; left: 40%; background: #333; color: #fff; padding: 8px 16px; }
+</style>
+</head>
+<body>
+<div class="tabs"><a href="naver.html?view=list">예약자관리</a><a href="naver.html?view=calendar">예약현황</a><a href="naver-stock.html?view=items">예약상품</a><a href="#">프로그램상품</a></div>
+<div id="app"></div>
+<script>
+  const P = new URLSearchParams(location.search);
+  const KEY = "mockStock1";
+  const DOW = ["일", "월", "화", "수", "목", "금", "토"];
+  const TODAY = P.get("today") || localStorage.getItem("mockStockToday") || "2026-10-20";
+  if (P.get("today")) localStorage.setItem("mockStockToday", P.get("today"));
+  const SLOW = P.get("slow") === "1" || localStorage.getItem("mockStockSlow") === "1";
+  const PRODUCTS = [
+    { name: "평일 무제한 / 휴일 1시간 50분 입장권", times: ["10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30"] },
+    { name: "야간자유 입장권", times: ["18:00", "18:30", "19:00", "19:30"] },
+    { name: "[평일] 단체 10시~13시 대관", times: ["10:00"] },
+    { name: "열쇠분실[미반납]결제", times: ["10:00"] },
+  ];
+  const dayMs = (d) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
+  const shift = (d, n) => new Date(dayMs(d) + n * 86400000).toISOString().slice(0, 10);
+  // 재고: 상품 → 날짜 → [{ t, n, cap }] — 이번 달 1일부터 석 달 · 오늘 + 29일까지 10개, 그 뒤는 0/0
+  function seed() {
+    const st = { stock: {} };
+    PRODUCTS.forEach((p, i) => {
+      const m = {};
+      for (let d = TODAY.slice(0, 8) + "01", k = 0; k < 100; d = shift(d, 1), k++) m[d] = p.times.map((t) => ({ t, n: 0, cap: d <= shift(TODAY, 29) ? 10 : 0 }));
+      st.stock[i] = m;
+    });
+    return st;
+  }
+  let S = JSON.parse(localStorage.getItem(KEY) || "null") || seed();
+  const save = () => localStorage.setItem(KEY, JSON.stringify(S));
+  save();
+  const app = document.getElementById("app");
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+  if (P.get("login") === "need") { document.querySelector(".tabs").remove(); app.innerHTML = `<h2>네이버 로그인</h2><input type="password">`; } // 로그인 화면엔 탭이 없음
+  else if ((P.get("view") || "items") === "items") {
+    app.innerHTML = `<h2>전체 ${PRODUCTS.length}</h2><div class="cards">${PRODUCTS.map((p, i) => `<div class="card"><div class="ph" data-i="${i}"><span>가격형</span></div><div><b>${esc(p.name)}</b></div><div>예약받기 운영중</div></div>`).join("")}</div>`;
+    app.querySelectorAll(".ph").forEach((el) => el.addEventListener("click", () => { location.href = `naver-stock.html?view=item&id=${el.dataset.i}`; }));
+  } else {
+    const id = +P.get("id"), prod = PRODUCTS[id];
+    let tab = "info", month = TODAY.slice(0, 7), loaded = false, pop = null; // pop = { kind, month, pick, val }
+    function draw() {
+      const head = `<div><a href="naver-stock.html?view=items">←</a> <b class="title">${esc(prod.name)}</b></div>
+        <div class="pills"><button data-tab="info">기본정보</button><button data-tab="stock">일정/가격</button><button>옵션 연결</button><button>예약자 정보 요청</button></div>`;
+      if (tab === "info") { app.innerHTML = head + `<p>예매 상품명을 입력해 주세요.</p>`; return wire(); }
+      if (!loaded) { app.innerHTML = head + `<p class="wait"></p>`; return wire(); } // 네이버가 시간 · 재고를 불러오는 중 (빈 화면)
+      const first = month + "-01", start = new Date(dayMs(first)).getUTCDay();
+      const days = []; for (let d = first; d.slice(0, 7) === month; d = shift(d, 1)) days.push(d);
+      const cells = Array(start).fill(null).concat(days);
+      while (cells.length % 7) cells.push(null);
+      let rows = "";
+      for (let r = 0; r < cells.length / 7; r++) rows += `<tr>${cells.slice(r * 7, r * 7 + 7).map((d) => !d ? "<td></td>" : `<td><div class="dnum">${+d.slice(8)}</div>${(S.stock[id][d] || []).map((s) => `<div class="slot"><div>${s.t}</div><div class="${s.cap ? "" : "off"}">${s.n}/${s.cap}개</div></div>`).join("")}</td>`).join("")}</tr>`;
+      app.innerHTML = head + `<div class="tool"><button>☰</button><button>가격수정</button><button>정보수정</button><button data-act="edit">재고수정</button><button>삭제</button><button>+ 회차</button></div>
+        <div class="mnav"><button data-m="-1">‹</button><span>${month.replace("-", ".")}</span><button data-m="1">›</button></div>
+        <table class="cal"><tr>${DOW.map((w) => `<th>${w}</th>`).join("")}</tr>${rows}</table>${popHtml()}`;
+      wire();
+    }
+    function popHtml() {
+      if (!pop) return "";
+      if (pop.kind === "period") {
+        const first = pop.month + "-01", start = new Date(dayMs(first)).getUTCDay();
+        const prevLast = shift(first, -1), btns = [];
+        for (let k = start - 1; k >= 0; k--) btns.push(`<button class="other" disabled>${+shift(prevLast, -k).slice(8)}</button>`);
+        for (let d = first; d.slice(0, 7) === pop.month; d = shift(d, 1)) btns.push(`<button class="dd ${pop.pick === d ? "on" : ""}" data-d="${d}" ${d < TODAY ? "disabled" : ""}>${+d.slice(8)}</button>`);
+        for (let k = 1; btns.length % 7; k++) btns.push(`<button class="other" disabled>${k}</button>`);
+        return `<div class="layer"><p>회차 정보를 수정할 기간을 선택해주세요.</p>
+          <div>${pop.month > TODAY.slice(0, 7) ? `<button data-pm="-1">◀</button>` : ""}<b>${pop.month.slice(0, 4)}. ${+pop.month.slice(5)}.</b><button data-pm="1">▶</button></div>
+          <div class="mini">${DOW.map((w) => `<span>${w}</span>`).join(" ")}<br>${btns.map((b, i) => b + ((i + 1) % 7 ? "" : "<br>")).join("")}</div>
+          <div class="field">${pop.pick ? pop.pick.replace(/-/g, ".") + (pop.end && pop.end !== pop.pick ? " ~ " + pop.end.replace(/-/g, ".") : "") : ""}</div>
+          <button data-pop="cancel">취소</button><button data-pop="next" ${pop.pick ? "" : "disabled"}>다음</button></div>`;
+      }
+      const md = `${pop.pick.slice(5, 7)}.${pop.pick.slice(8)}(${DOW[new Date(dayMs(pop.pick)).getUTCDay()]})`;
+      if (pop.kind === "scope") return `<div class="layer"><p><b>${md} 날짜의 모든 회차를 수정하나요?</b></p><button data-pop="all">모든 회차</button><button data-pop="some">특정회차 선택</button></div>`;
+      return `<div class="layer"><p>변경할 재고 수를 입력해주세요.</p><input id="q" placeholder="0" value="${esc(pop.val || "")}"><br><button data-pop="cancel">취소</button><button data-pop="save" ${pop.val ? "" : "disabled"}>저장</button></div>`;
+    }
+    function wire() {
+      app.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => {
+        tab = b.dataset.tab; loaded = false; draw();
+        if (tab === "stock") setTimeout(() => { loaded = true; draw(); }, SLOW ? 2500 : 900); // 네이버 딜레이
+      }));
+      app.querySelectorAll("[data-m]").forEach((b) => b.addEventListener("click", () => {
+        const d = new Date(dayMs(month + "-01")); d.setUTCMonth(d.getUTCMonth() + +b.dataset.m); month = d.toISOString().slice(0, 7);
+        loaded = false; draw(); setTimeout(() => { loaded = true; draw(); }, SLOW ? 1500 : 500);
+      }));
+      const e = app.querySelector("[data-act=edit]"); if (e) e.addEventListener("click", () => { pop = { kind: "period", month: TODAY.slice(0, 7), pick: null }; draw(); });
+      app.querySelectorAll("[data-pm]").forEach((b) => b.addEventListener("click", () => { const d = new Date(dayMs(pop.month + "-01")); d.setUTCMonth(d.getUTCMonth() + +b.dataset.pm); pop.month = d.toISOString().slice(0, 7); draw(); }));
+      app.querySelectorAll(".dd").forEach((b) => b.addEventListener("click", () => { if (pop.pick && !pop.end && b.dataset.d > pop.pick) pop.end = b.dataset.d; else { pop.pick = b.dataset.d; pop.end = null; } draw(); }));
+      const q = app.querySelector("#q"); if (q) q.addEventListener("input", () => { pop.val = q.value.replace(/\D/g, ""); const s = app.querySelector("[data-pop=save]"); if (s) s.disabled = !pop.val; });
+      app.querySelectorAll("[data-pop]").forEach((b) => b.addEventListener("click", () => {
+        const a = b.dataset.pop;
+        if (a === "cancel") { pop = null; return draw(); }
+        if (a === "next") { pop.kind = "scope"; return draw(); }
+        if (a === "all") { pop.kind = "qty"; pop.val = ""; return draw(); }
+        if (a === "save") {
+          const n = +pop.val, from = pop.pick, to = pop.end || pop.pick;
+          for (let d = from; d <= to; d = shift(d, 1)) for (const s of S.stock[id][d] || []) s.cap = Math.max(n, s.n);
+          save(); window.__saved = (window.__saved || []).concat([{ id, from, to, n }]); localStorage.setItem("mockStockSaves", JSON.stringify(JSON.parse(localStorage.getItem("mockStockSaves") || "[]").concat([{ id, from, to, n }])));
+          pop = null; loaded = false; draw();
+          const t = document.createElement("div"); t.className = "toast"; t.textContent = "수정되었습니다."; document.body.appendChild(t); setTimeout(() => t.remove(), 1500);
+          setTimeout(() => { loaded = true; draw(); }, SLOW ? 2000 : 700);
+        }
+      }));
+    }
+    draw();
+  }
+</script>
+</body>
+</html>
