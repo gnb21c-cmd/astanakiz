@@ -10,11 +10,12 @@
    installNaverStockDriver = 네이버 페이지 안에서 실행 (window.__naverStock) · NaverStock = Node 쪽 (앱: 숨은 네이버 창 · 시험: 가짜 화면) */
 
 function installNaverStockDriver() {
-  if (window.__naverStock && window.__naverStock.v === 3) return true;
+  if (window.__naverStock && window.__naverStock.v === 4) return true;
   const norm = (s) => String(s || "").replace(/\s+/g, "");
   const vis = (el) => !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== "hidden");
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
-  const textOf = (e) => norm(e.value || e.textContent);
+  // 버튼 글자 (button 의 value 는 글자가 아님 — 1.54 현장 10/20 21:47 [모든 회차]를 못 찾음 · 입력칸만 value)
+  const textOf = (e) => norm(e.tagName === "INPUT" ? e.value : e.textContent);
   const clickables = (root = document) => $$("button, a, [role=button], [role=tab]", root).filter(vis);
   // 상품 번호 · 예약상품 목록 주소 모양 (Node 가 window.__naverStockPat 로 넣을 수 있음 — 시험의 가짜 화면은 다른 모양)
   const PAT = () => window.__naverStockPat || { list: "/bizes/\\d+/biz-items/?(?:[?#]|$)", id: "/biz-items/(\\d+)" };
@@ -47,10 +48,14 @@ function installNaverStockDriver() {
     for (const [kind, re] of POP) {
       const t = deep(re)[0];
       if (!t) continue;
-      let root = t.parentElement || t;
-      for (let p = t.parentElement; p && p !== document.body; p = p.parentElement) {
-        root = p;
-        if (clickables(p).some((b) => POP_BTN.test(textOf(b)))) break;
+      // 창 = 제목을 품은 대화 창(.modal-content · [role=dialog]) → 없으면 제목에서 위로 올라가 창 버튼 글자를 품은 칸
+      let root = t.closest(".modal-content, .modal-dialog, [role=dialog]");
+      if (!root) {
+        root = t.parentElement || t;
+        for (let p = t.parentElement; p && p !== document.body; p = p.parentElement) {
+          root = p;
+          if (clickables(p).some((b) => POP_BTN.test(textOf(b))) || deep(POP_BTN, p).length) break;
+        }
       }
       return { kind, root, title: norm(t.textContent) };
     }
@@ -73,7 +78,7 @@ function installNaverStockDriver() {
   }
 
   window.__naverStock = {
-    v: 3,
+    v: 4,
     /** name: 지금 보는 상품이 이 상품인지 · 이 상품 카드가 있는지 · 재고수정 창 단계 */
     read(name) {
       const pop = popup();
@@ -118,12 +123,24 @@ function installNaverStockDriver() {
       }
       return st;
     },
-    /** 글자가 txt 인 버튼 누르기 (재고수정 창이 열려 있으면 그 안에서) */
+    /** 글자가 txt 인 버튼 누르기 (재고수정 창이 열려 있으면 그 안에서) — 버튼이 아니면 그 글자가 쓰인 칸을 누름 (네이버 '모든 회차'는 보통 버튼이 아닐 수 있음) */
     click(txt) {
       const pop = popup();
       const root = pop && POP_BTN.test(norm(txt)) ? pop.root : document;
-      const b = clickables(root).find((x) => textOf(x) === norm(txt) && !(pop && root === document && pop.root.contains(x)));
-      if (!b) return { ok: false, why: `[${txt}] 버튼을 못 찾음` };
+      const want = norm(txt), notOther = (x) => !(pop && root === document && pop.root.contains(x));
+      let b = clickables(root).find((x) => textOf(x) === want && notOther(x));
+      if (!b) {
+        const re = new RegExp(`^${escRe(want)}$`);
+        const t = deep(re, root).find(notOther);
+        if (t) b = t.closest("button, a, label, li, [role], [tabindex], [class]") || t;
+        if (b && !re.test(norm(b.textContent))) b = t; // 위 칸이 다른 글도 품으면 글자 칸 그대로
+      }
+      if (!b) {
+        // 창 안에 보이는 버튼 · 글 (날짜 숫자 · 요일은 빼고) — 다음에 맞추려고 알림 · 진단에 남김
+        const words = clickables(root).concat(deep(/^.{2,14}$/, root)).map((e) => e.textContent.replace(/\s+/g, " ").trim()).filter((w) => w && w.length <= 14 && !/^\d{1,2}$/.test(w) && !/^[일월화수목금토]$/.test(w));
+        const seen = root === document ? "" : ` (창 안: ${[...new Set(words)].slice(0, 10).join(" · ")})`;
+        return { ok: false, why: `[${txt}] 버튼을 못 찾음${seen}` };
+      }
       if (off(b)) return { ok: false, why: `[${txt}] 버튼이 꺼져 있음` };
       if (!press(b)) return { ok: false, why: `[${txt}]: ${OUT}` };
       return { ok: true };
@@ -393,12 +410,14 @@ class NaverStock {
     await sleep(1500);
     return r;
   }
-  /** 창을 닫고 실패로 (취소 버튼이 없는 창이면 페이지를 다시 불러옴 — 저장 전이라 바뀐 것 없음) · label 이 없으면 닫기만 */
+  /** 창을 닫고 실패로 (취소 버튼이 없는 창이면 페이지를 다시 불러옴 — 저장 전이라 바뀐 것 없음) · label 이 없으면 닫기만
+      진단 화면은 닫기 전에 (1.54: 닫은 뒤에 남겨 문제 창이 안 보였음) */
   async cancel(product, label, why) {
+    if (label && this.onSnap) try { await this.onSnap(label); } catch (e) { /* 진단 저장 실패는 무시 */ }
     const c = await this.act(`window.__naverStock.click("취소")`);
     if (!c.ok) await this.act("window.__naverStock.reload()");
     if (!label) { await this.until(product, (x) => !x.pop, 5000, ""); return { ok: true }; }
-    return this.fail(label, why);
+    return { ok: false, why };
   }
 }
 

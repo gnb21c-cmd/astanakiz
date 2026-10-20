@@ -146,9 +146,11 @@ test("재고 수 칸: 커서를 놓고 키보드로 쳐야 [저장]이 켜지는
   const browser = await launch();
   try {
     const { page, saves } = await setup(browser, "&strict=1");
-    const { st: noKeys } = mkStock(page, { type: null });
+    const snaps = [];
+    const { st: noKeys } = mkStock(page, { type: null, onSnap: async (label) => snaps.push([label, ((await page.evaluate(() => document.body.innerText)).match(/변경할 재고 수를 입력해주세요/) || [""])[0]]) });
     const bad = await noKeys.setDay({ product: P1, day: "2026-11-19", qty: 10 });
     assert.ok(!bad.ok && /재고 칸에 10이 안 들어감/.test(bad.why), JSON.stringify(bad));
+    assert.deepStrictEqual(snaps, [["stock-qty", "변경할 재고 수를 입력해주세요"]], "진단 화면은 창을 닫기 전에 (문제 창이 보이게)");
     assert.deepStrictEqual(await saves(), [], "저장 안 누름");
     assert.strictEqual((await noKeys.read(P1)).pop, null, "창은 [취소]로 닫음");
     const { st } = mkStock(page);
@@ -167,6 +169,28 @@ test("[저장] 뒤 네이버가 거절하는 경고 창이 뜨면 성공이 아�
     const r = await st.setDay({ product: P0, day: "2026-11-19", qty: 10 });
     assert.ok(!r.ok && /저장 뒤 네이버 알림: 재고 수량은 예약된 수량보다/.test(r.why), JSON.stringify(r));
     assert.deepStrictEqual(await saves(), []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("현장 10/20 21:47 (1.54): '모든 회차'가 value 붙은 버튼이거나 버튼이 아닌 칸이어도 누름 · 못 찾으면 창 안 글자를 알려 줌", async () => {
+  const browser = await launch();
+  try {
+    const { page, st, saves } = await setup(browser, "&opt=div");
+    const r = await st.setDay({ product: P0, day: "2026-11-19", qty: 10 });
+    assert.ok(r.ok && r.done, r.why);
+    assert.deepStrictEqual(await saves(), [{ id: 0, from: "2026-11-19", to: "2026-11-19", n: 10 }]);
+    // value 붙은 버튼 (기본 가짜 화면): 글자로 찾음
+    await page.evaluate(() => localStorage.removeItem("mockStockOpt"));
+    const r2 = await st.setDay({ product: P1, day: "2026-11-19", qty: 10 });
+    assert.ok(r2.ok && r2.done, r2.why);
+    // 없는 글자 → 창 안에 보이는 글자를 알려 줌
+    await st.until(P1, (x) => x.stockOn && !x.pop, 5000, "");
+    await st.call(`window.__naverStock.click("재고수정")`);
+    assert.ok((await st.until(P1, (x) => x.pop && x.pop.kind === "period", 5000, "")).ok);
+    const miss = await st.call(`window.__naverStock.click("저장")`);
+    assert.ok(!miss.ok && /창 안: .*취소/.test(miss.why), JSON.stringify(miss));
   } finally {
     await browser.close();
   }

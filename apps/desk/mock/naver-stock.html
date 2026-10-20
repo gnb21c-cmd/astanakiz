@@ -49,6 +49,8 @@
   if (P.get("strict") === "1") localStorage.setItem("mockStockStrict", "1");
   // &stale=1: 달을 넘기면 달 글자(2026.11)만 먼저 바뀌고 달력 · 회차는 잠깐 앞 달 그대로 (현장 10/20 20:55 — 그 사이에 읽으면 10월을 11월로 읽음)
   const STALE = P.get("stale") === "1" || localStorage.getItem("mockStockStale") === "1";
+  const OPT_DIV = P.get("opt") === "div" || localStorage.getItem("mockStockOpt") === "div";
+  if (P.get("opt") === "div") localStorage.setItem("mockStockOpt", "div");
   if (P.get("stale") === "1") localStorage.setItem("mockStockStale", "1");
   // &reject=1: [저장]을 누르면 네이버가 거절하는 경고 창 (재고 안 바뀜)
   const REJECT = P.get("reject") === "1" || localStorage.getItem("mockStockReject") === "1";
@@ -128,7 +130,10 @@
           <button data-pop="cancel">취소</button><button data-pop="next" ${pop.pick ? "" : "disabled"}>다음</button></div>`;
       }
       const md = `${pop.pick.slice(5, 7)}.${pop.pick.slice(8)}(${DOW[new Date(dayMs(pop.pick)).getUTCDay()]})`;
-      if (pop.kind === "scope") return `<div class="layer"><p><b>${md} 날짜의 모든 회차를 수정하나요?</b></p><button data-pop="all">모든 회차</button><button data-pop="some">특정회차 선택</button></div>`;
+      // 1.54 현장: [모든 회차]를 버튼 글자로 못 찾음 → 실제 모양을 몰라 두 가지 (기본: value 가 붙은 버튼 · &opt=div: 버튼이 아닌 칸)
+      if (pop.kind === "scope") return OPT_DIV
+        ? `<div class="layer" role="dialog"><p><b>${md} 날짜의 모든 회차를 수정하나요?</b></p><div class="opts"><div class="opt" data-pop="all"><span>모든 회차</span></div><div class="opt" data-pop="some"><span>특정회차 선택</span></div></div></div>`
+        : `<div class="layer"><p><b>${md} 날짜의 모든 회차를 수정하나요?</b></p><button data-pop="all" value="ALL">모든 회차</button><button data-pop="some" value="PART">특정회차 선택</button></div>`;
       return `<div class="layer"><p>변경할 재고 수를 입력해주세요.</p><input id="q" placeholder="0" value="${esc(pop.val || "")}"><br><button data-pop="cancel">취소</button><button data-pop="save" ${pop.val ? "" : "disabled"}>저장</button></div>`;
     }
     function wire() {
