@@ -21,6 +21,7 @@
   --accent-bg: #E3EAFA;
   --naver: #0B8F47;
   --naver-bg: #E1F3E8;
+  --on-naver: #FFFFFF; /* 초록 버튼 글씨 */
   --sky-bg: #DCEFFC;
   --sky-line: #8CC5EE;
   --done-bg: #E6E8EC;
@@ -47,7 +48,7 @@
     /* V2.0 시안 B '선명한 다크' (사장님 10/21) — 더 검은 바탕 · 흰 글씨 · 원색 */
     --sky-bg: #0C2440; --sky-line: #2D6CB0; --done-bg: #1A1F28;
     --bg: #06080C; --surface: #10141B; --surface-2: #161B24; --fg: #FFFFFF; --muted: #B3BDCC; --faint: #545F70; --line: #252D3A;
-    --ink: #FFFFFF; --on-ink: #06080C; --accent: #5B97FF; --accent-bg: #0F2347; --naver: #18E07A; --naver-bg: #0B3B24;
+    --ink: #FFFFFF; --on-ink: #06080C; --accent: #5B97FF; --accent-bg: #0F2347; --naver: #18E07A; --naver-bg: #0B3B24; --on-naver: #03170C;
     --pink: #FF8DB9; --pink-fg: #2A0614; --red: #FF4646; --yellow: #FFD400; --yellow-fg: #D10000; --nm-k3: #FFE14D; --ok: #46F2A0; --warn-bg: #3D0E10;
     --todo: #2F7BFF; --todo-fg: #FFFFFF; --gift: #FFD400; --gift-fg: #1C1400; --walk: #3D8BFF; --err-bg: #3D0E10; --amber: #FF9F1A;
     --shadow: 0 1px 2px rgba(0,0,0,.4), 0 3px 12px rgba(0,0,0,.35);
@@ -57,7 +58,7 @@
 :root[data-theme="dark"] {
   --sky-bg: #0C2440; --sky-line: #2D6CB0; --done-bg: #1A1F28;
   --bg: #06080C; --surface: #10141B; --surface-2: #161B24; --fg: #FFFFFF; --muted: #B3BDCC; --faint: #545F70; --line: #252D3A;
-  --ink: #FFFFFF; --on-ink: #06080C; --accent: #5B97FF; --accent-bg: #0F2347; --naver: #18E07A; --naver-bg: #0B3B24;
+  --ink: #FFFFFF; --on-ink: #06080C; --accent: #5B97FF; --accent-bg: #0F2347; --naver: #18E07A; --naver-bg: #0B3B24; --on-naver: #03170C;
   --pink: #FF8DB9; --pink-fg: #2A0614; --red: #FF4646; --yellow: #FFD400; --yellow-fg: #D10000; --nm-k3: #FFE14D; --ok: #46F2A0; --warn-bg: #3D0E10;
   --todo: #2F7BFF; --todo-fg: #FFFFFF; --gift: #FFD400; --gift-fg: #1C1400; --walk: #3D8BFF; --err-bg: #3D0E10; --amber: #FF9F1A;
   --shadow: 0 1px 2px rgba(0,0,0,.4), 0 3px 12px rgba(0,0,0,.35);
@@ -534,6 +535,10 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 .facts { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 4px 10px; margin: 0; align-items: center; }
 .facts dt { color: var(--muted); font-size: 13px; }
 .facts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+/* 열쇠 창 예약자 줄 오른쪽 [입장권 다시 출력] (사장님 10/21 · 감열지가 끊겼을 때) */
+.facts dd.whorow { display: flex; align-items: center; gap: 8px; }
+.facts dd.whorow > span { min-width: 0; }
+.facts .reprint { margin-left: auto; flex: none; font-weight: 700; }
 .bigkeys { display: flex; gap: 6px; flex-wrap: wrap; }
 .bigkey { font-size: 22px; font-weight: 700; min-width: 54px; text-align: center; padding: 4px 10px; border-radius: 10px; border: 2px solid var(--ink); }
 .field { display: grid; gap: 4px; }
@@ -571,6 +576,11 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 .wn { display: inline-grid; place-items: center; min-width: 22px; height: 22px; border-radius: 50%; font-size: 13px; font-weight: 800; color: var(--muted); }
 .wn.now { background: var(--accent); color: #fff; } .wn.done { color: var(--ok); }
 .wmain .wpay, .wmain .wdone { min-height: 50px; font-size: 17px; font-weight: 800; }
+/* ③ [POS로 이동] (사장님 10/21): 판매 가능 = 초록 · 판매 불가 = 빨강 (눌러도 POS로 안 넘어감 → 결제 완료도 안 눌림) */
+.wmain .wpay.go, .wmain .wpay.go:hover { background: var(--naver); border-color: var(--naver); color: var(--on-naver); }
+.wmain .wpay.no, .wmain .wpay.no:hover { background: var(--red); border-color: var(--red); color: #fff; cursor: not-allowed; }
+.wmain .wpay.go .wn:not(.now), .wmain .wpay.no .wn:not(.now) { color: inherit; }
+.wmain .wpay small { font-size: 13px; font-weight: 700; }
 /* 아래 두 버튼 (사장님 10/21): 왼쪽 이벤트 입장(서비스 키처럼 점선 · 결제 없음) · 오른쪽 결제 완료 · 열쇠 등록 (반으로 작아짐 · 하는 일은 그대로) */
 .wdones { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
 .wmain .wdones .wdone { font-size: 15px; }
@@ -2018,7 +2028,8 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       const ws = sheet.slot;
       const m = minutesFor(TODAY, ws);
       const okSell = !st.over && (!st.flex || sheet.flexOk);
-      const done = [okSell, !!sheet.paid, !!sheet.paid, st.phoneOk, false];
+      const paid = walkPaid();
+      const done = [okSell, paid, paid, st.phoneOk, false];
       const cur = done.indexOf(false);
       const step = (i, t) => `<li class="${done[i] ? "done" : i === cur ? "now" : ""}"><b>${"①②③④⑤"[i]}</b> ${t}</li>`;
       const tag = (i) => `<span class="wn ${done[i] ? "done" : i === cur ? "now" : ""}">${"①②③④⑤"[i]}</span>`;
@@ -2069,9 +2080,9 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
           <div class="wleft"><ol class="wguide">
             ${step(0, `<b>판매 가능한지</b> 오른쪽 맨 위 색을 봐요. <span class="g">초록 = 판매 가능</span> · <span class="r">빨강 = 지금은 판매 불가</span> (예약 손님 자리를 남겨 둔 계산)`)}
             ${step(1, `입장권 매수별 인원을 안내하고 <b>입장권 수</b>를 맞춰요 (열쇠가 이어서 붙어요). <b>입장 타임</b>은 바로 앞 타임이 기본 — 앞뒤로 바꿀 땐 ◀ ▶`)}
-            ${step(2, `<b>[POS로 이동]</b>을 눌러 POS에서 그 수만큼 결제 → 끝나면 POS를 최소화하면 이 창으로 돌아와요 (결제 없는 이벤트 손님은 건너뛰고 ⑤의 왼쪽 [이벤트 입장])`)}
+            ${step(2, `<b>[POS로 이동]</b>(<span class="g">초록</span> = 이동 · <span class="r">빨강</span> = 판매 불가라 안 넘어감)을 눌러 POS에서 그 수만큼 결제 → 끝나면 POS를 최소화하면 이 창으로 돌아와요 (결제 없는 이벤트 손님은 건너뛰고 ⑤의 왼쪽 [이벤트 입장])`)}
             ${step(3, `열쇠를 드리기 전에 <b>전화번호</b>를 받아요 (열쇠 미반납 때 연락). 010 뒤 8자리를 키패드로`)}
-            ${step(4, `<b>[결제 완료 · 열쇠 등록]</b> → 입장권이 나오면 열쇠와 함께 드려요 · 결제 없이 들어오는 이벤트 손님은 왼쪽 <b>[${esc(wevLabel())}]</b>`)}
+            ${step(4, `<b>[결제 완료 · 열쇠 등록]</b>(③ POS에 다녀와야 눌려요) → 입장권이 나오면 열쇠와 함께 드려요 · 결제 없이 들어오는 이벤트 손님은 왼쪽 <b>[${esc(wevLabel())}]</b>`)}
           </ol>${svcBox}</div>
           <div class="wmain">
             <div class="banner ${okSell ? "" : "bad"}">${tag(0)} ${st.over ? `<b>지금은 판매 불가</b> — 열쇠 <b class="num">${st.all}</b>개까지만 내줄 수 있어요 (예약 손님이 오실 자리)`
@@ -2081,13 +2092,13 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
               <div class="stepper"><button data-act="qty" data-d="-1" aria-label="수량 줄이기">−</button><output class="num">${st.need}</output><button data-act="qty" data-d="1" aria-label="수량 늘리기">+</button></div>
               <span class="wl">열쇠</span><div class="bigkeys">${sheet.keys.map((k) => `<span class="bigkey num">${k}</span>`).join("")}</div></div>
             ${slotRow}
-            <button class="btn wpay" data-act="pay" ${okSell ? "" : "disabled"}>${tag(2)} POS로 이동해서 ${st.need}장 결제하기${sheet.paid ? " ✓" : ""}</button>
+            <button class="btn wpay ${okSell ? "go" : "no"}" data-act="pay" ${okSell ? "" : `aria-disabled="true"`} title="${okSell ? "초록 = 판매 가능 → POS로 이동" : "빨강 = 지금은 판매 불가 — 눌러도 POS로 안 넘어가요"}">${tag(2)} POS로 이동해서 ${st.need}장 결제하기${!okSell ? ` <small>(${st.over ? "판매 불가" : "빈 좌석 확인 먼저"})</small>` : paid ? " ✓" : sheet.paid ? ` <small>(결제한 ${sheet.paid}장과 달라요 — 다시)</small>` : ""}</button>
             <div class="wphone">
               <div class="field"><label for="w-phone">${tag(3)} 전화번호 <span class="help">010 뒤 8자리</span></label>
                 <input id="w-phone" inputmode="numeric" autocomplete="off" value="${esc(walkFmt(sheet.phone))}" placeholder="010-0000-0000" data-autofocus></div>
               ${keypad}
             </div>
-            ${svLock ? `<div class="help svwarn">위 설문 번호(신규가 아니면 [제외])를 먼저 눌러 주세요</div>` : ""}<div class="wdones"><button class="btn wevent" id="w-event" data-act="walkEvent" title="POS 결제 없이 들어오는 이벤트 · 쿠폰 손님 — 열쇠 · 입장권 · 인원은 현장과 같고 총 판매수에는 안 셈" ${st.over || !st.phoneOk || (st.flex && !sheet.flexOk) || svLock ? "disabled" : ""}>${esc(wevLabel())}</button><button class="btn btn-ink wdone" id="w-done" data-act="walkDone" ${st.over || !st.phoneOk || (st.flex && !sheet.flexOk) || svLock ? "disabled" : ""}>${tag(4)} 결제 완료 · 열쇠 등록</button></div>
+            ${svLock ? `<div class="help svwarn">위 설문 번호(신규가 아니면 [제외])를 먼저 눌러 주세요</div>` : ""}<div class="wdones"><button class="btn wevent" id="w-event" data-act="walkEvent" title="POS 결제 없이 들어오는 이벤트 · 쿠폰 손님 — 판매 가능(초록 · 빨강)과 상관없이 전화번호 · 설문만 · 열쇠 · 입장권 · 인원은 현장과 같고 총 판매수에는 안 셈" ${!st.phoneOk || svLock ? "disabled" : ""}>${esc(wevLabel())}</button><button class="btn btn-ink wdone" id="w-done" data-act="walkDone" title="③ [POS로 이동]에서 결제하고 돌아와야 눌려요" ${st.over || !st.phoneOk || (st.flex && !sheet.flexOk) || svLock || !paid ? "disabled" : ""}>${tag(4)} 결제 완료 · 열쇠 등록</button></div>
           </div>
         </div>`;
       return;
@@ -2186,7 +2197,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
         <h3 id="sheet-title">${h.svc ? `<span>${h.keys.join(", ")}번 서비스 키 <span class="badge svcb">판매 아님</span></span>` : `${h.keys.join(", ")}번 열쇠`} <button class="x" data-act="close" aria-label="닫기">×</button></h3>
         <div class="${e ? "extgrid" : ""}"><div>${giftDueHtml(h)}
         <dl class="facts">
-          ${h.svc ? svcFacts(h) : `<dt>${h.walk ? "고객명" : "예약자"}</dt><dd>${h.walk ? esc(h.name) : nameHtml(h)}${h.walk ? ` · ${h.posNo}` : noteChecks(h)}</dd>`}
+          ${h.svc ? svcFacts(h) : `<dt>${h.walk ? "고객명" : "예약자"}</dt><dd class="whorow"><span>${h.walk ? esc(h.name) : nameHtml(h)}${h.walk ? ` · ${h.posNo}` : noteChecks(h)}</span><button class="btn btn-sm reprint" data-act="reprint" title="감열지가 다 돼 중간에 끊겼을 때 — 이 손님 입장권을 다시 출력">입장권 다시 출력</button></dd>`}
           <dt>전화번호</dt><dd class="num">${h.phone ? fmtPhone(h.phone) : "—"}</dd>
           <dt>입장</dt><dd class="num">${hm(h.enteredAt)}${h.walk ? "" : ` (예약 ${hm(h.slot)})`}</dd>
           <dt>이용</dt><dd class="num">${m == null ? "무제한" : `${used < 0 ? `예약 ${hm(h.slot)}부터 셈` : `${Math.floor(used / 60)}시간 ${used % 60}분째`} · ${h.keyUse && new Set(h.keys.map((k) => useOf(h, k))).size > 1 ? h.keys.map((k) => { const mk = useOf(h, k); return `${k}번 ${mk == null ? "무제한" : hm(h.slot + mk)}`; }).join(" · ") + " 반납" : `${hm(h.slot + m)} 반납`}`}${(() => {
@@ -2730,9 +2741,10 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     return (n * 10) / (Number(PRINT.baud) || 115200) + w / 1000;
   }
   const printerName = () => (PRINT.mode === "com" ? `${PRINT.port} · ${PRINT.baud}` : PRINT.sel || "");
-  function printForm(kind, v) {
+  /** force = [입장권 다시 출력]처럼 직접 누른 것 — 자동 출력을 꺼 둬도 출력 */
+  function printForm(kind, v, force) {
     const f = PRINT.forms[kind];
-    if (!f || !f.auto) return "";
+    if (!f || (!f.auto && !force)) return "";
     if (!printerReady()) return " · 프린터를 아직 고르지 않아 출력 못 함 (운영 설정 → 프린터 설정)";
     if (!APP || !window.desk.print) return ` · ${f.name} 출력 (${printerName()}, 체험)`;
     sendPrint(kind === "enter" ? enterText() : f.text, v).then((r) => {
@@ -3425,15 +3437,15 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
         <section class="mansec" id="man3"><div>${manImg("m3-walk.jpg", "현장입장 창")}</div><div><h4>③ 현장 손님 입장</h4>${manSteps([
           "열쇠판에서 <b>빈 열쇠</b>를 누른다 — 맨 위가 <b>초록(판매 가능)</b>인지 본다 · 빨강이면 지금은 판매 불가",
           "<b>입장권 수</b>를 맞춘다 (열쇠가 이어서 붙음) · 입장 타임은 ◀ ▶",
-          "<b>[POS로 이동해서 n장 결제하기]</b> → POS에서 그 수만큼 결제 → 끝나면 POS를 최소화하면 이 창으로 돌아온다",
+          "<b>[POS로 이동해서 n장 결제하기]</b>(초록 = 판매 가능 · 빨강 = 안 넘어감) → POS에서 그 수만큼 결제 → 끝나면 POS를 최소화하면 이 창으로 돌아온다",
           "<b>전화번호</b> 010 뒤 8자리를 키패드로",
-          "맨 아래 오른쪽 <b>[결제 완료 · 열쇠 등록]</b> → 입장권과 열쇠를 드린다",
-        ], "결제 없이 들어오는 이벤트 · 쿠폰 손님은 ③(POS)을 건너뛰고 맨 아래 왼쪽 <b>[이벤트 입장]</b> (이름은 관리자가 운영 설정 → 기타에서 · 총 판매수에는 안 셈) · 임직원 등 판매가 아닌 사용은 왼쪽 아래 <b>[서비스 키 (판매 아님)]</b>")}</div></section>
+          "맨 아래 오른쪽 <b>[결제 완료 · 열쇠 등록]</b>(POS에 다녀와야 눌림) → 입장권과 열쇠를 드린다",
+        ], "결제 없이 들어오는 이벤트 · 쿠폰 손님은 ③(POS)을 건너뛰고 맨 아래 왼쪽 <b>[이벤트 입장]</b> (전화번호 · 설문만 있으면 · 이름은 관리자가 운영 설정 → 기타에서 · 총 판매수에는 안 셈) · 임직원 등 판매가 아닌 사용은 왼쪽 아래 <b>[서비스 키 (판매 아님)]</b>")}</div></section>
         <section class="mansec" id="man4"><div>${manImg("m4-key.jpg", "열쇠 반납 창")}</div><div><h4>④ 퇴장 · 열쇠 반납</h4>${manSteps([
           "손님이 준 <b>열쇠 번호</b>를 열쇠판에서 누른다",
           "이용 시간을 본다 — <b>빨간 상자</b> = 반납 시간 지남 → <b>[POS로 결제 · 금액]</b>으로 초과요금을 결제",
           "<b>[n번 반납 · 퇴장]</b> — 열쇠가 여러 개면 <b>[n번만]</b> 또는 <b>[모두 반납]</b>",
-        ], "초과요금: 2시간이 되면 5,000원, 그 뒤 10분마다 5,000원씩 (열쇠마다) · 반납 시각만 바꾸기 = ◀ ▶ 후 [변경] · 한 타임 더 = [+1타임] (입장권을 더 산 것으로)")}</div></section>
+        ], "초과요금: 2시간이 되면 5,000원, 그 뒤 10분마다 5,000원씩 (열쇠마다) · 반납 시각만 바꾸기 = ◀ ▶ 후 [변경] · 한 타임 더 = [+1타임] (입장권을 더 산 것으로) · 감열지가 다 돼 입장권이 끊겼으면 종이를 갈고 열쇠 창 오른쪽 위 <b>[입장권 다시 출력]</b>")}</div></section>
         <section class="mansec" id="man5"><div>${manImg("m5-bulk.jpg", "열쇠 일괄 반납 창")}</div><div><h4>⑤ 마감 · 일괄 반납</h4>${manSteps([
           "영업 마감 때 <b>열쇠를 모두 받았는지</b> 먼저 확인한다",
           "<b>[열쇠 일괄 반납처리]</b>를 누르고 손님 · 열쇠 목록을 본다",
@@ -3799,11 +3811,12 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     if (window.desk && window.desk.pos) {
       // 설치한 앱: 실제 OKPOS 창으로 바로 넘어감 (못 찾으면 알리기만 — 가짜 POS 화면은 띄우지 않음)
       const r = await window.desk.pos.show();
-      if (r && r.ok) { posAway = true; return; }
+      if (r && r.ok) { posAway = true; return true; }
       toast((r && r.why) || "POS 창을 찾지 못함");
-      return;
+      return false;
     }
     $("pos").hidden = false; // 체험판: 가짜 POS 화면
+    return true;
   }
   window.addEventListener("focus", () => { if (posAway) { posAway = false; acts.posDone(); } });
 
@@ -3836,14 +3849,20 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     const done = $("w-done"); if (!done) return;
     if (sheet.svc) { done.disabled = !svcWalkState().ok; return; }
     const st = walkState();
-    done.disabled = st.over || !st.phoneOk || (st.flex && !sheet.flexOk) || (!!svForWalk() && sheet.sv == null); // 설문 대상이면 번호(또는 제외) 먼저
-    if ($("w-event")) $("w-event").disabled = done.disabled; // 이벤트 입장도 같은 조건 (결제만 없음)
+    const lock = !st.phoneOk || (!!svForWalk() && sheet.sv == null); // 전화번호 · 설문 대상이면 번호(또는 제외) 먼저
+    done.disabled = lock || st.over || (st.flex && !sheet.flexOk) || !walkPaid(); // 결제 완료 = 판매 가능 + ③ POS에 다녀온 뒤에만
+    if ($("w-event")) $("w-event").disabled = lock; // 이벤트 입장은 전화번호 · 설문만 (판매 가능 · POS 상관없음 · 사장님 10/21)
   }
+  /* 현장입장 ③ POS에 다녀왔나 (사장님 10/21): [POS로 이동]을 누르고 POS에서 데스크로 돌아와야(posDone) 결제한 수가 적힘
+     → 그 수와 지금 입장권 수가 같을 때만 [결제 완료 · 열쇠 등록] (결제 뒤 수를 바꾸면 다시 POS로) */
+  const walkPaid = () => sheet.paid === sheet.keys.length;
 
   /** 현장입장 등록 (ev = 이벤트 이름이면 이벤트 입장 · 결제 없음) */
   function walkReg(ev) {
     const st = walkState();
-    if (st.over || !st.phoneOk || (st.flex && !sheet.flexOk)) return;
+    if (!st.phoneOk) return;
+    if (ev == null && (st.over || (st.flex && !sheet.flexOk))) return; // 이벤트 입장은 판매 가능과 상관없음
+    if (ev == null && !walkPaid()) { toast("③ [POS로 이동]에서 결제하고 돌아와 주세요"); return; }
     if (svForWalk() && sheet.sv == null) { toast("설문 번호(또는 제외)를 먼저 눌러 주세요"); return; }
     if (sheet.keys.some((k) => holderOf(k))) { toast("그 사이 다른 손님이 쓴 열쇠가 있어요"); closeSheet(); renderAll(); return; }
     const w = walkin(digits(sheet.phone), sheet.keys, now, sheet.slot, ev);
@@ -4017,14 +4036,30 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     },
     // 현장입장 입장 타임 ◀ ▶ (기본 = 바로 앞 타임, 근무자가 최종 결정)
     wslot(btn) { sheet.slot = Math.max(SLOTS[0], Math.min(SLOTS[SLOTS.length - 1], (sheet.slot ?? walkSlot(now)) + Number(btn.dataset.d))); renderSheet(); const p = $("w-phone"); if (p) p.focus(); },
-    pay() { sheet.paid = true; $("pos-amt").textContent = `현장입장 ${sheet.keys.length}장`; goPos(); },
+    // ③ POS로 이동: 데스크로 돌아와야(posDone) 결제한 수가 적히고 [결제 완료 · 열쇠 등록]이 눌림 (사장님 10/21)
+    // POS 창을 못 찾았으면 작업표시줄에서 POS를 열어 결제하고 데스크로 돌아와도 같음 (데스크가 다시 앞으로 오면)
+    async pay() {
+      const st = walkState(); // 빨강(판매 불가) = 눌러도 POS로 안 넘어감
+      if (st.over) { toast("지금은 판매 불가 — POS로 넘어가지 않아요 (예약 손님이 오실 자리)"); return; }
+      if (st.flex && !sheet.flexOk) { toast("유동 열쇠 — 안에 빈 좌석을 보고 [빈 좌석 확인했어요]를 먼저 눌러 주세요"); return; }
+      sheet.payN = sheet.keys.length; $("pos-amt").textContent = `현장입장 ${sheet.payN}장`;
+      if (!(await goPos())) { posAway = true; toast("POS 창을 찾지 못했어요 — 작업표시줄에서 POS를 열어 결제하고 데스크로 돌아오세요", 6000); }
+    },
     payOver() {
       const h = holderById(sheet.hid); const o = overInfo(h); if (!o.due) return;
       sheet.pending = { amount: o.due, sec: o.sec, at: now }; // 누르기 직전 금액으로 고정
       $("pos-amt").textContent = `초과요금 ${won(o.due)} (열쇠 ${h.keys.join(", ")}번)`; goPos();
     },
+    // [입장권 다시 출력] (사장님 10/21): 감열지가 다 돼 중간에 끊기면 열쇠 창에서 그 손님 입장권을 다시 — 현장 · 이벤트 · 네이버 모두 (서비스 키는 입장권 없음)
+    // 지금 열쇠 · 정보로 다시 만듦 · 자동 출력을 꺼 둬도 출력 · 네이버 방문 횟수를 기다리는 중이면 곧 저절로 나오므로 한 번은 안내만 (한 번 더 누르면 출력)
+    reprint() {
+      const h = holderById(sheet.hid); if (!h || h.svc) return;
+      if (h.printWaiting && !sheet.rpAsk) { sheet.rpAsk = true; toast("입장권은 네이버 방문 횟수를 확인한 뒤 곧 저절로 나와요 — 그래도 지금 출력하려면 한 번 더 누르세요", 6000); return; }
+      toast(`다시 출력 — ${h.walk ? walkTag(h) : `${h.name}님`} 열쇠 ${h.keys.join(", ")}번${printForm("enter", keyVals(h), true) || " · 입장권 양식이 없어요"}`, 5000);
+    },
     posDone() {
       $("pos").hidden = true;
+      if (sheet.mode === "walk" && sheet.payN) { sheet.paid = sheet.payN; sheet.payN = 0; } // ③ POS에 다녀옴 → 결제한 수
       if (sheet.mode === "key" && sheet.pending) { const h = holderById(sheet.hid); if (h) h.overPaid = sheet.pending; sheet.pending = null; toast(`초과요금 ${won(h.overPaid.amount)} 결제됨 (영수증은 POS에서)`); }
       renderSheet(); const p = $("w-phone"); if (p) p.focus();
     },

@@ -3,6 +3,8 @@
    - 열쇠판: 띠지 · 글씨 없음 — 네이버 흰색 테두리 · 현장 파랑 테두리 · 서비스 흰 점선
    - 메모장(10/21 다시): 시간표 위 상자 = 근무자마다 + 관리자 · 숫자 = 완료 안 한 것 · 전달(받을 사람 고름 · 관리자는 모두) [접수] · [완료] · 지난 기록 · 전체 기록 · 찾기
    - 평일 [오늘 수량조절](10/21): 비수기 평일에 체크하면 그날만 수량 자동조절
+   - 현장 [결제 완료 · 열쇠 등록](10/21): ③ POS에 다녀와야 눌림 · [이벤트 입장]은 POS 없이
+   - 열쇠 창 [입장권 다시 출력](10/21): 감열지가 끊겼을 때 · 네이버 · 현장 · 이벤트 (서비스 키 없음)
    - 근무자 메뉴얼: 맨 위 버튼 · 차례 · 그림 */
 const test = require("node:test");
 const assert = require("node:assert");
@@ -331,7 +333,7 @@ test("현장 [이벤트 입장] (사장님 10/21): 운영 설정 → 기타 이�
     // 이름이 없으면 [이벤트 입장]
     await page.click(".key[data-k='32']");
     assert.strictEqual((await page.textContent("#w-event")).trim(), "이벤트 입장");
-    assert.ok(await page.isDisabled("#w-event"), "전화번호 전에는 못 누름 (결제 완료와 같은 조건)");
+    assert.ok(await page.isDisabled("#w-event"), "전화번호 전에는 못 누름");
     const sizes = await page.evaluate(() => { const r = (s) => document.querySelector(s).getBoundingClientRect(); return { ev: r("#w-event"), done: r("#w-done") }; });
     assert.ok(sizes.ev.right <= sizes.done.left && Math.abs(sizes.ev.width - sizes.done.width) < 2 && Math.abs(sizes.ev.top - sizes.done.top) < 1, "왼쪽 이벤트 입장 · 오른쪽 결제 완료 (반씩)");
     await page.click("#sheet [data-act=close]");
@@ -365,6 +367,225 @@ test("현장 [이벤트 입장] (사장님 10/21): 운영 설정 → 기타 이�
     assert.match(await page.textContent(".key[data-k='32']"), /한가위/);
     await page.click(".key[data-k='33']");
     assert.strictEqual((await page.textContent("#w-event")).trim(), "이벤트 입장");
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("현장 [결제 완료 · 열쇠 등록]은 ③ POS에 다녀와야 눌림 · [POS로 이동] 초록(판매 가능) · 빨강(판매 불가 → 안 넘어감) · 이벤트 입장은 전화번호 · 설문만 · 결제 뒤 수를 바꾸면 다시 POS (사장님 10/21)", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK);
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    const disabled = (s) => page.evaluate((x) => document.querySelector(x).disabled, s);
+    await page.click(".key[data-k='32']");
+    for (const k of "12345678") await page.click(`.keypad [data-k="${k}"]`);
+    assert.ok(!(await page.isDisabled("#w-event")), "이벤트 입장 = POS 없이 바로");
+    assert.ok(await page.isDisabled("#w-done"), "POS에 다녀오기 전엔 결제 완료 잠김");
+    assert.match(await page.getAttribute("#sheet [data-act=pay]", "class"), /\bgo\b/, "판매 가능 = 초록");
+    const green = await page.$eval("#sheet [data-act=pay]", (b) => [getComputedStyle(b).backgroundColor, getComputedStyle(document.documentElement).getPropertyValue("--naver").trim()]);
+    assert.notStrictEqual(green[0], "rgba(0, 0, 0, 0)");
+    assert.match(await page.getAttribute("#w-done", "title"), /POS로 이동/);
+    assert.match(await page.textContent("#sheet .wguide"), /③ POS에 다녀와야 눌려요/);
+    // 잠금을 억지로 풀어 눌러도 등록 안 됨
+    await page.evaluate(() => { const b = document.getElementById("w-done"); b.disabled = false; b.click(); });
+    assert.match(await page.textContent("#toast"), /③ \[POS로 이동\]에서 결제하고 돌아와 주세요/);
+    assert.ok(!(await page.evaluate(() => window.__deskTest.holders().some((h) => h.keys.includes(32)))), "등록 안 됨");
+    await page.evaluate(() => window.__deskTest.renderSheet()); // 억지로 푼 것을 되돌림
+    assert.ok(await page.isDisabled("#w-done"));
+    // ③ POS로 이동 → POS 화면에 있는 동안은 그대로 → 돌아오면 눌림
+    await page.click("#sheet [data-act=pay]");
+    assert.ok(await page.isVisible("#pos"));
+    assert.ok(await disabled("#w-done"), "POS에 있는 동안은 잠김");
+    await page.click("#pos [data-act=posDone]");
+    assert.ok(!(await page.isDisabled("#w-done")), "돌아오면 결제 완료");
+    assert.match(await page.textContent("#sheet [data-act=pay]"), /1장 결제하기 ✓/);
+    assert.match(await page.textContent("#sheet .wguide li:nth-child(5)"), /결제 완료/);
+    // 결제 뒤 입장권 수를 바꾸면 다시 POS
+    await page.click("#sheet [data-act=qty][data-d='1']");
+    assert.ok(await page.isDisabled("#w-done"), "수가 바뀌면 다시 잠김");
+    assert.ok(!(await page.isDisabled("#w-event")));
+    assert.match(await page.textContent("#sheet [data-act=pay]"), /2장 결제하기 \(결제한 1장과 달라요 — 다시\)/);
+    await page.click("#sheet [data-act=qty][data-d='-1']");
+    assert.ok(!(await page.isDisabled("#w-done")), "결제한 수로 되돌리면 그대로");
+    await page.click("#sheet [data-act=qty][data-d='1']");
+    await page.click("#sheet [data-act=pay]"); await page.click("#pos [data-act=posDone]");
+    assert.match(await page.textContent("#sheet [data-act=pay]"), /2장 결제하기 ✓/);
+    const ks = await page.$$eval("#sheet .bigkey", (e) => e.map((x) => x.textContent.trim()));
+    assert.strictEqual(ks.length, 2);
+    await page.click("#w-done");
+    assert.match(await page.textContent("#toast"), new RegExp(`현장입장자 · 열쇠 ${ks.join(", ")}번 등록`));
+    // 새 손님은 처음부터 다시 (앞 손님 결제가 이어지지 않음)
+    await page.click(".key[data-k='40']");
+    for (const k of "87654321") await page.click(`.keypad [data-k="${k}"]`);
+    assert.ok(await page.isDisabled("#w-done"), "새 창은 다시 POS부터");
+    await page.click("#sheet [data-act=close]");
+    // 판매 불가(빨강): 예약 손님 자리 → [POS로 이동] 빨강 · 눌러도 POS로 안 넘어감 · 결제 완료 잠김 · 이벤트 입장은 전화번호만 있으면
+    await page.evaluate(() => { const T = window.__deskTest.today(); window.__deskTest.addBooking(T, "14:00", "단체예약", "01011112222", 40, {}); });
+    await page.click(".key[data-k='41']");
+    assert.match(await page.textContent("#sheet .banner"), /지금은 판매 불가/);
+    assert.match(await page.getAttribute("#sheet [data-act=pay]", "class"), /\bno\b/, "판매 불가 = 빨강");
+    assert.strictEqual(await page.getAttribute("#sheet [data-act=pay]", "aria-disabled"), "true");
+    assert.match(await page.textContent("#sheet [data-act=pay]"), /\(판매 불가\)/);
+    const red = await page.$eval("#sheet [data-act=pay]", (b) => getComputedStyle(b).backgroundColor);
+    assert.notStrictEqual(red, green[0], "초록과 다른 색");
+    await page.click("#sheet [data-act=pay]", { force: true }); // 빨강도 눌리기는 함 (안내만)
+    assert.ok(await page.isHidden("#pos"), "POS로 안 넘어감");
+    assert.match(await page.textContent("#toast"), /지금은 판매 불가 — POS로 넘어가지 않아요/);
+    assert.ok(await page.isDisabled("#w-event"), "전화번호 전");
+    for (const k of "11223344") await page.click(`.keypad [data-k="${k}"]`);
+    assert.ok(!(await page.isDisabled("#w-event")), "판매 불가여도 이벤트 입장은 전화번호만 있으면");
+    assert.ok(await page.isDisabled("#w-done"), "결제 완료는 잠김");
+    await page.click("#w-event");
+    assert.match(await page.textContent("#toast"), /이벤트 입장 \(결제 없음 · 총 판매수에는 안 셈\) · 열쇠 41번 등록/);
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("현장 결제 완료(앱): 실제 POS 창으로 갔다가 데스크가 다시 앞으로 와야 눌림 · POS 창을 못 찾으면 작업표시줄로 다녀와도 됨", async () => {
+  const browser = await launch();
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+    const page = await ctx.newPage();
+    await page.addInitScript(() => {
+      window.__pos = { ok: true, n: 0 };
+      const cfg = { build: "2.1" };
+      window.desk = {
+        naver: { load: async (day) => ({ ok: true, day, slots: [], bookings: [] }), complete: async () => ({ ok: true }) },
+        state: { load: (day) => localStorage.getItem("test-state-" + day), save: (day, json) => localStorage.setItem("test-state-" + day, json) },
+        config: { get: async () => cfg, set: async (patch) => { Object.assign(cfg, patch); return { ok: true }; } },
+        pos: { show: async () => { window.__pos.n++; return window.__pos.ok ? { ok: true } : { ok: false, why: "POS 창을 찾지 못함" }; } },
+      };
+    });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK);
+    await page.waitForFunction(() => /불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 15000 });
+    const back = () => page.evaluate(() => window.dispatchEvent(new Event("focus"))); // POS를 최소화 → 데스크가 다시 앞으로
+    await page.click(".key[data-k='44']");
+    for (const k of "12345678") await page.click(`.keypad [data-k="${k}"]`);
+    assert.ok(await page.isDisabled("#w-done"));
+    await back();
+    assert.ok(await page.isDisabled("#w-done"), "POS에 안 가고 데스크만 다시 눌러도 그대로 잠김");
+    await page.click("#sheet [data-act=pay]");
+    await page.waitForFunction(() => window.__pos.n === 1);
+    assert.ok(await page.isHidden("#pos"), "앱은 가짜 POS 화면 없음");
+    assert.ok(await page.isDisabled("#w-done"), "POS로 넘어간 동안은 잠김");
+    await back();
+    assert.ok(!(await page.isDisabled("#w-done")), "POS에서 돌아오면 결제 완료");
+    // POS 창을 못 찾은 경우: 안내 → 작업표시줄에서 POS를 열고 돌아오면 됨
+    await page.click("#sheet [data-act=qty][data-d='1']");
+    assert.ok(await page.isDisabled("#w-done"));
+    await page.evaluate(() => (window.__pos.ok = false));
+    await page.click("#sheet [data-act=pay]");
+    await page.waitForFunction(() => window.__pos.n === 2);
+    assert.match(await page.textContent("#toast"), /POS 창을 찾지 못했어요 — 작업표시줄에서 POS를 열어 결제하고 데스크로 돌아오세요/);
+    assert.ok(await page.isDisabled("#w-done"));
+    await back();
+    assert.ok(!(await page.isDisabled("#w-done")), "다녀오면 결제 완료");
+    await page.click("#w-done");
+    assert.match(await page.textContent("#toast"), /현장입장자 · 열쇠 44, \d+번 등록/);
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("열쇠 창 [입장권 다시 출력] (사장님 10/21 · 감열지가 끊겼을 때): 네이버 · 현장 · 이벤트 모두 · 서비스 키는 없음 · 방문 횟수 기다리는 중이면 한 번은 안내 · 한 번 더 누르면 출력", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK);
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    // 네이버 손님 (열쇠 2개)
+    const nv = await page.evaluate(() => { const h = window.__deskTest.holders().find((x) => !x.walk && !x.svc && x.keys.length > 1); return { name: h.name, keys: h.keys }; });
+    await page.click(`.key[data-k='${nv.keys[0]}']`);
+    assert.strictEqual((await page.textContent("#sheet [data-act=reprint]")).trim(), "입장권 다시 출력");
+    const pos = await page.evaluate(() => { const r = (s) => document.querySelector(s).getBoundingClientRect(); return { b: r("#sheet [data-act=reprint]"), dd: r("#sheet .whorow"), x: r("#sheet .x") }; });
+    assert.ok(Math.abs(pos.b.right - pos.dd.right) < 2 && pos.b.top < pos.x.bottom + 40, "예약자 줄 오른쪽 끝 (닫기 아래)");
+    await page.click("#sheet [data-act=reprint]");
+    assert.strictEqual(await page.textContent("#toast"), `다시 출력 — ${nv.name}님 열쇠 ${nv.keys.join(", ")}번 · 프린터를 아직 고르지 않아 출력 못 함 (운영 설정 → 프린터 설정)`);
+    assert.ok(await page.isVisible("#sheet [data-act=reprint]"), "창은 그대로");
+    await page.click("#sheet [data-act=close]");
+    // 현장 · 이벤트 손님
+    const wk = await page.evaluate(() => window.__deskTest.holders().find((x) => x.walk && !x.svc).keys[0]);
+    await page.click(`.key[data-k='${wk}']`);
+    await page.click("#sheet [data-act=reprint]");
+    assert.match(await page.textContent("#toast"), new RegExp(`^다시 출력 — 현장 열쇠 ${wk}번 · `));
+    await page.click("#sheet [data-act=close]");
+    await page.click(".key[data-k='32']");
+    for (const k of "12345678") await page.click(`.keypad [data-k="${k}"]`);
+    await page.click("#w-event");
+    await page.click(".key[data-k='32']");
+    await page.click("#sheet [data-act=reprint]");
+    assert.match(await page.textContent("#toast"), /^다시 출력 — 이벤트 열쇠 32번 · /);
+    await page.click("#sheet [data-act=close]");
+    // 서비스 키(판매 아님)는 입장권이 없음
+    await page.click(".key[data-k='33']");
+    await page.click("#sheet [data-act=svcWalk]");
+    await page.fill("#w-svcname", "이직원");
+    await page.click("#w-done");
+    await page.click(".key[data-k='33']");
+    assert.match(await page.textContent("#sheet-title"), /서비스 키/);
+    assert.strictEqual(await page.$("#sheet [data-act=reprint]"), null);
+    await page.click("#sheet [data-act=close]");
+    // 네이버 방문 횟수를 기다리는 중(곧 저절로 출력) → 두 번 나가지 않게 기다림
+    await page.evaluate((k) => { window.__deskTest.holders().find((x) => x.keys.includes(k)).printWaiting = true; }, nv.keys[0]);
+    await page.click(`.key[data-k='${nv.keys[0]}']`);
+    await page.click("#sheet [data-act=reprint]");
+    assert.match(await page.textContent("#toast"), /방문 횟수를 확인한 뒤 곧 저절로 나와요 — 그래도 지금 출력하려면 한 번 더 누르세요/);
+    await page.click("#sheet [data-act=reprint]");
+    assert.match(await page.textContent("#toast"), new RegExp(`^다시 출력 — ${nv.name}님 열쇠`), "한 번 더 누르면 출력");
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("[입장권 다시 출력](앱): 프린터로 그 손님 입장권을 다시 보냄 · 자동 출력을 꺼 둬도 · 실패하면 알림", async () => {
+  const browser = await launch();
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+    const page = await ctx.newPage();
+    await page.addInitScript(() => {
+      window.__jobs = [];
+      window.__printFail = false;
+      const cfg = { build: "2.1", printMode: "com", comPort: "COM3", printForm: { auto: false } };
+      window.desk = {
+        naver: { load: async (day) => ({ ok: true, day, slots: [], bookings: [] }), complete: async () => ({ ok: true }) },
+        state: { load: (day) => localStorage.getItem("test-state-" + day), save: (day, json) => localStorage.setItem("test-state-" + day, json) },
+        config: { get: async () => cfg, set: async (patch) => { Object.assign(cfg, patch); return { ok: true }; } },
+        print: { escpos: async (j) => { window.__jobs.push(j); return window.__printFail ? { ok: false, why: "용지 없음" } : { ok: true }; } },
+      };
+    });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK);
+    await page.waitForFunction(() => /불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 15000 });
+    await page.evaluate(() => { const T = window.__deskTest; T.walkin("01055556666", [44, 45], 840, 840); T.setNow(845); });
+    assert.strictEqual(await page.evaluate(() => window.__jobs.length), 0, "자동 출력 꺼짐");
+    await page.click(".key[data-k='44']");
+    await page.click("#sheet [data-act=reprint]");
+    await page.waitForFunction(() => window.__jobs.length === 1);
+    assert.strictEqual(await page.textContent("#toast"), "다시 출력 — 현장 열쇠 44, 45번 · 입장권 출력");
+    const job = await page.evaluate(() => { const j = window.__jobs[0]; return { port: j.port, text: j.parts.map((p) => p.t || "").join("") }; });
+    assert.strictEqual(job.port, "COM3");
+    assert.match(job.text, /44, 45/);
+    assert.match(job.text, /6666/);
+    await page.evaluate(() => (window.__printFail = true));
+    await page.click("#sheet [data-act=reprint]");
+    await page.waitForFunction(() => /출력 실패: 용지 없음/.test(document.getElementById("toast").textContent));
+    assert.strictEqual(await page.evaluate(() => window.__jobs.length), 2);
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();

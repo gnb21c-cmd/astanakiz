@@ -75,6 +75,7 @@ test("설문조사: 신규 예약자는 번호를 눌러야 열쇠 · 현장구�
     assert.match(await page.textContent("#sheet .svwalk"), new RegExp(Q));
     assert.match(await page.textContent("#sheet .svwalk"), /제외/);
     for (const k of "12345678") await page.click(`.keypad [data-k="${k}"]`);
+    await page.click("#sheet [data-act=pay]"); await page.click("#pos [data-act=posDone]"); // ③ POS에 다녀와야 [결제 완료]
     assert.ok(await page.isDisabled("#w-done"), "번호 전엔 등록 잠김");
     await page.click("#sheet .svb.skip");
     assert.ok(await page.isEnabled("#w-done"), "제외 → 등록");
@@ -83,6 +84,7 @@ test("설문조사: 신규 예약자는 번호를 눌러야 열쇠 · 현장구�
     assert.deepStrictEqual(ws, [0], "제외 = 0");
     await page.click('.key[data-k="44"]');
     for (const k of "12345679") await page.click(`.keypad [data-k="${k}"]`);
+    await page.click("#sheet [data-act=pay]"); await page.click("#pos [data-act=posDone]"); // ③ POS에 다녀와야 [결제 완료]
     await page.click("#sheet .svb[data-n='1']");
     await page.click("#w-done");
 
@@ -296,6 +298,7 @@ test("설문조사 스위치: 끄면 예약자 · 현장입장 창에 설문 없
     await page.click('.key[data-k="43"]');
     assert.strictEqual(await page.$("#sheet .svwalk"), null);
     for (const k of "12345678") await page.click(`.keypad [data-k="${k}"]`);
+    await page.click("#sheet [data-act=pay]"); await page.click("#pos [data-act=posDone]"); // ③ POS에 다녀와야 [결제 완료]
     assert.ok(!(await page.isDisabled("#w-done")), "번호 없이 바로 등록");
     await close(page);
     // 다시 켜기 → 설문 다시 · 직접 더한 수는 그대로
