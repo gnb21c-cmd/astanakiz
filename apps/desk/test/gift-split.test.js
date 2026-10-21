@@ -143,7 +143,7 @@ test("추가 예약이 10번째: 알림에 사은권 · 연락처 → 확인 뒤
     assert.match(sp(await page.textContent("#sheet .giftdue")), /사은권 전달 전 — 10번째 예약완료 2만원 사은권 · 010-5555-0048/);
     await page.click("#sheet [data-act=close] >> nth=0");
     const k = h.keys[0];
-    assert.ok(await page.$(`.key.giftdue[data-k="${k}"]`), "열쇠판 칸에 '사은권' 표시");
+    assert.strictEqual(await page.$(`.key.giftdue[data-k="${k}"]`), null, "열쇠판 칸에는 사은권 표시 안 함 (사장님 10/21 — 카드 · 열쇠 창에만)");
     await slot(page, "16:00");
     assert.match(sp(await page.textContent('.res:has-text("더하기")')), /사은권 전달 전/);
     // 전달 전에 반납하려 하면 물음 → [취소]면 반납 안 함

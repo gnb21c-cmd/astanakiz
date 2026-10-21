@@ -300,8 +300,6 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 .banner.giftwarn, .banner.giftdue { background: var(--yellow); color: #3a2a00; border: 2px solid #c79a00; }
 .banner.giftdue { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: space-between; }
 .banner.giftwarn .help, .banner.giftdue .help { color: #5a4500; }
-.key.giftdue { position: relative; outline: 3px solid var(--yellow); outline-offset: -3px; }
-.key.giftdue::after { content: "사은권"; position: absolute; top: 1px; right: 1px; font-size: 9.5px; font-weight: 800; line-height: 1.2; background: var(--yellow); color: #3a2a00; border-radius: 4px; padding: 0 3px; }
 .gift { display: inline-block; font-size: 11px; font-weight: 700; color: #fff; background: var(--red); border-radius: 5px; padding: 0 6px; margin-left: 2px; }
 .badge { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
 .badge.conf { background: var(--red); color: #fff; } /* 미입장 = 빨강 스티커 */
@@ -1093,7 +1091,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     if (APP) setTimeout(naverFlush, 0);
   }
   /* 추가 예약이 10번째 (사장님 10/20): 이용 중인 손님의 뒤 타임 예약을 이용완료하면 마일리지 10 · 20 …번째가 되는지
-     → 알림에 '사은권을 드려야 해요 · 손님은 이용 중 — 연락해 전달' · 확인하면 그 예약에 giftDue (전달하면 giftGiven 시각) — [사은권 전달함]까지 열쇠 칸 · 열쇠 창 · 카드에 남고 반납 전에 물음 */
+     → 알림에 '사은권을 드려야 해요 · 손님은 이용 중 — 연락해 전달' · 확인하면 그 예약에 giftDue (전달하면 giftGiven 시각) — [사은권 전달함]까지 열쇠 창 · 카드에 남고 반납 전에 물음 (열쇠판 칸 표시는 10/21 사장님 말씀으로 뺌) */
   const extGift = (e) => { const x = e.x; if (!x || x.prevDone == null || evFrozen(x)) return 0; const n = doneSoFar(x) + 1 - evSub(x); return isGift(n) ? n : 0; };
   const extGiftHtml = (e) => { const n = extGift(e); return n ? `<div class="banner giftwarn"><b>이 예약을 이용완료하면 ${n}번째 예약완료 — ${RULES.giftName}을 드려야 해요</b><br>손님은 이용 중 — <b class="num">${fmtPhone(e.x.phone || e.h.phone)}</b> 로 연락해 전달하세요</div>` : ""; };
   /** 이 열쇠 손님이 아직 못 받은 사은권 (본인 · 함께 이용완료한 추가 예약) */
@@ -1315,7 +1313,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       if (k > RULES.keys) break; // 남는 칸(46~50)은 비워 둠
       const h = holderOf(k);
       if (!h) { html += `<button class="key free" data-act="key" data-k="${k}" aria-label="${k}번 빈 열쇠"><b class="num">${k}</b><span>&nbsp;</span></button>`; continue; }
-      html += `<button class="key ${keyColor(h, k)}${h.svc ? " svc" : ""}${giftPend(h).length ? " giftdue" : ""}" data-act="key" data-k="${k}" aria-label="${k}번 ${h.svc ? "서비스 키 " : ""}${esc(h.name)}"><b class="num">${k}</b><span>${esc(h.svc ? svcBoard(h) : h.walk ? "현장" : h.name)}</span></button>`;
+      html += `<button class="key ${keyColor(h, k)}${h.svc ? " svc" : ""}" data-act="key" data-k="${k}" aria-label="${k}번 ${h.svc ? "서비스 키 " : ""}${esc(h.name)}"><b class="num">${k}</b><span>${esc(h.svc ? svcBoard(h) : h.walk ? "현장" : h.name)}</span></button>`;
     }
     // 설명은 45번 오른쪽 빈 칸에 (사장님이 정한 순서 10/8)
     if (RULES.keys > 40 && RULES.keys <= 45) html += `<div class="legend" style="grid-column: ${RULES.keys - 39} / -1">
