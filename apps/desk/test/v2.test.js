@@ -227,10 +227,11 @@ test("메모장(사람마다 상자): 근무자 등록 → 상자 · 관리자�
   }
 });
 
-test("평일 [오늘 수량조절]: 비수기 평일에 체크하면 그날만 네이버 판매 수량 자동조절 · 다음 날은 다시 꺼짐 · 시간제인 날은 저절로(잠김) · 자동조절을 끄면 못 누름", async () => {
+test("맨 위 [오늘 수량조절] 스위치: 설정과 상관없이 그날만 켜고 끔 · 평일(무제한)에 켜면 같은 수량 조절 · 다음 날은 기본(평일 꺼짐 · 시간제인 날 = 설정) (사장님 10/21)", async () => {
   const browser = await launch();
   try {
     const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
     const open = async (day) => {
       const page = await ctx.newPage();
       page.on("pageerror", (e) => errs.push(e.message));
@@ -238,24 +239,20 @@ test("평일 [오늘 수량조절]: 비수기 평일에 체크하면 그날만 �
       await page.goto(DESK);
       return page;
     };
-    const errs = [];
-    const state = (page) => page.evaluate(() => { const cb = document.getElementById("capforce-on"); const p = window.__deskTest.capPlan(); return { checked: cb.checked, disabled: cb.disabled, skip: p.skip || "", refresh: document.getElementById("refresh-at").textContent }; });
+    const state = (page) => page.evaluate(() => { const cb = document.getElementById("capforce-on"); const p = window.__deskTest.capPlan(); return { on: cb.checked, disabled: cb.disabled, look: getComputedStyle(document.querySelector("#capforce .cfknob")).width, skip: p.skip || "", refresh: document.getElementById("refresh-at").textContent }; });
     let page = await open("2026-10-06"); // 화요일 · 비수기 평일 (무제한)
     await page.evaluate(() => localStorage.clear());
     await page.reload();
-    // 관리자가 자동조절을 꺼 두면 못 누름
-    assert.deepStrictEqual(await state(page).then((s) => [s.checked, s.disabled]), [false, true]);
-    const pos = await page.evaluate(() => { const r = (s) => document.querySelector(s).getBoundingClientRect(); return { afterDrawer: r("#capforce").left >= r("[data-act=drawer]").right, beforeCurtain: r("#capforce").right <= r(".curtain-tab").left }; });
-    assert.deepStrictEqual(pos, { afterDrawer: true, beforeCurtain: true }, "환전 오픈 오른쪽 · 커튼 손잡이에 안 가림");
-    await page.dblclick("#now"); await page.click("[data-t=naver]"); await page.check("#cap-on");
-    await page.click("#sheet [data-act=close]");
     let s = await state(page);
-    assert.deepStrictEqual([s.checked, s.disabled], [false, false]);
-    assert.match(s.skip, /비수기 평일\(무제한\)이라 조절하지 않아요 — 사람이 몰리면 맨 위 \[오늘 수량조절\]을 체크/);
-    assert.ok(!/수량조절/.test(s.refresh), "꺼진 평일은 새로고침 줄에 수량조절 없음");
-    // 체크 → 그날만 시간제 날과 같은 계획 (손님은 그대로 무제한 · 계획은 1시간 50분 머문다고 봄)
-    await page.check("#capforce-on");
-    assert.match(await page.textContent("#toast"), /오늘만 네이버 판매 수량 자동조절 — 10분마다 .*손님 이용은 그대로 무제한 · 내일은 다시 꺼져요/);
+    assert.deepStrictEqual([s.on, s.disabled, s.look], [false, false, "24px"], "스위치 모양 · 설정에서 자동조절이 꺼져 있어도 누를 수 있음");
+    assert.match(s.skip, /비수기 평일\(무제한\)이라 조절하지 않아요 — 사람이 몰리면 맨 위 \[오늘 수량조절\]을 켜요/);
+    assert.ok(!/수량조절/.test(s.refresh));
+    const pos = await page.evaluate(() => { const r = (q) => document.querySelector(q).getBoundingClientRect(); return { afterDrawer: r("#capforce").left >= r("[data-act=drawer]").right, beforeCurtain: r("#capforce").right <= r(".curtain-tab").left }; });
+    assert.deepStrictEqual(pos, { afterDrawer: true, beforeCurtain: true }, "환전 오픈 오른쪽 · 커튼 손잡이에 안 가림");
+    // 켬 → 그날만 시간제인 날과 같은 계획 (손님은 그대로 무제한 · 계획은 1시간 50분 머문다고 봄) — 설정의 자동조절은 꺼진 채
+    await page.click("#capforce");
+    assert.match(await page.textContent("#toast"), /오늘 네이버 판매 수량 자동조절을 켰어요 — 10분마다 .*손님 이용은 그대로 무제한 · 내일은 기본으로/);
+    assert.strictEqual(await page.evaluate(() => window.__deskTest.RULES.capAuto.on), false, "설정은 그대로");
     const p = await page.evaluate(() => { const p = window.__deskTest.capPlan(); return { skip: p.skip || "", slots: p.slots.map((x) => x.t), worst: p.plan.map((c) => c.worst), present: window.__deskTest.capPresent().map((x) => x.to) }; });
     assert.strictEqual(p.skip, "");
     assert.ok(p.slots.length && p.slots.every((t) => t < 18 * 60), "18:00 전 타임만");
@@ -263,21 +260,36 @@ test("평일 [오늘 수량조절]: 비수기 평일에 체크하면 그날만 �
     assert.ok(p.worst.every((w) => Number.isFinite(w) && w <= 43), `상한 43 안 ${p.worst}`);
     await page.waitForFunction(() => /네이버 판매 수량 조절/.test(document.getElementById("toast").textContent), null, { timeout: 5000 }); // 10분마다 도는 것이 바로 한 번
     assert.match((await state(page)).refresh, /수량조절 \d\d:\d\d/);
-    assert.strictEqual(await page.evaluate(() => JSON.parse(localStorage.getItem("astanakiz-capauto")).forceDay), "2026-10-06", "그날 날짜로 저장 (다시 켜도 그날은 그대로)");
+    assert.deepStrictEqual(await page.evaluate(() => JSON.parse(localStorage.getItem("astanakiz-capauto")).today), { day: "2026-10-06", on: true }, "그날 날짜로 저장 (다시 켜도 그날은 그대로)");
     await page.reload();
-    assert.strictEqual((await state(page)).checked, true);
+    assert.strictEqual((await state(page)).on, true);
+    // 끔 → 멈춤
+    await page.click("#capforce");
+    assert.match(await page.textContent("#toast"), /오늘 수량조절을 껐어요 \(오늘만\)/);
+    s = await state(page);
+    assert.deepStrictEqual([s.on, !!s.skip], [false, true]);
+    await page.click("#capforce"); // 다시 켜 둠 → 다음 날 확인
     await page.close();
     // 다음 날(수요일)은 다시 꺼진 상태
     page = await open("2026-10-07");
     s = await state(page);
-    assert.deepStrictEqual([s.checked, s.disabled], [false, false]);
+    assert.deepStrictEqual([s.on, s.disabled], [false, false]);
     assert.match(s.skip, /비수기 평일/);
     await page.close();
-    // 시간제인 날(토요일)은 저절로 — 체크 · 잠김
+    // 시간제인 날(토요일): 기본 = 설정 (꺼짐) → 스위치로 그날만 켬 · 설정을 켜면 기본이 켜짐 → 스위치로 그날만 끔
     page = await open("2026-10-10");
     s = await state(page);
-    assert.deepStrictEqual([s.checked, s.disabled, s.skip], [true, true, ""]);
-    assert.match(await page.getAttribute("#capforce", "title"), /시간제인 날.*저절로/);
+    assert.deepStrictEqual([s.on, s.disabled, s.skip], [false, false, ""], "설정이 꺼져 있으면 꺼짐 (계획은 볼 수 있음)");
+    await page.click("#capforce");
+    assert.strictEqual((await state(page)).on, true, "설정과 상관없이 켬");
+    await page.close();
+    page = await open("2026-10-11"); // 일요일 · 설정 켬
+    await page.dblclick("#now"); await page.click("[data-t=naver]"); await page.check("#cap-on"); await page.click("#sheet [data-act=close]");
+    assert.strictEqual((await state(page)).on, true, "시간제인 날 기본 = 설정 켜짐");
+    await page.click("#capforce");
+    s = await state(page);
+    assert.deepStrictEqual([s.on, /수량조절/.test(s.refresh)], [false, false], "그날만 끔 (자동조절 안 돎)");
+    assert.strictEqual(await page.evaluate(() => window.__deskTest.RULES.capAuto.on), true, "설정은 그대로 켜짐");
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();

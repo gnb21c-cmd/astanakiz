@@ -83,7 +83,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .btn-sm { padding: 2px 9px; min-height: 28px; font-size: 12.5px; border-radius: 7px; }
 
 /* 위 막대 */
-.top { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+.top { display: flex; align-items: center; gap: 5px; flex-wrap: nowrap; }
 .top .tag { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .top h1 { margin: 0; font-size: 16px; font-weight: 700; white-space: nowrap; }
 .top .brand { display: flex; align-items: baseline; gap: 6px; min-width: 0; flex: none; cursor: pointer; border-radius: 8px; padding: 2px 4px; margin-left: -4px; }
@@ -96,12 +96,15 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .captable small { color: var(--muted); font-size: 11px; }
 .captable .up { color: var(--ok); font-size: 12px; } .captable .down { color: var(--red); font-size: 12px; } .captable td.over { color: var(--red); font-weight: 700; }
 .caplog { display: grid; gap: 2px; font-size: 12.5px; max-height: 150px; overflow: auto; } .caplog .bad { color: var(--red); }
-.top .posgo { border: 2px solid var(--accent); color: var(--accent); font-weight: 800; padding: 4px 9px; }
-.top .capforce { display: inline-flex; align-items: center; gap: 5px; flex: none; border: 1.5px solid var(--line); border-radius: 8px; padding: 2px 6px 2px 4px; font-size: 11px; line-height: 1.15; font-weight: 700; color: var(--muted); cursor: pointer; white-space: nowrap; }
-.top .capforce input { width: 17px; height: 17px; margin: 0; accent-color: var(--todo); cursor: pointer; }
-.top .capforce.on { border-color: var(--todo); color: var(--fg); background: var(--accent-bg); }
-.top .capforce.auto, .top .capforce.off { cursor: default; }
-.top .capforce.off { opacity: .55; }
+.top .posgo { border: 2px solid var(--accent); color: var(--accent); font-weight: 800; padding: 4px 8px; }
+.top .capforce { position: relative; display: inline-flex; align-items: center; gap: 3px; flex: none; border: 1.5px solid var(--line); border-radius: 8px; padding: 2px 4px 2px 3px; font-size: 10.5px; line-height: 1.15; font-weight: 700; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.top .capforce input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none; } /* 스위치 모양 (사장님 10/21 — 체크박스 말고) */
+.top .capforce .cfknob { position: relative; flex: none; width: 24px; height: 14px; border-radius: 7px; background: var(--line); transition: background .15s; }
+.top .capforce .cfknob::after { content: ""; position: absolute; top: 2px; left: 2px; width: 10px; height: 10px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .35); transition: left .15s; }
+.top .capforce.on { border-color: var(--ok); color: var(--fg); }
+.top .capforce.on .cfknob { background: var(--ok); }
+.top .capforce.on .cfknob::after { left: 12px; }
+.top .capforce:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; }
 .top .spacer { flex: 1; }
 .top .now { font-size: 22px; font-weight: 700; border: 0; background: transparent; padding: 0; color: var(--fg); cursor: default; } /* 시계 = 관리자 숨은 입구 (두 번 누르기) */
 .top .manualbtn { color: var(--accent); border-color: var(--accent); }
@@ -624,7 +627,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     <button class="btn btn-sm posgo" data-act="posGo" title="POS 화면으로 (POS를 작업표시줄로 내리면 데스크로 돌아옴)">포스 전환</button>
     <button class="btn btn-sm posgo" data-act="drawer" title="POS와 연결된 현금통을 엶 (POS가 꺼져 있어도)">환전 오픈</button>
     <!-- 사장님 10/21: 사람이 몰리는 비수기 평일 — 근무자가 체크하면 그날만 네이버 판매 수량 자동조절 (다음 날은 다시 꺼짐 · 시간제인 날은 저절로 켜져 있음) -->
-    <label class="capforce" id="capforce"><input type="checkbox" id="capforce-on"><span>오늘<br>수량조절</span></label>
+    <label class="capforce" id="capforce"><input type="checkbox" id="capforce-on" role="switch" aria-label="오늘 수량조절"><span class="cfknob" aria-hidden="true"></span><span>오늘<br>수량조절</span></label>
     <span class="spacer"></span>
     <button class="btn btn-sm" data-act="time" data-min="5">+5분</button>
     <button class="btn btn-sm" data-act="time" data-min="30">+30분</button>
@@ -749,7 +752,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     /* 네이버 판매 수량 자동 조절 (시간제인 날 · 시간제 타임만): 2시간(4타임) 안의 손님(네이버 예약 + 현장)이 target 에 가깝게
        10분마다 지금 · 앞 3타임의 네이버 '회차당 수량'을 바꿈. 한 타임 최대 max (현장으로 갑자기 오는 손님 · 10분 사이 예약을 생각해서) */
     // target = 맞추려는 2시간 손님 수, ceiling = 절대 넘지 않는 상한 (40~43 · 사용자 지시 10/6)
-    capAuto: { on: false, target: 42, ceiling: 43, max: 13, visible: 10, ahead: 3, every: 10, product: "1시간 50분", forceDay: "" }, // visible: 고객에게 보이는 잔여 최대 (안내 '최대 10팀') · forceDay: 비수기 평일에 [오늘 수량조절]을 체크한 날 (그날만)
+    capAuto: { on: false, target: 42, ceiling: 43, max: 13, visible: 10, ahead: 3, every: 10, product: "1시간 50분", today: { day: "", on: false } }, // visible: 고객에게 보이는 잔여 최대 (안내 '최대 10팀') · today: 맨 위 [오늘 수량조절] 스위치로 그날만 켜고 끈 것 (on = 기본: 시간제인 날)
   };
   /* 이용시간: 성수기 — 평일·휴일 모두 17:30 입장까지 1시간 50분, 18:00 입장부터 무제한
               비수기 — 평일은 무제한, 휴일은 성수기와 같음 */
@@ -773,9 +776,17 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   const isHoliday = (key) => { const w = new Date(key + "T12:00:00").getDay(); return w === 0 || w === 6 || HOLIDAYS.includes(key); };
   const peakOf = (key) => RULES.peaks.find((p) => p.from <= key && key <= p.to) || null;
   const timedDay = (key) => !!peakOf(key) || isHoliday(key);
-  /** 사장님 10/21: 비수기 평일에 근무자가 맨 위 [오늘 수량조절]을 체크한 날 — 그날만 (forceDay = 그날 날짜 · 다음 날은 다시 꺼진 상태) */
-  const capForce = () => !timedDay(TODAY) && RULES.capAuto.forceDay === TODAY;
-  /** 네이버 판매 수량 자동조절을 하는 날: 시간제인 날(성수기 · 휴일) 또는 체크한 평일 */
+  /** 오늘 수량 자동조절이 도나 (사장님 10/21): 맨 위 [오늘 수량조절] 스위치 = 그날만 · 설정과 상관없이 근무자가 켜고 끔 (today = { day, on } · 다음 날은 기본으로)
+      기본 = 시간제인 날(성수기 · 휴일)은 운영 설정 → 네이버 설정의 자동조절 켜짐 · 비수기 평일(무제한)은 꺼짐 · (10/21 처음 모양 forceDay = 그날 켬) */
+  function capToday() {
+    const o = RULES.capAuto.today;
+    if (o && o.day === TODAY) return !!o.on;
+    if (RULES.capAuto.forceDay === TODAY) return true;
+    return timedDay(TODAY) && !!RULES.capAuto.on;
+  }
+  /** 비수기 평일(무제한)인데 오늘 수량조절을 켠 날 — 계획은 18:00 전 입장을 1시간 50분 머문다고 봄 */
+  const capForce = () => !timedDay(TODAY) && capToday();
+  /** 계획을 세울 수 있는 날: 시간제인 날 또는 켠 평일 ([지금 한 번 조절]도) */
   const capDay = () => timedDay(TODAY) || capForce();
   /** 이 날 이 시각 입장의 이용시간(분). 무제한이면 null */
   let golden = null; // 골든벨 { at } — 오늘 이 시각부터 모든 손님 무제한 (아래 goldenCheck)
@@ -1787,7 +1798,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   function capPlan() {
     const A = RULES.capAuto;
     // 가동하는 날: 성수기(평일 · 휴일) · 비수기 주말 · 휴일 = 시간제인 날. 비수기 평일은 제외 (사용자 지시 10/6) — 근무자가 [오늘 수량조절]을 체크한 날만 (10/21)
-    if (!capDay()) return { skip: "오늘은 비수기 평일(무제한)이라 조절하지 않아요 — 사람이 몰리면 맨 위 [오늘 수량조절]을 체크 (오늘만)" };
+    if (!capDay()) return { skip: "오늘은 비수기 평일(무제한)이라 조절하지 않아요 — 사람이 몰리면 맨 위 [오늘 수량조절]을 켜요 (오늘만)" };
     const slots = capSlots(TODAY);
     const cur = Math.floor(now / 30) * 30;
     // 영업 전(새벽 · 아침)이면 그날 첫 타임들을 (현장 10/7: 새벽 2시에 눌렀더니 조절할 타임이 없었음)
@@ -1858,7 +1869,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   /** 매분: 켜져 있으면 10분마다 (실패 · 바쁨이면 다음 분에 다시) */
   function capTick() {
     const A = RULES.capAuto;
-    if (!A.on || !capDay()) return;
+    if (!capToday()) return; // 맨 위 스위치 (기본: 시간제인 날 = 설정의 자동조절)
     const mark = Math.floor(now / A.every) * A.every;
     if (capMark === mark || now < toMin(RULES.naverAuto.from) || now > toMin(RULES.unlimitedFrom) || now < capPauseUntil) return;
     capMark = mark; // 같은 10분에 두 번 안 돌게 — 바빠서 못 했으면 다음 분에 다시
@@ -1877,7 +1888,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     if (fail.length) return `⚠ 네이버 이용완료 실패 ${fail.length}건: ${fail.map((b) => `${b.name} ${hm(b.slot)}`).join(", ")} — 2분마다 다시 · 안 되면 네이버에서 직접`;
     if (naverErr) return `⚠ ${naverErr}`;
     const nx = autoNext(now);
-    return [lastRefresh == null ? "" : `${hm(lastRefresh)} 불러옴`, nx == null ? "" : `다음 ${hm(nx)}`, RULES.capAuto.on && capDay() ? `수량조절 ${capBusy ? "중…" : capLastAt == null ? "켜짐" : hm(capLastAt)}` : ""].filter(Boolean).join(" · ");
+    return [lastRefresh == null ? "" : `${hm(lastRefresh)} 불러옴`, nx == null ? "" : `다음 ${hm(nx)}`, capToday() ? `수량조절 ${capBusy ? "중…" : capLastAt == null ? "켜짐" : hm(capLastAt)}` : ""].filter(Boolean).join(" · ");
   }
   /** 정해진 자동 시각이 지났는데 그 뒤로 오늘 예약을 안 불러왔으면 불러옴
       (팝업을 쓰는 중이면 닫을 때까지 기다림 · 실패하면 1분 뒤 다시 · PC가 잠깐 멈췄어도 놓치지 않음) */
@@ -1906,14 +1917,14 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     renderAll();
   }
   function renderAll() { saveState(); evSync(); hvSync(); notesSync(); $("now").textContent = hm(now); $("refresh-at").textContent = refreshText(); $("refresh-at").style.color = (naverErr || (bookings[TODAY] || []).some((b) => b.naverPending && b.naverWhy)) && !naverBusy ? "var(--red)" : ""; renderSlots(); renderRes(); renderKeys(); renderCars(); goldenCheck(); renderMemoBoxes(); renderCapForce(); }
-  /** 맨 위 [오늘 수량조절] (사장님 10/21): 비수기 평일만 체크 · 시간제인 날은 저절로(체크 · 잠김) · 관리자가 자동조절을 껐으면 못 누름 */
+  /** 맨 위 [오늘 수량조절] 스위치 (사장님 10/21): 설정과 상관없이 근무자가 그날만 켜고 끔 · 다음 날은 기본(시간제인 날 = 설정 · 평일 = 꺼짐) */
   function renderCapForce() {
     const el = $("capforce"), cb = $("capforce-on");
     if (!el) return;
-    const auto = timedDay(TODAY), on = RULES.capAuto.on;
-    cb.checked = on && (auto || capForce()); cb.disabled = auto || !on;
-    el.classList.toggle("on", cb.checked); el.classList.toggle("auto", auto); el.classList.toggle("off", !on);
-    el.title = !on ? "관리자가 네이버 판매 수량 자동조절을 꺼 둠 (운영 설정 → 네이버 설정)" : auto ? "오늘은 시간제인 날(성수기 · 휴일) — 수량 자동조절이 저절로 돌아요" : `사람이 몰리는 평일: 체크하면 오늘만 10분마다 네이버 판매 수량을 조절해요 (목표 ${RULES.capAuto.target} · 상한 ${RULES.capAuto.ceiling}) — 내일은 다시 꺼진 상태`;
+    const on = capToday(), mine = !!(RULES.capAuto.today && RULES.capAuto.today.day === TODAY);
+    cb.checked = on; cb.setAttribute("aria-checked", String(on));
+    el.classList.toggle("on", on);
+    el.title = `오늘 네이버 판매 수량 자동조절 ${on ? "켜짐" : "꺼짐"}${mine ? " (오늘 바꿈)" : timedDay(TODAY) ? " (시간제인 날 기본 = 운영 설정)" : " (비수기 평일 기본 = 꺼짐)"} — 누르면 오늘만 ${on ? "끔" : `켬 (10분마다 · 목표 ${RULES.capAuto.target} · 상한 ${RULES.capAuto.ceiling})`} · 내일은 기본으로`;
   }
 
   // ── 팝업 ─────────────────────────────────────────
@@ -2355,7 +2366,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
         const html = `
           <div class="field setcard plain"><span class="label">매일 재고 열기 <span class="help">기준의 상품 · 기간 · 재고로 네이버 예약상품 날짜를 열어요</span></span><div id="st-row" class="field">${stRow()}</div></div>
           <div class="setcard plain stack">
-          <div class="field"><span class="label">판매 수량 자동조절</span><label class="chk"><input type="checkbox" id="cap-on" ${A.on ? "checked" : ""}> <b>10분마다 네이버 판매 수량 자동 조절</b> <span class="help">(시간제인 날: 성수기 · 휴일)</span></label>
+          <div class="field"><span class="label">판매 수량 자동조절</span><label class="chk"><input type="checkbox" id="cap-on" ${A.on ? "checked" : ""}> <b>10분마다 네이버 판매 수량 자동 조절</b> <span class="help">(시간제인 날: 성수기 · 휴일 기본 · 그날만 바꾸려면 맨 위 [오늘 수량조절])</span></label>
             <div class="help longhelp" data-q="수량 자동조절이란">안에 있는 손님(<b>열쇠 · 좌석 기준</b>: 지금 안의 손님은 반납 시각까지 · 아직 안 온 예약 · 앞으로 팔릴 수 · 예상 현장)이 <b>어느 시각에도 상한을 넘지 않게</b>, 목표에 가깝게 아직 시작 안 한 앞 ${A.ahead}타임의 네이버 '회차당 수량'을 바꿔요. 일찍 나간 자리는 바로 다시 팔고, 비인기 타임은 예상만큼만 팔린다고 봐서 남는 열쇠를 인기 타임에. 비수기 평일은 하지 않아요.</div>
             <div class="btns" style="align-items:center"><label class="help" for="cap-target">4타임 목표</label><input id="cap-target" type="number" min="30" max="50" value="${A.target}" class="cfg" style="width:76px">
               <label class="help" for="cap-ceil">상한</label><input id="cap-ceil" type="number" min="30" max="50" value="${A.ceiling}" class="cfg" style="width:76px">
@@ -3381,13 +3392,13 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   /* 맨 위 [근무자 메뉴얼] → 입장 · 퇴장 · 화면 위치별 조작 (내려 보며 읽기)
      그림 = prototype/manual/*.jpg (체험판 화면 · apps/desk/tools/manual-shots.js 로 다시 찍음 · 설치본은 desk.html 옆 manual/)
      MANUAL_MARKS = 그림 1의 번호 자리 (% · 찍을 때 나온 값) */
-  const MANUAL_MARKS = [[14.8, 0.6], [38.7, 0], [1, 5.4], [1, 12.4], [23.4, 12.4], [48.7, 9.8], [48.7, 59.5], [48.7, 66.5], [69.3, 0.6]];
+  const MANUAL_MARKS = [[14.7, 0.6], [38.7, 0], [1, 5.3], [1, 12.3], [23.4, 12.3], [48.7, 9.7], [48.7, 59.5], [48.7, 66.5], [69.3, 0.5]];
   const MANUAL_TOC = [["man1", "① 화면 한눈에"], ["man2", "② 예약 손님 입장"], ["man3", "③ 현장 손님 입장"], ["man4", "④ 퇴장 · 열쇠 반납"], ["man5", "⑤ 마감 · 일괄 반납"], ["man6", "⑥ 주차등록"], ["man7", "⑦ 메모장"], ["man8", "⑧ 이럴 땐"]];
   const manImg = (f, alt) => `<img src="manual/${f}" alt="${alt}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'help',textContent:'(그림을 못 불러옴 — ${alt})'}))">`;
   const manSteps = (rows, tip) => `<div class="mansteps">${rows.map((r, i) => `<div><span class="n">${i + 1}</span><span>${r}</span></div>`).join("")}${tip ? `<div class="tip">${tip}</div>` : ""}</div>`;
   function manualHtml() {
     const keys = [
-      ["1", "<b>포스 전환 · 환전 오픈</b> — POS 화면으로 / 현금통 열기 · <b>오늘 수량조절</b> — 사람이 몰리는 평일에 체크하면 그날만 네이버 판매 수량 자동조절"],
+      ["1", "<b>포스 전환 · 환전 오픈</b> — POS 화면으로 / 현금통 열기 · <b>오늘 수량조절</b> 스위치 — 그날만 네이버 판매 수량 자동조절을 켜고 끔 (사람이 몰리는 평일엔 켜기)"],
       ["2", "<b>반납안내 커튼</b> — 손잡이를 내리면 손님께 반납 안내를 크게 (아래를 누르면 걷힘)"],
       ["3", "<b>메모 상자</b> — 근무자마다 하나 + 관리자 · 숫자 = 아직 완료 안 한 것 (칠해져 있으면 새 전달)"],
       ["4", "<b>시간표</b> — 시간마다 완료 · 확정 · 잔여 · 시간 줄을 누르면 그 시간 예약자 (네이버에서 다시 불러옴)"],
@@ -4429,10 +4440,9 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       if (v) { const c = Object.assign({}, (ST.view && ST.view.cfg) || {}, { [f]: v }); delete c.products; delete c.skip; clearTimeout(stCfgTimer); stCfgTimer = setTimeout(() => window.desk.config.set({ stockAuto: c }).then(stLoad, () => {}), 600); }
     }
     if (t.id === "capforce-on") {
-      if (timedDay(TODAY) || !RULES.capAuto.on) { renderCapForce(); return; }
-      RULES.capAuto.forceDay = t.checked ? TODAY : ""; capMark = null; saveCapAuto(); renderAll();
+      RULES.capAuto.today = { day: TODAY, on: t.checked }; delete RULES.capAuto.forceDay; capMark = null; saveCapAuto(); renderAll();
       if (sheet.mode === "settings" && sheet.tab === "naver") renderSheet();
-      toast(t.checked ? `오늘만 네이버 판매 수량 자동조절 — 10분마다 (목표 ${RULES.capAuto.target} · 상한 ${RULES.capAuto.ceiling}) · 손님 이용은 그대로 무제한 · 내일은 다시 꺼져요` : "오늘 수량조절을 껐어요 — 이미 바꾼 네이버 수량은 그대로예요", 7000);
+      toast(t.checked ? `오늘 네이버 판매 수량 자동조절을 켰어요 — 10분마다 (목표 ${RULES.capAuto.target} · 상한 ${RULES.capAuto.ceiling})${timedDay(TODAY) ? "" : " · 손님 이용은 그대로 무제한"} · 내일은 기본으로` : "오늘 수량조절을 껐어요 (오늘만) — 이미 바꾼 네이버 수량은 그대로예요", 7000);
     }
     if (t.id === "cap-on") { RULES.capAuto.on = t.checked; capMark = null; saveCapAuto(); renderAll(); toast(t.checked ? "네이버 판매 수량 자동 조절을 켰어요 (10분마다)" : "자동 조절을 껐어요"); }
     if ((t.id === "cap-target" || t.id === "cap-max" || t.id === "cap-ceil" || t.id === "cap-vis") && t.value) { RULES.capAuto[{ "cap-target": "target", "cap-max": "max", "cap-ceil": "ceiling", "cap-vis": "visible" }[t.id]] = Math.max(1, Math.min(60, Number(t.value) || 0)); saveCapAuto(); }
