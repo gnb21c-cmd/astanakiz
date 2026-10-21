@@ -52,6 +52,8 @@ contextBridge.exposeInMainWorld("desk", {
     stop: () => ipcRenderer.invoke("history:stop"),
     send: (job) => ipcRenderer.invoke("history:send", job),
   },
+  // 이벤트 입장 수 (사장님 10/21): 매일 20:00 그날 현장 [이벤트 입장] 수를 보고 시스템으로 → { ok, code, why }
+  eventStat: { send: (job) => ipcRenderer.invoke("event:send", job) },
   // 네이버 재고 자동 오픈 (사장님 10/20): 매일 오늘 + 30일 · 10:30 / 12:00 / 16:00 / 20:20 · [확인만] dry · [지금 한 번]
   stock: {
     run: (opts) => ipcRenderer.invoke("stock:run", opts),

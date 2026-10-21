@@ -307,6 +307,120 @@ test("예약자 카드: 이름만 굵게 · 나머지는 보통 글씨 · 글씨
   }
 });
 
+test("현장 [이벤트 입장] (사장님 10/21): 운영 설정 → 기타 이름 → 버튼 '한가위 이벤트 입장' · 결제 없이 열쇠 등록 · 입장권 구분 · 총 판매수에는 안 셈 · 목록 · 폰 실시간 따로", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK);
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    // 이름이 없으면 [이벤트 입장]
+    await page.click(".key[data-k='32']");
+    assert.strictEqual((await page.textContent("#w-event")).trim(), "이벤트 입장");
+    assert.ok(await page.isDisabled("#w-event"), "전화번호 전에는 못 누름 (결제 완료와 같은 조건)");
+    const sizes = await page.evaluate(() => { const r = (s) => document.querySelector(s).getBoundingClientRect(); return { ev: r("#w-event"), done: r("#w-done") }; });
+    assert.ok(sizes.ev.right <= sizes.done.left && Math.abs(sizes.ev.width - sizes.done.width) < 2 && Math.abs(sizes.ev.top - sizes.done.top) < 1, "왼쪽 이벤트 입장 · 오른쪽 결제 완료 (반씩)");
+    await page.click("#sheet [data-act=close]");
+    // 운영 설정 → 기타 → 현장 이벤트 이름
+    await page.dblclick("#now");
+    await page.click("[data-t=etc]");
+    await page.fill("#wev-name", "한가위");
+    assert.strictEqual(await page.textContent("#wev-preview"), "[한가위 이벤트 입장]");
+    await page.click("#sheet [data-act=close]");
+    const sold0 = await page.textContent("#sold");
+    const live0 = await page.evaluate(() => window.__deskTest.liveSnap().walk);
+    await page.click(".key[data-k='32']");
+    assert.strictEqual((await page.textContent("#w-event")).trim(), "한가위 이벤트 입장");
+    for (const k of "12345678") await page.click(`.keypad [data-k="${k}"]`);
+    await page.click("#w-event");
+    assert.match(await page.textContent("#toast"), /한가위 이벤트 입장 \(결제 없음 · 총 판매수에는 안 셈\) · 열쇠 32번 등록/);
+    assert.strictEqual(await page.textContent("#sold"), sold0, "총 판매수 그대로");
+    assert.match(await page.getAttribute("#sold", "title"), /이벤트 입장 1명은 판매 아님/);
+    assert.match(await page.textContent(".key[data-k='32']"), /32한가위/, "열쇠판 칸 = 이벤트 이름");
+    const w = await page.evaluate(() => { const h = window.__deskTest.holders().find((x) => x.keys.includes(32)); return { ev: h.ev, walk: h.walk, pos: h.posNo, kv: window.__deskTest.keyVals(h)["구분"] }; });
+    assert.deepStrictEqual(w, { ev: "한가위", walk: true, pos: "", kv: "한가위 이벤트" }, "입장권 구분 = '한가위 이벤트' · POS 번호 없음");
+    const live = await page.evaluate(() => window.__deskTest.liveSnap().walk);
+    assert.deepStrictEqual([live.tickets, live.event], [live0.tickets, (live0.event || 0) + 1], "폰 실시간: 현장 구매(입장료)에는 안 셈 · event 따로");
+    // 입장권 목록: '한가위 이벤트 입장' · 1명 · 이벤트 · 합계에서 빠짐
+    await page.click("#sold");
+    assert.match((await page.textContent("#sheet .soldlist")).replace(/\s+/g, " "), /^한가위 이벤트 입장 ?32번 ?13:50 입장 ?1명 · 이벤트/);
+    assert.match(await page.textContent("#sheet .help"), /\(이벤트 입장 1명은 판매 아님 · 따로\)/);
+    // 이름을 바꿔도 이미 들어온 손님은 그때 이름 그대로
+    await page.click("#sheet [data-act=close]");
+    await page.dblclick("#now"); await page.click("[data-t=etc]"); await page.fill("#wev-name", ""); await page.click("#sheet [data-act=close]");
+    assert.match(await page.textContent(".key[data-k='32']"), /한가위/);
+    await page.click(".key[data-k='33']");
+    assert.strictEqual((await page.textContent("#w-event")).trim(), "이벤트 입장");
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("이벤트 입장 수(앱): 매일 20:00 보고 시스템으로 한 번 (설문을 안 해도) · 이름별 · 숫자가 바뀌면 다시 · 실패하면 10분 뒤 · 손님 정보 없음", async () => {
+  const browser = await launch();
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+    const page = await ctx.newPage();
+    await page.clock.install({ time: new Date("2026-10-14T19:58:30") });
+    await page.addInitScript(() => {
+      window.__sent = [];
+      window.__fail = false;
+      const cfg = { build: "2.1", hasSurveyKey: true, surveyKeyTail: "abcd", walkEvent: { name: "한가위" } };
+      window.desk = {
+        naver: { load: async (day) => ({ ok: true, day, slots: [], bookings: [] }), complete: async () => ({ ok: true }) },
+        state: { load: (day) => localStorage.getItem("test-state-" + day), save: (day, json) => localStorage.setItem("test-state-" + day, json) },
+        config: { get: async () => cfg, set: async (patch) => { Object.assign(cfg, patch); return { ok: true }; } },
+        eventStat: { send: async (job) => { window.__sent.push(job); return window.__fail ? { ok: false, code: 0, why: "인터넷 오류" } : { ok: true, code: 200 }; } },
+      };
+    });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK);
+    await page.waitForFunction(() => /불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 15000 });
+    const evEnter = async (k, phone) => {
+      await page.click(`.key[data-k='${k}']`);
+      assert.strictEqual((await page.textContent("#w-event")).trim(), "한가위 이벤트 입장");
+      for (const d of phone) await page.click(`.keypad [data-k="${d}"]`);
+      await page.click("#w-event");
+    };
+    await evEnter(1, "11112222");
+    assert.deepStrictEqual(await page.evaluate(() => window.__sent), [], "20:00 전에는 안 보냄");
+    await page.clock.runFor(95000); // 20:00 지남
+    await page.waitForFunction(() => window.__sent.length === 1);
+    let job = (await page.evaluate(() => window.__sent))[0];
+    const p1 = JSON.parse(job.json);
+    assert.deepStrictEqual({ type: p1.type, day: p1.day, count: p1.count, names: p1.names }, { type: "astanakiz-event", day: "2026-10-14", count: 1, names: [{ name: "한가위", n: 1 }] });
+    assert.ok(!/1111|2222|010/.test(job.json), "전화번호 · 손님 정보 없음");
+    await page.clock.runFor(60000);
+    assert.strictEqual(await page.evaluate(() => window.__sent.length), 1, "하루 한 번 (바뀐 게 없으면)");
+    // 늦게 온 이벤트 손님 → 10초 안에 다시 (그날 숫자 고침)
+    await evEnter(2, "33334444");
+    await page.clock.runFor(12000);
+    await page.waitForFunction(() => window.__sent.length === 2);
+    assert.strictEqual(JSON.parse((await page.evaluate(() => window.__sent))[1].json).count, 2);
+    // 실패하면 10분 뒤 다시 · 운영 설정 → 기타에 보임
+    await page.evaluate(() => { window.__fail = true; });
+    await evEnter(3, "55556666");
+    await page.clock.runFor(12000);
+    await page.waitForFunction(() => window.__sent.length === 3);
+    await page.dblclick("#now"); await page.click("[data-t=etc]");
+    assert.match(await page.textContent("#evs-row"), /오늘 3명 · 매일 20:00 .*실패: 인터넷 오류 — \d\d:\d\d 다시/);
+    await page.click("#sheet [data-act=close]");
+    await page.evaluate(() => { window.__fail = false; });
+    await page.clock.runFor(5 * 60000);
+    assert.strictEqual(await page.evaluate(() => window.__sent.length), 3, "10분이 안 됐으면 기다림");
+    await page.clock.runFor(6 * 60000);
+    await page.waitForFunction(() => window.__sent.length === 4);
+    assert.strictEqual(JSON.parse((await page.evaluate(() => window.__sent))[3].json).count, 3);
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
 test("근무자 메뉴얼: 맨 위 버튼 → 차례 8개 · 그림이 뜸 · 차례를 누르면 그 자리로", async () => {
   const browser = await launch();
   try {

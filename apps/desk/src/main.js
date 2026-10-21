@@ -853,6 +853,16 @@ ipcMain.handle("history:backfill", (_e, job) => {
   })();
   return histJobView();
 });
+// 이벤트 입장 수 (사장님 10/21): 현장 [이벤트 입장]은 POS 를 안 거쳐 보고 시스템이 POS 0원 이벤트 상품으로 셀 수 없음
+//   → 데스크가 매일 20:00(설문 보낼 때 같이 · 설문이 없어도) 그날 이벤트 입장 수(astanakiz-event · 손님 정보 없음)를 boards/{열쇠}/deskStats/event-{날짜} 에 덮어씀
+ipcMain.handle("event:send", async (_e, job) => {
+  const json = String((job && job.json) || "");
+  let day = "";
+  try { const x = JSON.parse(json); if (x && x.type === "astanakiz-event") day = String(x.day || ""); } catch (err) { /* 모양 틀림 */ }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return { ok: false, code: 0, why: "모양이 틀림" };
+  if (json.length >= 5000) return { ok: false, code: 0, why: "글이 너무 길어요" };
+  return boardPatch(`deskStats/event-${day}`, json, job && job.at, "deskStats (event-날짜)");
+});
 ipcMain.handle("history:send", async (_e, job) => {
   const json = String((job && job.json) || "");
   if (!/^[{][\s\S]*astanakiz-revisit/.test(json)) return { ok: false, code: 0, why: "모양이 틀림" };
