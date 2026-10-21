@@ -895,6 +895,15 @@ ipcMain.handle("notes:set", (_e, job) => {
   }
 });
 
+// ── 근무자 메모장 (V2.0 · 사장님 10/21): 평일 ↔ 주말 전달 · 근무자마다 메모 → 이 PC 앱 폴더 staff-memo.json 에만 (staff-memo.js) ──
+const staffMemo = require("./staff-memo");
+ipcMain.handle("memo:get", () => {
+  try { return { ok: true, memo: staffMemo.load(histDir()) }; } catch (e) { return { ok: false, why: String(e.message || e) }; }
+});
+ipcMain.handle("memo:set", (_e, d) => {
+  try { const m = staffMemo.clean(d); staffMemo.save(histDir(), m); return { ok: true, memo: m }; } catch (e) { return { ok: false, why: String(e.message || e) }; }
+});
+
 // ── 네이버 재고 자동 오픈 (사장님 10/20): 매일 오늘 + 30일 날짜를 두 상품 모두 회차마다 재고 10개로 ──
 //   예약 > 예약상품 > 상품 > [일정/가격] > [재고수정] > 날짜 > [다음] > [모든 회차] > 10 > [저장] (naver-stock.js · 실제 화면 사진 10/20)
 //   하루 네 번 기회: 10:30 → 실패하면 12:00 → 16:00 → 20:20 (어느 때든 성공하면 그날 남은 것은 안 함 · 그날 안에 끝내는 것이 목표)

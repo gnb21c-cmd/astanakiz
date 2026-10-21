@@ -43,8 +43,8 @@ test("재고 자동 오픈(앱): 켜기 · 확인만 · 지금 한 번(묻고) �
     page.on("pageerror", (e) => errs.push(e.message));
     await page.goto(DESK);
     await page.waitForFunction(() => /불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 15000 });
-    await page.click("text=운영 설정");
-    await page.click('[data-t="cap"]');
+    await page.dblclick("#now");
+    await page.click('[data-t="naver"]');
     assert.match(await page.textContent("#st-row"), /네이버 재고 자동 오픈 꺼짐[\s\S]*매일 10:30 \(실패하면 12:00 · 16:00 · 20:20\) 오늘 \+ 30일을 두 상품 회차마다 10개/);
     // 켜기
     await page.click("[data-act=stToggle]");
@@ -86,8 +86,8 @@ test("재고 자동 오픈(체험판): 줄은 보이고 · 설치한 앱에서 �
   try {
     const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
     await page.goto(DESK);
-    await page.click("text=운영 설정");
-    await page.click('[data-t="cap"]');
+    await page.dblclick("#now");
+    await page.click('[data-t="naver"]');
     assert.match(await page.textContent("#st-text"), /체험판/);
     await page.click("[data-act=stNow]");
     assert.match(await page.textContent("#toast"), /설치한 앱/);

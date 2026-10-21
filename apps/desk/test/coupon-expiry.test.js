@@ -40,8 +40,8 @@ test("쿠폰 사용기한: 처음 1개월 · 일로 바꾸면 그날 + n일 · �
     assert.deepStrictEqual(due, { m31: "2월 28일", dec: "2027년 1월 15일", leap: "2월 29일", m3: "2027년 2월 28일", d30: "11월 4일", d30y: "2027년 1월 9일", none: "" });
 
     // 설정 화면: 방문 이벤트 → 쿠폰 사용기한 30 일 → 미리보기 · 저장
-    await page.click("text=운영 설정");
-    await page.click('[data-t="event"]');
+    await page.dblclick("#now");
+    await page.click('[data-t=\"prints\"]'); await page.click('[data-s=\"event\"]');
     await page.click("[data-act=evTpl][data-i='2']");
     assert.strictEqual(await page.inputValue("#ev-use"), "1");
     assert.strictEqual(await page.inputValue("#ev-useu"), "개월");

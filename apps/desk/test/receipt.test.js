@@ -111,8 +111,8 @@ test("[자르기]: 양식 한 줄로 그 자리에서 종이를 자름 (쿠폰 �
     ]);
 
     // 미리보기: 자르는 자리 표시 · 설명
-    await page.click("text=운영 설정");
-    await page.click('[data-t="printer"]');
+    await page.dblclick("#now");
+    await page.click('[data-t=\"prints\"]'); await page.click('[data-s=\"ticket\"]');
     await page.fill("#form-text", FORM);
     assert.deepStrictEqual(await page.$$eval("#paper .pl", (e) => e.map((x) => x.textContent.trim()).filter(Boolean)), ["위 입장권", "✂ 여기서 자름", "[ 수제돈까스 쿠폰 ]", "아래 안내"]);
     assert.match(await page.textContent("#sheet .formhelp"), /\[자르기\] 한 줄 = 그 자리에서 종이 자름/);
@@ -140,7 +140,7 @@ test("자르기 전 여백(줄): 처음 4줄 · 프린터 탭에서 줄이면 �
       return { feeds, calls, pad: /padding: 2mm 4mm ([\d.]+)mm/.exec(T.receiptDocs("^위", v)[0])[1] };
     });
     assert.deepStrictEqual(await run(), { feeds: [4, 4], calls: [4, 4], pad: "6.0" }, "처음 4줄 (예전과 같음)");
-    await page.click("text=운영 설정");
+    await page.dblclick("#now");
     await page.click('[data-t="printer"]');
     assert.strictEqual(await page.inputValue("#print-feed"), "4");
     await page.fill("#print-feed", "2");
@@ -172,8 +172,8 @@ test("+ = 세로 2배 (기본과 2배 사이 중간 크기 · 폭 그대로 42�
     assert.deepStrictEqual(r.mid, [0x1b, 0x45, 1, 0x1d, 0x21, 0x01, 0x1c, 0x21, 0x08], "굵게 + 세로 2배 (영문 · 한글)");
     assert.deepStrictEqual(r.big, [0x1b, 0x45, 0, 0x1d, 0x21, 0x11, 0x1c, 0x21, 0x0c], "2배는 그대로");
     assert.deepStrictEqual(r.plain, [0x1b, 0x45, 0], "보통은 그대로");
-    await page.click("text=운영 설정");
-    await page.click('[data-t="printer"]');
+    await page.dblclick("#now");
+    await page.click('[data-t=\"prints\"]'); await page.click('[data-s=\"ticket\"]');
     await page.fill("#form-text", "^+* 중간 크기\n^보통");
     const hgt = await page.$$eval("#paper .pl", (e) => e.map((x) => x.getBoundingClientRect().height));
     assert.ok(hgt[0] > hgt[1] * 1.6, `미리보기도 세로로 커짐 ${hgt}`);

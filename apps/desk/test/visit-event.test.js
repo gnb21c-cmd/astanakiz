@@ -33,7 +33,7 @@ const ticket = (page, name, text) => page.evaluate(([n, t]) => {
 const card = async (page, slot, name) => { await page.click(`.slot[data-s="${slot}"]`); return (await page.textContent(`.res:has-text("${name}") >> nth=0`)).replace(/\s+/g, " "); };
 /** 이벤트 기간 카드 글자(이벤트 시작 · {사은품} 쿠폰 지급하세요)에 마우스를 올리면 보이는 자세한 것 (다음 기한 · 오늘 이미 방문) — 10/16 카드는 짧게 */
 const tip = async (page, slot, name) => { await page.click(`.slot[data-s="${slot}"]`); return page.locator(`.res:has-text("${name}")`).first().locator(".evstart, .evcoupon").getAttribute("title"); };
-const openEvent = async (page) => { await page.click("text=운영 설정"); await page.click('[data-t="event"]'); };
+const openEvent = async (page) => { await page.dblclick("#now"); await page.click('[data-t=\"prints\"]'); await page.click('[data-s=\"event\"]'); };
 const find = async (page, q) => { await page.fill("#ev-q", q); return (await page.textContent("#ev-hits")).replace(/\s+/g, " "); };
 const close = (page) => page.click("#sheet [data-act=close] >> nth=0");
 const person = async (page, name, from) => Object.values((await page.evaluate((f) => window.__deskTest.evLog(f || undefined), from || null)).people).find((p) => p.name === name);
@@ -382,11 +382,11 @@ test("공통 양식: 이벤트 기간 입장권의 나머지(안내 문구)도 �
     // 쓰는 법은 입장권 양식과 똑같음
     const evHelp = (await page.textContent("#sheet .formhelp")).replace(/\s+/g, " ");
     assert.match(evHelp, /\{열쇠\}.*\{누계\}.*\{다음기한\}.*\[이벤트\].*\[기한\]/);
-    await page.click('[data-t="printer"]');
+    await page.click('[data-t=\"prints\"]'); await page.click('[data-s=\"ticket\"]');
     assert.strictEqual((await page.textContent("#sheet .formhelp")).replace(/\s+/g, " "), evHelp, "프린터 탭과 같은 설명");
     await page.click("[data-act=previewKind][data-k=event]");
     assert.match(await page.textContent("#paper"), /재방문 이벤트/, "프린터 탭 미리보기에서도 이벤트 입장권");
-    await page.click('[data-t="event"]');
+    await page.click('[data-t=\"prints\"]'); await page.click('[data-s=\"event\"]');
 
     // 공통 양식: 처음엔 프린터 탭의 원래 양식 그대로
     await page.click(`[data-act=evTpl][data-i='9']`);
@@ -399,7 +399,7 @@ test("공통 양식: 이벤트 기간 입장권의 나머지(안내 문구)도 �
     assert.match(prev, /재방문 이벤트.*수제돈까스 무료 증정!/, "1번 안내도 같이");
     assert.match(await page.textContent("#ev-def"), /이벤트 기간 모든 입장권/);
     // 프린터 탭 원래 양식은 그대로 · 이벤트 중이라는 안내
-    await page.click('[data-t="printer"]');
+    await page.click('[data-t=\"prints\"]'); await page.click('[data-s=\"ticket\"]');
     assert.ok((await page.inputValue("#form-text")).includes(OLD), "원래 양식은 안 건드림");
     assert.match(await page.textContent("#sheet"), /방문 이벤트 중이라 지금은 '방문 이벤트 → 공통 양식'으로 출력돼요/);
     await close(page);
@@ -473,7 +473,7 @@ test("양식을 쓰는 중에 창이 다시 그려져도(수량 자동조절 등
     assert.strictEqual(await page.inputValue("#ev-text"), "#* {열쇠}번\n^퇴장 때 열쇠는 바구니에 넣어주세요!");
     assert.match(await page.textContent("#ev-paper"), /퇴장 때 열쇠는 바구니에 넣어주세요!/, "미리보기도");
     // 수량 자동조절이 돌아도 다른 탭은 다시 그리지 않음
-    const src = await page.evaluate(() => document.documentElement.innerHTML.includes('sheet.tab === "cap") renderSheet()'));
+    const src = await page.evaluate(() => document.documentElement.innerHTML.includes('sheet.tab === "naver") renderSheet()'));
     assert.ok(src);
     assert.deepStrictEqual(errs, []);
   } finally {
@@ -533,7 +533,7 @@ test("양식 자리 (10/16): 공통 양식의 [이벤트] 줄 = 1번 · 2번 자
     await page.evaluate(() => window.__deskTest.evInject("홍예준", { day: "2026-09-20" })); // → 오늘 성공
     const lines = (name) => page.evaluate((n) => { const T = window.__deskTest, h = T.holders().find((x) => x.name === n); return T.receiptLines(T.form(), T.keyVals(h)).map((l) => (l.k === "cut" ? "✂" : l.t.trim())).filter(Boolean); }, name);
     // 예전 2번 예시(1.39~1.41) 그대로였으면 새 예시: 성공 머리 + [사은품] + 다음 기한 · 제공상품 = 무료 증정 안내
-    await page.click("text=운영 설정"); await page.click('[data-t="event"]');
+    await page.dblclick("#now"); await page.click('[data-t=\"prints\"]'); await page.click('[data-s=\"event\"]');
     await page.click("[data-act=evTpl][data-i='1']");
     assert.strictEqual(await page.inputValue("#ev-text"), "#* 재방문 이벤트 성공!\n[사은품]\n^*{다음기한}(포함)까지 또 오시면\n[기한]^*{사은품} 또 드려요");
     await page.click("[data-act=evTpl][data-i='2']");

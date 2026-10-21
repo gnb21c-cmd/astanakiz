@@ -72,8 +72,8 @@ test("키즈 실시간: 현황 글이 데스크 화면과 같음 (네이버 합 
     assert.strictEqual(shape(sample.keys.holders[0]), shape(s.keys.holders[0]), "예시 글 손님 칸");
 
     // 운영 설정 → 설문조사: 보고 열쇠 밑 '폰 실시간 현황' (체험판은 보내지 않음)
-    await page.click("text=운영 설정");
-    await page.click('[data-t="survey"]');
+    await page.dblclick("#now");
+    await page.click('[data-t="etc"]');
     assert.match(await page.textContent("#sheet [data-act=liveToggle]"), /폰 실시간 현황 켜짐/);
     assert.match(await page.textContent("#live-last"), /보고 열쇠를 넣으면 보내요/);
     const box = await page.evaluate(() => { const r = document.getElementById("sheet").getBoundingClientRect(); return r.bottom; });
@@ -133,8 +133,8 @@ test("키즈 실시간(앱): 열쇠가 있으면 바로 · 바뀌면 5초 안에
     assert.strictEqual(s.people.total, 2, "이용완료 2장 = 총 판매수");
 
     // 설정 화면: 마지막 보낸 시각
-    await page.click("text=운영 설정");
-    await page.click('[data-t="survey"]');
+    await page.dblclick("#now");
+    await page.click('[data-t="etc"]');
     assert.match(await page.textContent("#live-last"), /마지막: 14:\d\d:\d\d 보냄/);
     // 실패하면 30초 뒤 다시 (그 사이 바뀌어도 안 보냄)
     await page.evaluate(() => { window.__liveFail = true; });

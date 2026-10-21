@@ -1,14 +1,15 @@
 # 입장 데스크 Windows 설치 파일 만들기 (GitHub 의 Windows 컴퓨터가 대신 만듦)
 # main 에 apps/desk · prototype 이 바뀌어 올라가면 저절로, 또는 Actions → 설치 파일 만들기 → Run workflow
 # 결과: Releases 의 '최신'(test-latest, 받는 주소가 늘 같음) + 버전별 기록(v1.X) 에 설치 파일(.exe) — POS PC 에서 받아 더블클릭
-# 버전: ver.1.X — 정식 ver.1.0 부터, 설치 파일을 만들 때마다 X 가 1씩 늘어남 (이 작업의 실행 번호 − 14)
+# 버전: ver.2.X — V2.0(사장님 10/21 · 새 디자인)부터, 설치 파일을 만들 때마다 X 가 1씩 늘어남 (이 작업의 실행 번호 − 72)
+#   (ver.1.0 ~ 1.55 = 실행 번호 − 16)
 #   (현장 시험판은 ver.0.1 ~ 0.9) · 화면 맨 위 "네이버 · 아마노 · POS 연결 ver.1.X" 로 새 설치본인지 확인
 # 아마노 · 네이버 주소 · 아이디 · 비밀번호는 넣지 않음 (POS PC 앱 설정에서 입력)
 name: 설치 파일 만들기
 on:
   push:
     branches: [main]
-    paths: ["apps/desk/**", "prototype/desk.html", "docs/manual/**", ".github/workflows/build-win.yml"]
+    paths: ["apps/desk/**", "prototype/desk.html", "prototype/manual/**", "docs/manual/**", ".github/workflows/build-win.yml"]
   workflow_dispatch:
 permissions:
   contents: write
@@ -25,11 +26,11 @@ jobs:
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
         run: npm install --no-audit --no-fund
-      - name: 버전 적기 (ver.1.X)
+      - name: 버전 적기 (ver.2.X)
         id: ver
         shell: bash
         run: |
-          v="1.$(( ${{ github.run_number }} - 16 ))" # 1.24.1 끼워 넣음 · 40번 빌드 실패 → -16 (다음 일반 빌드 = 1.26)
+          v="2.$(( ${{ github.run_number }} - 72 ))" # 1.55 = 71번 → 72번부터 2.0 (V2.0 새 디자인 · 사장님 10/21)
           # 커밋 메시지에 [ver 1.24.1] 처럼 적으면 그 번호로 (작은 수정판 · 사장님 10/7)
           o=$(git log -1 --format=%B | grep -oE '\[ver [0-9]+(\.[0-9]+){1,2}\]' | grep -oE '[0-9]+(\.[0-9]+){1,2}' | head -1 || true) # 없으면 grep 이 실패 코드를 내도 멈추지 않게
           [ -n "$o" ] && v="$o"

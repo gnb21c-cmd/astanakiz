@@ -91,7 +91,7 @@ test("데스크: 키즈상담 · 카페상담 버튼 붉은 원 · 누르면 상
       return { right: lg.left >= k45.right, row: Math.abs(lg.top - k45.top) < 4, inBoard: lg.bottom <= k45.bottom + 1, foot: kids.top > k45.bottom && Math.abs((kids.top + kids.bottom) / 2 - (bulk.top + bulk.bottom) / 2) < 3 };
     });
     assert.deepStrictEqual(pos, { right: true, row: true, inBoard: true, foot: true }, "설명은 45번 오른쪽 · 상담 버튼은 열쇠판 아래 일괄 반납 옆");
-    assert.match((await page.textContent("#keys .legend")).replace(/\s+/g, " "), /빈 열쇠.*빈 열쇠를 누르면 현장입장.*입장 ~ 1시간 50분.*1시간 50분 ~ 2시간.*2시간 넘음/);
+    assert.match((await page.textContent("#keys .legend")).replace(/\s+/g, " "), /빈 열쇠 · 누르면 현장입장.*~ 1시간 50분.*~ 2시간.*2시간 넘음.*테두리.*네이버.*현장.*서비스/);
 
     // 설치한 앱: 뒤에서 읽은 숫자를 받아 표시
     await page.addInitScript(() => {

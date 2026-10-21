@@ -234,7 +234,7 @@ test("데스크 [지금 한 번 조절] → 네이버 칸의 회차당 수량이
     assert.deepStrictEqual(c14, ["0", "4", String(capAt("14:00") - 4)]);
 
     // 한 칸 시험: 운영 설정 → 수량 자동조절 → 다음 날 10:30 을 12장으로
-    await desk.click("text=운영 설정"); await desk.click('[data-t="cap"]');
+    await desk.dblclick("#now"); await desk.click('[data-t="naver"]');
     await desk.fill("#cap-t-day", "2026-10-06");
     await desk.selectOption("#cap-t-time", "10:30");
     await desk.fill("#cap-t-n", "12");

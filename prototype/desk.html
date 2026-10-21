@@ -32,25 +32,35 @@
   --ochre: #E8CB8E; /* 이벤트 쿠폰 지급 네모 (옅은 황토색 · 밝은 · 어두운 화면 같음) */
   --ok: #1D7F52;
   --warn-bg: #FBE3E3;
+  /* V2.0 색 약속 (사장님 10/21): 한 가지 뜻에 한 가지 색 — 미입장(할 일) 파랑 · 사은권 금색 · 빨강은 지금 처리할 문제에만
+     열쇠 테두리: 네이버 예약 = 잉크(어두운 화면 흰색) · 현장 = 파랑(--walk) · 서비스 = 잉크 점선 */
+  --todo: #2563EB; --todo-fg: #FFFFFF;
+  --gift: #FFC400; --gift-fg: #2B1F00;
+  --walk: #2563EB;
+  --err-bg: #FDE7E7;
+  --amber: #B45F00;
   --shadow: 0 1px 2px rgba(20, 26, 38, .06), 0 3px 12px rgba(20, 26, 38, .05);
   --font: "IBM Plex Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --sky-bg: #16324A; --sky-line: #2F6A96; --done-bg: #262C35;
-    --bg: #0F141C; --surface: #18202B; --surface-2: #1F2834; --fg: #E8ECF2; --muted: #9AA4B5; --faint: #4A5566; --line: #2C3645;
-    --ink: #E8ECF2; --on-ink: #10151D; --accent: #82A3F2; --accent-bg: #1E2B4A; --naver: #4CC788; --naver-bg: #163126;
-    --pink: #E58FA8; --pink-fg: #3A0E1B; --red: #EF6B6B; --yellow: #FFD23F; --yellow-fg: #C81E1E; --nm-k3: #FFD23F; --ok: #5BCB92; --warn-bg: #43201F;
-    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 3px 12px rgba(0,0,0,.25);
+    /* V2.0 시안 B '선명한 다크' (사장님 10/21) — 더 검은 바탕 · 흰 글씨 · 원색 */
+    --sky-bg: #0C2440; --sky-line: #2D6CB0; --done-bg: #1A1F28;
+    --bg: #06080C; --surface: #10141B; --surface-2: #161B24; --fg: #FFFFFF; --muted: #B3BDCC; --faint: #545F70; --line: #252D3A;
+    --ink: #FFFFFF; --on-ink: #06080C; --accent: #5B97FF; --accent-bg: #0F2347; --naver: #18E07A; --naver-bg: #0B3B24;
+    --pink: #FF8DB9; --pink-fg: #2A0614; --red: #FF4646; --yellow: #FFD400; --yellow-fg: #D10000; --nm-k3: #FFE14D; --ok: #46F2A0; --warn-bg: #3D0E10;
+    --todo: #2F7BFF; --todo-fg: #FFFFFF; --gift: #FFD400; --gift-fg: #1C1400; --walk: #3D8BFF; --err-bg: #3D0E10; --amber: #FF9F1A;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 3px 12px rgba(0,0,0,.35);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-    --sky-bg: #16324A; --sky-line: #2F6A96; --done-bg: #262C35;
-  --bg: #0F141C; --surface: #18202B; --surface-2: #1F2834; --fg: #E8ECF2; --muted: #9AA4B5; --faint: #4A5566; --line: #2C3645;
-  --ink: #E8ECF2; --on-ink: #10151D; --accent: #82A3F2; --accent-bg: #1E2B4A; --naver: #4CC788; --naver-bg: #163126;
-  --pink: #E58FA8; --pink-fg: #3A0E1B; --red: #EF6B6B; --yellow: #FFD23F; --yellow-fg: #C81E1E; --nm-k3: #FFD23F; --ok: #5BCB92; --warn-bg: #43201F;
-  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 3px 12px rgba(0,0,0,.25);
+  --sky-bg: #0C2440; --sky-line: #2D6CB0; --done-bg: #1A1F28;
+  --bg: #06080C; --surface: #10141B; --surface-2: #161B24; --fg: #FFFFFF; --muted: #B3BDCC; --faint: #545F70; --line: #252D3A;
+  --ink: #FFFFFF; --on-ink: #06080C; --accent: #5B97FF; --accent-bg: #0F2347; --naver: #18E07A; --naver-bg: #0B3B24;
+  --pink: #FF8DB9; --pink-fg: #2A0614; --red: #FF4646; --yellow: #FFD400; --yellow-fg: #D10000; --nm-k3: #FFE14D; --ok: #46F2A0; --warn-bg: #3D0E10;
+  --todo: #2F7BFF; --todo-fg: #FFFFFF; --gift: #FFD400; --gift-fg: #1C1400; --walk: #3D8BFF; --err-bg: #3D0E10; --amber: #FF9F1A;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 3px 12px rgba(0,0,0,.35);
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -86,7 +96,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .caplog { display: grid; gap: 2px; font-size: 12.5px; max-height: 150px; overflow: auto; } .caplog .bad { color: var(--red); }
 .top .posgo { border: 2px solid var(--accent); color: var(--accent); font-weight: 800; padding: 4px 14px; }
 .top .spacer { flex: 1; }
-.top .now { font-size: 22px; font-weight: 700; }
+.top .now { font-size: 22px; font-weight: 700; border: 0; background: transparent; padding: 0; color: var(--fg); cursor: default; } /* 시계 = 관리자 숨은 입구 (두 번 누르기) */
+.top .manualbtn { color: var(--accent); border-color: var(--accent); }
+.top .rgrp { display: flex; align-items: center; gap: 4px; } /* 오른쪽 묶음은 촘촘히 — 가운데 커튼 손잡이에 안 가리게 */
+.top .rgrp .sold { padding: 2px 6px; }
+.top .rgrp .sold b { font-size: 17px; }
 .top .sold { font-size: 13px; font-weight: 700; white-space: nowrap; flex-shrink: 0; color: var(--fg); background: var(--surface-2); border: 1.5px solid var(--line); border-radius: 10px; padding: 2px 8px; cursor: pointer; } /* 바탕화면 · 총 판매수 (글씨 줄임 · 커튼 손잡이에 안 가리게 · 10/9) */
 .top .sold:hover { border-color: var(--accent); }
 .soldlist { max-height: 420px; overflow: auto; display: grid; gap: 4px; margin: 6px 0; }
@@ -112,7 +126,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .panel h2 small { font-size: 11.5px; color: var(--muted); font-weight: 500; }
 .panel { height: 100%; }
 /* 가운데 칸: 위에 새로고침 버튼, 그 아래로 예약자 명단 상자를 내림 */
-.midcol { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 6px; min-height: 0; min-width: 0; }
+.midcol, .leftcol { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 6px; min-height: 0; min-width: 0; }
+.memobtn .mbadge { display: inline-block; margin-left: 6px; font-size: 11.5px; font-weight: 700; padding: 1px 8px; border-radius: 10px; background: var(--todo); color: var(--todo-fg); }
+.memobtn .mbadge[hidden] { display: none; }
 .refresh { min-height: 38px; width: 100%; font-size: 14px; border-color: var(--ink); color: var(--ink); background: var(--surface); } /* 테두리 · 글씨 흰색 */
 .refresh small { font-size: 11px; color: var(--muted); font-weight: 500; margin-left: 4px; }
 .scroll { min-height: 0; display: grid; gap: 5px; align-content: start; overflow: auto; flex: 1; }
@@ -155,8 +171,79 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .kpick button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .kpick button[disabled] { border-color: var(--line); background: var(--surface-2); color: var(--faint); opacity: .45; cursor: default; font-weight: 500; }
 .sheet.wide { width: min(620px, 100%); }
-.sheet.setsheet { width: min(760px, 100%); }
-.sheet.setsheet.evsheet { width: min(1000px, 100%); }
+/* 운영 설정 V2.0 (사장님 10/21): 왼쪽 메뉴 7개 · 오른쪽만 내려 봄 · 긴 설명은 [?] */
+.sheet.setsheet { width: min(1000px, 100%); height: min(740px, 100%); grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
+.setwrap { display: grid; grid-template-columns: 172px minmax(0, 1fr); gap: 14px; min-height: 0; }
+.setnav { display: flex; flex-direction: column; gap: 3px; border-right: 1px solid var(--line); padding-right: 10px; overflow: auto; }
+.setnav button { display: grid; gap: 1px; text-align: left; min-height: 48px; padding: 6px 10px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-size: 14.5px; font-weight: 600; }
+.setnav button small { font-size: 11px; font-weight: 500; color: var(--faint); }
+.setnav button:hover { background: var(--surface-2); color: var(--fg); }
+.setnav button.on { background: var(--accent-bg); color: var(--fg); box-shadow: inset 3px 0 0 var(--accent); }
+.setnav button.on small { color: var(--muted); }
+.setbody { overflow: auto; min-height: 0; display: grid; gap: 12px; align-content: start; padding: 0 4px 12px 0; }
+.setbody .evgrid { grid-template-columns: minmax(0, 1fr) 300px; }
+.setbody .evgrid > :nth-child(3) { grid-column: 2; grid-row: 1 / span 2; }
+.setbody .psub { max-width: 420px; }
+.setcard { border: 1px solid var(--accent); border-radius: 12px; padding: 10px 12px; }
+.setcard.plain { border-color: var(--line); }
+.setcard.stack { display: grid; gap: 10px; }
+.setcard .svswitch { margin-left: 0; }
+.skv > .help { white-space: nowrap; }
+.setsheet h3 > .help, .mansheet h3 > .help { margin: 0 auto 0 10px; }
+.skv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 12px; align-items: center; font-size: 13px; }
+.chip { display: inline-block; padding: 3px 10px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); font-size: 12.5px; }
+.qhelp { justify-self: start; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 12px; min-width: 24px; height: 24px; padding: 0 7px; font-size: 12px; font-weight: 700; margin-left: 4px; vertical-align: middle; }
+.qhelp[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
+.qtext[hidden] { display: none; }
+.qtext { display: block; font-weight: 400; color: var(--muted); font-size: 12.5px; line-height: 1.5; background: var(--surface-2); border-radius: 8px; padding: 6px 9px; margin-top: 4px; }
+.stafflist { display: grid; gap: 6px; max-width: 460px; }
+.staffrow { display: grid; grid-template-columns: minmax(0, 1fr) 150px auto; gap: 6px; align-items: center; }
+.seg2.sm button { min-height: 30px; font-size: 13px; }
+/* 근무자 메뉴얼 (V2.0) — 내려 보며 읽기 · 그림 = 체험판 화면 (apps/desk/tools/manual-shots.js) */
+.sheet.mansheet { width: min(980px, 100%); height: min(740px, 100%); grid-template-rows: auto auto minmax(0, 1fr); overflow: hidden; }
+.mannav { display: flex; gap: 6px; flex-wrap: wrap; }
+.mannav button { border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); border-radius: 16px; min-height: 32px; padding: 0 12px; font-size: 13px; font-weight: 600; }
+.manbody { overflow: auto; min-height: 0; display: grid; gap: 22px; align-content: start; padding: 2px 6px 24px 0; }
+.mansec { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start; padding-top: 14px; border-top: 1px solid var(--line); }
+.mansec.full { grid-template-columns: minmax(0, 1fr); }
+.mansec h4 { margin: 0 0 8px; font-size: 17px; }
+.mansec img { width: 100%; height: auto; display: block; border-radius: 10px; border: 1px solid var(--line); }
+.manpic { position: relative; }
+.manpic .mk { position: absolute; transform: translate(-30%, -30%); min-width: 24px; height: 24px; border-radius: 12px; background: var(--todo); color: var(--todo-fg); font-size: 13px; font-weight: 800; display: grid; place-items: center; box-shadow: 0 0 0 2px var(--bg); }
+.mansteps { display: grid; gap: 8px; font-size: 14px; line-height: 1.55; }
+.mansteps > div { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 8px; align-items: start; }
+.mansteps .n { width: 24px; height: 24px; border-radius: 12px; background: var(--todo); color: var(--todo-fg); font-size: 13px; font-weight: 800; display: grid; place-items: center; margin-top: 1px; }
+.mansteps .tip { display: block; grid-template-columns: none; font-size: 13px; color: var(--muted); background: var(--surface-2); border-radius: 8px; padding: 7px 10px; }
+.mankeys { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 18px; font-size: 13.5px; line-height: 1.5; }
+.mankeys > div { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 8px; }
+.mankey { display: inline-grid; place-items: center; width: 34px; height: 26px; border-radius: 6px; font-weight: 700; font-size: 12px; vertical-align: middle; margin-right: 4px; }
+/* 메모장 (V2.0) */
+.sheet.memosheet { width: min(960px, 100%); height: min(720px, 100%); grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
+.memosheet h3 .mq { margin-left: auto; margin-right: 8px; width: 200px; font-size: 13px; font-weight: 400; }
+.mbody { overflow: auto; min-height: 0; display: grid; gap: 12px; align-content: start; padding-right: 4px; }
+.memosheet h3 > .help { margin-left: 10px; }
+.mmhead .seg2 button { flex: none; padding: 0 12px; white-space: nowrap; }
+.mhands { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.mhand { border: 1px solid var(--line); border-radius: 11px; background: var(--surface-2); padding: 9px 11px; display: grid; gap: 7px; align-content: start; }
+.mhand.mine { border: 1.5px solid var(--todo); }
+.mhhead { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.gchip { font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
+.mitem { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; line-height: 1.45; padding: 7px 9px; border-radius: 8px; background: var(--surface); }
+.mitem > span { flex: 1; min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.mitem small { display: block; font-size: 11px; color: var(--muted); white-space: normal; }
+.mitem.okd, .mitem.done { color: var(--muted); background: transparent; border: 1px solid var(--line); }
+.mitem.done > span > i { font-style: normal; text-decoration: line-through; }
+.mitem .mok { background: var(--todo); color: var(--todo-fg); border-color: var(--todo); font-weight: 700; }
+.mitem .mchk { flex: none; width: 24px; height: 24px; padding: 0; border-radius: 6px; border: 2px solid var(--ok); background: transparent; color: var(--ok); font-weight: 800; }
+.madd { display: flex; gap: 6px; }
+.madd input { flex: 1; min-width: 0; }
+.mmine { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
+.mmhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mwho { display: flex; gap: 5px; flex-wrap: wrap; }
+.mwho button { min-height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 13px; }
+.mwho button.on { border: 1.5px solid var(--accent); background: var(--accent-bg); color: var(--fg); font-weight: 700; }
+.mlist { display: grid; gap: 6px; }
+.mhit mark { background: var(--yellow); color: #000; border-radius: 3px; padding: 0 1px; }
 .evgrid { display: grid; grid-template-columns: 290px minmax(0, 1fr) 300px; gap: 14px; }
 .evgrid > .field, .evgrid > .stack { align-content: start; }
 .evtpl #ev-text { min-height: 210px; }
@@ -166,7 +253,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .field .evp select.evpu { min-height: 30px; font-size: 14px; padding: 2px 4px; border-radius: 7px; }
 .field .evp input.evgift { width: 110px; min-height: 30px; font-size: 14px; padding: 2px 6px; border-radius: 7px; letter-spacing: 0; }
 .evdesc { font-size: 12.5px; line-height: 1.3; }
-.evwarn { color: var(--red); }
+.evwarn { color: var(--red); font-weight: 600; }
+.errline { color: var(--red); background: var(--err-bg); border-radius: 7px; padding: 2px 8px; font-weight: 700; } /* 실패 · 경고 한 줄 (V2.0: 또렷한 빨강 + 옅은 바탕) */
 .evdates { color: var(--fg); font-weight: 700; }
 .evgrid .evdays { flex-wrap: nowrap; gap: 4px; }
 .evgrid .evdays .date-in { width: 126px !important; padding: 4px 5px; }
@@ -300,9 +388,9 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 .banner.giftwarn, .banner.giftdue { background: var(--yellow); color: #3a2a00; border: 2px solid #c79a00; }
 .banner.giftdue { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: space-between; }
 .banner.giftwarn .help, .banner.giftdue .help { color: #5a4500; }
-.gift { display: inline-block; font-size: 11px; font-weight: 700; color: #fff; background: var(--red); border-radius: 5px; padding: 0 6px; margin-left: 2px; }
+.gift { display: inline-block; font-size: 11px; font-weight: 700; color: var(--gift-fg); background: var(--gift); border-radius: 5px; padding: 0 6px; margin-left: 2px; } /* 사은권 = 금색 (V2.0 · 미입장과 다른 색) */
 .badge { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
-.badge.conf { background: var(--red); color: #fff; } /* 미입장 = 빨강 스티커 */
+.badge.conf { background: var(--todo); color: var(--todo-fg); } /* 미입장 = 할 일 파랑 (V2.0 · 빨강은 문제에만) */
 .qmany { display: inline-block; background: var(--yellow); color: var(--yellow-fg); font-weight: 800; border-radius: 6px; padding: 0 7px; line-height: 1.4; } /* 예약 수량 2장 이상 = 노랑 네모 · 빨강 글씨 (미입장 스티커처럼 · 사장님 10/16) */
 .golden { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; background: rgba(0, 0, 0, .55); }
 .golden[hidden] { display: none; }
@@ -317,7 +405,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 .mvrow.off b { color: var(--muted); }
 .mvwhy { margin-top: 2px; font-weight: 400; }
 .badge.proxy { background: var(--surface-2); color: var(--fg); border: 1px solid var(--line); font-size: 11px; vertical-align: 2px; }
-.badge.unpaid { background: #E8A33D; color: #1b1200; } /* 입금대기 (결제 안 함 · 자동 취소 대상이 될 수 있음) */
+.badge.unpaid { background: transparent; color: var(--amber); box-shadow: inset 0 0 0 1.5px var(--amber); } /* 입금대기 (결제 안 함 · 자동 취소 대상이 될 수 있음) */
 .res dd.visitor { font-weight: 700; }
 .badge.done { background: var(--naver-bg); color: var(--ok); }
 .badge.paid { background: var(--surface-2); color: var(--fg); border: 1px solid var(--line); }
@@ -339,9 +427,11 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 .key { aspect-ratio: 1 / .98; max-width: 100%; border-radius: 8px; border: 1.5px solid var(--line); background: var(--surface-2); color: var(--faint); display: grid; align-content: center; justify-items: center; padding: 1px; line-height: 1.1; min-width: 0; overflow: hidden; }
 .key b { font-size: 17px; font-weight: 700; }
 .key span { font-size: 11px; font-weight: 400; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.key.in { background: var(--surface); border: 2px solid var(--ink); color: var(--ink); }
-.key.pink { background: var(--pink); border: 2px solid var(--pink); color: var(--pink-fg); }
-.key.red { background: var(--red); border: 2px solid var(--red); color: #fff; }
+.key.in { background: var(--surface); border: 2.5px solid var(--ink); color: var(--ink); }
+.key.pink { background: var(--pink); border: 2.5px solid var(--ink); color: var(--pink-fg); }
+.key.red { background: var(--red); border: 2.5px solid var(--ink); color: #fff; }
+/* V2.0 (사장님 10/21): 테두리 = 누구 열쇠 — 네이버 예약 흰색(밝은 화면은 잉크) · 현장 파랑 · 서비스 흰 점선 / 바탕 = 이용 시간 */
+.key.walk { border-color: var(--walk); }
 .key.void { visibility: hidden; }
 .key.bulk { aspect-ratio: auto; height: auto; min-height: 0; align-self: stretch; font-size: 14px; font-weight: 800; }
 .key.bulk:not(:disabled) { background: var(--surface); border: 1.5px solid var(--ink); color: var(--ink); } /* 선은 주차등록 칸과 같은 굵기 (10/9) */ /* 열쇠 2개 이상 나가면 지급된 열쇠처럼 */
@@ -357,7 +447,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 .tbadge { position: absolute; top: -9px; right: -9px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: #E5484D; color: #fff; font-size: 12px; font-weight: 800; line-height: 20px; text-align: center; }
 .tbadge.warn { background: #E8A33D; color: #1b1200; }
 /* 일괄 반납 버튼 왼쪽 빈 곳: 굵은 두 줄 경고 (반납 안 된 열쇠를 확인하지 않고 누르면 마지막에 누가 썼는지 모름 · 사장님 10/8) */
-.bulkwarn { grid-column: 5 / span 3; font-size: 12.5px; font-weight: 800; line-height: 1.35; text-align: center; color: var(--ink); }
+.bulkwarn { grid-column: 5 / span 3; font-size: 12.5px; font-weight: 400; line-height: 1.35; text-align: center; color: var(--muted); } /* 일반체 (V2.0 · 사장님 10/21) */
 /* 설명(범례): 45번 오른쪽 빈 칸에 세 줄 */
 .legend { display: flex; flex-wrap: wrap; align-content: center; gap: 3px 10px; font-size: 11px; color: var(--muted); }
 .keys .legend { grid-row: 5; padding-left: 8px; min-width: 0; }
@@ -366,6 +456,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 .legend .l-in { border-color: var(--ink); background: var(--surface); }
 .legend .l-pink { border-color: var(--pink); background: var(--pink); }
 .legend .l-red { border-color: var(--red); background: var(--red); }
+.legend .l-nv { border: 2px solid var(--ink); background: transparent; } .legend .l-walk { border: 2px solid var(--walk); background: transparent; } .legend .l-svc { border: 2px dashed var(--ink); background: transparent; }
 
 /* 주차등록: 뒤에 열어 둔 아마노 화면과 같은 항목 */
 .park { border-top: 1px solid var(--line); padding-top: 6px; display: grid; gap: 5px; grid-template-rows: auto auto minmax(0, 1fr) auto; flex: 0 0 236px; min-height: 0; } /* 주차등록은 아래에 고정 높이, 남는 높이는 열쇠판으로 */
@@ -437,7 +528,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 .svcwalk .btn { min-height: 38px; font-weight: 700; }
 .svcwalk .help { font-size: 12px; line-height: 1.4; }
 .badge.svcb { background: var(--surface-2); color: var(--fg); border: 1.5px dashed var(--muted); font-size: 12px; vertical-align: middle; }
-.key.svc { border-style: dashed; }
+.key.svc { border-style: dashed; border-color: var(--ink); }
 .key.svc span { font-weight: 700; }
 .svcpick { margin: 4px 0 8px; padding: 8px 10px; border: 1.5px dashed var(--accent); border-radius: 10px; display: grid; gap: 6px; }
 .svckeys { display: flex; flex-wrap: wrap; gap: 5px; }
@@ -479,7 +570,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 
 /* 반납안내 커튼: 위 가운데 손잡이를 아래로 끌면 화면 전체를 덮는 안내 그림이 내려옴 (열쇠 반납 독려 · 고객정보 가림)
    내려온 뒤 아래 손잡이를 누르면 바로 사라짐 · 그림 왼쪽 아래 빨간 별을 누르면 위로 빨리 걷힘 */
-.curtain-tab { position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000; padding: 3px 26px 5px; border: 1.5px solid #3D7BF0; border-top: 0; border-radius: 0 0 16px 16px; background: rgba(12, 18, 32, .9); color: #7FB0FF; font-weight: 800; font-size: 14px; letter-spacing: .5px; cursor: grab; touch-action: none; user-select: none; white-space: nowrap; }
+.curtain-tab { position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 9000; padding: 3px 10px 5px; border: 1.5px solid #3D7BF0; border-top: 0; border-radius: 0 0 16px 16px; background: rgba(12, 18, 32, .9); color: #7FB0FF; font-weight: 800; font-size: 14px; letter-spacing: .5px; cursor: grab; touch-action: none; user-select: none; white-space: nowrap; }
 .curtain-tab[hidden] { display: none; }
 .curtain { position: fixed; inset: 0; z-index: 9500; background: #f3efe8; transform: translateY(-100%); display: flex; align-items: center; justify-content: center; padding-bottom: 40px; box-sizing: border-box; touch-action: none; user-select: none; }
 .curtain.anim { transition: transform .45s cubic-bezier(.2, .8, .2, 1); }
@@ -498,15 +589,21 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     <button class="btn btn-sm posgo" data-act="posGo" title="POS 화면으로 (POS를 작업표시줄로 내리면 데스크로 돌아옴)">포스 전환</button>
     <button class="btn btn-sm posgo" data-act="drawer" title="POS와 연결된 현금통을 엶 (POS가 꺼져 있어도)">환전 오픈</button>
     <span class="spacer"></span>
-    <button class="sold" id="desktop-btn" data-act="desktop" title="모든 창을 내리고 PC 바탕화면으로 (데스크는 작업표시줄에서 다시)">바탕화면</button>
-    <button class="sold" id="sold" data-act="soldList" aria-live="polite" title="누르면 오늘 입장권 목록"></button>
-    <span class="now num" id="now">13:50</span>
     <button class="btn btn-sm" data-act="time" data-min="5">+5분</button>
     <button class="btn btn-sm" data-act="time" data-min="30">+30분</button>
-    <button class="btn btn-sm" data-act="settings">운영 설정</button>
+    <span class="rgrp">
+    <button class="sold manualbtn" data-act="manual" title="입장 · 퇴장 · 화면 위치별 조작 방법">근무자 메뉴얼</button>
+    <button class="sold" id="desktop-btn" data-act="desktop" title="모든 창을 내리고 PC 바탕화면으로 (데스크는 작업표시줄에서 다시)">바탕화면</button>
+    <button class="sold" id="sold" data-act="soldList" aria-live="polite" title="누르면 오늘 입장권 목록"></button>
+    <!-- V2.0 (사장님 10/21): 시계는 맨 오른쪽 · 1.5초 안에 두 번 누르면 운영 설정 (관리자만 앎 — 버튼은 없앰) -->
+    <button class="now num" id="now" data-act="clock" aria-label="지금 시각">13:50</button>
+    </span>
   </header>
 
   <div class="cols">
+    <!-- V2.0 (사장님 10/21): 시간표 상자를 조금 내리고 그 위에 [메모] — 평일 ↔ 주말 전달 · 근무자마다 메모 -->
+    <div class="leftcol">
+    <button class="btn refresh memobtn" data-act="memo" aria-label="메모장">메모 <span class="mbadge num" id="memo-badge" hidden></span></button>
     <section class="panel" aria-label="날짜와 시간별 예약">
       <div class="datebar">
         <button class="arrow" data-act="day" data-d="-1" aria-label="전날">←</button>
@@ -517,6 +614,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       <div class="slot-head"><span>시간</span><span>완료</span><span>확정</span><span>잔여</span></div>
       <div class="scroll" id="slots"></div>
     </section>
+    </div>
 
     <div class="midcol">
       <button class="btn refresh" data-act="refresh">새로고침 <small id="refresh-at"></small></button>
@@ -1313,13 +1411,13 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       if (k > RULES.keys) break; // 남는 칸(46~50)은 비워 둠
       const h = holderOf(k);
       if (!h) { html += `<button class="key free" data-act="key" data-k="${k}" aria-label="${k}번 빈 열쇠"><b class="num">${k}</b><span>&nbsp;</span></button>`; continue; }
-      html += `<button class="key ${keyColor(h, k)}${h.svc ? " svc" : ""}" data-act="key" data-k="${k}" aria-label="${k}번 ${h.svc ? "서비스 키 " : ""}${esc(h.name)}"><b class="num">${k}</b><span>${esc(h.svc ? svcBoard(h) : h.walk ? "현장" : h.name)}</span></button>`;
+      html += `<button class="key ${keyColor(h, k)}${h.svc ? " svc" : h.walk ? " walk" : ""}" data-act="key" data-k="${k}" aria-label="${k}번 ${h.svc ? "서비스 키 " : ""}${esc(h.name)}"><b class="num">${k}</b><span>${esc(h.svc ? svcBoard(h) : h.walk ? "현장" : h.name)}</span></button>`;
     }
     // 설명은 45번 오른쪽 빈 칸에 (사장님이 정한 순서 10/8)
     if (RULES.keys > 40 && RULES.keys <= 45) html += `<div class="legend" style="grid-column: ${RULES.keys - 39} / -1">
-      <span class="row"><span><i></i>빈 열쇠</span><span>· 빈 열쇠를 누르면 현장입장</span></span>
-      <span class="row"><span><i class="l-in"></i>입장 ~ 1시간 50분</span><span><i class="l-pink"></i>1시간 50분 ~ 2시간</span></span>
-      <span class="row"><span><i class="l-red"></i>2시간 넘음</span></span></div>`;
+      <span class="row"><span><i></i>빈 열쇠 · 누르면 현장입장</span></span>
+      <span class="row"><span><i class="l-in"></i>~ 1시간 50분</span><span><i class="l-pink"></i>~ 2시간</span><span><i class="l-red"></i>2시간 넘음</span></span>
+      <span class="row"><span>테두리</span><span><i class="l-nv"></i>네이버</span><span><i class="l-walk"></i>현장</span><span><i class="l-svc"></i>서비스</span></span></div>`;
     $("keys").innerHTML = html;
     $("bulk-btn").disabled = holders().reduce((a, h) => a + h.keys.length, 0) < 2; // 열쇠 2개 이상 나가면 켜짐
   }
@@ -1423,7 +1521,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       <div class="dlist">${wait}${d.history.length ? d.history.map((h, i) => `<div><span class="num">${esc(h.type)} · ${esc(String(h.at).slice(11, 16))}</span>${h.canDelete === false ? `<span class="help">${esc(h.note || "삭제 불가")}</span>` : `<button data-act="discDel" data-i="${i}" aria-label="할인 삭제" ${dis}>삭제</button>`}</div>`).join("") : wait ? "" : `<span class="help">할인내역 없음</span>`}</div>`;
     const bad = park.jobs.filter((j) => j.why), going = park.jobs.length - bad.length;
     $("synclog").innerHTML = bad.length
-      ? `<b style="color:var(--red)">⚠ 할인 등록 실패 ${bad.map((j) => `${esc(j.carNo)} ${esc(j.type)}`).join(", ")} — ${esc(bad[0].why)}</b> <button class="btn btn-sm" data-act="parkRetry">다시</button> <button class="btn btn-sm" data-act="parkDrop">지우기</button>`
+      ? `<b class="errline">⚠ 할인 등록 실패 ${bad.map((j) => `${esc(j.carNo)} ${esc(j.type)}`).join(", ")} — ${esc(bad[0].why)}</b> <button class="btn btn-sm" data-act="parkRetry">다시</button> <button class="btn btn-sm" data-act="parkDrop">지우기</button>`
       : `아마노${REAL ? "" : "(체험)"}: ${going ? `<b>뒤에서 할인 등록 중 ${going}건</b> · ` : ""}<b style="color:${park.err ? "var(--red)" : "inherit"}">${esc(park.msg)}</b>`;
   }
 
@@ -1670,7 +1768,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   async function capRun(manual) {
     if (capBusy) return;
     if (!manual && (naverBusy || sheet.mode === "enter" || sheet.mode === "walk")) return "wait";
-    capBusy = true; if (sheet.mode === "settings" && sheet.tab === "cap") renderSheet(); // 다른 탭에서 글을 쓰는 중이면 건드리지 않음 (10/15 이벤트 양식 입력이 끊김)
+    capBusy = true; if (sheet.mode === "settings" && sheet.tab === "naver") renderSheet(); // 다른 탭에서 글을 쓰는 중이면 건드리지 않음 (10/15 이벤트 양식 입력이 끊김)
     try {
       if (APP) { if (naverBusy) { toast("네이버를 불러오는 중이에요 — 잠시 뒤에 다시"); return "wait"; } await loadNaver(TODAY, false); if (naverErr && /로그인/.test(naverErr)) { capNote({ ok: false, why: naverErr }); return; } }
       const p = capPlan();
@@ -1697,7 +1795,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       capFails = bad ? capFails + 1 : 0;
       if (capFails >= 3) { capPauseUntil = now + 30; capFails = 0; capNote({ ok: false, why: "3번 연속 실패 — 30분 쉬었다가 다시 해요 (네이버 화면 확인)" }); }
       toast(`네이버 판매 수량 조절${done.length ? `: ${done.join(" · ")}` : ""}${bad ? ` · 실패 ${bad}건 (운영 설정 → 수량 자동조절)` : ""}`);
-    } finally { capBusy = false; renderAll(); if (sheet.mode === "settings" && sheet.tab === "cap") renderSheet(); }
+    } finally { capBusy = false; renderAll(); if (sheet.mode === "settings" && sheet.tab === "naver") renderSheet(); }
   }
   /** 매분: 켜져 있으면 10분마다 (실패 · 바쁨이면 다음 분에 다시) */
   function capTick() {
@@ -1749,7 +1847,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     $("golden").hidden = false;
     renderAll();
   }
-  function renderAll() { saveState(); evSync(); hvSync(); notesSync(); $("now").textContent = hm(now); $("refresh-at").textContent = refreshText(); $("refresh-at").style.color = (naverErr || (bookings[TODAY] || []).some((b) => b.naverPending && b.naverWhy)) && !naverBusy ? "var(--red)" : ""; renderSlots(); renderRes(); renderKeys(); renderCars(); goldenCheck(); }
+  function renderAll() { saveState(); evSync(); hvSync(); notesSync(); $("now").textContent = hm(now); $("refresh-at").textContent = refreshText(); $("refresh-at").style.color = (naverErr || (bookings[TODAY] || []).some((b) => b.naverPending && b.naverWhy)) && !naverBusy ? "var(--red)" : ""; renderSlots(); renderRes(); renderKeys(); renderCars(); goldenCheck(); memoBadge(); }
 
   // ── 팝업 ─────────────────────────────────────────
   const sheet = { mode: null };
@@ -1770,7 +1868,9 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   function renderSheet() {
     const a = document.activeElement, id = a && a.id && $("sheet").contains(a) ? a.id : "";
     const pos = id && typeof a.selectionStart === "number" ? [a.selectionStart, a.selectionEnd, a.scrollTop] : null;
+    const keep = ["setbody", "memo-body", "manual-body"].map((k) => [k, $(k) ? $(k).scrollTop : 0]); // 다시 그려도 내려 보던 자리 그대로
     renderSheet0();
+    for (const [k, y] of keep) if (y && $(k)) $(k).scrollTop = y;
     const n = id && $(id);
     if (n && n !== document.activeElement && !n.disabled) { n.focus(); if (pos) try { n.setSelectionRange(pos[0], pos[1]); n.scrollTop = pos[2]; } catch (e) { /* 숫자 칸 등 */ } }
   }
@@ -1780,7 +1880,10 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     el.classList.toggle("walksheet", sheet.mode === "walk");
     el.classList.toggle("keysheet", sheet.mode === "key");
     el.classList.toggle("setsheet", sheet.mode === "settings");
-    el.classList.toggle("evsheet", sheet.mode === "settings" && sheet.tab === "event"); // 방문 이벤트 탭은 넓게 (설정 · 양식 · 미리보기)
+    el.classList.toggle("memosheet", sheet.mode === "memo");
+    el.classList.toggle("mansheet", sheet.mode === "manual");
+    if (sheet.mode === "memo") { el.innerHTML = memoSheetHtml(); return; }
+    if (sheet.mode === "manual") { el.innerHTML = manualHtml(); return; }
     if (sheet.mode === "enter") {
       const b = findB(sheet.id);
       const ch = chainOf(b), ci = ch.indexOf(b);
@@ -2027,9 +2130,70 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       return;
     }
     if (sheet.mode === "settings") {
-      const tab = sheet.tab || "rules";
-      const tabs = `<div class="tabs" role="tablist">${[["rules", "운영 규칙"], ["cap", "수량 자동조절"], ["event", "방문 이벤트"], ["printer", "프린터"], ["link", "아마노 · POS"], ["survey", "설문조사"]].map(([k, t]) => `<button role="tab" class="${tab === k ? "on" : ""}" aria-selected="${tab === k}" data-act="setTab" data-t="${k}">${t}</button>`).join("")}</div>`;
-      if (tab === "event") {
+      // V2.0 (사장님 10/21): 왼쪽 메뉴 7개 · 긴 설명은 [?] 뒤로 — 예전 탭 이름(rules · cap · event · link · survey)도 받음
+      const SETOLD = { rules: "season", cap: "naver", event: "prints", link: "api", survey: "etc" };
+      if (SETOLD[sheet.tab]) { if (sheet.tab === "event") sheet.psub = "event"; sheet.tab = SETOLD[sheet.tab]; }
+      if (!SET_MENU.some(([k]) => k === sheet.tab)) sheet.tab = "season";
+      const tab = sheet.tab, pg = setPage(tab);
+      el.innerHTML = `<h3 id="sheet-title">운영 설정 <span class="help">관리자 · 바꾸면 바로 저장</span><button class="x" data-act="close" aria-label="닫기">×</button></h3>
+        <div class="setwrap"><nav class="setnav" aria-label="설정 메뉴">${SET_MENU.map(([k, t]) => `<button class="${tab === k ? "on" : ""}" aria-current="${tab === k ? "page" : "false"}" data-act="setTab" data-t="${k}"><span>${t}</span><small>${esc(setBadge(k))}</small></button>`).join("")}</nav>
+        <div class="setbody" id="setbody">${pg.html}</div></div>`;
+      qhelpify($("setbody"));
+      if (pg.after) pg.after();
+    }
+  }
+  // ── 운영 설정 V2.0 (사장님 10/21): 왼쪽 메뉴 · [?] 설명 · 기준 · 근무자 ─────────────
+  const SET_MENU = [["season", "비성수기 설정"], ["printer", "프린터 설정"], ["prints", "프린트물 설정"], ["staff", "근무자 등록"], ["api", "API 연결 설정"], ["naver", "네이버 설정"], ["etc", "기타"]];
+  /** 메뉴 옆 작은 상태 (들어가 보지 않아도 켜졌는지) */
+  function setBadge(k) {
+    if (k === "season") return `기간 ${RULES.peaks.length}`;
+    if (k === "printer") return PRINT.mode === "com" ? PRINT.port || "포트?" : PRINT.sel ? "Windows" : "프린터?";
+    if (k === "prints") return EV.on ? "이벤트 켜짐" : "입장권";
+    if (k === "staff") return `${MEMO.staff.length}명`;
+    if (k === "api") return REAL ? "" : "체험판";
+    if (k === "naver") { const n = (RULES.capAuto.on ? 1 : 0) + (ST.view && ST.view.cfg && ST.view.cfg.on ? 1 : 0); return n ? `켜짐 ${n}` : "꺼짐"; }
+    if (k === "etc") return SV.on ? "설문 켜짐" : "";
+    return "";
+  }
+  /** 프린트물 설정 위쪽: 입장권 양식 / 재방문 이벤트 · 쿠폰 */
+  const psubHtml = () => `<div class="seg2 psub"><button class="${sheet.psub === "event" ? "" : "on"}" data-act="psub" data-s="ticket" aria-pressed="${sheet.psub !== "event"}">입장권 양식</button><button class="${sheet.psub === "event" ? "on" : ""}" data-act="psub" data-s="event" aria-pressed="${sheet.psub === "event"}">재방문 이벤트 · 쿠폰</button></div>`;
+  /** 네이버 설정 맨 위 '기준' — 재고 자동 오픈 · 판매 수량 자동조절이 같이 보는 것 (사장님 10/21 통합) */
+  function naverBase() {
+    const c = (ST.view && ST.view.cfg) || { qty: 10, ahead: 30, products: ["평일 무제한 / 휴일 1시간 50분 입장권", "야간자유 입장권"] };
+    const dis = ST_APP() ? "" : "disabled";
+    return `<div class="field setcard"><span class="label">기준 <span class="help">재고 자동 오픈 · 판매 수량 자동조절이 같이 봐요</span></span>
+      <div class="skv"><span class="help">대상 상품</span><span>${(c.products || []).map((x) => `<span class="chip">${esc(x)}</span>`).join(" ")}</span>
+        <label class="help" for="st-qty">회차당 기본 재고</label><span><input id="st-qty" type="number" min="1" max="99" value="${c.qty}" class="cfg num" style="width:76px" ${dis}> 개</span>
+        <label class="help" for="st-ahead">열어 둘 기간</label><span>오늘 + <input id="st-ahead" type="number" min="1" max="90" value="${c.ahead}" class="cfg num" style="width:76px" ${dis}> 일</span></div></div>`;
+  }
+  /** 입금대기 예약 자동 취소 (예전 운영 규칙 → 네이버 설정 아래) */
+  const unpaidHtml = () => `
+          <div class="field"><label class="chk"><input type="checkbox" id="unpaid-on" ${RULES.unpaidCancel.on ? "checked" : ""}> <b>입금대기 예약 자동 취소</b> <span class="help">네이버를 불러올 때마다 · 지금 ~ 2시간 안 타임에 결제 안 한 예약([이용완료] 없이 [예약취소]만)이 있으면 취소 · 결제한 예약은 안 누름</span></label>
+            <div class="help">지금 대상: ${(() => { const d = unpaidDue(); return d.length ? d.map((b) => `${esc(b.name)} ${hm(b.slot)} ${b.qty}장`).join(", ") : "없음"; })()}</div>
+            <div class="caplog">${unpaidLog.slice(0, 8).map((x) => `<div class="${x.ok ? "" : "bad"}"><span class="num">${esc(x.at)}</span> ${esc(x.name)} ${esc(x.time)} ${x.qty}장 ${x.ok ? "취소함" : `실패: ${esc(x.why || "")}`}</div>`).join("")}</div></div>`;
+  /** 기타 아래 '정보' */
+  const infoHtml = () => `<div class="field"><span class="label">정보</span><span class="help">${esc((document.querySelector(".top .tag") || {}).textContent || "체험판")} · 기록은 이 PC 앱 폴더 · 바탕화면 '아스타나키즈-진단'(화면 저장) · '아스타나키즈-이벤트'(이벤트 장부)</span></div>`;
+  /** 근무자 등록 (메모장 이름 · 평일/주말 전달) */
+  function staffHtml() {
+    return `<div class="field"><span class="label">근무자 <span class="help">메모장에서 이름을 골라 메모 · 평일 근무자 ↔ 주말 근무자 전달</span></span>
+      <div class="stafflist">${MEMO.staff.length ? MEMO.staff.map((x, i) => `<div class="staffrow"><input class="cfg staffname" data-i="${i}" value="${esc(x.name)}" maxlength="12" placeholder="이름" aria-label="${i + 1}번 근무자 이름"><div class="seg2 sm">${["평일", "주말"].map((g) => `<button class="${x.grp === g ? "on" : ""}" data-act="staffGrp" data-i="${i}" data-g="${g}" aria-pressed="${x.grp === g}">${g}</button>`).join("")}</div><button class="btn btn-sm" data-act="staffDel" data-i="${i}" aria-label="${esc(x.name || i + 1 + "번")} 지우기">×</button></div>`).join("") : `<span class="help">아직 없어요 — [+ 근무자 추가]</span>`}</div>
+      <div class="btns"><button class="btn btn-sm" data-act="staffAdd">+ 근무자 추가</button></div></div>`;
+  }
+  /** 긴 설명을 [?] 뒤로 (V2.0 · 사장님 10/21 '설명은 따로 깔끔하게') — 칸 이름 옆 설명 · longhelp 표시한 덩어리 */
+  function qhelpify(root) {
+    if (!root) return;
+    for (const h of root.querySelectorAll(".label > .help, label > .help, .longhelp")) {
+      if (h.id || h.querySelector("button, input, select") || (!h.classList.contains("longhelp") && h.textContent.trim().length < 26)) continue;
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "qhelp"; b.dataset.act = "qhelp"; b.setAttribute("aria-expanded", "false");
+      b.setAttribute("aria-label", h.dataset.q || "설명 보기"); b.textContent = h.classList.contains("longhelp") ? `? ${h.dataset.q || "설명"}` : "?";
+      h.classList.add("qtext"); h.hidden = true;
+      h.before(b);
+    }
+  }
+  /** 운영 설정 한 쪽 (왼쪽 메뉴에서 고른 것) → { html, after(그린 뒤 할 일) } */
+  function setPage(tab) {
+      if (tab === "prints" && sheet.psub === "event") {
         const L = EV.from ? evLog() : null, i = EV.cur, period = isDay(EV.from) && isDay(EV.to) ? `${krDate(EV.from)} ~ ${krDate(EV.to)}` : "";
         const subs = evFroms().reduce((a, f) => a + evLog(f).count, 0);
         const st = !EV.on ? `<b>꺼짐</b> — 입장권에 마일리지(네이버 이용완료 누계)와 ${RULES.giftEvery}회 사은권${subs ? " · 지난 이벤트 기간 이용완료는 빼고 셈" : ""}`
@@ -2038,8 +2202,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
           : TODAY < EV.from ? `<b>기다리는 중</b> — ${period} (그 전에는 원래대로)`
           : `<b>끝남</b> — ${period} · 기간 동안 이용완료는 마일리지에서 빼고 셈`;
         const lock = !!(L && L.count && EV.from <= TODAY); // 기록이 생긴 뒤에는 시작일을 못 바꿈 (새 이벤트는 끝난 뒤에)
-        el.innerHTML = `
-          <h3 id="sheet-title">운영 설정 <button class="x" data-act="close" aria-label="닫기">×</button></h3>${tabs}
+        const html = `
           <div class="evgrid">
             <div class="stack">
               <div class="field"><span class="label">재방문 이벤트</span>
@@ -2049,7 +2212,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
                 <span class="help evdates" id="ev-dates">${esc(evDatesText())}</span>
                 <span class="help" id="ev-usehelp">${esc(useHelp())}</span>
                 <div class="btns"><button class="btn btn-sm btn-ink" data-act="evApply">${EV.on ? "기간 · 기한 적용" : "적용 (켜기)"}</button>${EV.on ? `<button class="btn btn-sm" data-act="evOff">끄기</button>` : ""}</div>
-                <span class="help">기간 동안 입장권에 마일리지 대신 이벤트 안내 (마일리지 멈춤) · 끝나면 기간 동안 이용완료한 수를 네이버 완료에서 빼고 이어서 셈 (기간에 안 온 손님은 그대로)</span></div>
+                <span class="help longhelp" data-q="이벤트 기간 동안">기간 동안 입장권에 마일리지 대신 이벤트 안내 (마일리지 멈춤) · 끝나면 기간 동안 이용완료한 수를 네이버 완료에서 빼고 이어서 셈 (기간에 안 온 손님은 그대로)</span></div>
               <div class="field"><span class="label">손님 찾기 ${APP && window.desk.ledger && window.desk.ledger.open ? `<button class="btn btn-sm" data-act="evOpen">바탕화면 폴더</button>` : ""}</span>
                 <span class="help">${L && L.count ? `기록 ${L.people.size}명 · 이용완료 ${L.count}건 · ` : ""}${APP ? "바탕화면 + 앱 폴더 두 곳에 저장" : "체험판: 이 브라우저에만 (앱은 바탕화면 + 앱 폴더)"}${evSaveErr ? ` <b class="evwarn">⚠ 저장 확인: ${esc(evSaveErr)}</b>` : ""}</span>
                 <input id="ev-q" class="cfg" placeholder="이름 또는 전화 뒷번호" value="${esc(EV.q)}" autocomplete="off" aria-label="손님 찾기 (이름 또는 전화 뒷번호)">
@@ -2061,44 +2224,41 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
               <div class="btns" style="align-items:center"><button class="btn btn-sm" data-act="evReset">${i === EV_BASE ? "원래 양식으로" : "예시 문구로"}</button><button class="btn btn-sm" data-act="evTest">${ro(evName(i))} 시험 출력</button><label class="chk" title="제공상품(쿠폰)을 매장만 찍을 수 있는 무늬 그림으로 — 프린터가 그림을 못 찍으면 끄세요"><input type="checkbox" id="ev-seal" ${EV.seal ? "checked" : ""}> 쿠폰 보안 무늬</label></div>
               <span class="help" id="ev-def">${evDefText()}</span></div>
             <div class="field"><span class="label">미리보기 <span class="help">${i === EV_BASE ? "공통 양식 + 1번 안내" : EV_NAMES[i]} · 예시 값 · 칠한 줄이 이벤트 안내</span></span><div class="paper" id="ev-paper">${evPrev()}</div>${formHelp()}</div>
-          </div>
-          <div class="sheet-foot"><button class="btn btn-ink" data-act="close">닫기</button></div>`;
-        if (i !== EV_BASE) evScroll("ev-paper");
-        return;
+          </div>`;
+        return { html: psubHtml() + html, after: () => { if (i !== EV_BASE) evScroll("ev-paper"); } };
       }
-      if (tab === "survey") {
+      if (tab === "etc") {
         const c = svCounts(), st = !SV.on ? `<b>꺼짐</b> — 설문 없이 바로 입장` : !SV.from || !SV.to ? "기간을 정하면 시작해요" : svOn() ? `<b class="on">진행 중</b> — ${krDate(SV.from)} ~ ${krDate(SV.to)}` : TODAY < SV.from ? `${krDate(SV.from)}부터 시작해요` : TODAY > SV.to ? `끝났어요 (${krDate(SV.to)}까지)` : "대상을 하나 이상 골라 주세요";
         const L = SV.last;
-        el.innerHTML = `
-          <h3 id="sheet-title">운영 설정 <button class="x" data-act="close" aria-label="닫기">×</button></h3>${tabs}
+        const html = `
+          <div class="setcard plain stack"><b>설문조사</b>
           <div class="field"><span class="label">설문 기간 <span class="help">신규 손님에게 '아스타나키즈를 어떻게 알게 되었는지' — 현장 안내문의 번호를 근무자가 누름 (번호를 눌러야 열쇠 등록)</span></span>
             <div class="btns" style="align-items:center"><input type="date" id="sv-from" class="date-in" value="${esc(SV.from)}"> <span>~</span> <input type="date" id="sv-to" class="date-in" value="${esc(SV.to)}"> <span class="evstate">${st}</span>
               <button type="button" class="svswitch ${SV.on ? "on" : ""}" role="switch" aria-checked="${SV.on}" data-act="svToggle" title="끄면 예약자 · 현장입장 창에 설문 없이 바로 입장"><span class="knob"></span><b>설문조사 ${SV.on ? "켜짐" : "꺼짐"}</b></button></div></div>
-          <div class="field"><label class="chk"><input type="checkbox" id="sv-send" ${SV.send ? "checked" : ""}> <b>보고앱에 보내기</b> <span class="help">매일 20:00 번호별 오늘 · 누적 수를 파일로 남기고 보고 열쇠가 있으면 클라우드 보고함에도 (뒤에 바뀌면 다시)</span></label>
-            <div class="btns" style="align-items:center"><label class="help" for="sv-key">보고 열쇠</label><input id="sv-key" class="cfg svkey" type="password" autocomplete="off" spellcheck="false" maxlength="64" placeholder="${svKey.has ? `저장됨 (끝 ••${esc(svKey.tail)}) — 바꾸려면 새로 넣기` : "보고 앱 주소 …/b/{열쇠}/ 의 열쇠 (16~64자)"}" aria-label="보고 열쇠"><button class="btn btn-sm" data-act="svKeySave">열쇠 저장</button>${svKey.has ? `<button class="btn btn-sm" data-act="svKeyDel">지우기</button>` : ""}<button class="btn btn-sm" data-act="svSendNow">지금 보내기</button></div>
-            <span class="help ${L && (!L.ok || (L.inbox && !L.inbox.ok)) ? "evwarn" : ""}">${L ? `마지막: ${esc(L.at)} ${L.auto ? "자동" : "직접"} · ${L.ok ? "파일로 남김" : `파일 실패 ${esc(L.why || "")}`} · ${L.inbox ? (L.inbox.ok ? "보고함에 보냄" : `보고함 실패 ${esc(L.inbox.why || "")}${SV.retry && SV.retry.day === TODAY ? ` — ${hm(SV.retry.m)} 다시` : ""}`) : "보고 열쇠 없음 (파일만)"}` : svKey.has ? "보고 열쇠 있음 — 보고 파일을 쓸 때마다 보고함에도 보냄" : "보고 열쇠를 넣으면 보고 시스템 클라우드 '설문 보고함'에도 보내요 (보고 앱에 바로 보임)"}</span></div>
-          <div class="field"><div class="btns" style="align-items:center"><button type="button" class="svswitch ${LIVE.on ? "on" : ""}" role="switch" aria-checked="${LIVE.on}" data-act="liveToggle" title="같은 보고 열쇠로 1분마다 · 바뀌면 바로"><span class="knob"></span><b>폰 실시간 현황 ${LIVE.on ? "켜짐" : "꺼짐"}</b></button>
-            <span class="help">보고 앱 '입장권 판매' → 네이버 · 열쇠 · 입장료 (1분마다)</span> <span class="help ${LIVE.last && !LIVE.last.ok ? "evwarn" : ""}" id="live-last">${esc(liveText())}</span></div></div>
-          <div class="field" id="hv-row">${hvRow()}</div>
           <div class="field"><span class="label">대상 <span class="help">대상 손님은 설문 번호를 눌러야 열쇠를 고르고 등록해요</span></span>
             <div class="svtargets"><label class="chk"><input type="checkbox" id="sv-new" ${SV.naverNew || SV.all ? "checked" : ""} ${SV.all ? "disabled" : ""}> 신규고객 <span class="help">(네이버 완료 0)</span></label>
             <label class="chk"><input type="checkbox" id="sv-walk" ${SV.walkin || SV.all ? "checked" : ""} ${SV.all ? "disabled" : ""}> 현장구매자 <span class="help">(신규가 아니면 [제외])</span></label>
             <label class="chk"><input type="checkbox" id="sv-all" ${SV.all ? "checked" : ""}> 전체고객 <span class="help">(모두 — 기존 손님은 [제외])</span></label></div></div>
           <div class="field"><span class="label">선택지 <span class="help">현장 안내문의 번호와 같게 · 오늘 / 기간 누적</span></span>
             <div class="svopts">${SV.opts.map((o, i) => `<div class="svopt"><b class="num">${i + 1}</b><input class="cfg svlabel" data-i="${i}" value="${esc(o)}" placeholder="${i + 1}번 내용 (예: 네이버 검색)" aria-label="${i + 1}번 선택지">${svExtra[i + 1] > 0 ? `<button class="btn btn-sm svpm" data-act="svMinus" data-n="${i + 1}" aria-label="${i + 1}번 직접 더한 것 1건 빼기" title="잘못 누른 [+] 되돌리기">−</button>` : `<span class="svpm-sp"></span>`}<button class="btn btn-sm svpm svplus" data-act="svPlus" data-n="${i + 1}" ${svOn() ? "" : "disabled"} aria-label="${i + 1}번 확인된 1건 더하기" title="예약 없이 들어온 손님 등 — 확인된 1건 더하기">+</button><span class="help num svcnt">오늘 ${(c.cnt[i + 1] || {}).today || 0}${svExtra[i + 1] > 0 ? ` (직접 +${svExtra[i + 1]})` : ""} · 누적 <b>${(c.cnt[i + 1] || {}).total || 0}</b></span>${i === SV.opts.length - 1 && SV.opts.length > 1 ? `<button class="btn btn-sm svdel" data-act="svDel" aria-label="${i + 1}번 지우기">×</button>` : `<span class="svdel-sp"></span>`}</div>`).join("")}</div>
-            <div class="btns" style="align-items:center"><button class="btn btn-sm" data-act="svAdd">+ 선택지 추가</button><span class="help num">응답 오늘 ${c.ans.today} · 누적 <b>${c.ans.total}</b> · 제외 오늘 ${c.ex.today} · 누적 ${c.ex.total}</span></div></div>
-          <div class="sheet-foot"><button class="btn btn-ink" data-act="close">닫기</button></div>`;
-        hvRefresh(); // 재방문 간격: 방문 기록이 지금 몇 날인지 다시 물음
-        return;
+            <div class="btns" style="align-items:center"><button class="btn btn-sm" data-act="svAdd">+ 선택지 추가</button><span class="help num">응답 오늘 ${c.ans.today} · 누적 <b>${c.ans.total}</b> · 제외 오늘 ${c.ex.today} · 누적 ${c.ex.total}</span></div></div></div>
+          <div class="setcard plain stack"><b>보고 앱 <span class="help">설문 · 폰 실시간 현황 · 재방문 간격 — 같은 보고 열쇠</span></b>
+          <div class="field"><label class="chk"><input type="checkbox" id="sv-send" ${SV.send ? "checked" : ""}> <b>보고앱에 보내기</b> <span class="help">매일 20:00 번호별 오늘 · 누적 수를 파일로 남기고 보고 열쇠가 있으면 클라우드 보고함에도 (뒤에 바뀌면 다시)</span></label>
+            <div class="btns" style="align-items:center"><label class="help" for="sv-key">보고 열쇠</label><input id="sv-key" class="cfg svkey" type="password" autocomplete="off" spellcheck="false" maxlength="64" placeholder="${svKey.has ? `저장됨 (끝 ••${esc(svKey.tail)}) — 바꾸려면 새로 넣기` : "보고 앱 주소 …/b/{열쇠}/ 의 열쇠 (16~64자)"}" aria-label="보고 열쇠"><button class="btn btn-sm" data-act="svKeySave">열쇠 저장</button>${svKey.has ? `<button class="btn btn-sm" data-act="svKeyDel">지우기</button>` : ""}<button class="btn btn-sm" data-act="svSendNow">지금 보내기</button></div>
+            <span class="help ${L && (!L.ok || (L.inbox && !L.inbox.ok)) ? "evwarn" : ""}">${L ? `마지막: ${esc(L.at)} ${L.auto ? "자동" : "직접"} · ${L.ok ? "파일로 남김" : `파일 실패 ${esc(L.why || "")}`} · ${L.inbox ? (L.inbox.ok ? "보고함에 보냄" : `보고함 실패 ${esc(L.inbox.why || "")}${SV.retry && SV.retry.day === TODAY ? ` — ${hm(SV.retry.m)} 다시` : ""}`) : "보고 열쇠 없음 (파일만)"}` : svKey.has ? "보고 열쇠 있음 — 보고 파일을 쓸 때마다 보고함에도 보냄" : "보고 열쇠를 넣으면 보고 시스템 클라우드 '설문 보고함'에도 보내요 (보고 앱에 바로 보임)"}</span></div>
+          <div class="field"><div class="btns" style="align-items:center"><button type="button" class="svswitch ${LIVE.on ? "on" : ""}" role="switch" aria-checked="${LIVE.on}" data-act="liveToggle" title="같은 보고 열쇠로 1분마다 · 바뀌면 바로"><span class="knob"></span><b>폰 실시간 현황 ${LIVE.on ? "켜짐" : "꺼짐"}</b></button>
+            <span class="help">보고 앱 '입장권 판매' → 네이버 · 열쇠 · 입장료 (1분마다)</span> <span class="help ${LIVE.last && !LIVE.last.ok ? "evwarn" : ""}" id="live-last">${esc(liveText())}</span></div></div>
+          <div class="field" id="hv-row">${hvRow()}</div>
+          </div>`;
+        return { html: html + infoHtml(), after: hvRefresh };
       }
-      if (tab === "rules") {
+      if (tab === "season") {
         const dateIn = (id, v) => `<input type="date" id="${id}" value="${v}" class="date-in">`;
-        el.innerHTML = `
-          <h3 id="sheet-title">운영 설정 <button class="x" data-act="close" aria-label="닫기">×</button></h3>${tabs}
+        const html = `
           <div class="field"><span class="label">성수기 기간 <span class="help">이 기간은 평일·휴일 모두 시간제 · 기간 밖 평일은 무제한</span></span>
             ${RULES.peaks.map((p, i) => `<div class="peakrow">${dateIn("pf-" + i, p.from)} <span>~</span> ${dateIn("pt-" + i, p.to)}${RULES.peaks.length > 1 ? `<button class="btn btn-sm" data-act="delPeak" data-i="${i}" aria-label="이 기간 지우기">×</button>` : ""}</div>`).join("")}
             <div><button class="btn btn-sm" data-act="addPeak">+ 기간 추가</button></div></div>
-          <ul class="steps" style="list-style:disc">
+          <ul class="steps longhelp" style="list-style:disc" data-q="운영 규칙 설명">
             <li>성수기: 평일·휴일 모두 17:30 입장까지 1시간 50분, 18:00 입장부터 무제한</li>
             <li>비수기: 평일은 무제한, 휴일(토·일·공휴일)은 성수기와 같음</li>
             <li>열쇠 ${RULES.keys}개 = 기본 ${RULES.baseKeys}개 + 유동 ${RULES.keys - RULES.baseKeys}개 · 좌석 ${RULES.seats}석</li>
@@ -2107,13 +2267,10 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
             <li>골든벨: 1시간 50분 제한이 있는 날 ${RULES.golden.from} 이후 안에 있는 열쇠 ${RULES.golden.keys}개 이하 · 남은 예약 ${RULES.golden.rest}장 이하 — 둘 다 되면 알림창 · 그때부터 모든 손님 무제한${golden ? ` (오늘 ${hm(golden.at)} 울림)` : ` (지금 열쇠 ${holders().reduce((a, h) => a + h.keys.length, 0)}개 · 남은 예약 ${restBooked()}장)`}</li>
             <li>네이버 예약 자동 불러오기: ${RULES.naverAuto.from}부터 매시 ${RULES.naverAuto.at.join("분 · ")}분 (${RULES.naverAuto.until}까지) · 그 사이에 들어온 예약은 [새로고침]</li>
           </ul>
-          <div class="field"><label class="chk"><input type="checkbox" id="unpaid-on" ${RULES.unpaidCancel.on ? "checked" : ""}> <b>입금대기 예약 자동 취소</b> <span class="help">네이버를 불러올 때마다 · 지금 ~ 2시간 안 타임에 결제 안 한 예약([이용완료] 없이 [예약취소]만)이 있으면 취소 · 결제한 예약은 안 누름</span></label>
-            <div class="help">지금 대상: ${(() => { const d = unpaidDue(); return d.length ? d.map((b) => `${esc(b.name)} ${hm(b.slot)} ${b.qty}장`).join(", ") : "없음"; })()}</div>
-            <div class="caplog">${unpaidLog.slice(0, 8).map((x) => `<div class="${x.ok ? "" : "bad"}"><span class="num">${esc(x.at)}</span> ${esc(x.name)} ${esc(x.time)} ${x.qty}장 ${x.ok ? "취소함" : `실패: ${esc(x.why || "")}`}</div>`).join("")}</div></div>
-          <div class="sheet-foot"><button class="btn btn-ink" data-act="close" data-autofocus>닫기</button></div>`;
-        return;
+`;
+        return { html };
       }
-      if (tab === "cap") {
+      if (tab === "naver") {
         const A = RULES.capAuto, p = capPlan();
         const rows = p.skip ? "" : p.slots.filter((x) => x.t >= Math.floor(now / 30) * 30 - 90 && x.t <= Math.floor(now / 30) * 30 + 30 * A.ahead).map((x) => {
           const c = p.plan.find((y) => y.t === x.t);
@@ -2121,18 +2278,18 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
           const pop = !x.started && (x.fc == null || x.demand >= x.cap); // 인기: 열린 수량이 다 팔린다고 봄
           return `<tr class="${c && !c.far ? "adj" : ""}"><td class="num">${hm(x.t)}${x.started ? "" : c && !c.far ? " ●" : ""}</td><td class="num">${x.used}${x.started ? "" : `<small> (예상 ${x.demand}${pop ? " · 인기" : ""}${x.past ? "" : " · 지금 수준"})</small>`}</td><td class="num">${x.walk}${x.started ? "" : `<small> +${x.expWalk}</small>`}</td><td class="num">${x.cap}</td><td class="num">${c ? `<b>${c.to}</b>${c.to !== c.from ? ` <span class="${c.to > c.from ? "up" : "down"}">${c.to > c.from ? "▲" : "▼"}${Math.abs(c.to - c.from)}</span>` : ""}${c.target > c.to ? `<small> (목표 ${c.target})</small>` : ""}` : x.started ? "시작함" : "—"}</td><td class="num ${w > A.ceiling ? "over" : ""}">${x.started ? "—" : w}</td></tr>`;
         }).join("");
-        el.innerHTML = `
-          <h3 id="sheet-title">운영 설정 <button class="x" data-act="close" aria-label="닫기">×</button></h3>${tabs}
-          <div class="field" id="st-row">${stRow()}</div>
-          <div class="field"><label class="chk"><input type="checkbox" id="cap-on" ${A.on ? "checked" : ""}> <b>10분마다 네이버 판매 수량 자동 조절</b> <span class="help">(시간제인 날: 성수기 · 휴일)</span></label>
-            <div class="help">안에 있는 손님(<b>열쇠 · 좌석 기준</b>: 지금 안의 손님은 반납 시각까지 · 아직 안 온 예약 · 앞으로 팔릴 수 · 예상 현장)이 <b>어느 시각에도 상한을 넘지 않게</b>, 목표에 가깝게 아직 시작 안 한 앞 ${A.ahead}타임의 네이버 '회차당 수량'을 바꿔요. 일찍 나간 자리는 바로 다시 팔고, 비인기 타임은 예상만큼만 팔린다고 봐서 남는 열쇠를 인기 타임에. 비수기 평일은 하지 않아요.</div>
+        const html = `
+          <div class="field setcard plain"><span class="label">매일 재고 열기 <span class="help">기준의 상품 · 기간 · 재고로 네이버 예약상품 날짜를 열어요</span></span><div id="st-row" class="field">${stRow()}</div></div>
+          <div class="setcard plain stack">
+          <div class="field"><span class="label">판매 수량 자동조절</span><label class="chk"><input type="checkbox" id="cap-on" ${A.on ? "checked" : ""}> <b>10분마다 네이버 판매 수량 자동 조절</b> <span class="help">(시간제인 날: 성수기 · 휴일)</span></label>
+            <div class="help longhelp" data-q="수량 자동조절이란">안에 있는 손님(<b>열쇠 · 좌석 기준</b>: 지금 안의 손님은 반납 시각까지 · 아직 안 온 예약 · 앞으로 팔릴 수 · 예상 현장)이 <b>어느 시각에도 상한을 넘지 않게</b>, 목표에 가깝게 아직 시작 안 한 앞 ${A.ahead}타임의 네이버 '회차당 수량'을 바꿔요. 일찍 나간 자리는 바로 다시 팔고, 비인기 타임은 예상만큼만 팔린다고 봐서 남는 열쇠를 인기 타임에. 비수기 평일은 하지 않아요.</div>
             <div class="btns" style="align-items:center"><label class="help" for="cap-target">4타임 목표</label><input id="cap-target" type="number" min="30" max="50" value="${A.target}" class="cfg" style="width:76px">
               <label class="help" for="cap-ceil">상한</label><input id="cap-ceil" type="number" min="30" max="50" value="${A.ceiling}" class="cfg" style="width:76px">
               <label class="help" for="cap-max">한 타임 최대</label><input id="cap-max" type="number" min="5" max="20" value="${A.max}" class="cfg" style="width:76px">
               <label class="help" for="cap-vis">보이는 잔여 최대</label><input id="cap-vis" type="number" min="1" max="20" value="${A.visible}" class="cfg" style="width:76px">
               <button class="btn btn-sm btn-ink" data-act="capNow" ${capBusy ? "disabled" : ""}>${capBusy ? "조절 중…" : "지금 한 번 조절"}</button></div></div>
           ${p.skip ? `<div class="banner">${esc(p.skip)}</div>` : `
-          <div class="help">지금 ${hm(now)} · 안에 있는 손님(열쇠) <b class="num">${p.inside}</b> · ● = 이번에 바꿀 타임 · 예상 = 같은 요일 지난주 70% · 3주 평균 10% · 추세 10% · 오늘 예약 속도 10% (같은 요일 기록이 없으면 <b>지금 수준</b> = 지금 예약 90% · 오늘 추세 10%) · 예상이 열린 수량 이상이면 <b>인기</b> = 다 팔린다고 · 현장 +예상 · <b>그때 안</b> = 그 타임 시작 때 안에 있을 손님 — 상한 ${A.ceiling}을 넘지 않게 계산해요</div>
+          <div class="help longhelp" data-q="표 읽는 법">지금 ${hm(now)} · 안에 있는 손님(열쇠) <b class="num">${p.inside}</b> · ● = 이번에 바꿀 타임 · 예상 = 같은 요일 지난주 70% · 3주 평균 10% · 추세 10% · 오늘 예약 속도 10% (같은 요일 기록이 없으면 <b>지금 수준</b> = 지금 예약 90% · 오늘 추세 10%) · 예상이 열린 수량 이상이면 <b>인기</b> = 다 팔린다고 · 현장 +예상 · <b>그때 안</b> = 그 타임 시작 때 안에 있을 손님 — 상한 ${A.ceiling}을 넘지 않게 계산해요</div>
           <table class="captable"><tr><th>타임</th><th>네이버 예약</th><th>현장</th><th>지금 수량</th><th>계획</th><th>그때 안</th></tr>${rows}</table>`}
           <div class="field"><span class="label">한 칸 시험 <span class="help">네이버 수량을 실제로 바꿀 수 있는지 — 손님 영향이 없는 먼 날짜로 해 보고, 끝나면 원래 수량으로 되돌리세요</span></span>
             <div class="btns" style="align-items:center"><input type="date" id="cap-t-day" value="${esc(capTry.day)}" class="date-in">
@@ -2141,16 +2298,14 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
               <button class="btn btn-sm" data-act="capTry" ${capBusy || !APP ? "disabled" : ""}>${capBusy ? "넣는 중…" : "네이버에 넣기"}</button></div>
             ${APP ? "" : `<span class="help">체험판에서는 네이버가 없어 시험할 수 없어요</span>`}</div>
           <div class="field"><span class="label">기록 <span class="help">${capLastAt == null ? "아직 안 함" : `마지막 ${hm(capLastAt)}`}</span></span>
-            <div class="caplog">${capLog.length ? capLog.slice(0, 14).map((x) => `<div class="${x.ok ? "" : "bad"}"><span class="num">${esc(x.at)}</span> ${x.t ? `${esc(x.t)} ${x.from} → <b>${x.to}</b>${x.ok ? "" : ` 실패: ${esc(x.why || "")}`}` : esc(x.msg || x.why || "")}</div>`).join("") : `<span class="help">없음</span>`}</div></div>
-          <div class="sheet-foot"><button class="btn btn-ink" data-act="close" data-autofocus>닫기</button></div>`;
-        return;
+            <div class="caplog">${capLog.length ? capLog.slice(0, 14).map((x) => `<div class="${x.ok ? "" : "bad"}"><span class="num">${esc(x.at)}</span> ${x.t ? `${esc(x.t)} ${x.from} → <b>${x.to}</b>${x.ok ? "" : ` 실패: ${esc(x.why || "")}`}` : esc(x.msg || x.why || "")}</div>`).join("") : `<span class="help">없음</span>`}</div></div></div>`;
+        return { html: naverBase() + html + `<div class="setcard plain">${unpaidHtml()}</div>` };
       }
-      if (tab === "link") {
+      if (tab === "api") {
         const c = CFG || {};
         const dis = REAL ? "" : "disabled";
         const learned = (k) => (c.amanoSelectors && c.amanoSelectors[k] ? " ✓" : "");
-        el.innerHTML = `
-          <h3 id="sheet-title">운영 설정 <button class="x" data-act="close" aria-label="닫기">×</button></h3>${tabs}
+        const html = `
           ${REAL ? "" : `<div class="banner warn">체험판에서는 저장되지 않아요. POS PC에 설치한 앱에서 설정합니다.</div>`}
           <div class="field"><label for="cfg-url">아마노 로그인 주소 <span class="help">예: http://아마노주소/login · 로그인하면 할인등록 화면으로 자동 이동</span></label>
             <input id="cfg-url" class="cfg" value="${esc(c.amanoUrl || "")}" placeholder="http://.../login" ${dis}></div>
@@ -2168,15 +2323,12 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
           <div class="field"><span class="label">네이버 톡톡 상담 (키즈상담 · 카페상담 버튼) <span class="help">예약과 같은 네이버 아이디 · 처음 한 번: '톡톡 화면 보기' → 그 계정(아스타나키즈 / 카페아스타나)의 <b>상담관리</b> 목록 화면까지 들어간 뒤 창을 닫고 '지금 화면을 …으로'</span></span>
             ${Object.entries(TALK_NAME).map(([k, t]) => `<div class="btns"><b style="min-width:64px">${t}</b><button class="btn btn-sm" data-act="talkSetup" data-k="${k}" ${dis}>톡톡 화면 보기</button><button class="btn btn-sm" data-act="talkHome" data-k="${k}" ${dis}>지금 화면을 ${t}으로</button><button class="btn btn-sm" data-act="talkDump" data-k="${k}" ${dis}>화면 저장 (문제 확인용)</button></div>
             <span class="help">${(c.talkUrls || {})[k] ? `${t} 화면: ${esc(c.talkUrls[k])}` : `${t}: 아직 안 정함`}</span>`).join("")}</div>
-          <p class="help">창은 한 화면에 겹쳐 둡니다: 맨 뒤 아마노·네이버 → 가운데 POS → 맨 앞 입장 데스크. 아마노 창이 가려져 있어도 입력·클릭이 됩니다.</p>
-          <div class="sheet-foot"><button class="btn btn-ink" data-act="close">닫기</button></div>`;
-        return;
+          <p class="help longhelp" data-q="창 겹침">창은 한 화면에 겹쳐 둡니다: 맨 뒤 아마노·네이버 → 가운데 POS → 맨 앞 입장 데스크. 아마노 창이 가려져 있어도 입력·클릭이 됩니다.</p>`;
+        return { html };
       }
-      const f = PRINT.forms[PRINT.cur];
-      el.innerHTML = `
-        <h3 id="sheet-title">운영 설정 <button class="x" data-act="close" aria-label="닫기">×</button></h3>${tabs}
-        <div class="prn">
-          <div class="stack">
+      if (tab === "staff") return { html: staffHtml() };
+      if (tab === "printer") {
+        const html = `
             <div class="field"><span class="label">연결 방식 <span class="help">80mm 감열지</span></span>
               <div class="seg2"><button class="${PRINT.mode === "com" ? "on" : ""}" data-act="printMode" data-m="com" aria-pressed="${PRINT.mode === "com"}">POS 프린터 (COM 포트)</button><button class="${PRINT.mode === "win" ? "on" : ""}" data-act="printMode" data-m="win" aria-pressed="${PRINT.mode === "win"}">Windows 프린터</button></div>
               ${PRINT.mode === "com" ? `
@@ -2192,6 +2344,14 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
               <div class="btns" style="align-items:center"><span class="help"><b>현금통 단자</b> (환전 오픈)</span>${[["auto", "자동 (2번 → 5번)"], ["2", "2번"], ["5", "5번"]].map(([v, t]) => `<button class="btn btn-sm ${PRINT.drawerPin === v ? "btn-ink" : ""}" data-act="drawerPin" data-v="${v}" aria-pressed="${PRINT.drawerPin === v}">${t}</button>`).join("")}<button class="btn btn-sm" data-act="drawer">현금통 열어 보기</button></div>
               <span class="help">2번 · 5번을 하나씩 골라 '열어 보기' → 열리는 쪽으로 두면 더 빨리 열려요</span>
               ${PRINT.msg ? `<span class="help">${esc(PRINT.msg)}</span>` : ""}</div>
+`;
+        return { html };
+      }
+      // 프린트물 설정 — 입장권 양식 (재방문 이벤트 · 쿠폰은 위 [재방문 이벤트] 쪽)
+      const f = PRINT.forms[PRINT.cur];
+      const html = psubHtml() + `
+        <div class="prn">
+          <div class="stack">
             <div class="field"><span class="label">출력 양식</span>
               <div class="help">입장권 (네이버 · 현장) · 초과요금은 POS에서 결제하고 POS 영수증을 드려요 · <button class="btn btn-sm" data-act="resetForm">기본 양식으로</button></div>
               <label class="chk"><input type="checkbox" id="form-auto" ${f.auto ? "checked" : ""}> ${f.when}에 자동 출력</label>
@@ -2199,10 +2359,8 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
               <textarea id="form-text" spellcheck="false" aria-label="양식 내용">${esc(f.text)}</textarea></div>
           </div>
           <div class="field"><span class="label">미리보기 <span class="help">예시 값</span> <button class="btn btn-sm ${SAMPLE === SAMPLE_NAVER ? "btn-ink" : ""}" data-act="previewKind" data-k="naver">네이버</button><button class="btn btn-sm ${SAMPLE === SAMPLE_WALK ? "btn-ink" : ""}" data-act="previewKind" data-k="walk">현장</button><button class="btn btn-sm ${SAMPLE._이벤트 ? "btn-ink" : ""}" data-act="previewKind" data-k="event" title="방문 이벤트 ${EV_NAMES[EV.cur]} 안내로">이벤트</button></span><div class="paper" id="paper">${paperHtml(f.text, SAMPLE)}</div>${formHelp()}</div>
-        </div>
-        <div class="sheet-foot"><button class="btn btn-ink" data-act="close">닫기</button></div>`;
-      if (SAMPLE._이벤트) evScroll("paper");
-    }
+        </div>`;
+        return { html, after: () => { if (SAMPLE._이벤트) evScroll("paper"); } };
   }
 
   // ── 영수증 프린터 (80mm 감열지) ─────────────────────
@@ -3025,7 +3183,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     const same = again && prev && prev.ok === SV.last.ok && !!(prev.inbox && prev.inbox.ok) === !!(ib && ib.ok);
     if (!same) toast(r && r.demo ? `체험판: 설문 누적(응답 ${p.answered.total} · 제외 ${p.excluded.total})을 보고 파일로 남기는 흉내${ib ? " · 보고함에도 보내는 흉내" : ""}`
       : `${r && r.ok ? "설문 누적을 보고 파일로 남겼어요" : `설문 보고 파일을 못 썼어요: ${(r && r.why) || "응답 없음"}`}${ib ? (ib.ok ? " · 보고함에 보냄 (보고 앱에 바로 보여요)" : ` · 보고함 실패: ${ib.why} — 10분 뒤 다시`) : " · 보고 열쇠가 없어 보고함에는 안 보냄"}`);
-    if (sheet.mode === "settings" && sheet.tab === "survey") renderSheet();
+    if (sheet.mode === "settings" && sheet.tab === "etc") renderSheet();
   }
   /** 보낸 숫자 (바뀌었는지 보려고) */
   const svSig = (p) => JSON.stringify([p.options.map((o) => [o.label, o.today, o.total]), p.excluded, p.answered]);
@@ -3046,7 +3204,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   const ST_APP = () => APP && !!(window.desk && window.desk.stock);
   const stShort = (n) => String(n || "").replace(/\s*입장권$/, "").split(" / ")[0];
   const stMd = (d) => (d ? `${+d.slice(5, 7)}/${+d.slice(8, 10)}` : "");
-  let stPollAt = 0, stPolling = false;
+  let stPollAt = 0, stPolling = false, stCfgTimer = 0;
   function stLoad() { if (ST_APP()) window.desk.stock.job().then((v) => { if (v && v.ok) { ST.view = v; stShow(); } }, () => {}); }
   if (ST_APP()) {
     stLoad();
@@ -3088,18 +3246,173 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   const stRow = () => {
     const c = (ST.view && ST.view.cfg) || { on: false, qty: 10, ahead: 30 }, run = !!(ST.view && ST.view.job && ST.view.job.running);
     const bad = !!(ST.view && ST.view.last && !ST.view.last.ok && ST.view.doneDay !== TODAY);
-    return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><button type="button" class="svswitch ${c.on ? "on" : ""}" role="switch" aria-checked="${!!c.on}" data-act="stToggle" ${ST_APP() ? "" : "disabled"}><span class="knob"></span><b>네이버 재고 자동 오픈 ${c.on ? "켜짐" : "꺼짐"}</b></button>
-      <span class="help">매일 10:30 (실패하면 12:00 · 16:00 · 20:20) <b>오늘 + ${c.ahead}일</b>을 두 상품 회차마다 <b>${c.qty}개</b>로 (이미 넣은 날도)</span>
+    return `<div class="btns" style="align-items:center"><button type="button" class="svswitch ${c.on ? "on" : ""}" role="switch" aria-checked="${!!c.on}" data-act="stToggle" ${ST_APP() ? "" : "disabled"}><span class="knob"></span><b>네이버 재고 자동 오픈 ${c.on ? "켜짐" : "꺼짐"}</b></button>
       <button class="btn btn-sm" data-act="stDry" ${run ? "disabled" : ""}>확인만 해 보기</button><button class="btn btn-sm" data-act="stNow" ${run ? "disabled" : ""}>지금 한 번 열기</button></div>
+      <span class="help">매일 10:30 (실패하면 12:00 · 16:00 · 20:20) <b>오늘 + ${c.ahead}일</b>을 두 상품 회차마다 <b>${c.qty}개</b>로 (이미 넣은 날도)</span>
       <span class="help ${bad ? "evwarn" : ""}" id="st-text">${esc(stText())}</span>`;
   };
-  const stShow = () => { const el = $("st-row"); if (el && sheet.mode === "settings" && sheet.tab === "cap") el.innerHTML = stRow(); };
+  const stShow = () => { const el = $("st-row"); if (el && sheet.mode === "settings" && sheet.tab === "naver") el.innerHTML = stRow(); };
   /** 1초마다: 여는 중이면 2초쯤마다 진행을 물음 */
   function stTick() {
     if (!ST_APP() || stPolling || !(ST.view && ST.view.job && ST.view.job.running) || Date.now() - stPollAt < 1500) return;
     stPolling = true; stPollAt = Date.now();
     window.desk.stock.job().then((v) => { stPolling = false; if (v && v.ok) { ST.view = v; stShow(); } }, () => { stPolling = false; });
   }
+
+  // ── 근무자 메뉴얼 (V2.0 · 사장님 10/21) ─────────────────────
+  /* 맨 위 [근무자 메뉴얼] → 입장 · 퇴장 · 화면 위치별 조작 (내려 보며 읽기)
+     그림 = prototype/manual/*.jpg (체험판 화면 · apps/desk/tools/manual-shots.js 로 다시 찍음 · 설치본은 desk.html 옆 manual/)
+     MANUAL_MARKS = 그림 1의 번호 자리 (% · 찍을 때 나온 값) */
+  const MANUAL_MARKS = [[15.1, 0.6], [38.7, 0], [1, 5.3], [1, 12.3], [23.4, 12.3], [48.7, 9.7], [48.7, 59.5], [48.7, 66.5], [62.4, 0.5]];
+  const MANUAL_TOC = [["man1", "① 화면 한눈에"], ["man2", "② 예약 손님 입장"], ["man3", "③ 현장 손님 입장"], ["man4", "④ 퇴장 · 열쇠 반납"], ["man5", "⑤ 마감 · 일괄 반납"], ["man6", "⑥ 주차등록"], ["man7", "⑦ 메모장"], ["man8", "⑧ 이럴 땐"]];
+  const manImg = (f, alt) => `<img src="manual/${f}" alt="${alt}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'help',textContent:'(그림을 못 불러옴 — ${alt})'}))">`;
+  const manSteps = (rows, tip) => `<div class="mansteps">${rows.map((r, i) => `<div><span class="n">${i + 1}</span><span>${r}</span></div>`).join("")}${tip ? `<div class="tip">${tip}</div>` : ""}</div>`;
+  function manualHtml() {
+    const keys = [
+      ["1", "<b>포스 전환 · 환전 오픈</b> — POS 화면으로 / 현금통 열기"],
+      ["2", "<b>반납안내 커튼</b> — 손잡이를 내리면 손님께 반납 안내를 크게 (아래를 누르면 걷힘)"],
+      ["3", "<b>메모</b> — 근무자 전달 · 내 메모 (<b>전달 n</b> = 아직 확인 안 한 전달)"],
+      ["4", "<b>시간표</b> — 시간마다 완료 · 확정 · 잔여 · 시간 줄을 누르면 그 시간 예약자 (네이버에서 다시 불러옴)"],
+      ["5", "<b>새로고침 · 예약자</b> — 고른 시간의 네이버 예약 카드 · 파랑 <b>미입장</b> 카드를 눌러 입장"],
+      ["6", "<b>열쇠판</b> — 숫자 = 열쇠 번호 · 바탕색 = 이용 시간 · 테두리 = 네이버(흰색) / 현장(파랑) / 서비스(흰 점선)"],
+      ["7", "<b>키즈상담 · 카페상담</b> (붉은 숫자 = 새 상담) · <b>열쇠 일괄 반납처리</b> (마감)"],
+      ["8", "<b>주차등록</b> — 차량번호로 찾아 할인 (뒤에 열린 아마노와 같이 움직임)"],
+      ["9", "<b>근무자 메뉴얼 · 바탕화면 · 총 판매수</b> (누르면 입장권 목록) · 지금 시각"],
+    ];
+    const tile = (bg, line, fg, dash) => `<span class="mankey" style="background:${bg};border:2px ${dash ? "dashed" : "solid"} ${line};color:${fg}">12</span>`;
+    return `<h3 id="sheet-title">근무자 메뉴얼 <span class="help">내려 보면서 읽어요 · 그림의 번호 = 화면 위치</span><button class="x" data-act="close" aria-label="닫기">×</button></h3>
+      <nav class="mannav" aria-label="차례">${MANUAL_TOC.map(([id, t]) => `<button data-act="manGo" data-s="${id}">${t}</button>`).join("")}</nav>
+      <div class="manbody" id="manual-body">
+        <section class="mansec full" id="man1"><h4>① 화면 한눈에</h4>
+          <div class="manpic">${manImg("m1-main.jpg", "통합 데스크 전체 화면")}${MANUAL_MARKS.map(([x, y], i) => `<span class="mk" style="left:${x}%;top:${y}%">${i + 1}</span>`).join("")}</div>
+          <div class="mankeys">${keys.map(([n, t]) => `<div><span class="mansteps"><span class="n">${n}</span></span><span>${t}</span></div>`).join("")}</div>
+          <div class="mansteps"><div class="tip">열쇠 색: ${tile("var(--surface)", "var(--ink)", "var(--ink)")} 이용 중 (1시간 50분까지) ${tile("var(--pink)", "var(--ink)", "var(--pink-fg)")} 곧 끝남 (2시간까지) ${tile("var(--red)", "var(--ink)", "#fff")} 2시간 넘음 → 초과요금 · 테두리: ${tile("var(--surface)", "var(--ink)", "var(--ink)")} 네이버 ${tile("var(--surface)", "var(--walk)", "var(--ink)")} 현장 ${tile("var(--surface)", "var(--ink)", "var(--ink)", true)} 서비스</div></div></section>
+        <section class="mansec" id="man2"><div>${manImg("m2-enter.jpg", "네이버 예약자 입장 창")}</div><div><h4>② 예약 손님 입장</h4>${manSteps([
+          "시간표에서 시간을 고르고, 예약자에서 <b>파랑 [미입장]</b> 카드를 누른다",
+          "이용일시 · 수량 · 결제상태를 본다 — 금색 <b>2만원 사은권 증정</b>이 보이면 입장할 때 함께 드린다",
+          "<b>수량만큼 빈 열쇠 번호</b>를 누른다 (흐린 번호 = 이미 나간 열쇠)",
+          "<b>[등록 완료]</b> → 입장권이 나오면 열쇠와 함께 드린다",
+        ], "예약 시간보다 일찍 와도 입장할 수 있어요 (초록 안내) · 설문 번호가 보이면 손님 답(번호)을 먼저 눌러요 · 연속예약은 첫 예약에서 한 번에")}</div></section>
+        <section class="mansec" id="man3"><div>${manImg("m3-walk.jpg", "현장입장 창")}</div><div><h4>③ 현장 손님 입장</h4>${manSteps([
+          "열쇠판에서 <b>빈 열쇠</b>를 누른다 — 맨 위가 <b>초록(판매 가능)</b>인지 본다 · 빨강이면 지금은 판매 불가",
+          "<b>[POS로 이동해서 결제하기]</b> → POS에서 결제 → 끝나면 POS를 최소화하면 이 창으로 돌아온다",
+          "결제한 만큼 <b>입장권 수</b>를 맞춘다 (열쇠가 이어서 붙음) · 입장 타임은 ◀ ▶",
+          "<b>전화번호</b> 010 뒤 8자리를 키패드로",
+          "<b>[결제 완료 · 열쇠 등록]</b> → 입장권과 열쇠를 드린다",
+        ], "임직원 등 판매가 아닌 사용은 아래 <b>[서비스 키 (판매 아님)]</b> — 쓰는 사람만 적어요 (총 판매수 · 인원에 안 셈)")}</div></section>
+        <section class="mansec" id="man4"><div>${manImg("m4-key.jpg", "열쇠 반납 창")}</div><div><h4>④ 퇴장 · 열쇠 반납</h4>${manSteps([
+          "손님이 준 <b>열쇠 번호</b>를 열쇠판에서 누른다",
+          "이용 시간을 본다 — <b>빨간 상자</b> = 반납 시간 지남 → <b>[POS로 결제 · 금액]</b>으로 초과요금을 결제",
+          "<b>[n번 반납 · 퇴장]</b> — 열쇠가 여러 개면 <b>[n번만]</b> 또는 <b>[모두 반납]</b>",
+        ], "초과요금: 2시간이 되면 5,000원, 그 뒤 10분마다 5,000원씩 (열쇠마다) · 반납 시각만 바꾸기 = ◀ ▶ 후 [변경] · 한 타임 더 = [+1타임] (입장권을 더 산 것으로)")}</div></section>
+        <section class="mansec" id="man5"><div>${manImg("m5-bulk.jpg", "열쇠 일괄 반납 창")}</div><div><h4>⑤ 마감 · 일괄 반납</h4>${manSteps([
+          "영업 마감 때 <b>열쇠를 모두 받았는지</b> 먼저 확인한다",
+          "<b>[열쇠 일괄 반납처리]</b>를 누르고 손님 · 열쇠 목록을 본다",
+          "<b>초과요금이 남은 손님</b>이 보이면 결제했는지 확인 → <b>[모두 반납]</b>",
+        ], "일괄 반납은 열쇠를 하나씩 확인하지 않아요 — 못 받은 열쇠가 있으면 하나씩 반납해야 누가 썼는지 남아요")}</div></section>
+        <section class="mansec" id="man6"><div>${manImg("m6-park.jpg", "주차등록")}</div><div><h4>⑥ 주차등록</h4>${manSteps([
+          "<b>입차일</b>을 확인한다 (새벽 손님 때문에 전날부터 찾음)",
+          "<b>차량번호</b> 뒷자리를 넣고 <b>[검색]</b>",
+          "목록에서 차를 고르고 <b>할인 유형</b>을 누른다 — 뒤의 아마노에도 같이 들어가요",
+        ], "맨 아래 줄 = 아마노 진행 상황 · 빨간 글이면 실패 → 다시 하거나 관리자에게")}</div></section>
+        <section class="mansec" id="man7"><div>${manImg("m7-memo.jpg", "메모장")}</div><div><h4>⑦ 메모장</h4>${manSteps([
+          "왼쪽 위 <b>[메모]</b>를 누른다 (<b>전달 n</b> = 나에게 온 전달)",
+          "<b>근무자 전달</b>: 평일 → 주말 / 주말 → 평일 칸에 쓰고 <b>[남기기]</b> · 받은 쪽은 읽고 <b>[확인함]</b>",
+          "<b>내 메모</b>: 내 이름을 누르고 쓰고 Enter · 해결하면 ☐ 를 눌러 <b>완료</b>로",
+          "지난 메모는 맨 위 <b>지난 메모 찾기</b>",
+        ], "메모는 이 PC 에만 저장돼요 · 근무자 이름은 관리자가 넣어요")}</div></section>
+        <section class="mansec full" id="man8"><h4>⑧ 이럴 땐</h4><div class="mansteps">
+          <div class="tip"><b>예약이 안 보이면</b> → 가운데 위 <b>[새로고침]</b> 또는 시간표의 그 시간 줄을 누름 (네이버 예약은 09:50부터 매시 20분 · 50분에 자동)</div>
+          <div class="tip"><b>빨간 글 · 빨간 상자</b> = 지금 확인할 문제 (초과요금 · 실패) — 그 일을 먼저</div>
+          <div class="tip"><b>사은권</b> = 금색 표시 (예약 카드 · 입장 창 · 열쇠 창) → 2만원 사은권을 드리고 <b>[사은권 전달함]</b></div>
+          <div class="tip"><b>POS로 갔다 돌아오기</b> → POS를 작업표시줄로 최소화하면 데스크가 앞으로 · 맨 위 [포스 전환]은 결제와 상관없이 POS로</div>
+          <div class="tip"><b>더 자세한 것</b> → 인쇄용 직원 메뉴얼 (PDF) · 관리자에게</div>
+        </div></section>
+      </div>`;
+  }
+
+  // ── 근무자 메모장 (V2.0 · 사장님 10/21) ─────────────────────
+  /* 전 근무자가 남기고 다음 근무자가 확인 — 시간표 위 [메모] (확인 안 한 전달이 있으면 '전달 n')
+     - 근무자 전달 (위): 평일 → 주말 · 주말 → 평일 — 받는 쪽이 [확인함] → 흐리게 (지우지 않음 · 찾기로 다시)
+     - 내 메모 (아래): 근무자(운영 설정 → 근무자 등록)마다 할 일 · ☐ 를 누르면 그 사람 '완료'로 (찾기 · 되돌리기)
+     - 앱: 이 PC 앱 폴더 staff-memo.json (+ bak · staff-memo.js) · 체험판: 이 브라우저 · 클라우드로 안 보냄 */
+  const MEMO_LS = "astanakiz-staffmemo";
+  const MEMO = { staff: [], hand: [], notes: [] };
+  const MEMO_APP = () => APP && !!(window.desk && window.desk.memo);
+  let memoWhoId = "", memoTimer = 0;
+  function memoLoad(v) {
+    if (!v || v.v !== 1) return;
+    for (const k of ["staff", "hand", "notes"]) MEMO[k] = Array.isArray(v[k]) ? v[k] : [];
+  }
+  if (MEMO_APP()) window.desk.memo.get().then((r) => { if (r && r.ok) { memoLoad(r.memo); memoBadge(); if (sheet.mode === "memo" || (sheet.mode === "settings" && sheet.tab === "staff")) renderSheet(); } }, () => {});
+  else try { memoLoad(JSON.parse(localStorage.getItem(MEMO_LS))); } catch (e) { /* 없음 */ }
+  function memoSave() {
+    clearTimeout(memoTimer); memoTimer = 0;
+    const d = { v: 1, staff: MEMO.staff, hand: MEMO.hand, notes: MEMO.notes };
+    if (MEMO_APP()) window.desk.memo.set(d).then((r) => { if (!(r && r.ok)) toast(`메모 저장 실패: ${(r && r.why) || "응답 없음"}`, 8000); }, (e) => toast(`메모 저장 실패: ${e}`, 8000));
+    else try { localStorage.setItem(MEMO_LS, JSON.stringify(d)); } catch (e) { /* 저장 못 해도 화면은 동작 */ }
+    memoBadge();
+  }
+  const memoSaveSoon = () => { clearTimeout(memoTimer); memoTimer = setTimeout(memoSave, 600); };
+  const memoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const memoStamp = () => `${TODAY} ${hm(now)}`;
+  /** "2026-10-21 13:40" → 오늘이면 13:40 · 아니면 10/21 13:40 */
+  const memoWhen = (at) => (!at ? "" : at.slice(0, 10) === TODAY ? at.slice(11) : `${+at.slice(5, 7)}/${+at.slice(8, 10)} ${at.slice(11)}`);
+  const staffName = (id) => { const x = id && MEMO.staff.find((s) => s.id === id); return x ? x.name || "이름 없음" : id ? "지운 근무자" : ""; };
+  /** 오늘 받는 쪽: 휴일(토 · 일 · 공휴일) = 주말 근무자 */
+  const memoGrp = () => (isHoliday(TODAY) ? "주말" : "평일");
+  const memoInbox = () => MEMO.hand.filter((h) => !h.ok && h.dir.endsWith("→" + memoGrp()));
+  function memoBadge() {
+    const b = $("memo-badge"), n = memoInbox().length;
+    if (!b) return;
+    b.hidden = !n; b.textContent = n ? `전달 ${n}` : "";
+  }
+  /** 지금 고른 근무자 (없으면 오늘 쪽 첫 사람) */
+  function memoWho() {
+    if (memoWhoId && MEMO.staff.some((s) => s.id === memoWhoId)) return memoWhoId;
+    const s = MEMO.staff.find((x) => x.grp === memoGrp()) || MEMO.staff[0];
+    return (memoWhoId = s ? s.id : "");
+  }
+  const memoDraft = (id) => esc((sheet.draft || {})[id] || "");
+  const MEMO_IN = { "평일→주말": "memo-wk", "주말→평일": "memo-we" };
+  const memoMark = (t, q) => { const e = esc(t); if (!q) return e; const i = t.toLowerCase().indexOf(q.toLowerCase()); return i < 0 ? e : esc(t.slice(0, i)) + `<mark>${esc(t.slice(i, i + q.length))}</mark>` + esc(t.slice(i + q.length)); };
+  function memoHandHtml(dir) {
+    const [from, to] = dir.split("→"), mine = to === memoGrp();
+    const items = MEMO.hand.filter((h) => h.dir === dir);
+    const open = items.filter((h) => !h.ok).reverse(), done = items.filter((h) => h.ok).slice(-3).reverse();
+    const by = (h) => [staffName(h.by), memoWhen(h.at)].filter(Boolean).join(" · ");
+    return `<section class="mhand ${mine ? "mine" : ""}" aria-label="${from}에서 ${to}로">
+      <div class="mhhead"><span class="gchip">${from}</span>→<span class="gchip">${to}</span>${mine ? `<span class="help">오늘 받는 쪽</span>` : ""}<span class="spacer"></span>${open.length ? `<span class="help num">확인 안 함 ${open.length}</span>` : ""}</div>
+      ${open.map((h) => `<div class="mitem"><span>${esc(h.text)}<small class="num">${esc(by(h))}</small></span><button class="btn btn-sm mok" data-act="memoOk" data-id="${h.id}">확인함</button></div>`).join("")}
+      ${done.map((h) => `<div class="mitem okd"><span>${esc(h.text)}<small class="num">${esc(by(h))} · ✓ ${esc([staffName(h.okBy), memoWhen(h.ok)].filter(Boolean).join(" "))} 확인</small></span></div>`).join("")}
+      ${items.length ? "" : `<span class="help">아직 없어요</span>`}
+      <div class="madd"><input id="${MEMO_IN[dir]}" class="cfg memo-in" data-dir="${dir}" maxlength="300" value="${memoDraft(MEMO_IN[dir])}" placeholder="${to} 근무자에게 남길 말…" aria-label="${to} 근무자에게 남길 말" autocomplete="off"><button class="btn btn-sm" data-act="memoHand" data-dir="${dir}">남기기</button></div></section>`;
+  }
+  function memoMineHtml() {
+    const who = memoWho();
+    if (!MEMO.staff.length) return `<div class="mmine"><b>내 메모</b><span class="help">근무자 이름이 아직 없어요 — 관리자가 운영 설정 → 근무자 등록에서 넣으면 근무자마다 메모장이 생겨요</span></div>`;
+    const mine = MEMO.notes.filter((n) => n.who === who), todo = mine.filter((n) => !n.done).reverse(), done = mine.filter((n) => n.done).sort((a, b) => (a.done < b.done ? 1 : -1));
+    const tab = sheet.tab === "done" ? "done" : "todo", nm = staffName(who);
+    const list = tab === "todo"
+      ? todo.map((n) => `<div class="mitem"><button class="mchk" data-act="memoDone" data-id="${n.id}" aria-label="해결 — 완료로" title="해결하면 눌러요 → 완료 기록으로"></button><span>${esc(n.text)}<small class="num">${esc(memoWhen(n.at))}</small></span><button class="btn btn-sm" data-act="memoDel" data-id="${n.id}" aria-label="지우기" title="잘못 쓴 메모 지우기">×</button></div>`).join("") || `<span class="help">할 일이 없어요</span>`
+      : done.slice(0, 60).map((n) => `<div class="mitem done"><span><i>${esc(n.text)}</i><small class="num">${esc(memoWhen(n.at))} 씀 · ${esc(memoWhen(n.done))} 해결</small></span><button class="btn btn-sm" data-act="memoUndo" data-id="${n.id}" title="다시 할 일로">되돌리기</button></div>`).join("") + (done.length > 60 ? `<span class="help">더 지난 것은 위 '지난 메모 찾기'로</span>` : "") || `<span class="help">아직 해결한 메모가 없어요</span>`;
+    return `<div class="mmine"><div class="mmhead"><b>내 메모</b><div class="mwho" role="group" aria-label="근무자 고르기">${MEMO.staff.map((s) => `<button class="${s.id === who ? "on" : ""}" aria-pressed="${s.id === who}" data-act="memoWho" data-id="${s.id}">${esc(s.name || "이름 없음")}</button>`).join("")}</div><span class="spacer"></span>
+        <div class="seg2 sm"><button class="${tab === "todo" ? "on" : ""}" aria-pressed="${tab === "todo"}" data-act="memoTab" data-t="todo">할 일 ${todo.length}</button><button class="${tab === "done" ? "on" : ""}" aria-pressed="${tab === "done"}" data-act="memoTab" data-t="done">완료 ${done.length}</button></div></div>
+      ${tab === "todo" ? `<div class="madd"><input id="memo-new" class="cfg" maxlength="300" value="${memoDraft("memo-new")}" placeholder="${esc(nm)}의 메모 — 쓰고 Enter" aria-label="${esc(nm)}의 메모 쓰기" autocomplete="off"><button class="btn btn-sm btn-ink" data-act="memoAdd">추가</button></div>` : ""}
+      <div class="mlist">${list}</div></div>`;
+  }
+  /** 지난 메모 찾기: 전달 · 각자 메모(할 일 · 완료) 모두 · 글 또는 근무자 이름 */
+  function memoFindHtml(q) {
+    const k = q.toLowerCase(), hit = (t) => t.toLowerCase().includes(k);
+    const rows = [
+      ...MEMO.hand.map((h) => ({ at: h.at, text: h.text, tag: `전달 ${h.dir.replace("→", " → ")}`, who: staffName(h.by), st: h.ok ? `✓ ${[staffName(h.okBy), memoWhen(h.ok)].filter(Boolean).join(" ")} 확인` : "확인 안 함" })),
+      ...MEMO.notes.map((n) => ({ at: n.at, text: n.text, tag: staffName(n.who), who: "", st: n.done ? `${memoWhen(n.done)} 해결` : "할 일" })),
+    ].filter((r) => hit(r.text) || hit(r.tag) || (r.who && hit(r.who))).sort((a, b) => (a.at < b.at ? 1 : -1));
+    return `<div class="mlist mhit"><span class="help">'${esc(q)}' ${rows.length}개${rows.length > 100 ? " (최근 100개)" : ""}</span>${rows.slice(0, 100).map((r) => `<div class="mitem okd"><span>${memoMark(r.text, q)}<small class="num">${esc([r.tag, r.who, memoWhen(r.at), r.st].filter(Boolean).join(" · "))}</small></span></div>`).join("")}</div>`;
+  }
+  const memoBodyHtml = () => ((sheet.q || "").trim() ? memoFindHtml(sheet.q.trim()) : `<div class="mhands">${memoHandHtml("평일→주말")}${memoHandHtml("주말→평일")}</div>${memoMineHtml()}`);
+  const memoSheetHtml = () => `<h3 id="sheet-title">메모장 <span class="help">이 PC 에만 저장 · 해결하면 그 사람 완료로</span><input id="memo-q" class="cfg mq" placeholder="지난 메모 찾기" value="${esc(sheet.q || "")}" aria-label="지난 메모 찾기" autocomplete="off"><button class="x" data-act="close" aria-label="닫기">×</button></h3>
+    <div class="mbody" id="memo-body">${memoBodyHtml()}</div>`;
 
   // ── 재방문 간격 (사장님 10/19) ─────────────────────
   /* 네이버 예약 손님이 며칠 만에 다시 오는지 — 보고 앱 '네이버 판매 수' 세부 화면 맨 위 (docs/REVISIT.md)
@@ -3217,7 +3530,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     hvRefreshAt = Date.now();
     window.desk.history.job().then((r) => { if (r && r.ok && !hvPolling) { HV.job = r.job; if (r.history) HV.hist = r.history; hvShow(); } }, () => {});
   }
-  const hvShow = () => { const el = $("hv-row"); if (el && sheet.mode === "settings" && sheet.tab === "survey") el.innerHTML = hvRow(); };
+  const hvShow = () => { const el = $("hv-row"); if (el && sheet.mode === "settings" && sheet.tab === "etc") el.innerHTML = hvRow(); };
 
   // ── 초과요금 미터 ────────────────────────────────
   /* 초과요금 (열쇠 1개 기준, 예약 입장시간부터)
@@ -3354,6 +3667,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     done.disabled = st.over || !st.phoneOk || (st.flex && !sheet.flexOk) || (!!svForWalk() && sheet.sv == null); // 설문 대상이면 번호(또는 제외) 먼저
   }
 
+  let clockTapAt = 0; // 시계 두 번 누르기 (운영 설정)
   const acts = {
     // 새로고침: 자동 시각(매시 20분 · 50분) 사이에 들어온 예약을 바로 불러옴 (체험판은 화면만 다시 그림)
     refresh() {
@@ -3704,10 +4018,54 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       try { r = await sendPrint(text, v); } catch (e) { r = { ok: false, why: String(e) }; } finally { PRINT.busy = false; }
       toast(r && r.ok ? `${ro(evName(EV.cur))} 시험 출력을 보냈어요` : `출력 실패: ${(r && r.why) || "응답 없음"}`);
     },
-    settings() { openSheet({ mode: "settings", tab: "rules" }); },
+    settings() { openSheet({ mode: "settings", tab: "season" }); },
+    // 운영 설정 V2.0: [?] 설명 펼치기 · 프린트물 (입장권 양식 / 재방문 이벤트)
+    qhelp(btn) { const t = btn.nextElementSibling; if (!t || !t.classList.contains("qtext")) return; t.hidden = !t.hidden; btn.setAttribute("aria-expanded", String(!t.hidden)); },
+    psub(btn) { sheet.psub = btn.dataset.s === "event" ? "event" : "ticket"; renderSheet(); },
+    // 근무자 등록 (메모장 이름 · 평일 / 주말)
+    staffAdd() {
+      if (MEMO.staff.length >= 30) { toast("근무자는 30명까지예요"); return; }
+      MEMO.staff.push({ id: memoId(), name: "", grp: memoGrp() }); memoSave(); renderSheet();
+      const ins = document.querySelectorAll(".staffname"); if (ins.length) ins[ins.length - 1].focus();
+    },
+    staffDel(btn) {
+      const s = MEMO.staff[Number(btn.dataset.i)];
+      if (!s) return;
+      const n = MEMO.notes.filter((x) => x.who === s.id).length;
+      if (!confirm(`${s.name || "이 근무자"}를 지울까요?${n ? `\n쓴 메모 ${n}개는 남고 '지운 근무자'로 보여요 (찾기로 볼 수 있음)` : ""}`)) return;
+      MEMO.staff = MEMO.staff.filter((x) => x !== s); memoSave(); renderSheet();
+    },
+    staffGrp(btn) { const s = MEMO.staff[Number(btn.dataset.i)]; if (s) { s.grp = btn.dataset.g === "주말" ? "주말" : "평일"; memoSave(); renderSheet(); } },
+    // 메모장 (V2.0)
+    memo() { openSheet({ mode: "memo", q: "", tab: "todo", draft: {} }); },
+    // 근무자 메뉴얼 (V2.0): 차례를 누르면 그 자리로
+    manual() { openSheet({ mode: "manual" }); },
+    manGo(btn) { const box = $("manual-body"), t = $(btn.dataset.s); if (box && t) box.scrollTo({ top: box.scrollTop + t.getBoundingClientRect().top - box.getBoundingClientRect().top - 4 }); },
+    memoWho(btn) { memoWhoId = btn.dataset.id; sheet.tab = "todo"; renderSheet(); },
+    memoTab(btn) { sheet.tab = btn.dataset.t === "done" ? "done" : "todo"; renderSheet(); },
+    memoAdd() {
+      const t = String(sheet.draft["memo-new"] || "").trim(), who = memoWho();
+      if (!who) return;
+      if (!t) { toast("메모를 써 주세요"); $("memo-new") && $("memo-new").focus(); return; }
+      MEMO.notes.push({ id: memoId(), who, text: t.slice(0, 300), at: memoStamp(), done: "" });
+      sheet.draft["memo-new"] = ""; sheet.tab = "todo"; memoSave(); renderSheet();
+    },
+    memoDone(btn) { const n = MEMO.notes.find((x) => x.id === btn.dataset.id); if (!n) return; n.done = memoStamp(); memoSave(); renderSheet(); toast(`해결 — ${staffName(n.who)} 완료로 옮겼어요`); },
+    memoUndo(btn) { const n = MEMO.notes.find((x) => x.id === btn.dataset.id); if (!n) return; n.done = ""; memoSave(); renderSheet(); toast("다시 할 일로"); },
+    memoDel(btn) { const n = MEMO.notes.find((x) => x.id === btn.dataset.id); if (!n || !confirm(`이 메모를 지울까요?\n"${n.text.slice(0, 40)}"\n(해결한 것이면 지우지 말고 ☐ 를 눌러 완료로)`)) return; MEMO.notes = MEMO.notes.filter((x) => x !== n); memoSave(); renderSheet(); },
+    memoHand(btn) {
+      const dir = btn.dataset.dir, id = MEMO_IN[dir], t = String(sheet.draft[id] || "").trim();
+      if (!id) return;
+      if (!t) { toast("남길 말을 써 주세요"); $(id) && $(id).focus(); return; }
+      MEMO.hand.push({ id: memoId(), dir, text: t.slice(0, 300), by: memoWho(), at: memoStamp(), ok: "", okBy: "" });
+      sheet.draft[id] = ""; memoSave(); renderSheet(); toast(`${dir.split("→")[1]} 근무자에게 남겼어요`);
+    },
+    memoOk(btn) { const h = MEMO.hand.find((x) => x.id === btn.dataset.id); if (!h) return; h.ok = memoStamp(); h.okBy = memoWho(); memoSave(); renderSheet(); },
+    // 시계를 1.5초 안에 두 번 누르면 운영 설정 (사장님 10/21 — 근무자는 몰라도 됨)
+    clock() { const t = Date.now(); if (clockTapAt && t - clockTapAt <= 1500) { clockTapAt = 0; acts.settings(); } else clockTapAt = t; },
     async setTab(btn) {
       sheet.tab = btn.dataset.t;
-      if (sheet.tab === "link" && REAL) CFG = await window.desk.config.get();
+      if (sheet.tab === "api" && REAL) CFG = await window.desk.config.get();
       renderSheet();
     },
     async cfgSave() {
@@ -3845,11 +4203,21 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     if (e.target === $("overlay")) acts.close();
   });
   document.addEventListener("keydown", (e) => {
+    // 메모장: Enter = 추가 · 남기기 (한글 조합 중 Enter 는 빼고)
+    if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229 && sheet.mode === "memo") {
+      const t = e.target;
+      if (t.id === "memo-new") { e.preventDefault(); acts.memoAdd(); return; }
+      if (t.classList && t.classList.contains("memo-in")) { e.preventDefault(); acts.memoHand(t); return; }
+    }
     if (e.key !== "Escape" || !$("pos").hidden) return;
     if (sheet.mode) acts.close();
   });
   document.addEventListener("input", (e) => {
     const t = e.target;
+    // 메모장 (V2.0): 쓰던 글은 다시 그려도 남게 · 찾기는 아래만 다시
+    if (sheet.mode === "memo" && (t.id === "memo-new" || t.classList.contains("memo-in"))) sheet.draft[t.id] = t.value;
+    if (t.id === "memo-q") { sheet.q = t.value; $("memo-body").innerHTML = memoBodyHtml(); }
+    if (t.classList.contains("staffname")) { const s = MEMO.staff[Number(t.dataset.i)]; if (s) { s.name = t.value.trim().slice(0, 12); memoSaveSoon(); } }
     // 고객 메모 (사장님 10/20): 메모는 2줄에 맞춰 0.6초 뒤 저장 · 체크는 바로 저장하고 이름 색을 바꿈
     if (t.id === "note-m") { const b = noteTarget(); if (b) { noteFit(t); noteChange(b, { m: t.value }); } }
     if (t.id === "note-k3" || t.id === "note-bl") {
@@ -3875,6 +4243,10 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     if (t.id === "cap-t-n" && t.value !== "") capTry.n = Math.max(0, Number(t.value) || 0);
     if (t.id === "sold-key") { sheet.key = t.value; renderSheet(); } // 입장권 목록: 열쇠 번호로 찾기 (최근 2주)
     if (t.id === "unpaid-on") { RULES.unpaidCancel.on = t.checked; if (APP && window.desk.config) window.desk.config.set({ unpaidCancel: { on: t.checked } }); toast(t.checked ? "입금대기 예약 자동 취소를 켰어요" : "입금대기 예약 자동 취소를 껐어요"); }
+    if ((t.id === "st-qty" || t.id === "st-ahead") && t.value && ST_APP()) {
+      const f = t.id === "st-qty" ? "qty" : "ahead", v = Math.max(1, Math.min(f === "qty" ? 99 : 90, Math.round(Number(t.value)) || 0));
+      if (v) { const c = Object.assign({}, (ST.view && ST.view.cfg) || {}, { [f]: v }); delete c.products; delete c.skip; clearTimeout(stCfgTimer); stCfgTimer = setTimeout(() => window.desk.config.set({ stockAuto: c }).then(stLoad, () => {}), 600); }
+    }
     if (t.id === "cap-on") { RULES.capAuto.on = t.checked; capMark = null; saveCapAuto(); renderAll(); toast(t.checked ? "네이버 판매 수량 자동 조절을 켰어요 (10분마다)" : "자동 조절을 껐어요"); }
     if ((t.id === "cap-target" || t.id === "cap-max" || t.id === "cap-ceil" || t.id === "cap-vis") && t.value) { RULES.capAuto[{ "cap-target": "target", "cap-max": "max", "cap-ceil": "ceiling", "cap-vis": "visible" }[t.id]] = Math.max(1, Math.min(60, Number(t.value) || 0)); saveCapAuto(); }
     if (t.id === "com-baud") { PRINT.baud = Number(t.value); savePrint(); }
@@ -3935,7 +4307,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 
   // 시험용: 입장권을 만드는 함수들 (자동 시험이 실제 입장 손님으로 출력 내용을 확인)
   document.addEventListener("change", (e) => { if (/^cap-(target|max|ceil)$/.test(e.target.id)) renderSheet(); if (e.target.id === "note-m") noteFlush(); }); // 숫자를 다 넣으면 계획 다시
-  window.__deskTest = { notes: () => Object.fromEntries(NOTES), evLoadCfg, today: () => TODAY, useDueText, printSecs, PRINT_: () => PRINT, sealOf, withSeal, SEAL, evSample: (i) => evSample(i), sealClear: () => sealCache.clear(), EV_: () => EV, liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capPlan, capRun, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => enterText(), holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, evOf: (b) => evOf(b),
+  window.__deskTest = { notes: () => Object.fromEntries(NOTES), evLoadCfg, today: () => TODAY, useDueText, printSecs, PRINT_: () => PRINT, sealOf, withSeal, SEAL, evSample: (i) => evSample(i), sealClear: () => sealCache.clear(), EV_: () => EV, liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capPlan, capRun, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => enterText(), holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, sheet, evOf: (b) => evOf(b),
     evLog: (from) => { const L = evLog(from); return { from: L.from, count: L.count, people: Object.fromEntries([...L.people].map(([k, p]) => [k, JSON.parse(JSON.stringify(p))])) }; },
     // 장부에 지난 방문 한 줄 넣기: o = { day, n(네이버 순번, 기본 = 지금 완료 수), base, st("안내" | "성공"), due, from(장부 · 기본 지금 이벤트), no }
     evInject: (name, o = {}) => {

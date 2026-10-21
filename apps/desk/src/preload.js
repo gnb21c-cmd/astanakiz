@@ -63,6 +63,11 @@ contextBridge.exposeInMainWorld("desk", {
     get: (job) => ipcRenderer.invoke("notes:get", job),
     set: (job) => ipcRenderer.invoke("notes:set", job),
   },
+  // 근무자 메모장 (V2.0): 평일 ↔ 주말 전달 · 근무자마다 메모 — 이 PC 에만
+  memo: {
+    get: () => ipcRenderer.invoke("memo:get"),
+    set: (d) => ipcRenderer.invoke("memo:set", d),
+  },
   // 방문 이벤트 참여자 기록 (이용완료마다 한 줄 · 10/14) — 앱 폴더 + 바탕화면 '아스타나키즈-이벤트' 두 곳 · 지우지 않음
   ledger: {
     load: (from) => ipcRenderer.sendSync("ledger:load", from), // 두 곳을 합친 글 (빠진 쪽은 채움)

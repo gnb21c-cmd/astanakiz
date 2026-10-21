@@ -140,8 +140,8 @@ test("쿠폰 보안 띠: 성공 입장권의 쿠폰 위아래에 등록 글자(E
     assert.match(await page.evaluate(() => localStorage.getItem("astanakiz-sealkey")), /^[0-9a-f]{32}$/, "체험판 비밀값은 이 브라우저에 (앱은 이 PC 설정에)");
 
     // 운영 설정 → 방문 이벤트 → 2번 성공 미리보기에 그림 · [쿠폰 보안 무늬] 끄면 글자
-    await page.click("text=운영 설정");
-    await page.click('[data-t="event"]');
+    await page.dblclick("#now");
+    await page.click('[data-t=\"prints\"]'); await page.click('[data-s=\"event\"]');
     await page.click("[data-act=evTpl][data-i='1']");
     assert.strictEqual(await page.$eval("#ev-paper .seal img", (im) => im.naturalWidth), 504);
     assert.ok(await page.isChecked("#ev-seal"), "처음엔 켜짐");
@@ -252,8 +252,8 @@ test("시험 출력 시간 어림 (현장 10/17 'COM1 액세스 거부'): 쿠폰
     assert.ok(r.text < 3 && r.guide < 3, "글만이면 금방 " + JSON.stringify(r));
     assert.strictEqual(r.win, 0, "Windows 프린터는 어림 없음");
     // 체험판 [2번 성공으로 시험 출력]: 걸리는 초를 알려 줌
-    await page.click("text=운영 설정");
-    await page.click('[data-t="event"]');
+    await page.dblclick("#now");
+    await page.click('[data-t=\"prints\"]'); await page.click('[data-s=\"event\"]');
     await page.click("[data-act=evTpl][data-i='1']");
     await page.click("[data-act=evTest]");
     assert.match(await page.textContent("#toast"), /시험 출력 \(COM1 · 9600, 체험\)/);

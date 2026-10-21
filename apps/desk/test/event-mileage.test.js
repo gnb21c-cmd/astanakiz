@@ -93,7 +93,7 @@ test("사장님 시나리오: 홍길동 이벤트 전 5 + 기간 6번(네이버 
     await onDay(ctx, "2027-03-01", async (page) => {
       assert.deepStrictEqual(await ledger(page, HONG), { base: 5, last: 11, n: [6, 7, 8, 9, 10, 11], st: ["안내", "성공", "성공", "안내", "성공", "안내"] });
       assert.strictEqual(await ledger(page, KIM), null, "김철수는 기간에 안 옴 → 장부에 없음");
-      await page.click("text=운영 설정"); await page.click('[data-t="event"]');
+      await page.dblclick("#now"); await page.click('[data-t=\"prints\"]'); await page.click('[data-s=\"event\"]');
       assert.match(await page.textContent("#sheet .evstate"), /끝남 — 10월 26일 ~ 2월 28일/);
       await page.fill("#ev-q", "0001");
       assert.match((await page.textContent("#ev-hits")).replace(/\s+/g, " "), /홍길동님 010-9999-0001 · 마일리지 5 \(네이버 완료 11 − 이벤트 6\).*방문 6일 · 성공 3번/);

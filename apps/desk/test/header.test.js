@@ -66,7 +66,7 @@ test("맨 위: 통합 데스크 · 포스 전환 · 환전 오픈(현금통 열�
     assert.deepStrictEqual([job.mode, job.port, job.pin], ["com", "COM3", "auto"]);
     assert.match(await page.textContent("#toast"), /현금통을 열었어요/);
     // 현금통 단자 5번으로 → 그 핀만 (운영 설정 → 프린터)
-    await page.click("text=운영 설정");
+    await page.dblclick("#now");
     await page.click('[data-t="printer"]');
     await page.click("[data-act=drawerPin][data-v='5']");
     assert.strictEqual(await page.evaluate(() => window.__cfg.drawerPin), "5", "이 PC 설정에 저장");

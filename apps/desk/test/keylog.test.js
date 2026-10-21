@@ -28,7 +28,7 @@ test("경고 문구 · 입장권 목록 최근 입장 순 · 반납해도 열쇠
       const cafe = document.getElementById("talk-cafe").getBoundingClientRect(), bulk = document.getElementById("bulk-btn").getBoundingClientRect();
       return { text: e.innerText.split("\n").map((s) => s.trim()), bold: +getComputedStyle(e).fontWeight >= 700, between: r.left >= cafe.right && r.right <= bulk.left, sameRow: r.top < bulk.bottom && r.bottom > bulk.top };
     });
-    assert.deepStrictEqual(w, { text: ["모든 키 반납 확인 후", "한번에 종료 처리 하세요"], bold: true, between: true, sameRow: true });
+    assert.deepStrictEqual(w, { text: ["모든 키 반납 확인 후", "한번에 종료 처리 하세요"], bold: false, between: true, sameRow: true }, "V2.0: 굵지 않은 보통 글씨 (사장님 10/21)");
 
     // 입장권 목록: 열쇠를 가져간 순서 (최근 입장이 맨 위)
     await page.$eval("#sold", (e) => e.click());

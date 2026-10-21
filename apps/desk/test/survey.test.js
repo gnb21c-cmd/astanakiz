@@ -15,7 +15,7 @@ try {
 const DESK = "file://" + path.join(__dirname, "..", "..", "..", "prototype", "desk.html");
 const launch = () => chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
 const Q = "신규고객께 아스타나키즈를 어떻게 알게 되었는지 물어봐주세요";
-const openSurvey = async (page) => { await page.click("text=운영 설정"); await page.click('[data-t="survey"]'); };
+const openSurvey = async (page) => { await page.dblclick("#now"); await page.click('[data-t="etc"]'); };
 const close = (page) => page.click("#sheet [data-act=close] >> nth=0");
 
 test("설문조사: 신규 예약자는 번호를 눌러야 열쇠 · 현장구매자는 번호 또는 제외 · 기간 누적 · 20:00 보고", async () => {
@@ -32,10 +32,10 @@ test("설문조사: 신규 예약자는 번호를 눌러야 열쇠 · 현장구�
     assert.strictEqual(await page.$("#sheet .svbox"), null);
     await close(page);
 
-    // 운영 설정 → 설문조사 (마지막 탭)
-    const tabs = await page.$$eval("#sheet .tabs button", (e) => e.map((x) => x.textContent.trim())).catch(() => []);
+    // 운영 설정 → 기타 (왼쪽 메뉴 맨 아래 · V2.0) → 설문조사
     await openSurvey(page);
-    assert.strictEqual((await page.$$eval("#sheet .tabs button", (e) => e.map((x) => x.textContent.trim()))).pop(), "설문조사", "아마노 · POS 다음 " + tabs);
+    assert.deepStrictEqual(await page.$$eval("#sheet .setnav button span", (e) => e.map((x) => x.textContent.trim())), ["비성수기 설정", "프린터 설정", "프린트물 설정", "근무자 등록", "API 연결 설정", "네이버 설정", "기타"]);
+    assert.strictEqual(await page.getAttribute("#sheet .setnav [data-t=etc]", "aria-current"), "page");
     await page.fill("#sv-from", "2026-10-05");
     await page.fill("#sv-to", "2026-10-31");
     assert.match(await page.textContent("#sheet .evstate"), /진행 중/);

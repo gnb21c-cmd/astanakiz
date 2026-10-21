@@ -94,8 +94,8 @@ test("재방문 간격(앱): 입장 처리 때마다 그날 손님 · 20:00 일�
     assert.deepStrictEqual([h.send.length, h.backfill.length], [3, 1], "그 뒤로 그날은 더 안 보내고 · 안 읽음");
     assert.strictEqual((await page.evaluate(() => window.__cfg.revisit)).sentDay, "2026-10-26", "보낸 날 저장 (다시 켜도 그날 또 안 보냄)");
     // 설정 → 설문조사 탭: 재방문 간격 줄
-    await page.click("text=운영 설정");
-    await page.click('[data-t="survey"]');
+    await page.dblclick("#now");
+    await page.click('[data-t="etc"]');
     assert.match(await page.textContent("#hv-text"), /기록 4\/1 ~ 10\/26 · 205일 · 마지막 20:\d\d 보냄/);
     const box = await page.evaluate(() => document.getElementById("sheet").getBoundingClientRect().bottom);
     assert.ok(box <= 768, "설정 화면 안 " + box);
@@ -110,8 +110,8 @@ test("재방문 간격(앱): [지난 방문 기록 읽기] 4/1 ~ 어제 · 영�
   try {
     const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
     const { page, errs, hv } = await setup(ctx, { time: "2026-10-26T15:00:00" });
-    await page.click("text=운영 설정");
-    await page.click('[data-t="survey"]');
+    await page.dblclick("#now");
+    await page.click('[data-t="etc"]');
     assert.match(await page.textContent("#hv-text"), /^지난 기록은 20:00 에 저절로 읽어요 · 기록 10\/26 ~ 10\/26 · 1일 · 매일 20:00 보내요$/, "설정을 열면 앱 본체에 방문 기록을 다시 물음");
     await page.click("#sheet [data-act=hvBackfill]");
     assert.strictEqual((await hv()).backfill.length, 0, "영업 중 첫 누름은 안내만");
@@ -137,8 +137,8 @@ test("재방문 간격(앱): [지난 방문 기록 읽기] 4/1 ~ 어제 · 영�
     const { page: p2, hv: hv2 } = await setup(ctx, { key: false, time: "2026-10-26T19:59:00" });
     await p2.clock.runFor(3 * 60 * 1000);
     assert.deepStrictEqual([(await hv2()).send.length, (await hv2()).backfill.length], [0, 0], "보내지도 · 저절로 읽지도 않음");
-    await p2.click("text=운영 설정");
-    await p2.click('[data-t="survey"]');
+    await p2.dblclick("#now");
+    await p2.click('[data-t="etc"]');
     assert.match(await p2.textContent("#hv-text"), /보고 열쇠를 넣으면/);
   } finally {
     await browser.close();
@@ -150,8 +150,8 @@ test("재방문 간격(체험판): 설정에 줄은 보이고 · 설치한 앱�
   try {
     const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
     await page.goto(DESK);
-    await page.click("text=운영 설정");
-    await page.click('[data-t="survey"]');
+    await page.dblclick("#now");
+    await page.click('[data-t="etc"]');
     assert.match(await page.textContent("#hv-text"), /체험판/);
     await page.click("#sheet [data-act=hvBackfill]");
     assert.match(await page.textContent("#toast"), /설치한 앱/);
