@@ -74,7 +74,7 @@ function makeAmanoWin(kind) {
   const win = new BrowserWindow({ width: 1024, height: 768, show: false, skipTaskbar: true, title: kind === "back" ? "아마노 (뒤에서 할인 등록)" : "아마노 주차 (입장 데스크가 조작 중)", webPreferences: { backgroundThrottling: false } });
   win.setMenuBarVisibility(false);
   if (settings.amanoUrl) win.loadURL(settings.amanoUrl);
-  else win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent("<p style='font:16px sans-serif;padding:24px'>운영 설정 → 아마노 탭에서 아마노 할인등록 주소를 넣어 주세요.</p>"));
+  else win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent("<p style='font:16px sans-serif;padding:24px'>운영 설정 → API 연결 설정에서 아마노 할인등록 주소를 넣어 주세요.</p>"));
   const sync = new AmanoSync((code) => timed(win.webContents.executeJavaScript(code, true), 8000, "아마노 화면이 응답하지 않음"), { selectors: settings.amanoSelectors });
   // 로그인하면 할인등록 화면으로 자동 이동 (근무자는 아침에 아이디·비밀번호만 넣으면 됨)
   win.webContents.on("did-finish-load", async () => {
@@ -558,7 +558,7 @@ async function talkCount(k) {
       t.fails = 0;
       t.okAt = Date.now();
       t.state = { n: r.n, warn: "" };
-    } else if (r.needLogin) t.state = { n: 0, warn: "네이버 로그인이 필요해요 (운영 설정 → 톡톡 화면 보기)" };
+    } else if (r.needLogin) t.state = { n: 0, warn: "네이버 로그인이 필요해요 (운영 설정 → API 연결 설정 → 톡톡 화면 보기)" };
     else throw new Error(r.why || "톡톡 화면을 읽지 못함");
   } catch (e) {
     if (++t.fails >= 3) t.state = { n: 0, warn: String(e.message || e) }; // 잠깐 못 읽은 것은 넘어감
@@ -587,7 +587,7 @@ function talkTick() {
 ipcMain.handle("talk:counts", () => talkStates());
 ipcMain.handle("talk:open", (_e, k) => {
   if (!TALK_KINDS[k]) return { ok: false, why: "모르는 상담" };
-  if (!talkUrl(k)) return { ok: false, why: `운영 설정 → 아마노 · POS → 네이버 톡톡에서 ${TALK_KINDS[k]} 화면을 먼저 정해 주세요` };
+  if (!talkUrl(k)) return { ok: false, why: `운영 설정 → API 연결 설정 → 네이버 톡톡에서 ${TALK_KINDS[k]} 화면을 먼저 정해 주세요` };
   showTalk(k, false);
   return { ok: true };
 });
@@ -1266,7 +1266,7 @@ function prnAgentSend(job, ms = 6000) {
 }
 ipcMain.handle("print:drawer", async (_e, { mode, port, baud, deviceName, pin }) => {
   if (mode === "com" && !port) return { ok: false, why: "영수증 프린터 COM 포트를 먼저 정해 주세요" };
-  if (mode !== "com" && !deviceName) return { ok: false, why: "운영 설정 → 프린터에서 영수증 프린터를 먼저 정해 주세요" };
+  if (mode !== "com" && !deviceName) return { ok: false, why: "운영 설정 → 프린터 설정에서 영수증 프린터를 먼저 정해 주세요" };
   // COM 은 출력과 같은 포트 → 출력 중이면 끝난 뒤 바로 (com-queue · 현장 10/17)
   return mode === "com" ? comTurn(port, () => drawerOpen(mode, port, baud, deviceName, pin)) : drawerOpen(mode, port, baud, deviceName, pin);
 });

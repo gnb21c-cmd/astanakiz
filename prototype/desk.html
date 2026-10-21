@@ -258,9 +258,6 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .evdates { color: var(--fg); font-weight: 700; }
 .evgrid .evdays { flex-wrap: nowrap; gap: 4px; }
 .evgrid .evdays .date-in { width: 126px !important; padding: 4px 5px; }
-.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
-.tabs button { border: 0; background: transparent; padding: 6px 12px; font-weight: 700; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
-.tabs button.on { color: var(--fg); border-bottom-color: var(--ink); }
 .cfg { font-size: 15px !important; font-weight: 500 !important; min-height: 38px !important; letter-spacing: 0 !important; }
 .date-in { font-size: 14px !important; min-height: 34px; width: 150px !important; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 .peakrow { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; }
@@ -1794,7 +1791,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       // 계속 실패하면 30분 쉼 (네이버 창을 붙잡고 있으면 이용완료 · 불러오기가 늦어져 현장 통제에 지장)
       capFails = bad ? capFails + 1 : 0;
       if (capFails >= 3) { capPauseUntil = now + 30; capFails = 0; capNote({ ok: false, why: "3번 연속 실패 — 30분 쉬었다가 다시 해요 (네이버 화면 확인)" }); }
-      toast(`네이버 판매 수량 조절${done.length ? `: ${done.join(" · ")}` : ""}${bad ? ` · 실패 ${bad}건 (운영 설정 → 수량 자동조절)` : ""}`);
+      toast(`네이버 판매 수량 조절${done.length ? `: ${done.join(" · ")}` : ""}${bad ? ` · 실패 ${bad}건 (운영 설정 → 네이버 설정)` : ""}`);
     } finally { capBusy = false; renderAll(); if (sheet.mode === "settings" && sheet.tab === "naver") renderSheet(); }
   }
   /** 매분: 켜져 있으면 10분마다 (실패 · 바쁨이면 다음 분에 다시) */
@@ -2648,10 +2645,10 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   function printForm(kind, v) {
     const f = PRINT.forms[kind];
     if (!f || !f.auto) return "";
-    if (!printerReady()) return " · 프린터를 아직 고르지 않아 출력 못 함 (운영 설정 → 프린터)";
+    if (!printerReady()) return " · 프린터를 아직 고르지 않아 출력 못 함 (운영 설정 → 프린터 설정)";
     if (!APP || !window.desk.print) return ` · ${f.name} 출력 (${printerName()}, 체험)`;
     sendPrint(kind === "enter" ? enterText() : f.text, v).then((r) => {
-      if (!r || !r.ok) toast(`${f.name} 출력 실패: ${(r && r.why) || "응답 없음"} — 운영 설정 → 프린터에서 확인`);
+      if (!r || !r.ok) toast(`${f.name} 출력 실패: ${(r && r.why) || "응답 없음"} — 운영 설정 → 프린터 설정에서 확인`);
       else if (r.cutWhy) toast(`출력은 됐지만 자르기 명령 실패: ${r.cutWhy}`);
     });
     return ` · ${f.name} 출력`;
@@ -2681,7 +2678,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   };
 
   // ── 방문 이벤트 (사장님 10/14 · 10/15 단순하게) ─────────────
-  /* 재방문 이벤트 — 운영 설정 → 방문 이벤트에서 시작일 ~ 종료일
+  /* 재방문 이벤트 — 운영 설정 → 프린트물 설정 → 재방문 이벤트 · 쿠폰에서 시작일 ~ 종료일
      - 기간 동안 네이버 예약 손님 입장권: 마일리지(네이버 이용완료 누계 · 10회 사은권) 대신 이벤트 안내 → 마일리지는 멈춤
      - 방문한 날(D) + 기한(기본 20일, 그날 포함) 안에 다시 오면 성공 → 사은품(기본 수제돈까스) · 그 방문일부터 다시 기한 → 계속 반복
        처음 · 기한 넘김 = 1번 안내 (다음 기한) · 기한 안 = 2번 성공 · 같은 날 또 오면 1번 안내(기한 그대로) · 기한은 종료일을 넘지 않음
@@ -3034,7 +3031,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 
   // ── 설문조사 (사장님 10/14) ───────────────────────
   /* 신규 손님에게 '아스타나키즈를 어떻게 알게 되었는지' (현장 안내문의 1~n 번호) — 근무자가 손님이 말한 번호를 누름
-     - 대상: 신규고객(네이버 '완료 0' 예약자) · 현장구매자 · 전체고객(네이버 · 현장 모두) — 운영 설정 → 설문조사
+     - 대상: 신규고객(네이버 '완료 0' 예약자) · 현장구매자 · 전체고객(네이버 · 현장 모두) — 운영 설정 → 기타 → 설문조사
      - 대상 손님은 번호를 눌러야 열쇠를 고르고 등록할 수 있음 (필수 단계). 신규가 아닌 현장구매자 · 전체고객의 기존 손님은 [제외]
      - 답(번호, 제외 = 0)은 그 예약 · 현장입장 기록(sv)에 붙어 날짜별 저장 파일에 남음 → 설문 기간 누적 = 저장 파일을 더함
      - 보고앱에 보내기를 켜면 기간 동안 매일 20:00 에 번호별 오늘 · 누적 수를 보냄 (파일로 남기고 · 보고앱 주소가 있으면 그 주소로) */
@@ -3199,7 +3196,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   // ── 네이버 재고 자동 오픈 (사장님 10/20) ─────────────────────
   /* 매일 오늘 + 30일 날짜를 두 상품(평일 무제한 / 휴일 1시간 50분 · 야간자유) 모두 회차마다 재고 10개로 — 앱 본체(main.js stockTick · naver-stock.js)가
      10:30 → 실패하면 12:00 → 16:00 → 20:20 에 (어느 때든 성공하면 그날 남은 것은 안 함). 1.54: 확인하지 않고 바로 [재고수정] (이미 넣은 날도 10개로)
-     데스크는 운영 설정 → 수량 자동조절 맨 위에서 켜기 · 끄기 · [확인만 해 보기](그 날짜 '모든 회차' 확인 창까지 가 보고 취소 · 바꾸지 않음) · [지금 한 번 열기] · 결과 */
+     데스크는 운영 설정 → 네이버 설정 '매일 재고 열기'에서 켜기 · 끄기 · [확인만 해 보기](그 날짜 '모든 회차' 확인 창까지 가 보고 취소 · 바꾸지 않음) · [지금 한 번 열기] · 결과 */
   const ST = { view: null };
   const ST_APP = () => APP && !!(window.desk && window.desk.stock);
   const stShort = (n) => String(n || "").replace(/\s*입장권$/, "").split(" / ")[0];
@@ -3827,7 +3824,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     // 맨 위 '환전 오픈': POS 와 연결된 현금통을 엶 — 영수증 프린터의 돈통 단자로 열기 명령 (POS 프로그램이 꺼져 있어도 · 사장님 10/9)
     async drawer() {
       if (!APP || !window.desk.print || !window.desk.print.drawer) { toast("체험판: 설치한 앱에서는 현금통이 열려요"); return; }
-      if (!printerReady()) { toast("운영 설정 → 프린터에서 영수증 프린터(포트)를 먼저 정해 주세요"); return; }
+      if (!printerReady()) { toast("운영 설정 → 프린터 설정에서 영수증 프린터(포트)를 먼저 정해 주세요"); return; }
       const r = await window.desk.print.drawer({ mode: PRINT.mode, port: PRINT.port, baud: PRINT.baud, deviceName: PRINT.sel, pin: PRINT.drawerPin }).catch((e) => ({ ok: false, why: String(e) }));
       toast(r && r.ok ? "현금통을 열었어요" : `현금통을 못 열었어요: ${(r && r.why) || "응답 없음"}`);
     },
@@ -4006,7 +4003,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     async evOpen() { const r = await window.desk.ledger.open().catch((e) => ({ ok: false, why: String(e) })); if (!r || !r.ok) toast(`폴더를 못 열었어요: ${(r && r.why) || ""}`); },
     evReset() { if (EV.cur === EV_BASE) EV.form = null; else EV.tpl[EV.cur] = EV_TPL[EV.cur]; evSaveCfg(); renderSheet(); },
     async evTest() {
-      if (!printerReady()) { toast("운영 설정 → 프린터에서 영수증 프린터를 먼저 정해 주세요"); return; }
+      if (!printerReady()) { toast("운영 설정 → 프린터 설정에서 영수증 프린터를 먼저 정해 주세요"); return; }
       const text = evBaseForm(), v = evSample(EV.cur === EV_BASE ? 0 : EV.cur), secs = printSecs(text, v);
       const wait = secs >= 3 ? ` (${Math.ceil(secs)}초쯤 걸려요)` : "";
       if (!APP || !window.desk.print) { toast(`${ro(evName(EV.cur))} 시험 출력 (${printerName()}, 체험)${wait}`); return; }

@@ -84,7 +84,7 @@ class NaverSync {
     this.step(`네이버 ${view === "list" ? "예약 목록" : "예약현황"} 화면 확인 (지금: ${s.page === "calendar" ? "예약현황" : s.page === "list" ? "예약자관리" : s.needLogin ? "로그인 화면" : "다른 화면"})`);
     if (s.needLogin) return { ok: false, why: "네이버에 로그인해 주세요 (로그인할 때 '로그인 상태 유지'를 꼭 체크)" };
     if (s.page === view) return { ok: true, state: s };
-    if (!this.urls) return { ok: false, why: "네이버 예약관리 주소를 모름 (운영 설정 → 지금 화면을 시작 화면으로)" };
+    if (!this.urls) return { ok: false, why: "네이버 예약관리 주소를 모름 (운영 설정 → API 연결 설정 → 지금 화면을 시작 화면으로)" };
     const r = await this.act(`window.__naver.go(${JSON.stringify(this.urls[view])})`);
     if (!r.ok) return r;
     s = await this.read();
