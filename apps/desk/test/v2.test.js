@@ -1,7 +1,8 @@
 /* V2.0 (사장님 10/21) — 새 디자인 · 시계로 운영 설정 · 열쇠 테두리 · 메모장 · 근무자 메뉴얼
    - 시계를 1.5초 안에 두 번 누르면 운영 설정 (버튼은 없앰) · 왼쪽 메뉴 7개 · 긴 설명은 [?]
    - 열쇠판: 띠지 · 글씨 없음 — 네이버 흰색 테두리 · 현장 파랑 테두리 · 서비스 흰 점선
-   - 메모장: 평일 ↔ 주말 전달(받는 쪽 [확인함]) · 근무자마다 메모(해결 → 완료) · 찾기 · 다시 켜도 그대로
+   - 메모장(10/21 다시): 시간표 위 상자 = 근무자마다 + 관리자 · 숫자 = 완료 안 한 것 · 전달(받을 사람 고름 · 관리자는 모두) [접수] · [완료] · 지난 기록 · 전체 기록 · 찾기
+   - 평일 [오늘 수량조절](10/21): 비수기 평일에 체크하면 그날만 수량 자동조절
    - 근무자 메뉴얼: 맨 위 버튼 · 차례 · 그림 */
 const test = require("node:test");
 const assert = require("node:assert");
@@ -19,33 +20,52 @@ try {
 const DESK = "file://" + path.join(__dirname, "..", "..", "..", "prototype", "desk.html");
 const launch = () => chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
 
-test("메모 파일: 모르는 칸 · 틀린 값은 버림 · 길이 · 줄 수 제한(끝난 것부터) · 저장 · 깨지면 bak 에서", () => {
+test("메모 파일(2번 모양): 모르는 칸 · 틀린 값은 버림 · 길이 · 줄 수 제한(끝난 것부터) · 1번 모양(평일 ↔ 주말 전달)은 전달로 · 저장 · 깨지면 bak 에서", () => {
   const d = M.clean({
-    staff: [{ id: "a1", name: " 김민지 ", grp: "주말", pw: "x" }, { id: "a1", name: "중복" }, { id: "BAD!", name: "x" }, { id: "b2", name: "가".repeat(40), grp: "?" }],
-    hand: [{ id: "h1", dir: "평일→주말", text: " 단체 20명 ", by: "a1", at: "2026-10-21 13:40", ok: "", okBy: "" }, { id: "h2", dir: "옆으로", text: "x" }, { id: "h3", dir: "주말→평일", text: "   " }],
+    v: 2, admin: " 사장님 ", pw: "x",
+    staff: [{ id: "a1", name: " 김민지 ", grp: "주말" }, { id: "a1", name: "중복" }, { id: "BAD!", name: "x" }, { id: "admin", name: "관리자 흉내" }, { id: "b2", name: "가".repeat(40) }],
     notes: [{ id: "n1", who: "a1", text: "냉장고 확인", at: "2026-10-21 12:10", done: "2026-10-21 15:00" }, { id: "n2", who: "", text: "주인 없음" }],
-    extra: "버림",
+    msgs: [
+      { id: "m1", from: "admin", to: ["a1", "b2", "a1", "BAD!"], text: " 단체 20명 ", at: "2026-10-21 13:40", st: { a1: { ack: "2026-10-21 13:45", done: "" }, zz: { ack: "2026-10-21 13:45" } } },
+      { id: "m2", from: "a1", to: [], text: "받는 사람 없음" }, { id: "m3", from: "a1", to: ["b2"], text: "  " }, { id: "m1", from: "a1", to: ["b2"], text: "같은 번호" },
+      { id: "m4", from: "a1", to: ["b2"], text: "완료만 눌러도 접수", at: "2026-10-21 14:00", st: { b2: { done: "2026-10-21 14:10" } } },
+    ],
   });
-  assert.deepStrictEqual(d.staff, [{ id: "a1", name: "김민지", grp: "주말" }, { id: "b2", name: "가".repeat(M.NAME_MAX), grp: "평일" }]);
-  assert.deepStrictEqual(d.hand, [{ id: "h1", dir: "평일→주말", text: "단체 20명", by: "a1", at: "2026-10-21 13:40", ok: "", okBy: "" }]);
+  assert.strictEqual(d.v, 2);
+  assert.strictEqual(d.admin, "사장님");
+  assert.deepStrictEqual(d.staff, [{ id: "a1", name: "김민지" }, { id: "b2", name: "가".repeat(M.NAME_MAX) }], "같은 번호 · 틀린 번호 · 관리자 번호는 근무자가 아님");
   assert.deepStrictEqual(d.notes, [{ id: "n1", who: "a1", text: "냉장고 확인", at: "2026-10-21 12:10", done: "2026-10-21 15:00" }]);
-  assert.strictEqual(d.extra, undefined);
+  assert.deepStrictEqual(d.msgs, [
+    { id: "m1", from: "admin", to: ["a1", "b2"], text: "단체 20명", at: "2026-10-21 13:40", st: { a1: { ack: "2026-10-21 13:45", done: "" } } },
+    { id: "m4", from: "a1", to: ["b2"], text: "완료만 눌러도 접수", at: "2026-10-21 14:00", st: { b2: { ack: "2026-10-21 14:10", done: "2026-10-21 14:10" } } },
+  ]);
+  assert.strictEqual(d.pw, undefined);
   assert.strictEqual(M.clean({ notes: [{ id: "n1", who: "a1", text: "가".repeat(999) }] }).notes[0].text.length, M.TEXT_MAX);
-  // 넘치면 해결한 것부터 오래된 순으로 뺌
-  const many = Array.from({ length: M.LIMIT.notes + 2 }, (_, i) => ({ id: "n" + i, who: "a1", text: "t" + i, done: i === 5 || i === 9 ? "2026-10-21 10:00" : "" }));
-  const kept = M.clean({ notes: many }).notes.map((n) => n.id);
-  assert.strictEqual(kept.length, M.LIMIT.notes);
-  assert.ok(!kept.includes("n5") && !kept.includes("n9") && kept.includes("n0"), "할 일은 남기고 해결한 것을 뺌");
+  assert.strictEqual(M.clean({}).admin, "관리자");
+  // 넘치면 끝난 것부터 오래된 순으로 뺌
+  const many = Array.from({ length: M.LIMIT.msgs + 2 }, (_, i) => ({ id: "m" + i, from: "a1", to: ["b2"], text: "t" + i, st: i === 5 || i === 9 ? { b2: { ack: "2026-10-21 10:00", done: "2026-10-21 10:00" } } : {} }));
+  const kept = M.clean({ staff: [], msgs: many }).msgs.map((m) => m.id);
+  assert.strictEqual(kept.length, M.LIMIT.msgs);
+  assert.ok(!kept.includes("m5") && !kept.includes("m9") && kept.includes("m0"), "완료 안 된 전달은 남기고 끝난 것을 뺌");
+  // 1번 모양 (V2.0 처음): 평일 ↔ 주말 전달 → 쓴 사람 빼고 모든 근무자에게 · 확인한 것은 접수 · 완료
+  const old = M.clean({ v: 1, staff: [{ id: "a1", name: "민지", grp: "평일" }, { id: "b2", name: "하늘", grp: "주말" }, { id: "c3", name: "서준", grp: "주말" }],
+    hand: [{ id: "h1", dir: "평일→주말", text: "단체", by: "a1", at: "2026-10-21 13:40", ok: "2026-10-21 16:27", okBy: "b2" }, { id: "h2", dir: "주말→평일", text: "용지", by: "", at: "2026-10-21 13:41", ok: "" }], notes: [] });
+  assert.deepStrictEqual(old.msgs, [
+    { id: "h1", from: "a1", to: ["b2", "c3"], text: "단체", at: "2026-10-21 13:40", st: { b2: { ack: "2026-10-21 16:27", done: "2026-10-21 16:27" }, c3: { ack: "2026-10-21 16:27", done: "2026-10-21 16:27" } } },
+    { id: "h2", from: "", to: ["a1", "b2", "c3"], text: "용지", at: "2026-10-21 13:41", st: {} },
+  ]);
+  assert.deepStrictEqual(old.staff, [{ id: "a1", name: "민지" }, { id: "b2", name: "하늘" }, { id: "c3", name: "서준" }], "평일 / 주말 나눔은 안 씀");
 
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sm-"));
   assert.deepStrictEqual(M.load(dir), M.empty());
   M.save(dir, d);
   assert.deepStrictEqual(M.load(dir), d);
-  const d2 = M.clean({ ...d, notes: [] });
-  M.save(dir, d2); // 앞 파일 → bak
+  M.save(dir, M.clean({ ...d, notes: [] })); // 앞 파일 → bak
   fs.writeFileSync(path.join(dir, M.FILE), "{깨짐");
   assert.deepStrictEqual(M.load(dir), d, "깨지면 bak (바로 앞 저장) 에서");
   assert.ok(fs.readdirSync(dir).some((f) => f.startsWith("staff-memo.broken-")), "깨진 파일은 지우지 않고 옆에");
+  fs.writeFileSync(path.join(dir, M.FILE), JSON.stringify({ v: 1, staff: [{ id: "a1", name: "민지" }], hand: [], notes: [] }));
+  assert.deepStrictEqual(M.load(dir).staff, [{ id: "a1", name: "민지" }], "1번 모양 파일도 읽음");
 });
 
 test("시계를 1.5초 안에 두 번 → 운영 설정 (버튼 없음) · 왼쪽 메뉴 7개 · 긴 설명은 [?] · 예전 탭 이름도 받음", async () => {
@@ -116,7 +136,7 @@ test("열쇠판: 띠지 · 사은권 표시 없이 테두리로 — 네이버 �
   }
 });
 
-test("메모장: 근무자 등록 → 평일 ↔ 주말 전달 · [확인함] · 내 메모 → 해결 → 완료 · 찾기 · 다시 켜도 그대로", async () => {
+test("메모장(사람마다 상자): 근무자 등록 → 상자 · 관리자는 모두에게 · 받을 사람 고르기 · [접수] · [완료] · 숫자 · 지난 기록 · 전체 기록 · 찾기 · 다시 켜도 그대로", async () => {
   const browser = await launch();
   try {
     const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
@@ -124,72 +144,140 @@ test("메모장: 근무자 등록 → 평일 ↔ 주말 전달 · [확인함] ·
     const errs = [];
     page.on("pageerror", (e) => errs.push(e.message));
     page.on("dialog", (d) => d.accept());
-    await page.clock.install({ time: new Date("2026-10-05T13:50:00") }); // 10/5 공휴일 → 오늘 받는 쪽 = 주말
+    await page.clock.install({ time: new Date("2026-10-05T13:50:00") });
     await page.goto(DESK);
     await page.evaluate(() => localStorage.clear());
     await page.reload();
-    assert.ok(await page.isHidden("#memo-badge"));
-    // 메모 버튼은 시간표 상자 바로 위
-    const pos = await page.evaluate(() => { const b = document.querySelector("[data-act=memo]").getBoundingClientRect(), p = document.querySelector(".leftcol .panel").getBoundingClientRect(); return b.bottom <= p.top && Math.abs(b.left - p.left) < 2; });
-    assert.ok(pos, "[메모] = 시간표 위");
-    // 근무자가 없으면 안내
-    await page.click("[data-act=memo]");
-    assert.match(await page.textContent("#memo-body"), /근무자 이름이 아직 없어요 — 관리자가 운영 설정 → 근무자 등록/);
-    await page.click("#sheet [data-act=close]");
-    // 운영 설정 → 근무자 등록
+    const boxes = () => page.$$eval(".mbox", (e) => e.map((x) => x.querySelector(".mname").textContent + (x.querySelector(".mcnt") ? `(${x.querySelector(".mcnt").textContent}${x.querySelector(".mcnt.new") ? "새" : ""})` : "")));
+    assert.deepStrictEqual(await boxes(), ["관리자"], "근무자가 없으면 관리자 상자만");
+    const pos = await page.evaluate(() => { const b = document.getElementById("memo-boxes").getBoundingClientRect(), p = document.querySelector(".leftcol .panel").getBoundingClientRect(); return b.bottom <= p.top && Math.abs(b.left - p.left) < 2; });
+    assert.ok(pos, "상자 = 시간표 위");
+    // 운영 설정 → 근무자 등록: 이름 · 별칭 · 성 → 상자가 늘어남
     await page.dblclick("#now");
     await page.click("[data-t=staff]");
-    for (const [n, g] of [["김민지", "평일"], ["이하늘", "주말"]]) {
-      await page.click("[data-act=staffAdd]");
-      await page.keyboard.type(n);
-      await page.locator(".staffrow").last().locator(`[data-g=${g}]`).click();
-    }
-    assert.match(await page.textContent("#sheet .setnav [data-t=staff]"), /2명/);
+    for (const n of ["민지", "서준", "하늘"]) { await page.click("[data-act=staffAdd]"); await page.keyboard.type(n); }
+    await page.fill("#memo-admin", "사장님");
+    await page.clock.runFor(700);
+    assert.match(await page.textContent("#sheet .setnav [data-t=staff]"), /3명 \+ 관리자/);
     await page.click("#sheet [data-act=close]");
-    // 전달: 평일 → 주말 (오늘 받는 쪽) · 주말 → 평일
-    await page.click("[data-act=memo]");
-    assert.match(await page.textContent(".mhand.mine"), /평일.*주말.*오늘 받는 쪽/s);
-    assert.match(await page.getAttribute(".mwho .on", "data-id"), /^[a-z0-9]+$/);
-    assert.strictEqual((await page.textContent(".mwho .on")).trim(), "이하늘", "오늘 쪽(주말) 근무자가 먼저 골라짐");
-    await page.click(".mwho button:has-text('김민지')");
-    await page.fill("#memo-wk", "토요일 단체 20명 — 열쇠 미리 빼 두기");
+    assert.deepStrictEqual(await boxes(), ["민지", "서준", "하늘", "사장님"], "근무자마다 하나 + 관리자");
+    // 관리자: 처음부터 모든 근무자에게 → 쓰고 Enter
+    await page.click(".mbox.adm");
+    assert.deepStrictEqual(await page.$$eval(".mto button.on", (e) => e.map((x) => x.textContent)), ["모두", "민지", "서준", "하늘"]);
+    await page.fill("#memo-msg", "토요일 단체 20명 — 열쇠 미리 빼 두기");
     await page.keyboard.press("Enter");
-    await page.fill("#memo-we", "영수증 용지 주문 부탁");
-    await page.click("[data-act=memoHand][data-dir='주말→평일']");
-    assert.match(await page.textContent(".mhand.mine"), /토요일 단체 20명.*김민지 · 13:50.*확인함/s);
+    assert.match(await page.textContent(".mitem.sent"), /토요일 단체 20명.*민지 아직.*서준 아직.*하늘 아직/s);
     await page.click("#sheet [data-act=close]");
-    assert.strictEqual(await page.textContent("#memo-badge"), "전달 1", "오늘(주말) 받을 전달만 셈");
-    // 받는 쪽이 [확인함] → 흐리게 · 배지 없어짐
-    await page.click("[data-act=memo]");
-    await page.click(".mwho button:has-text('이하늘')");
-    await page.click(".mhand.mine [data-act=memoOk]");
-    assert.match(await page.textContent(".mhand.mine .okd"), /✓ 이하늘 13:50 확인/);
-    assert.ok(await page.isHidden("#memo-badge"));
-    // 내 메모: 쓰고 Enter → 할 일 → ☐ → 완료 · 되돌리기
+    assert.deepStrictEqual(await boxes(), ["민지(1새)", "서준(1새)", "하늘(1새)", "사장님"], "쓴 것이 없어도 받은 전달 수 · 새 전달은 칠함");
+    // 민지: 내 메모 · 하늘에게만 전달 · 관리자 전달 [접수]
+    await page.click(".mbox:has-text('민지')");
     await page.fill("#memo-new", "카페 냉장고 온도 확인");
     await page.keyboard.press("Enter");
-    await page.fill("#memo-new", "키즈상담 톡 답장");
-    await page.click("[data-act=memoAdd]");
-    assert.match(await page.textContent("[data-act=memoTab][data-t=todo]"), /할 일 2/);
+    await page.click("[data-act=memoSend]");
+    assert.match(await page.textContent("#toast"), /받을 사람을 먼저 골라 주세요/);
+    await page.click(".mto button:has-text('하늘')");
+    await page.fill("#memo-msg", "영수증 용지 주문 부탁");
+    await page.keyboard.press("Enter");
+    await page.click(".mitem.fresh [data-act=memoAck]");
+    assert.match(await page.textContent("#memo-body"), /토요일 단체 20명.*사장님 → 3명 · 13:50 · 13:50 접수/s);
+    assert.match(await page.textContent("[data-act=memoTab][data-t=now]"), /지금 2/);
+    await page.click("#sheet [data-act=close]");
+    assert.deepStrictEqual(await boxes(), ["민지(2)", "서준(1새)", "하늘(2새)", "사장님"], "접수하면 칠하지 않음 · 완료 전까지 셈");
+    // 하늘: 받은 전달 둘 다 [완료] (알리기만 한 것은 바로) → 숫자 없어짐 · 지난 기록
+    await page.click(".mbox:has-text('하늘')");
+    while (await page.$(".mitem [data-act=memoFin]")) await page.click(".mitem [data-act=memoFin] >> nth=0");
+    await page.click("[data-act=memoTab][data-t=past]");
+    assert.match(await page.textContent("#memo-body"), /영수증 용지 주문 부탁.*받은 전달 · 민지.*13:50 완료/s);
+    await page.click("#sheet [data-act=close]");
+    assert.deepStrictEqual(await boxes(), ["민지(2)", "서준(1새)", "하늘", "사장님"]);
+    // 보낸 사람이 봄: 민지가 보낸 전달은 하늘 완료 → 지난 기록 · 관리자 보낸 전달은 사람마다
+    await page.click(".mbox.adm");
+    assert.match(await page.textContent(".mitem.sent"), /민지 접수.*서준 아직.*하늘 완료/s);
+    // 전체 전달 기록 (모두 같이 봄)
+    await page.click("[data-act=memoTab][data-t=all]");
+    assert.match(await page.textContent("#memo-body"), /영수증 용지 주문 부탁.*민지 → 하늘.*하늘 완료.*토요일 단체 20명.*사장님 → 민지, 서준, 하늘/s);
+    await page.click("#sheet [data-act=close]");
+    // 민지: 내 메모 완료 → 지난 기록 → 되돌리기 · 찾기
+    await page.click(".mbox:has-text('민지')");
     await page.click(".mitem:has-text('카페 냉장고') [data-act=memoDone]");
-    assert.match(await page.textContent("[data-act=memoTab][data-t=done]"), /완료 1/);
-    await page.click("[data-act=memoTab][data-t=done]");
-    assert.match(await page.textContent(".mlist"), /카페 냉장고 온도 확인.*13:50 해결/s);
-    // 다른 사람 메모장은 따로
-    await page.click(".mwho button:has-text('김민지')");
-    assert.match(await page.textContent(".mlist"), /할 일이 없어요/);
-    // 찾기: 전달 · 메모 모두 · 해결한 것도
+    await page.click("[data-act=memoTab][data-t=past]");
+    assert.match(await page.textContent("#memo-body"), /카페 냉장고 온도 확인.*내 메모 · 13:50 씀 · 13:50 완료/s);
     await page.fill("#memo-q", "냉장고");
-    assert.match(await page.textContent("#memo-body"), /'냉장고' 1개.*카페 냉장고 온도 확인.*이하늘.*해결/s);
-    await page.fill("#memo-q", "열쇠");
-    assert.match(await page.textContent("#memo-body"), /전달 평일 → 주말.*김민지.*이하늘 13:50 확인/s);
+    assert.match(await page.textContent("#memo-body"), /'냉장고' 1개.*카페 냉장고 온도 확인.*내 메모/s);
+    await page.fill("#memo-q", "영수증");
+    assert.match(await page.textContent("#memo-body"), /'영수증' 1개.*전달 민지 → 하늘.*하늘 완료/s);
     await page.fill("#memo-q", "");
+    await page.click("[data-act=memoUndo]");
+    await page.click("#sheet [data-act=close]");
+    assert.deepStrictEqual(await boxes(), ["민지(2)", "서준(1새)", "하늘", "사장님"], "되돌리면 다시 셈");
     // 다시 켜도 그대로 (체험판 = 이 브라우저 · 앱 = staff-memo.json)
     await page.reload();
-    await page.click("[data-act=memo]");
-    assert.match(await page.textContent(".mhand:not(.mine)"), /영수증 용지 주문 부탁/);
-    await page.click(".mwho button:has-text('이하늘')");
-    assert.match(await page.textContent("[data-act=memoTab][data-t=done]"), /완료 1/);
+    assert.deepStrictEqual(await boxes(), ["민지(2)", "서준(1새)", "하늘", "사장님"]);
+    // 근무자를 더하면 상자가 하나 늘어남
+    await page.dblclick("#now");
+    await page.click("[data-t=staff]");
+    await page.click("[data-act=staffAdd]");
+    await page.keyboard.type("주말2");
+    await page.clock.runFor(700);
+    await page.click("#sheet [data-act=close]");
+    assert.deepStrictEqual(await boxes(), ["민지(2)", "서준(1새)", "하늘", "주말2", "사장님"]);
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("평일 [오늘 수량조절]: 비수기 평일에 체크하면 그날만 네이버 판매 수량 자동조절 · 다음 날은 다시 꺼짐 · 시간제인 날은 저절로(잠김) · 자동조절을 끄면 못 누름", async () => {
+  const browser = await launch();
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+    const open = async (day) => {
+      const page = await ctx.newPage();
+      page.on("pageerror", (e) => errs.push(e.message));
+      await page.addInitScript((d) => { window.__today = d; }, day);
+      await page.goto(DESK);
+      return page;
+    };
+    const errs = [];
+    const state = (page) => page.evaluate(() => { const cb = document.getElementById("capforce-on"); const p = window.__deskTest.capPlan(); return { checked: cb.checked, disabled: cb.disabled, skip: p.skip || "", refresh: document.getElementById("refresh-at").textContent }; });
+    let page = await open("2026-10-06"); // 화요일 · 비수기 평일 (무제한)
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    // 관리자가 자동조절을 꺼 두면 못 누름
+    assert.deepStrictEqual(await state(page).then((s) => [s.checked, s.disabled]), [false, true]);
+    const pos = await page.evaluate(() => { const r = (s) => document.querySelector(s).getBoundingClientRect(); return { afterDrawer: r("#capforce").left >= r("[data-act=drawer]").right, beforeCurtain: r("#capforce").right <= r(".curtain-tab").left }; });
+    assert.deepStrictEqual(pos, { afterDrawer: true, beforeCurtain: true }, "환전 오픈 오른쪽 · 커튼 손잡이에 안 가림");
+    await page.dblclick("#now"); await page.click("[data-t=naver]"); await page.check("#cap-on");
+    await page.click("#sheet [data-act=close]");
+    let s = await state(page);
+    assert.deepStrictEqual([s.checked, s.disabled], [false, false]);
+    assert.match(s.skip, /비수기 평일\(무제한\)이라 조절하지 않아요 — 사람이 몰리면 맨 위 \[오늘 수량조절\]을 체크/);
+    assert.ok(!/수량조절/.test(s.refresh), "꺼진 평일은 새로고침 줄에 수량조절 없음");
+    // 체크 → 그날만 시간제 날과 같은 계획 (손님은 그대로 무제한 · 계획은 1시간 50분 머문다고 봄)
+    await page.check("#capforce-on");
+    assert.match(await page.textContent("#toast"), /오늘만 네이버 판매 수량 자동조절 — 10분마다 .*손님 이용은 그대로 무제한 · 내일은 다시 꺼져요/);
+    const p = await page.evaluate(() => { const p = window.__deskTest.capPlan(); return { skip: p.skip || "", slots: p.slots.map((x) => x.t), worst: p.plan.map((c) => c.worst), present: window.__deskTest.capPresent().map((x) => x.to) }; });
+    assert.strictEqual(p.skip, "");
+    assert.ok(p.slots.length && p.slots.every((t) => t < 18 * 60), "18:00 전 타임만");
+    assert.ok(p.present.length && p.present.every(Number.isFinite), "안에 있는 무제한 손님도 끝이 있다고 봄 (계속 있으면 10분마다 다시)");
+    assert.ok(p.worst.every((w) => Number.isFinite(w) && w <= 43), `상한 43 안 ${p.worst}`);
+    await page.waitForFunction(() => /네이버 판매 수량 조절/.test(document.getElementById("toast").textContent), null, { timeout: 5000 }); // 10분마다 도는 것이 바로 한 번
+    assert.match((await state(page)).refresh, /수량조절 \d\d:\d\d/);
+    assert.strictEqual(await page.evaluate(() => JSON.parse(localStorage.getItem("astanakiz-capauto")).forceDay), "2026-10-06", "그날 날짜로 저장 (다시 켜도 그날은 그대로)");
+    await page.reload();
+    assert.strictEqual((await state(page)).checked, true);
+    await page.close();
+    // 다음 날(수요일)은 다시 꺼진 상태
+    page = await open("2026-10-07");
+    s = await state(page);
+    assert.deepStrictEqual([s.checked, s.disabled], [false, false]);
+    assert.match(s.skip, /비수기 평일/);
+    await page.close();
+    // 시간제인 날(토요일)은 저절로 — 체크 · 잠김
+    page = await open("2026-10-10");
+    s = await state(page);
+    assert.deepStrictEqual([s.checked, s.disabled, s.skip], [true, true, ""]);
+    assert.match(await page.getAttribute("#capforce", "title"), /시간제인 날.*저절로/);
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();

@@ -28,11 +28,32 @@ const shot = (loc, name) => loc.screenshot({ path: path.join(OUT, name), type: "
     document.querySelectorAll("[data-act=time]").forEach((x) => (x.hidden = true));
     const t = document.querySelector(".top .tag"); if (t) t.textContent = "ver.2.0";
   });
+  // 메모 상자: 예시 근무자 3명 + 관리자 전달 · 메모 (상자 숫자가 보이게)
+  await page.dblclick("#now");
+  await page.click("[data-t=staff]");
+  for (const n of ["민지", "서준", "하늘"]) { await page.click("[data-act=staffAdd]"); await page.keyboard.type(n); }
+  await page.waitForTimeout(700);
+  await page.click("[data-act=close]");
+  await page.click(".mbox.adm");
+  await page.fill("#memo-msg", "토요일 10:00 어린이집 단체 20명 — 열쇠 미리 빼 두기");
+  await page.click("[data-act=memoSend]");
+  await page.click("[data-act=close]");
+  await page.click(".mbox >> nth=0");
+  await page.click(".mto button:has-text('하늘')");
+  await page.fill("#memo-msg", "영수증 용지 1롤 남음 — 월요일에 주문 부탁");
+  await page.click("[data-act=memoSend]");
+  for (const t of ["카페 냉장고 온도 확인 (오후 3시)", "환불 문의 손님 — 사장님께 전달"]) { await page.fill("#memo-new", t); await page.click("[data-act=memoAdd]"); }
+  await page.click(".mitem.fresh [data-act=memoAck]");
+  await page.waitForTimeout(250);
+  await page.evaluate(() => { const t = document.getElementById("toast"); if (t) t.hidden = true; });
+  await shot(page.locator("#sheet"), "m7-memo.jpg");
+  await page.click("[data-act=close]");
+  await page.evaluate(() => { const t = document.getElementById("toast"); if (t) t.hidden = true; });
   // 1. 전체 화면 + 번호 자리 (% · 왼쪽 위)
   await shot(page, "m1-main.jpg");
   const marks = await page.evaluate(() => {
     const at = (sel, dx = 0, dy = 0) => { const r = document.querySelector(sel).getBoundingClientRect(); return [Math.round(((r.left + dx) / 1024) * 1000) / 10, Math.round(((r.top + dy) / 768) * 1000) / 10]; };
-    return [at("[data-act=posGo]", -6, -4), at(".curtain-tab", -10, 0), at("[data-act=memo]", -6, -6), at(".leftcol .panel", -6, 4), at(".midcol .panel", -6, 4), at("#keys", -8, -8), at(".keyfoot", -8, -6), at(".park", -8, -4), at(".top .rgrp", -10, -4)];
+    return [at("[data-act=posGo]", -6, -4), at(".curtain-tab", -10, 0), at("#memo-boxes", -6, -6), at(".leftcol .panel", -6, 4), at(".midcol .panel", -6, 4), at("#keys", -8, -8), at(".keyfoot", -8, -6), at(".park", -8, -4), at(".top .rgrp", -10, -4)];
   });
   console.log("MANUAL_MARKS", JSON.stringify(marks));
   // 2. 예약 손님 입장
@@ -57,24 +78,6 @@ const shot = (loc, name) => loc.screenshot({ path: path.join(OUT, name), type: "
   await page.keyboard.press("Escape");
   // 6. 주차등록
   await shot(page.locator(".park"), "m6-park.jpg");
-  // 7. 메모장 (예시 근무자 · 메모)
-  await page.dblclick("#now");
-  await page.click("[data-t=staff]");
-  for (const [n, g] of [["근무자1", "평일"], ["근무자2", "평일"], ["근무자3", "주말"]]) {
-    await page.click("[data-act=staffAdd]");
-    await page.keyboard.type(n);
-    await page.locator(".staffrow").last().locator(`[data-g=${g}]`).click();
-  }
-  await page.click("[data-act=close]");
-  await page.click("[data-act=memo]");
-  await page.fill("#memo-wk", "토요일 10:00 어린이집 단체 20명 — 열쇠 미리 빼 두기");
-  await page.click("[data-act=memoHand][data-dir='평일→주말']");
-  await page.fill("#memo-we", "영수증 용지 1롤 남음 — 월요일에 주문 부탁");
-  await page.click("[data-act=memoHand][data-dir='주말→평일']");
-  await page.click("[data-act=memoWho] >> nth=0");
-  for (const t of ["카페 냉장고 온도 확인 (오후 3시)", "환불 문의 손님 — 사장님께 전달"]) { await page.fill("#memo-new", t); await page.click("[data-act=memoAdd]"); }
-  await page.waitForTimeout(250);
-  await shot(page.locator("#sheet"), "m7-memo.jpg");
   await b.close();
   for (const f of fs.readdirSync(OUT)) console.log(f, fs.statSync(path.join(OUT, f)).size);
 })();

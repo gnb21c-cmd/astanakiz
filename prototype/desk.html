@@ -83,7 +83,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .btn-sm { padding: 2px 9px; min-height: 28px; font-size: 12.5px; border-radius: 7px; }
 
 /* 위 막대 */
-.top { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; }
+.top { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
 .top .tag { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .top h1 { margin: 0; font-size: 16px; font-weight: 700; white-space: nowrap; }
 .top .tag { font-size: 11.5px; color: var(--muted); }
@@ -94,7 +94,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .captable small { color: var(--muted); font-size: 11px; }
 .captable .up { color: var(--ok); font-size: 12px; } .captable .down { color: var(--red); font-size: 12px; } .captable td.over { color: var(--red); font-weight: 700; }
 .caplog { display: grid; gap: 2px; font-size: 12.5px; max-height: 150px; overflow: auto; } .caplog .bad { color: var(--red); }
-.top .posgo { border: 2px solid var(--accent); color: var(--accent); font-weight: 800; padding: 4px 14px; }
+.top .posgo { border: 2px solid var(--accent); color: var(--accent); font-weight: 800; padding: 4px 9px; }
+.top .capforce { display: inline-flex; align-items: center; gap: 5px; flex: none; border: 1.5px solid var(--line); border-radius: 8px; padding: 2px 6px 2px 4px; font-size: 11px; line-height: 1.15; font-weight: 700; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.top .capforce input { width: 17px; height: 17px; margin: 0; accent-color: var(--todo); cursor: pointer; }
+.top .capforce.on { border-color: var(--todo); color: var(--fg); background: var(--accent-bg); }
+.top .capforce.auto, .top .capforce.off { cursor: default; }
+.top .capforce.off { opacity: .55; }
 .top .spacer { flex: 1; }
 .top .now { font-size: 22px; font-weight: 700; border: 0; background: transparent; padding: 0; color: var(--fg); cursor: default; } /* 시계 = 관리자 숨은 입구 (두 번 누르기) */
 .top .manualbtn { color: var(--accent); border-color: var(--accent); }
@@ -127,8 +132,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .panel { height: 100%; }
 /* 가운데 칸: 위에 새로고침 버튼, 그 아래로 예약자 명단 상자를 내림 */
 .midcol, .leftcol { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 6px; min-height: 0; min-width: 0; }
-.memobtn .mbadge { display: inline-block; margin-left: 6px; font-size: 11.5px; font-weight: 700; padding: 1px 8px; border-radius: 10px; background: var(--todo); color: var(--todo-fg); }
-.memobtn .mbadge[hidden] { display: none; }
+.memoboxes { display: grid; grid-template-columns: repeat(auto-fit, minmax(46px, 1fr)); gap: 4px; }
+.mbox { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 38px; padding: 0 4px; border-radius: 9px; border: 1px solid var(--ink); background: var(--surface); color: var(--fg); font-size: 13.5px; font-weight: 700; cursor: pointer; }
+.mbox .mname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mbox.adm { border-color: var(--accent); color: var(--accent); }
+.mbox .mcnt { position: absolute; top: -7px; right: -5px; min-width: 18px; height: 18px; line-height: 15px; box-sizing: border-box; border-radius: 9px; padding: 0 4px; font-size: 11px; font-weight: 800; text-align: center; border: 1.5px solid var(--todo); color: var(--todo); }
+.mbox .mcnt { background: var(--bg); }
+.mbox .mcnt.new { background: var(--todo); color: var(--todo-fg); }
 .refresh { min-height: 38px; width: 100%; font-size: 14px; border-color: var(--ink); color: var(--ink); background: var(--surface); } /* 테두리 · 글씨 흰색 */
 .refresh small { font-size: 11px; color: var(--muted); font-weight: 500; margin-left: 4px; }
 .scroll { min-height: 0; display: grid; gap: 5px; align-content: start; overflow: auto; flex: 1; }
@@ -197,7 +207,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .qtext[hidden] { display: none; }
 .qtext { display: block; font-weight: 400; color: var(--muted); font-size: 12.5px; line-height: 1.5; background: var(--surface-2); border-radius: 8px; padding: 6px 9px; margin-top: 4px; }
 .stafflist { display: grid; gap: 6px; max-width: 460px; }
-.staffrow { display: grid; grid-template-columns: minmax(0, 1fr) 150px auto; gap: 6px; align-items: center; }
+.staffrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: center; }
 .seg2.sm button { min-height: 30px; font-size: 13px; }
 /* 근무자 메뉴얼 (V2.0) — 내려 보며 읽기 · 그림 = 체험판 화면 (apps/desk/tools/manual-shots.js) */
 .sheet.mansheet { width: min(980px, 100%); height: min(740px, 100%); grid-template-rows: auto auto minmax(0, 1fr); overflow: hidden; }
@@ -217,31 +227,36 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .mankeys { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 18px; font-size: 13.5px; line-height: 1.5; }
 .mankeys > div { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 8px; }
 .mankey { display: inline-grid; place-items: center; width: 34px; height: 26px; border-radius: 6px; font-weight: 700; font-size: 12px; vertical-align: middle; margin-right: 4px; }
-/* 메모장 (V2.0) */
-.sheet.memosheet { width: min(960px, 100%); height: min(720px, 100%); grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
+/* 메모장 (V2.0 · 10/21 다시: 사람마다) */
+.sheet.memosheet { width: min(980px, 100%); height: min(730px, 100%); grid-template-rows: auto auto minmax(0, 1fr); overflow: hidden; }
 .memosheet h3 .mq { margin-left: auto; margin-right: 8px; width: 200px; font-size: 13px; font-weight: 400; }
-.mbody { overflow: auto; min-height: 0; display: grid; gap: 12px; align-content: start; padding-right: 4px; }
 .memosheet h3 > .help { margin-left: 10px; }
-.mmhead .seg2 button { flex: none; padding: 0 12px; white-space: nowrap; }
-.mhands { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.mhand { border: 1px solid var(--line); border-radius: 11px; background: var(--surface-2); padding: 9px 11px; display: grid; gap: 7px; align-content: start; }
-.mhand.mine { border: 1.5px solid var(--todo); }
-.mhhead { display: flex; align-items: center; gap: 6px; font-size: 13px; }
-.gchip { font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
-.mitem { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; line-height: 1.45; padding: 7px 9px; border-radius: 8px; background: var(--surface); }
+.memosheet .mtabs { max-width: 440px; }
+.mme { padding: 1px 12px; border-radius: 12px; border: 1.5px solid var(--ink); margin-right: 6px; }
+.mme.adm { border-color: var(--accent); color: var(--accent); }
+.mbody { overflow: auto; min-height: 0; display: grid; gap: 12px; align-content: start; padding-right: 4px; }
+.mnow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+.mcol { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.msec { display: grid; gap: 7px; align-content: start; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-2); padding: 9px 11px; }
+.msec h4 { margin: 0; font-size: 14.5px; display: flex; align-items: baseline; gap: 8px; }
+.mitem { display: flex; gap: 6px; align-items: flex-start; font-size: 13.5px; line-height: 1.45; padding: 7px 9px; border-radius: 8px; background: var(--surface); border: 1px solid transparent; }
 .mitem > span { flex: 1; min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 .mitem small { display: block; font-size: 11px; color: var(--muted); white-space: normal; }
+.mitem.fresh { border: 1.5px solid var(--todo); }
+.mitem.fromadm { box-shadow: inset 3px 0 0 var(--accent); }
 .mitem.okd, .mitem.done { color: var(--muted); background: transparent; border: 1px solid var(--line); }
 .mitem.done > span > i { font-style: normal; text-decoration: line-through; }
-.mitem .mok { background: var(--todo); color: var(--todo-fg); border-color: var(--todo); font-weight: 700; }
+.mitem .mack { background: var(--todo); color: var(--todo-fg); border-color: var(--todo); font-weight: 700; }
+.mitem .mfin { border-color: var(--ok); color: var(--ok); font-weight: 700; }
 .mitem .mchk { flex: none; width: 24px; height: 24px; padding: 0; border-radius: 6px; border: 2px solid var(--ok); background: transparent; color: var(--ok); font-weight: 800; }
 .madd { display: flex; gap: 6px; }
 .madd input { flex: 1; min-width: 0; }
-.mmine { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
-.mmhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.mwho { display: flex; gap: 5px; flex-wrap: wrap; }
-.mwho button { min-height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 13px; }
-.mwho button.on { border: 1.5px solid var(--accent); background: var(--accent-bg); color: var(--fg); font-weight: 700; }
+.mto { display: flex; gap: 5px; flex-wrap: wrap; }
+.mto button { min-height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 13px; }
+.mto button.on { border: 1.5px solid var(--accent); background: var(--accent-bg); color: var(--fg); font-weight: 700; }
+.mst { display: inline-block; font-size: 11px; padding: 0 6px; border-radius: 8px; border: 1px solid var(--line); margin: 2px 3px 0 0; color: var(--muted); }
+.mst.ack { border-color: var(--todo); color: var(--todo); }
+.mst.done { border-color: var(--ok); color: var(--ok); }
 .mlist { display: grid; gap: 6px; }
 .mhit mark { background: var(--yellow); color: #000; border-radius: 3px; padding: 0 1px; }
 .evgrid { display: grid; grid-template-columns: 290px minmax(0, 1fr) 300px; gap: 14px; }
@@ -585,6 +600,8 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     <span class="tag" title="체험판 · 예시 데이터 · 네이버·POS·아마노는 실제로 연결되지 않음">체험판</span>
     <button class="btn btn-sm posgo" data-act="posGo" title="POS 화면으로 (POS를 작업표시줄로 내리면 데스크로 돌아옴)">포스 전환</button>
     <button class="btn btn-sm posgo" data-act="drawer" title="POS와 연결된 현금통을 엶 (POS가 꺼져 있어도)">환전 오픈</button>
+    <!-- 사장님 10/21: 사람이 몰리는 비수기 평일 — 근무자가 체크하면 그날만 네이버 판매 수량 자동조절 (다음 날은 다시 꺼짐 · 시간제인 날은 저절로 켜져 있음) -->
+    <label class="capforce" id="capforce"><input type="checkbox" id="capforce-on"><span>오늘<br>수량조절</span></label>
     <span class="spacer"></span>
     <button class="btn btn-sm" data-act="time" data-min="5">+5분</button>
     <button class="btn btn-sm" data-act="time" data-min="30">+30분</button>
@@ -598,9 +615,9 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   </header>
 
   <div class="cols">
-    <!-- V2.0 (사장님 10/21): 시간표 상자를 조금 내리고 그 위에 [메모] — 평일 ↔ 주말 전달 · 근무자마다 메모 -->
+    <!-- V2.0 (사장님 10/21): 시간표 위 메모 상자 — 근무자마다 하나 + 관리자 (숫자 = 아직 완료 안 한 것) -->
     <div class="leftcol">
-    <button class="btn refresh memobtn" data-act="memo" aria-label="메모장">메모 <span class="mbadge num" id="memo-badge" hidden></span></button>
+    <div class="memoboxes" id="memo-boxes" role="group" aria-label="메모장 (사람마다)"></div>
     <section class="panel" aria-label="날짜와 시간별 예약">
       <div class="datebar">
         <button class="arrow" data-act="day" data-d="-1" aria-label="전날">←</button>
@@ -710,7 +727,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     /* 네이버 판매 수량 자동 조절 (시간제인 날 · 시간제 타임만): 2시간(4타임) 안의 손님(네이버 예약 + 현장)이 target 에 가깝게
        10분마다 지금 · 앞 3타임의 네이버 '회차당 수량'을 바꿈. 한 타임 최대 max (현장으로 갑자기 오는 손님 · 10분 사이 예약을 생각해서) */
     // target = 맞추려는 2시간 손님 수, ceiling = 절대 넘지 않는 상한 (40~43 · 사용자 지시 10/6)
-    capAuto: { on: false, target: 42, ceiling: 43, max: 13, visible: 10, ahead: 3, every: 10, product: "1시간 50분" }, // visible: 고객에게 보이는 잔여 최대 (안내 '최대 10팀')
+    capAuto: { on: false, target: 42, ceiling: 43, max: 13, visible: 10, ahead: 3, every: 10, product: "1시간 50분", forceDay: "" }, // visible: 고객에게 보이는 잔여 최대 (안내 '최대 10팀') · forceDay: 비수기 평일에 [오늘 수량조절]을 체크한 날 (그날만)
   };
   /* 이용시간: 성수기 — 평일·휴일 모두 17:30 입장까지 1시간 50분, 18:00 입장부터 무제한
               비수기 — 평일은 무제한, 휴일은 성수기와 같음 */
@@ -734,6 +751,10 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   const isHoliday = (key) => { const w = new Date(key + "T12:00:00").getDay(); return w === 0 || w === 6 || HOLIDAYS.includes(key); };
   const peakOf = (key) => RULES.peaks.find((p) => p.from <= key && key <= p.to) || null;
   const timedDay = (key) => !!peakOf(key) || isHoliday(key);
+  /** 사장님 10/21: 비수기 평일에 근무자가 맨 위 [오늘 수량조절]을 체크한 날 — 그날만 (forceDay = 그날 날짜 · 다음 날은 다시 꺼진 상태) */
+  const capForce = () => !timedDay(TODAY) && RULES.capAuto.forceDay === TODAY;
+  /** 네이버 판매 수량 자동조절을 하는 날: 시간제인 날(성수기 · 휴일) 또는 체크한 평일 */
+  const capDay = () => timedDay(TODAY) || capForce();
   /** 이 날 이 시각 입장의 이용시간(분). 무제한이면 null */
   let golden = null; // 골든벨 { at } — 오늘 이 시각부터 모든 손님 무제한 (아래 goldenCheck)
   const baseMinutes = (key, entry) => (timedDay(key) && entry < toMin(RULES.unlimitedFrom) ? RULES.useMinutes : null); // 골든벨과 상관없는 원래 이용시간
@@ -1687,11 +1708,13 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     r.fc = r.demand; // 먼 타임은 예상만큼 (예상이 열린 수량 이상이면 인기 = 다 팔린다고)
     return r;
   }
+  /** 수량조절 계획에 쓰는 이용시간(분): 시간제는 원래대로 · 체크한 평일(손님은 그대로 무제한)은 18:00 전 입장을 1시간 50분 머문다고 봄 */
+  const capMinutes = (t) => { const m = minutesFor(TODAY, t); return m != null ? m : capForce() && t < toMin(RULES.unlimitedFrom) ? RULES.useMinutes : null; };
   /** 오늘 시간제 타임마다 { t, used(네이버 확정+완료 · 입장권 전부), mainUsed(조절할 상품), cap(조절할 상품의 회차당 수량), walk(현장), started } */
   const capMain = (name) => new RegExp(RULES.capAuto.product.replace(/\s+/g, "\\s*")).test(name || "");
   function capSlots(day) {
     const list = bookings[day] || [];
-    return SLOTS.filter((t) => minutesFor(day, t) != null).map((t) => {
+    return SLOTS.filter((t) => (day === TODAY ? capMinutes(t) : minutesFor(day, t)) != null).map((t) => {
       const ns = (naverSlots[day] || {})[t];
       const out = list.filter((b) => b.slot === t && testOut.has(b.no) && (b.status === "확정" || b.status === "완료")).reduce((a, b) => a + b.qty, 0); // 시험으로 잡힌 손님은 통계에서 뺌
       const used = Math.max(0, (ns ? ns.conf + ns.done : list.filter((b) => b.slot === t && (b.status === "확정" || b.status === "완료")).reduce((a, b) => a + b.qty, 0)) - (day === TODAY ? out : 0));
@@ -1712,12 +1735,13 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     const out = [];
     for (const h of holders()) {
       if (h.svc || h.slot > now || (h.no && testOut.has(h.no))) continue; // 서비스 키는 네이버 · 현장 인원에 안 셈
-      for (const k of h.keys) { const m = useOf(h, k); out.push({ from: now, to: m == null ? Infinity : Math.max(h.slot + m, now + 10), n: 1 }); }
+      // 체크한 평일: 무제한 손님은 1시간 50분이 지나도 나갈 때까지 있으니 적어도 30분 더 있다고 봄 (10분마다 다시 계산)
+      for (const k of h.keys) { const m = useOf(h, k); out.push({ from: now, to: m == null ? (capForce() ? Math.max(h.slot + RULES.useMinutes, now + 30) : Infinity) : Math.max(h.slot + m, now + 10), n: 1 }); }
     }
     for (const b of bookings[TODAY] || []) {
       if (b.slot > now || testOut.has(b.no) || b.chainHead || b.keys.length || b.outAt != null) continue;
       if (!(b.status === "확정" || (b.status === "완료" && b.enteredAt == null))) continue;
-      const m = minutesFor(TODAY, b.slot);
+      const m = capMinutes(b.slot);
       out.push({ from: now, to: m == null ? Infinity : b.slot + m, n: b.qty });
     }
     return out;
@@ -1725,8 +1749,8 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   /** 지금 계획: { skip } 또는 { slots, adj, plan, changes, walkAvg, win } */
   function capPlan() {
     const A = RULES.capAuto;
-    // 가동하는 날: 성수기(평일 · 휴일) · 비수기 주말 · 휴일 = 시간제인 날. 비수기 평일은 완전히 제외 (사용자 지시 10/6)
-    if (!timedDay(TODAY)) return { skip: "오늘은 비수기 평일(무제한)이라 조절하지 않아요" };
+    // 가동하는 날: 성수기(평일 · 휴일) · 비수기 주말 · 휴일 = 시간제인 날. 비수기 평일은 제외 (사용자 지시 10/6) — 근무자가 [오늘 수량조절]을 체크한 날만 (10/21)
+    if (!capDay()) return { skip: "오늘은 비수기 평일(무제한)이라 조절하지 않아요 — 사람이 몰리면 맨 위 [오늘 수량조절]을 체크 (오늘만)" };
     const slots = capSlots(TODAY);
     const cur = Math.floor(now / 30) * 30;
     // 영업 전(새벽 · 아침)이면 그날 첫 타임들을 (현장 10/7: 새벽 2시에 눌렀더니 조절할 타임이 없었음)
@@ -1797,7 +1821,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   /** 매분: 켜져 있으면 10분마다 (실패 · 바쁨이면 다음 분에 다시) */
   function capTick() {
     const A = RULES.capAuto;
-    if (!A.on || !timedDay(TODAY)) return;
+    if (!A.on || !capDay()) return;
     const mark = Math.floor(now / A.every) * A.every;
     if (capMark === mark || now < toMin(RULES.naverAuto.from) || now > toMin(RULES.unlimitedFrom) || now < capPauseUntil) return;
     capMark = mark; // 같은 10분에 두 번 안 돌게 — 바빠서 못 했으면 다음 분에 다시
@@ -1816,7 +1840,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     if (fail.length) return `⚠ 네이버 이용완료 실패 ${fail.length}건: ${fail.map((b) => `${b.name} ${hm(b.slot)}`).join(", ")} — 2분마다 다시 · 안 되면 네이버에서 직접`;
     if (naverErr) return `⚠ ${naverErr}`;
     const nx = autoNext(now);
-    return [lastRefresh == null ? "" : `${hm(lastRefresh)} 불러옴`, nx == null ? "" : `다음 ${hm(nx)}`, RULES.capAuto.on && timedDay(TODAY) ? `수량조절 ${capBusy ? "중…" : capLastAt == null ? "켜짐" : hm(capLastAt)}` : ""].filter(Boolean).join(" · ");
+    return [lastRefresh == null ? "" : `${hm(lastRefresh)} 불러옴`, nx == null ? "" : `다음 ${hm(nx)}`, RULES.capAuto.on && capDay() ? `수량조절 ${capBusy ? "중…" : capLastAt == null ? "켜짐" : hm(capLastAt)}` : ""].filter(Boolean).join(" · ");
   }
   /** 정해진 자동 시각이 지났는데 그 뒤로 오늘 예약을 안 불러왔으면 불러옴
       (팝업을 쓰는 중이면 닫을 때까지 기다림 · 실패하면 1분 뒤 다시 · PC가 잠깐 멈췄어도 놓치지 않음) */
@@ -1844,7 +1868,16 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     $("golden").hidden = false;
     renderAll();
   }
-  function renderAll() { saveState(); evSync(); hvSync(); notesSync(); $("now").textContent = hm(now); $("refresh-at").textContent = refreshText(); $("refresh-at").style.color = (naverErr || (bookings[TODAY] || []).some((b) => b.naverPending && b.naverWhy)) && !naverBusy ? "var(--red)" : ""; renderSlots(); renderRes(); renderKeys(); renderCars(); goldenCheck(); memoBadge(); }
+  function renderAll() { saveState(); evSync(); hvSync(); notesSync(); $("now").textContent = hm(now); $("refresh-at").textContent = refreshText(); $("refresh-at").style.color = (naverErr || (bookings[TODAY] || []).some((b) => b.naverPending && b.naverWhy)) && !naverBusy ? "var(--red)" : ""; renderSlots(); renderRes(); renderKeys(); renderCars(); goldenCheck(); renderMemoBoxes(); renderCapForce(); }
+  /** 맨 위 [오늘 수량조절] (사장님 10/21): 비수기 평일만 체크 · 시간제인 날은 저절로(체크 · 잠김) · 관리자가 자동조절을 껐으면 못 누름 */
+  function renderCapForce() {
+    const el = $("capforce"), cb = $("capforce-on");
+    if (!el) return;
+    const auto = timedDay(TODAY), on = RULES.capAuto.on;
+    cb.checked = on && (auto || capForce()); cb.disabled = auto || !on;
+    el.classList.toggle("on", cb.checked); el.classList.toggle("auto", auto); el.classList.toggle("off", !on);
+    el.title = !on ? "관리자가 네이버 판매 수량 자동조절을 꺼 둠 (운영 설정 → 네이버 설정)" : auto ? "오늘은 시간제인 날(성수기 · 휴일) — 수량 자동조절이 저절로 돌아요" : `사람이 몰리는 평일: 체크하면 오늘만 10분마다 네이버 판매 수량을 조절해요 (목표 ${RULES.capAuto.target} · 상한 ${RULES.capAuto.ceiling}) — 내일은 다시 꺼진 상태`;
+  }
 
   // ── 팝업 ─────────────────────────────────────────
   const sheet = { mode: null };
@@ -2146,7 +2179,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     if (k === "season") return `기간 ${RULES.peaks.length}`;
     if (k === "printer") return PRINT.mode === "com" ? PRINT.port || "포트?" : PRINT.sel ? "Windows" : "프린터?";
     if (k === "prints") return EV.on ? "이벤트 켜짐" : "입장권";
-    if (k === "staff") return `${MEMO.staff.length}명`;
+    if (k === "staff") return `${MEMO.staff.length}명 + 관리자`;
     if (k === "api") return REAL ? "" : "체험판";
     if (k === "naver") { const n = (RULES.capAuto.on ? 1 : 0) + (ST.view && ST.view.cfg && ST.view.cfg.on ? 1 : 0); return n ? `켜짐 ${n}` : "꺼짐"; }
     if (k === "etc") return SV.on ? "설문 켜짐" : "";
@@ -2171,10 +2204,13 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   /** 기타 아래 '정보' */
   const infoHtml = () => `<div class="field"><span class="label">정보</span><span class="help">${esc((document.querySelector(".top .tag") || {}).textContent || "체험판")} · 기록은 이 PC 앱 폴더 · 바탕화면 '아스타나키즈-진단'(화면 저장) · '아스타나키즈-이벤트'(이벤트 장부)</span></div>`;
   /** 근무자 등록 (메모장 이름 · 평일/주말 전달) */
+  /** 근무자 등록 = 메인 화면 메모 상자 (사장님 10/21: 근무자마다 상자 + 관리자 · 글은 이름 · 별칭 · 성) */
   function staffHtml() {
-    return `<div class="field"><span class="label">근무자 <span class="help">메모장에서 이름을 골라 메모 · 평일 근무자 ↔ 주말 근무자 전달</span></span>
-      <div class="stafflist">${MEMO.staff.length ? MEMO.staff.map((x, i) => `<div class="staffrow"><input class="cfg staffname" data-i="${i}" value="${esc(x.name)}" maxlength="12" placeholder="이름" aria-label="${i + 1}번 근무자 이름"><div class="seg2 sm">${["평일", "주말"].map((g) => `<button class="${x.grp === g ? "on" : ""}" data-act="staffGrp" data-i="${i}" data-g="${g}" aria-pressed="${x.grp === g}">${g}</button>`).join("")}</div><button class="btn btn-sm" data-act="staffDel" data-i="${i}" aria-label="${esc(x.name || i + 1 + "번")} 지우기">×</button></div>`).join("") : `<span class="help">아직 없어요 — [+ 근무자 추가]</span>`}</div>
-      <div class="btns"><button class="btn btn-sm" data-act="staffAdd">+ 근무자 추가</button></div></div>`;
+    return `<div class="field"><span class="label">근무자 <span class="help">메인 화면 시간표 위 메모 상자 = 근무자마다 하나 + 관리자 · 상자 글은 짧게 (이름 · 별칭 · 성) · 근무자를 더하면 상자가 하나 늘어요</span></span>
+      <div class="stafflist">${MEMO.staff.length ? MEMO.staff.map((x, i) => `<div class="staffrow"><input class="cfg staffname" data-i="${i}" value="${esc(x.name)}" maxlength="12" placeholder="이름 · 별칭 · 성" aria-label="${i + 1}번 근무자 상자 글"><button class="btn btn-sm" data-act="staffDel" data-i="${i}" aria-label="${esc(x.name || i + 1 + "번")} 지우기">×</button></div>`).join("") : `<span class="help">아직 없어요 — [+ 근무자 추가]</span>`}</div>
+      <div class="btns"><button class="btn btn-sm" data-act="staffAdd">+ 근무자 추가</button></div></div>
+      <div class="field"><label for="memo-admin">관리자 상자 글 <span class="help">관리자 상자에서 쓰면 고른 근무자(처음엔 모두)에게 같은 내용이 전달돼요</span></label>
+        <input id="memo-admin" class="cfg" maxlength="12" value="${esc(MEMO.admin)}" style="max-width:220px" aria-label="관리자 상자 글"></div>`;
   }
   /** 긴 설명을 [?] 뒤로 (V2.0 · 사장님 10/21 '설명은 따로 깔끔하게') — 칸 이름 옆 설명 · longhelp 표시한 덩어리 */
   function qhelpify(root) {
@@ -3260,15 +3296,15 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   /* 맨 위 [근무자 메뉴얼] → 입장 · 퇴장 · 화면 위치별 조작 (내려 보며 읽기)
      그림 = prototype/manual/*.jpg (체험판 화면 · apps/desk/tools/manual-shots.js 로 다시 찍음 · 설치본은 desk.html 옆 manual/)
      MANUAL_MARKS = 그림 1의 번호 자리 (% · 찍을 때 나온 값) */
-  const MANUAL_MARKS = [[15.1, 0.6], [38.7, 0], [1, 5.3], [1, 12.3], [23.4, 12.3], [48.7, 9.7], [48.7, 59.5], [48.7, 66.5], [62.4, 0.5]];
+  const MANUAL_MARKS = [[14.4, 0.6], [38.7, 0], [1, 5.4], [1, 12.4], [23.4, 12.4], [48.7, 9.8], [48.7, 59.5], [48.7, 66.5], [62.4, 0.6]];
   const MANUAL_TOC = [["man1", "① 화면 한눈에"], ["man2", "② 예약 손님 입장"], ["man3", "③ 현장 손님 입장"], ["man4", "④ 퇴장 · 열쇠 반납"], ["man5", "⑤ 마감 · 일괄 반납"], ["man6", "⑥ 주차등록"], ["man7", "⑦ 메모장"], ["man8", "⑧ 이럴 땐"]];
   const manImg = (f, alt) => `<img src="manual/${f}" alt="${alt}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'help',textContent:'(그림을 못 불러옴 — ${alt})'}))">`;
   const manSteps = (rows, tip) => `<div class="mansteps">${rows.map((r, i) => `<div><span class="n">${i + 1}</span><span>${r}</span></div>`).join("")}${tip ? `<div class="tip">${tip}</div>` : ""}</div>`;
   function manualHtml() {
     const keys = [
-      ["1", "<b>포스 전환 · 환전 오픈</b> — POS 화면으로 / 현금통 열기"],
+      ["1", "<b>포스 전환 · 환전 오픈</b> — POS 화면으로 / 현금통 열기 · <b>오늘 수량조절</b> — 사람이 몰리는 평일에 체크하면 그날만 네이버 판매 수량 자동조절"],
       ["2", "<b>반납안내 커튼</b> — 손잡이를 내리면 손님께 반납 안내를 크게 (아래를 누르면 걷힘)"],
-      ["3", "<b>메모</b> — 근무자 전달 · 내 메모 (<b>전달 n</b> = 아직 확인 안 한 전달)"],
+      ["3", "<b>메모 상자</b> — 근무자마다 하나 + 관리자 · 숫자 = 아직 완료 안 한 것 (칠해져 있으면 새 전달)"],
       ["4", "<b>시간표</b> — 시간마다 완료 · 확정 · 잔여 · 시간 줄을 누르면 그 시간 예약자 (네이버에서 다시 불러옴)"],
       ["5", "<b>새로고침 · 예약자</b> — 고른 시간의 네이버 예약 카드 · 파랑 <b>미입장</b> 카드를 눌러 입장"],
       ["6", "<b>열쇠판</b> — 숫자 = 열쇠 번호 · 바탕색 = 이용 시간 · 테두리 = 네이버(흰색) / 현장(파랑) / 서비스(흰 점선)"],
@@ -3313,11 +3349,12 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
           "목록에서 차를 고르고 <b>할인 유형</b>을 누른다 — 뒤의 아마노에도 같이 들어가요",
         ], "맨 아래 줄 = 아마노 진행 상황 · 빨간 글이면 실패 → 다시 하거나 관리자에게")}</div></section>
         <section class="mansec" id="man7"><div>${manImg("m7-memo.jpg", "메모장")}</div><div><h4>⑦ 메모장</h4>${manSteps([
-          "왼쪽 위 <b>[메모]</b>를 누른다 (<b>전달 n</b> = 나에게 온 전달)",
-          "<b>근무자 전달</b>: 평일 → 주말 / 주말 → 평일 칸에 쓰고 <b>[남기기]</b> · 받은 쪽은 읽고 <b>[확인함]</b>",
-          "<b>내 메모</b>: 내 이름을 누르고 쓰고 Enter · 해결하면 ☐ 를 눌러 <b>완료</b>로",
-          "지난 메모는 맨 위 <b>지난 메모 찾기</b>",
-        ], "메모는 이 PC 에만 저장돼요 · 근무자 이름은 관리자가 넣어요")}</div></section>
+          "시간표 위 <b>내 이름 상자</b>를 누른다 — 숫자 = 아직 완료 안 한 것 (칠해져 있으면 새 전달)",
+          "<b>받은 전달</b>: 읽고 <b>[접수]</b> → 할 일을 마치면 <b>[완료]</b> (알리기만 한 것은 바로 [완료])",
+          "<b>내 메모</b>: 쓰고 Enter → 할 일 · 마치면 ☐ 를 눌러 <b>완료</b> (지난 기록에 남음 · 잘못 쓴 것은 ×)",
+          "<b>전달하기</b>: 받을 사람을 고르고(여럿 · 모두) 쓰고 Enter — <b>보낸 전달</b>에서 사람마다 접수 · 완료가 보여요",
+          "<b>지난 기록</b> · <b>전체 전달 기록</b>(모두 같이 봄) · 맨 위 <b>찾기</b>",
+        ], "관리자 상자에서 쓰면 근무자 모두에게 같은 내용이 가요 · 메모는 이 PC 에만 · 상자 이름은 관리자가 운영 설정 → 근무자 등록에서")}</div></section>
         <section class="mansec full" id="man8"><h4>⑧ 이럴 땐</h4><div class="mansteps">
           <div class="tip"><b>예약이 안 보이면</b> → 가운데 위 <b>[새로고침]</b> 또는 시간표의 그 시간 줄을 누름 (네이버 예약은 09:50부터 매시 20분 · 50분에 자동)</div>
           <div class="tip"><b>빨간 글 · 빨간 상자</b> = 지금 확인할 문제 (초과요금 · 실패) — 그 일을 먼저</div>
@@ -3328,88 +3365,129 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       </div>`;
   }
 
-  // ── 근무자 메모장 (V2.0 · 사장님 10/21) ─────────────────────
-  /* 전 근무자가 남기고 다음 근무자가 확인 — 시간표 위 [메모] (확인 안 한 전달이 있으면 '전달 n')
-     - 근무자 전달 (위): 평일 → 주말 · 주말 → 평일 — 받는 쪽이 [확인함] → 흐리게 (지우지 않음 · 찾기로 다시)
-     - 내 메모 (아래): 근무자(운영 설정 → 근무자 등록)마다 할 일 · ☐ 를 누르면 그 사람 '완료'로 (찾기 · 되돌리기)
-     - 앱: 이 PC 앱 폴더 staff-memo.json (+ bak · staff-memo.js) · 체험판: 이 브라우저 · 클라우드로 안 보냄 */
-  const MEMO_LS = "astanakiz-staffmemo";
-  const MEMO = { staff: [], hand: [], notes: [] };
+  // ── 근무자 메모장 (V2.0 · 사장님 10/21 다시: 사람마다 상자) ─────────────────────
+  /* 시간표 위 상자 = 근무자마다 하나 + 관리자 (운영 설정 → 근무자 등록에서 더하면 상자가 늘어남 · 상자 글 = 이름 · 별칭 · 성)
+     - 평일 1명 · 주말 2명이 돌아가며 PC 앞 → 날(평일 / 주말)로 나누지 않고 사람마다
+     - 상자 숫자 = 아직 완료 안 한 것 (내 메모 + 받은 전달) — 쓴 것이 없어도 받은 전달이 있으면 보임 · 아직 접수 안 한 새 전달이 있으면 칠함
+     - 상자 → 그 사람 메모장
+       · 받은 전달: [접수](받았어요 · 보낸 사람이 봄) → 할 일을 마치면 [완료] (알리기만 한 것은 바로 [완료])
+       · 내 메모: 쓰고 Enter → 할 일 · ☐ = 완료(지난 기록 · 되돌리기) · × 지우기
+       · 전달하기: 받을 사람 고르기(여럿 · 관리자 상자는 처음부터 모든 근무자) → 쓰고 Enter
+       · 보낸 전달: 사람마다 아직 / 접수 / 완료 (아무도 접수 안 했으면 [회수])
+       · 지난 기록(내가 완료한 것) · 전체 전달 기록(모두 같이 봄) · 찾기
+     - 앱: 이 PC 앱 폴더 staff-memo.json (staff-memo.js) · 체험판: 이 브라우저 · 클라우드로 안 보냄 */
+  const MEMO_LS = "astanakiz-staffmemo", MEMO_ADMIN = "admin";
+  const MEMO = { admin: "관리자", staff: [], notes: [], msgs: [] };
   const MEMO_APP = () => APP && !!(window.desk && window.desk.memo);
-  let memoWhoId = "", memoTimer = 0;
+  let memoTimer = 0;
+  /** 읽기: 2번 모양 · 체험판에 남은 1번 모양(평일 ↔ 주말 전달)은 전달로 (받는 사람 = 쓴 사람 빼고 모든 근무자) */
   function memoLoad(v) {
-    if (!v || v.v !== 1) return;
-    for (const k of ["staff", "hand", "notes"]) MEMO[k] = Array.isArray(v[k]) ? v[k] : [];
+    if (!v || (v.v !== 1 && v.v !== 2)) return;
+    MEMO.admin = String(v.admin || "관리자");
+    MEMO.staff = (Array.isArray(v.staff) ? v.staff : []).map((s) => ({ id: s.id, name: s.name || "" }));
+    MEMO.notes = Array.isArray(v.notes) ? v.notes : [];
+    MEMO.msgs = Array.isArray(v.msgs) ? v.msgs : [];
+    for (const h of v.v === 1 && Array.isArray(v.hand) ? v.hand : []) {
+      const to = MEMO.staff.map((s) => s.id).filter((p) => p !== h.by);
+      if (to.length) MEMO.msgs.push({ id: h.id, from: h.by || "", to, text: h.text, at: h.at, st: h.ok ? Object.fromEntries(to.map((p) => [p, { ack: h.ok, done: h.ok }])) : {} });
+    }
   }
-  if (MEMO_APP()) window.desk.memo.get().then((r) => { if (r && r.ok) { memoLoad(r.memo); memoBadge(); if (sheet.mode === "memo" || (sheet.mode === "settings" && sheet.tab === "staff")) renderSheet(); } }, () => {});
+  if (MEMO_APP()) window.desk.memo.get().then((r) => { if (r && r.ok) { memoLoad(r.memo); renderMemoBoxes(); if (sheet.mode === "memo" || (sheet.mode === "settings" && sheet.tab === "staff")) renderSheet(); } }, () => {});
   else try { memoLoad(JSON.parse(localStorage.getItem(MEMO_LS))); } catch (e) { /* 없음 */ }
   function memoSave() {
     clearTimeout(memoTimer); memoTimer = 0;
-    const d = { v: 1, staff: MEMO.staff, hand: MEMO.hand, notes: MEMO.notes };
+    const d = { v: 2, admin: MEMO.admin, staff: MEMO.staff, notes: MEMO.notes, msgs: MEMO.msgs };
     if (MEMO_APP()) window.desk.memo.set(d).then((r) => { if (!(r && r.ok)) toast(`메모 저장 실패: ${(r && r.why) || "응답 없음"}`, 8000); }, (e) => toast(`메모 저장 실패: ${e}`, 8000));
     else try { localStorage.setItem(MEMO_LS, JSON.stringify(d)); } catch (e) { /* 저장 못 해도 화면은 동작 */ }
-    memoBadge();
+    renderMemoBoxes();
   }
   const memoSaveSoon = () => { clearTimeout(memoTimer); memoTimer = setTimeout(memoSave, 600); };
   const memoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const memoStamp = () => `${TODAY} ${hm(now)}`;
   /** "2026-10-21 13:40" → 오늘이면 13:40 · 아니면 10/21 13:40 */
   const memoWhen = (at) => (!at ? "" : at.slice(0, 10) === TODAY ? at.slice(11) : `${+at.slice(5, 7)}/${+at.slice(8, 10)} ${at.slice(11)}`);
-  const staffName = (id) => { const x = id && MEMO.staff.find((s) => s.id === id); return x ? x.name || "이름 없음" : id ? "지운 근무자" : ""; };
-  /** 오늘 받는 쪽: 휴일(토 · 일 · 공휴일) = 주말 근무자 */
-  const memoGrp = () => (isHoliday(TODAY) ? "주말" : "평일");
-  const memoInbox = () => MEMO.hand.filter((h) => !h.ok && h.dir.endsWith("→" + memoGrp()));
-  function memoBadge() {
-    const b = $("memo-badge"), n = memoInbox().length;
-    if (!b) return;
-    b.hidden = !n; b.textContent = n ? `전달 ${n}` : "";
+  /** 상자 차례: 근무자(등록한 차례) → 관리자 */
+  const memoPeople = () => MEMO.staff.map((s) => ({ id: s.id, name: s.name || "이름 없음" })).concat([{ id: MEMO_ADMIN, name: MEMO.admin || "관리자", admin: true }]);
+  const staffName = (id) => { if (id === MEMO_ADMIN) return MEMO.admin || "관리자"; const x = id && MEMO.staff.find((s) => s.id === id); return x ? x.name || "이름 없음" : id ? "지운 근무자" : ""; };
+  const memoSt = (m, p) => (m.st || {})[p] || {};
+  const memoMsgDone = (m) => m.to.every((p) => memoSt(m, p).done);
+  /** 그 사람이 아직 완료 안 한 것: 내 메모 · 받은 전달 (fresh = 아직 접수 안 한 전달) */
+  function memoTodo(id) {
+    const notes = MEMO.notes.filter((n) => n.who === id && !n.done);
+    const inbox = MEMO.msgs.filter((m) => m.to.includes(id) && !memoSt(m, id).done);
+    return { notes, inbox, fresh: inbox.filter((m) => !memoSt(m, id).ack), n: notes.length + inbox.length };
   }
-  /** 지금 고른 근무자 (없으면 오늘 쪽 첫 사람) */
-  function memoWho() {
-    if (memoWhoId && MEMO.staff.some((s) => s.id === memoWhoId)) return memoWhoId;
-    const s = MEMO.staff.find((x) => x.grp === memoGrp()) || MEMO.staff[0];
-    return (memoWhoId = s ? s.id : "");
+  /** 메인 화면 상자 (화면을 그릴 때마다) */
+  function renderMemoBoxes() {
+    const el = $("memo-boxes");
+    if (!el) return;
+    el.innerHTML = memoPeople().map((p) => {
+      const o = memoTodo(p.id);
+      const tip = `${p.name} 메모장${o.n ? ` — 완료 안 한 것 ${o.n} (내 메모 ${o.notes.length} · 받은 전달 ${o.inbox.length}${o.fresh.length ? ` · 새 전달 ${o.fresh.length}` : ""})` : ""}`;
+      return `<button class="mbox ${p.admin ? "adm" : ""}" data-act="memoOpen" data-id="${p.id}" title="${esc(tip)}" aria-label="${esc(tip)}"><span class="mname">${esc(p.name)}</span>${o.n ? `<span class="mcnt num ${o.fresh.length ? "new" : ""}">${o.n}</span>` : ""}</button>`;
+    }).join("");
   }
-  const memoDraft = (id) => esc((sheet.draft || {})[id] || "");
-  const MEMO_IN = { "평일→주말": "memo-wk", "주말→평일": "memo-we" };
+  const memoDraft = (k) => esc((sheet.draft || {})[k] || "");
   const memoMark = (t, q) => { const e = esc(t); if (!q) return e; const i = t.toLowerCase().indexOf(q.toLowerCase()); return i < 0 ? e : esc(t.slice(0, i)) + `<mark>${esc(t.slice(i, i + q.length))}</mark>` + esc(t.slice(i + q.length)); };
-  function memoHandHtml(dir) {
-    const [from, to] = dir.split("→"), mine = to === memoGrp();
-    const items = MEMO.hand.filter((h) => h.dir === dir);
-    const open = items.filter((h) => !h.ok).reverse(), done = items.filter((h) => h.ok).slice(-3).reverse();
-    const by = (h) => [staffName(h.by), memoWhen(h.at)].filter(Boolean).join(" · ");
-    return `<section class="mhand ${mine ? "mine" : ""}" aria-label="${from}에서 ${to}로">
-      <div class="mhhead"><span class="gchip">${from}</span>→<span class="gchip">${to}</span>${mine ? `<span class="help">오늘 받는 쪽</span>` : ""}<span class="spacer"></span>${open.length ? `<span class="help num">확인 안 함 ${open.length}</span>` : ""}</div>
-      ${open.map((h) => `<div class="mitem"><span>${esc(h.text)}<small class="num">${esc(by(h))}</small></span><button class="btn btn-sm mok" data-act="memoOk" data-id="${h.id}">확인함</button></div>`).join("")}
-      ${done.map((h) => `<div class="mitem okd"><span>${esc(h.text)}<small class="num">${esc(by(h))} · ✓ ${esc([staffName(h.okBy), memoWhen(h.ok)].filter(Boolean).join(" "))} 확인</small></span></div>`).join("")}
-      ${items.length ? "" : `<span class="help">아직 없어요</span>`}
-      <div class="madd"><input id="${MEMO_IN[dir]}" class="cfg memo-in" data-dir="${dir}" maxlength="300" value="${memoDraft(MEMO_IN[dir])}" placeholder="${to} 근무자에게 남길 말…" aria-label="${to} 근무자에게 남길 말" autocomplete="off"><button class="btn btn-sm" data-act="memoHand" data-dir="${dir}">남기기</button></div></section>`;
+  /** 받는 사람마다 아직 · 접수 · 완료 */
+  const memoStatus = (m) => m.to.map((p) => { const x = memoSt(m, p); return `<span class="mst ${x.done ? "done" : x.ack ? "ack" : ""}" title="${esc(staffName(p))} ${x.done ? `${memoWhen(x.done)} 완료` : x.ack ? `${memoWhen(x.ack)} 접수` : "아직 접수 안 함"}">${esc(staffName(p))} ${x.done ? "완료" : x.ack ? "접수" : "아직"}</span>`; }).join("");
+  const memoFromTo = (m) => `${esc(staffName(m.from) || "?")} → ${esc(m.to.map(staffName).join(", "))}`;
+  function memoInHtml(m, me) {
+    const x = memoSt(m, me);
+    return `<div class="mitem ${x.ack ? "" : "fresh"} ${m.from === MEMO_ADMIN ? "fromadm" : ""}"><span>${esc(m.text)}<small class="num">${esc(staffName(m.from) || "?")}${m.to.length > 1 ? ` → ${m.to.length}명` : ""} · ${esc(memoWhen(m.at))}${x.ack ? ` · ${esc(memoWhen(x.ack))} 접수` : ""}</small></span>${x.ack ? "" : `<button class="btn btn-sm mack" data-act="memoAck" data-id="${m.id}" title="받았어요 — 보낸 사람이 봐요">접수</button>`}<button class="btn btn-sm mfin" data-act="memoFin" data-id="${m.id}" title="할 일을 마쳤거나 알리기만 한 것 → 지난 기록으로">완료</button></div>`;
   }
-  function memoMineHtml() {
-    const who = memoWho();
-    if (!MEMO.staff.length) return `<div class="mmine"><b>내 메모</b><span class="help">근무자 이름이 아직 없어요 — 관리자가 운영 설정 → 근무자 등록에서 넣으면 근무자마다 메모장이 생겨요</span></div>`;
-    const mine = MEMO.notes.filter((n) => n.who === who), todo = mine.filter((n) => !n.done).reverse(), done = mine.filter((n) => n.done).sort((a, b) => (a.done < b.done ? 1 : -1));
-    const tab = sheet.tab === "done" ? "done" : "todo", nm = staffName(who);
-    const list = tab === "todo"
-      ? todo.map((n) => `<div class="mitem"><button class="mchk" data-act="memoDone" data-id="${n.id}" aria-label="해결 — 완료로" title="해결하면 눌러요 → 완료 기록으로"></button><span>${esc(n.text)}<small class="num">${esc(memoWhen(n.at))}</small></span><button class="btn btn-sm" data-act="memoDel" data-id="${n.id}" aria-label="지우기" title="잘못 쓴 메모 지우기">×</button></div>`).join("") || `<span class="help">할 일이 없어요</span>`
-      : done.slice(0, 60).map((n) => `<div class="mitem done"><span><i>${esc(n.text)}</i><small class="num">${esc(memoWhen(n.at))} 씀 · ${esc(memoWhen(n.done))} 해결</small></span><button class="btn btn-sm" data-act="memoUndo" data-id="${n.id}" title="다시 할 일로">되돌리기</button></div>`).join("") + (done.length > 60 ? `<span class="help">더 지난 것은 위 '지난 메모 찾기'로</span>` : "") || `<span class="help">아직 해결한 메모가 없어요</span>`;
-    return `<div class="mmine"><div class="mmhead"><b>내 메모</b><div class="mwho" role="group" aria-label="근무자 고르기">${MEMO.staff.map((s) => `<button class="${s.id === who ? "on" : ""}" aria-pressed="${s.id === who}" data-act="memoWho" data-id="${s.id}">${esc(s.name || "이름 없음")}</button>`).join("")}</div><span class="spacer"></span>
-        <div class="seg2 sm"><button class="${tab === "todo" ? "on" : ""}" aria-pressed="${tab === "todo"}" data-act="memoTab" data-t="todo">할 일 ${todo.length}</button><button class="${tab === "done" ? "on" : ""}" aria-pressed="${tab === "done"}" data-act="memoTab" data-t="done">완료 ${done.length}</button></div></div>
-      ${tab === "todo" ? `<div class="madd"><input id="memo-new" class="cfg" maxlength="300" value="${memoDraft("memo-new")}" placeholder="${esc(nm)}의 메모 — 쓰고 Enter" aria-label="${esc(nm)}의 메모 쓰기" autocomplete="off"><button class="btn btn-sm btn-ink" data-act="memoAdd">추가</button></div>` : ""}
-      <div class="mlist">${list}</div></div>`;
+  function memoNowHtml() {
+    const me = sheet.who, o = memoTodo(me);
+    const others = memoPeople().filter((p) => p.id !== me);
+    const allOn = others.length > 0 && others.every((p) => sheet.to.includes(p.id));
+    const sent = MEMO.msgs.filter((m) => m.from === me && !memoMsgDone(m)).reverse();
+    const toNames = sheet.to.map(staffName).join(" · ");
+    const inbox = o.inbox.slice().reverse().map((m) => memoInHtml(m, me)).join("") || `<span class="help">없어요</span>`;
+    const notes = o.notes.slice().reverse().map((n) => `<div class="mitem"><button class="mchk" data-act="memoDone" data-id="${n.id}" aria-label="완료" title="마쳤으면 눌러요 → 지난 기록"></button><span>${esc(n.text)}<small class="num">${esc(memoWhen(n.at))}</small></span><button class="btn btn-sm" data-act="memoDel" data-id="${n.id}" aria-label="지우기" title="지우기">×</button></div>`).join("") || `<span class="help">할 일이 없어요</span>`;
+    const send = others.length ? `<div class="mto" role="group" aria-label="받을 사람">${others.length > 1 ? `<button class="${allOn ? "on" : ""}" aria-pressed="${allOn}" data-act="memoTo" data-id="*">모두</button>` : ""}${others.map((p) => `<button class="${sheet.to.includes(p.id) ? "on" : ""} ${p.admin ? "adm" : ""}" aria-pressed="${sheet.to.includes(p.id)}" data-act="memoTo" data-id="${p.id}">${esc(p.name)}</button>`).join("")}</div>
+        <div class="madd"><input id="memo-msg" class="cfg" maxlength="300" value="${memoDraft("memo-msg")}" placeholder="${toNames ? `${esc(toNames)}에게 — 쓰고 Enter` : "받을 사람을 먼저 고르세요"}" aria-label="전달할 말" autocomplete="off"><button class="btn btn-sm btn-ink" data-act="memoSend">전달</button></div>`
+      : `<span class="help">전달할 사람이 없어요 — 관리자가 운영 설정 → 근무자 등록에서 근무자를 넣어요</span>`;
+    const sentHtml = sent.map((m) => `<div class="mitem sent"><span>${esc(m.text)}<small class="num">${esc(memoWhen(m.at))} → ${memoStatus(m)}</small></span>${Object.keys(m.st || {}).length ? "" : `<button class="btn btn-sm" data-act="memoRecall" data-id="${m.id}" title="아무도 접수 안 했을 때만 거둘 수 있어요">회수</button>`}</div>`).join("") || `<span class="help">없어요</span>`;
+    return `<div class="mnow"><div class="mcol">
+        <section class="msec"><h4>받은 전달 ${o.inbox.length ? `<span class="help num">완료 안 한 것 ${o.inbox.length}${o.fresh.length ? ` · 새로 ${o.fresh.length}` : ""}</span>` : ""}</h4>${inbox}<span class="help">[접수] = 받았어요 (보낸 사람이 봐요) · 할 일을 마치면 [완료] · 알리기만 한 것은 바로 [완료]</span></section>
+        <section class="msec"><h4>내 메모 ${o.notes.length ? `<span class="help num">할 일 ${o.notes.length}</span>` : ""}</h4><div class="madd"><input id="memo-new" class="cfg" maxlength="300" value="${memoDraft("memo-new")}" placeholder="내 메모 — 쓰고 Enter" aria-label="내 메모 쓰기" autocomplete="off"><button class="btn btn-sm" data-act="memoAdd">추가</button></div><div class="mlist">${notes}</div></section>
+      </div><div class="mcol">
+        <section class="msec"><h4>${me === MEMO_ADMIN ? "근무자에게 전달" : "전달하기"} <span class="help">받을 사람 고르기 (여럿)</span></h4>${send}</section>
+        <section class="msec"><h4>보낸 전달 <span class="help">완료 안 된 것 · 사람마다 접수 / 완료</span></h4>${sentHtml}</section>
+      </div></div>`;
   }
-  /** 지난 메모 찾기: 전달 · 각자 메모(할 일 · 완료) 모두 · 글 또는 근무자 이름 */
-  function memoFindHtml(q) {
-    const k = q.toLowerCase(), hit = (t) => t.toLowerCase().includes(k);
+  /** 지난 기록: 이 사람이 완료한 내 메모 · 받은 전달 · 모두 완료된 보낸 전달 (완료한 때 늦은 것부터) */
+  function memoPastHtml() {
+    const me = sheet.who;
+    const last = (m) => m.to.map((p) => memoSt(m, p).done || "").sort().pop() || m.at;
     const rows = [
-      ...MEMO.hand.map((h) => ({ at: h.at, text: h.text, tag: `전달 ${h.dir.replace("→", " → ")}`, who: staffName(h.by), st: h.ok ? `✓ ${[staffName(h.okBy), memoWhen(h.ok)].filter(Boolean).join(" ")} 확인` : "확인 안 함" })),
-      ...MEMO.notes.map((n) => ({ at: n.at, text: n.text, tag: staffName(n.who), who: "", st: n.done ? `${memoWhen(n.done)} 해결` : "할 일" })),
-    ].filter((r) => hit(r.text) || hit(r.tag) || (r.who && hit(r.who))).sort((a, b) => (a.at < b.at ? 1 : -1));
-    return `<div class="mlist mhit"><span class="help">'${esc(q)}' ${rows.length}개${rows.length > 100 ? " (최근 100개)" : ""}</span>${rows.slice(0, 100).map((r) => `<div class="mitem okd"><span>${memoMark(r.text, q)}<small class="num">${esc([r.tag, r.who, memoWhen(r.at), r.st].filter(Boolean).join(" · "))}</small></span></div>`).join("")}</div>`;
+      ...MEMO.notes.filter((n) => n.who === me && n.done).map((n) => ({ when: n.done, html: `<div class="mitem done"><span><i>${esc(n.text)}</i><small class="num">내 메모 · ${esc(memoWhen(n.at))} 씀 · ${esc(memoWhen(n.done))} 완료</small></span><button class="btn btn-sm" data-act="memoUndo" data-id="${n.id}" title="다시 할 일로">되돌리기</button></div>` })),
+      ...MEMO.msgs.filter((m) => m.to.includes(me) && memoSt(m, me).done).map((m) => ({ when: memoSt(m, me).done, html: `<div class="mitem done"><span><i>${esc(m.text)}</i><small class="num">받은 전달 · ${esc(staffName(m.from) || "?")} · ${esc(memoWhen(m.at))} · ${esc(memoWhen(memoSt(m, me).done))} 완료</small></span><button class="btn btn-sm" data-act="memoUnfin" data-id="${m.id}" title="다시 받은 전달로">되돌리기</button></div>` })),
+      ...MEMO.msgs.filter((m) => m.from === me && memoMsgDone(m)).map((m) => ({ when: last(m), html: `<div class="mitem done"><span><i>${esc(m.text)}</i><small class="num">보낸 전달 · ${esc(memoWhen(m.at))} → ${memoStatus(m)}</small></span></div>` })),
+    ].sort((a, b) => (a.when < b.when ? 1 : -1));
+    return `<div class="mlist">${rows.slice(0, 150).map((r) => r.html).join("") || `<span class="help">아직 완료한 것이 없어요</span>`}${rows.length > 150 ? `<span class="help">더 지난 것은 위 찾기로</span>` : ""}</div>`;
   }
-  const memoBodyHtml = () => ((sheet.q || "").trim() ? memoFindHtml(sheet.q.trim()) : `<div class="mhands">${memoHandHtml("평일→주말")}${memoHandHtml("주말→평일")}</div>${memoMineHtml()}`);
-  const memoSheetHtml = () => `<h3 id="sheet-title">메모장 <span class="help">이 PC 에만 저장 · 해결하면 그 사람 완료로</span><input id="memo-q" class="cfg mq" placeholder="지난 메모 찾기" value="${esc(sheet.q || "")}" aria-label="지난 메모 찾기" autocomplete="off"><button class="x" data-act="close" aria-label="닫기">×</button></h3>
+  /** 전체 전달 기록: 누가 누구에게 · 사람마다 접수 / 완료 (모두 같이 봄 · 최근 것부터) */
+  function memoAllHtml() {
+    const all = MEMO.msgs.slice().reverse();
+    return `<div class="mlist">${all.slice(0, 200).map((m) => `<div class="mitem ${memoMsgDone(m) ? "okd" : ""}"><span>${esc(m.text)}<small class="num">${memoFromTo(m)} · ${esc(memoWhen(m.at))}</small><small>${memoStatus(m)}</small></span></div>`).join("") || `<span class="help">아직 전달이 없어요</span>`}${all.length > 200 ? `<span class="help">더 지난 것은 위 찾기로</span>` : ""}</div>`;
+  }
+  /** 찾기: 모든 전달 + 이 사람의 내 메모 (할 일 · 완료) — 글 또는 이름 */
+  function memoFindHtml(q) {
+    const me = sheet.who, k = q.toLowerCase(), hit = (t) => String(t || "").toLowerCase().includes(k);
+    const rows = [
+      ...MEMO.msgs.map((m) => ({ at: m.at, text: m.text, tag: `전달 ${staffName(m.from) || "?"} → ${m.to.map(staffName).join(", ")}`, st: memoStatus(m) })),
+      ...MEMO.notes.filter((n) => n.who === me).map((n) => ({ at: n.at, text: n.text, tag: "내 메모", st: n.done ? `${esc(memoWhen(n.done))} 완료` : "할 일" })),
+    ].filter((r) => hit(r.text) || hit(r.tag)).sort((a, b) => (a.at < b.at ? 1 : -1));
+    return `<div class="mlist mhit"><span class="help">'${esc(q)}' ${rows.length}개${rows.length > 100 ? " (최근 100개)" : ""}</span>${rows.slice(0, 100).map((r) => `<div class="mitem okd"><span>${memoMark(r.text, q)}<small class="num">${esc(r.tag)} · ${esc(memoWhen(r.at))}</small><small>${r.st}</small></span></div>`).join("")}</div>`;
+  }
+  const memoBodyHtml = () => ((sheet.q || "").trim() ? memoFindHtml(sheet.q.trim()) : sheet.tab === "past" ? memoPastHtml() : sheet.tab === "all" ? memoAllHtml() : memoNowHtml());
+  function memoSheetHtml() {
+    const me = sheet.who, o = memoTodo(me);
+    return `<h3 id="sheet-title"><span class="mme ${me === MEMO_ADMIN ? "adm" : ""}">${esc(staffName(me) || "?")}</span> 메모장 <span class="help">이 PC 에만 저장</span><input id="memo-q" class="cfg mq" placeholder="지난 기록 찾기" value="${esc(sheet.q || "")}" aria-label="메모 · 전달 기록 찾기" autocomplete="off"><button class="x" data-act="close" aria-label="닫기">×</button></h3>
+    <div class="seg2 sm mtabs">${[["now", `지금${o.n ? ` ${o.n}` : ""}`], ["past", "지난 기록"], ["all", "전체 전달 기록"]].map(([k, t]) => `<button class="${sheet.tab === k ? "on" : ""}" aria-pressed="${sheet.tab === k}" data-act="memoTab" data-t="${k}">${t}</button>`).join("")}</div>
     <div class="mbody" id="memo-body">${memoBodyHtml()}</div>`;
+  }
 
   // ── 재방문 간격 (사장님 10/19) ─────────────────────
   /* 네이버 예약 손님이 며칠 만에 다시 오는지 — 보고 앱 '네이버 판매 수' 세부 화면 맨 위 (docs/REVISIT.md)
@@ -4019,45 +4097,52 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     // 운영 설정 V2.0: [?] 설명 펼치기 · 프린트물 (입장권 양식 / 재방문 이벤트)
     qhelp(btn) { const t = btn.nextElementSibling; if (!t || !t.classList.contains("qtext")) return; t.hidden = !t.hidden; btn.setAttribute("aria-expanded", String(!t.hidden)); },
     psub(btn) { sheet.psub = btn.dataset.s === "event" ? "event" : "ticket"; renderSheet(); },
-    // 근무자 등록 (메모장 이름 · 평일 / 주말)
+    // 근무자 등록 (메인 화면 상자 · 사장님 10/21)
     staffAdd() {
       if (MEMO.staff.length >= 30) { toast("근무자는 30명까지예요"); return; }
-      MEMO.staff.push({ id: memoId(), name: "", grp: memoGrp() }); memoSave(); renderSheet();
+      MEMO.staff.push({ id: memoId(), name: "" }); memoSave(); renderSheet();
       const ins = document.querySelectorAll(".staffname"); if (ins.length) ins[ins.length - 1].focus();
     },
     staffDel(btn) {
       const s = MEMO.staff[Number(btn.dataset.i)];
       if (!s) return;
-      const n = MEMO.notes.filter((x) => x.who === s.id).length;
-      if (!confirm(`${s.name || "이 근무자"}를 지울까요?${n ? `\n쓴 메모 ${n}개는 남고 '지운 근무자'로 보여요 (찾기로 볼 수 있음)` : ""}`)) return;
+      const n = MEMO.notes.filter((x) => x.who === s.id).length + MEMO.msgs.filter((m) => m.from === s.id || m.to.includes(s.id)).length;
+      if (!confirm(`${s.name || "이 근무자"}를 지울까요? 메인 화면 상자가 없어져요.${n ? `\n쓴 메모 · 전달 기록 ${n}개는 남고 '지운 근무자'로 보여요 (찾기로 볼 수 있음)` : ""}`)) return;
       MEMO.staff = MEMO.staff.filter((x) => x !== s); memoSave(); renderSheet();
     },
-    staffGrp(btn) { const s = MEMO.staff[Number(btn.dataset.i)]; if (s) { s.grp = btn.dataset.g === "주말" ? "주말" : "평일"; memoSave(); renderSheet(); } },
-    // 메모장 (V2.0)
-    memo() { openSheet({ mode: "memo", q: "", tab: "todo", draft: {} }); },
     // 근무자 메뉴얼 (V2.0): 차례를 누르면 그 자리로
     manual() { openSheet({ mode: "manual" }); },
     manGo(btn) { const box = $("manual-body"), t = $(btn.dataset.s); if (box && t) box.scrollTo({ top: box.scrollTop + t.getBoundingClientRect().top - box.getBoundingClientRect().top - 4 }); },
-    memoWho(btn) { memoWhoId = btn.dataset.id; sheet.tab = "todo"; renderSheet(); },
-    memoTab(btn) { sheet.tab = btn.dataset.t === "done" ? "done" : "todo"; renderSheet(); },
+    // 메모장 (사장님 10/21 다시): 상자를 누르면 그 사람 메모장 · 관리자 상자는 받을 사람이 처음부터 모든 근무자
+    memoOpen(btn) { const id = btn.dataset.id; openSheet({ mode: "memo", who: id, tab: "now", q: "", draft: {}, to: id === MEMO_ADMIN ? MEMO.staff.map((x) => x.id) : [] }); },
+    memoTab(btn) { sheet.tab = ["past", "all"].includes(btn.dataset.t) ? btn.dataset.t : "now"; sheet.q = ""; renderSheet(); },
+    memoTo(btn) {
+      const id = btn.dataset.id, others = memoPeople().filter((p) => p.id !== sheet.who).map((p) => p.id);
+      if (id === "*") sheet.to = others.every((p) => sheet.to.includes(p)) ? [] : others.slice();
+      else sheet.to = sheet.to.includes(id) ? sheet.to.filter((x) => x !== id) : sheet.to.concat(id);
+      renderSheet();
+    },
+    memoSend() {
+      const t = String(sheet.draft["memo-msg"] || "").trim(), to = sheet.to.filter((p) => p !== sheet.who && memoPeople().some((x) => x.id === p));
+      if (!to.length) { toast("받을 사람을 먼저 골라 주세요"); return; }
+      if (!t) { toast("전달할 말을 써 주세요"); $("memo-msg") && $("memo-msg").focus(); return; }
+      MEMO.msgs.push({ id: memoId(), from: sheet.who, to, text: t.slice(0, 300), at: memoStamp(), st: {} });
+      sheet.draft["memo-msg"] = ""; memoSave(); renderSheet(); toast(`${to.map(staffName).join(" · ")}에게 전달했어요`);
+    },
+    memoAck(btn) { const m = MEMO.msgs.find((x) => x.id === btn.dataset.id), me = sheet.who; if (!m || !m.to.includes(me)) return; m.st = Object.assign({}, m.st, { [me]: { ack: memoStamp(), done: "" } }); memoSave(); renderSheet(); },
+    memoFin(btn) { const m = MEMO.msgs.find((x) => x.id === btn.dataset.id), me = sheet.who; if (!m || !m.to.includes(me)) return; m.st = Object.assign({}, m.st, { [me]: { ack: memoSt(m, me).ack || memoStamp(), done: memoStamp() } }); memoSave(); renderSheet(); toast("완료 — 지난 기록으로 (찾기로 다시 볼 수 있어요)"); },
+    memoUnfin(btn) { const m = MEMO.msgs.find((x) => x.id === btn.dataset.id), me = sheet.who; if (!m || !m.to.includes(me)) return; m.st = Object.assign({}, m.st, { [me]: { ack: memoSt(m, me).ack || memoStamp(), done: "" } }); memoSave(); renderSheet(); toast("다시 받은 전달로"); },
+    memoRecall(btn) { const m = MEMO.msgs.find((x) => x.id === btn.dataset.id); if (!m || m.from !== sheet.who || Object.keys(m.st || {}).length || !confirm(`이 전달을 거둘까요?\n"${m.text.slice(0, 40)}"`)) return; MEMO.msgs = MEMO.msgs.filter((x) => x !== m); memoSave(); renderSheet(); },
     memoAdd() {
-      const t = String(sheet.draft["memo-new"] || "").trim(), who = memoWho();
+      const t = String(sheet.draft["memo-new"] || "").trim(), who = sheet.who;
       if (!who) return;
       if (!t) { toast("메모를 써 주세요"); $("memo-new") && $("memo-new").focus(); return; }
       MEMO.notes.push({ id: memoId(), who, text: t.slice(0, 300), at: memoStamp(), done: "" });
-      sheet.draft["memo-new"] = ""; sheet.tab = "todo"; memoSave(); renderSheet();
+      sheet.draft["memo-new"] = ""; memoSave(); renderSheet();
     },
-    memoDone(btn) { const n = MEMO.notes.find((x) => x.id === btn.dataset.id); if (!n) return; n.done = memoStamp(); memoSave(); renderSheet(); toast(`해결 — ${staffName(n.who)} 완료로 옮겼어요`); },
+    memoDone(btn) { const n = MEMO.notes.find((x) => x.id === btn.dataset.id); if (!n) return; n.done = memoStamp(); memoSave(); renderSheet(); toast("완료 — 지난 기록으로 (찾기로 다시 볼 수 있어요)"); },
     memoUndo(btn) { const n = MEMO.notes.find((x) => x.id === btn.dataset.id); if (!n) return; n.done = ""; memoSave(); renderSheet(); toast("다시 할 일로"); },
-    memoDel(btn) { const n = MEMO.notes.find((x) => x.id === btn.dataset.id); if (!n || !confirm(`이 메모를 지울까요?\n"${n.text.slice(0, 40)}"\n(해결한 것이면 지우지 말고 ☐ 를 눌러 완료로)`)) return; MEMO.notes = MEMO.notes.filter((x) => x !== n); memoSave(); renderSheet(); },
-    memoHand(btn) {
-      const dir = btn.dataset.dir, id = MEMO_IN[dir], t = String(sheet.draft[id] || "").trim();
-      if (!id) return;
-      if (!t) { toast("남길 말을 써 주세요"); $(id) && $(id).focus(); return; }
-      MEMO.hand.push({ id: memoId(), dir, text: t.slice(0, 300), by: memoWho(), at: memoStamp(), ok: "", okBy: "" });
-      sheet.draft[id] = ""; memoSave(); renderSheet(); toast(`${dir.split("→")[1]} 근무자에게 남겼어요`);
-    },
-    memoOk(btn) { const h = MEMO.hand.find((x) => x.id === btn.dataset.id); if (!h) return; h.ok = memoStamp(); h.okBy = memoWho(); memoSave(); renderSheet(); },
+    memoDel(btn) { const n = MEMO.notes.find((x) => x.id === btn.dataset.id); if (!n || !confirm(`이 메모를 지울까요?\n"${n.text.slice(0, 40)}"\n(마친 것이면 지우지 말고 ☐ 를 눌러 완료로)`)) return; MEMO.notes = MEMO.notes.filter((x) => x !== n); memoSave(); renderSheet(); },
     // 시계를 1.5초 안에 두 번 누르면 운영 설정 (사장님 10/21 — 근무자는 몰라도 됨)
     clock() { const t = Date.now(); if (clockTapAt && t - clockTapAt <= 1500) { clockTapAt = 0; acts.settings(); } else clockTapAt = t; },
     async setTab(btn) {
@@ -4204,7 +4289,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229 && sheet.mode === "memo") {
       const t = e.target;
       if (t.id === "memo-new") { e.preventDefault(); acts.memoAdd(); return; }
-      if (t.classList && t.classList.contains("memo-in")) { e.preventDefault(); acts.memoHand(t); return; }
+      if (t.id === "memo-msg") { e.preventDefault(); acts.memoSend(); return; }
     }
     if (e.key !== "Escape" || !$("pos").hidden) return;
     if (sheet.mode) acts.close();
@@ -4212,7 +4297,8 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   document.addEventListener("input", (e) => {
     const t = e.target;
     // 메모장 (V2.0): 쓰던 글은 다시 그려도 남게 · 찾기는 아래만 다시
-    if (sheet.mode === "memo" && (t.id === "memo-new" || t.classList.contains("memo-in"))) sheet.draft[t.id] = t.value;
+    if (sheet.mode === "memo" && (t.id === "memo-new" || t.id === "memo-msg")) sheet.draft[t.id] = t.value;
+    if (t.id === "memo-admin") { MEMO.admin = t.value.trim().slice(0, 12) || "관리자"; memoSaveSoon(); }
     if (t.id === "memo-q") { sheet.q = t.value; $("memo-body").innerHTML = memoBodyHtml(); }
     if (t.classList.contains("staffname")) { const s = MEMO.staff[Number(t.dataset.i)]; if (s) { s.name = t.value.trim().slice(0, 12); memoSaveSoon(); } }
     // 고객 메모 (사장님 10/20): 메모는 2줄에 맞춰 0.6초 뒤 저장 · 체크는 바로 저장하고 이름 색을 바꿈
@@ -4243,6 +4329,12 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     if ((t.id === "st-qty" || t.id === "st-ahead") && t.value && ST_APP()) {
       const f = t.id === "st-qty" ? "qty" : "ahead", v = Math.max(1, Math.min(f === "qty" ? 99 : 90, Math.round(Number(t.value)) || 0));
       if (v) { const c = Object.assign({}, (ST.view && ST.view.cfg) || {}, { [f]: v }); delete c.products; delete c.skip; clearTimeout(stCfgTimer); stCfgTimer = setTimeout(() => window.desk.config.set({ stockAuto: c }).then(stLoad, () => {}), 600); }
+    }
+    if (t.id === "capforce-on") {
+      if (timedDay(TODAY) || !RULES.capAuto.on) { renderCapForce(); return; }
+      RULES.capAuto.forceDay = t.checked ? TODAY : ""; capMark = null; saveCapAuto(); renderAll();
+      if (sheet.mode === "settings" && sheet.tab === "naver") renderSheet();
+      toast(t.checked ? `오늘만 네이버 판매 수량 자동조절 — 10분마다 (목표 ${RULES.capAuto.target} · 상한 ${RULES.capAuto.ceiling}) · 손님 이용은 그대로 무제한 · 내일은 다시 꺼져요` : "오늘 수량조절을 껐어요 — 이미 바꾼 네이버 수량은 그대로예요", 7000);
     }
     if (t.id === "cap-on") { RULES.capAuto.on = t.checked; capMark = null; saveCapAuto(); renderAll(); toast(t.checked ? "네이버 판매 수량 자동 조절을 켰어요 (10분마다)" : "자동 조절을 껐어요"); }
     if ((t.id === "cap-target" || t.id === "cap-max" || t.id === "cap-ceil" || t.id === "cap-vis") && t.value) { RULES.capAuto[{ "cap-target": "target", "cap-max": "max", "cap-ceil": "ceiling", "cap-vis": "visible" }[t.id]] = Math.max(1, Math.min(60, Number(t.value) || 0)); saveCapAuto(); }
