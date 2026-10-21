@@ -70,3 +70,30 @@ test("입장권 목록: 네이버 이용완료 · 현장구매자 · 기록 삭�
     await browser.close();
   }
 });
+
+test("입장권 목록: 같은 열쇠를 여러 명이 쓰면 — 지금 · 마지막에 쓴 사람은 노랑, 그 앞 사람은 회색 (열쇠로 찾기에선 그대로 · 사장님 10/21)", async () => {
+  const browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK);
+    await page.evaluate(() => {
+      window.__deskTest.walkin("01011112222", [41], 600); // 10:00 41번
+      window.__deskTest.walkin("01033334444", [41, 42], 690); // 11:30 41 · 42번 (41번 다시)
+      window.__deskTest.walkin("01055556666", [41], 780); // 13:00 41번 (마지막)
+    });
+    await page.$eval("#sold", (e) => e.click());
+    const cells = await page.$$eval(".soldlist .srow", (rows) => rows.map((r) => [r.querySelector(".sn").textContent.trim(), r.querySelector(".st").textContent.trim(), [...r.querySelectorAll(".sk span")].map((s) => s.textContent + ":" + s.className).join(" ")]).filter((x) => /41|42/.test(x[2])));
+    assert.deepStrictEqual(cells.map((c) => c[2]), ["41:kcur", "41:kold 42:kcur", "41:kold"], JSON.stringify(cells));
+    const bg = await page.$eval(".soldlist .sk .kcur", (e) => getComputedStyle(e).backgroundColor);
+    assert.notStrictEqual(bg, "rgba(0, 0, 0, 0)", "노랑 칸");
+    // 열쇠 번호로 찾기: 색 없이 그대로
+    await page.selectOption("#sold-key", "41");
+    assert.strictEqual(await page.$$eval(".soldlist .sk span", (e) => e.length), 0);
+    assert.strictEqual(await page.$$eval(".soldlist .srow", (e) => e.length) >= 3, true);
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
