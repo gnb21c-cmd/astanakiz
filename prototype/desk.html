@@ -86,6 +86,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .top { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
 .top .tag { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .top h1 { margin: 0; font-size: 16px; font-weight: 700; white-space: nowrap; }
+.top .brand { display: flex; align-items: baseline; gap: 6px; min-width: 0; flex: none; cursor: pointer; border-radius: 8px; padding: 2px 4px; margin-left: -4px; }
+.top .brand:hover { background: var(--surface-2); }
 .top .tag { font-size: 11.5px; color: var(--muted); }
 .captable { width: 100%; border-collapse: collapse; font-size: 14px; }
 .captable th, .captable td { border-bottom: 1px solid var(--line); padding: 4px 6px; text-align: center; }
@@ -288,6 +290,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .prn > .field { align-content: start; }
 #form-text, #ev-text { width: 100%; min-height: 150px; border: 1px solid var(--line); border-radius: 8px; padding: 8px; font-family: ui-monospace, Consolas, "D2Coding", monospace; font-size: 13px; background: var(--surface); color: var(--fg); resize: vertical; }
 #ev-text { min-height: 74px; }
+/* 입장권 양식 글 칸은 크게 (사장님 10/21 — 작게 할 필요 없음): 운영 설정 → 프린트물 설정 아래까지 */
+.prn #form-text { height: 470px; min-height: 300px; resize: vertical; box-sizing: border-box; }
 /* 설문조사 (10/14) */
 .svgrid { display: grid; grid-template-columns: minmax(0, 1fr) 236px; gap: 12px; align-items: start; }
 .svbox { border: 2px solid var(--line); border-radius: 12px; padding: 10px; display: grid; gap: 8px; }
@@ -426,6 +430,19 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 .kv dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
 .kv dd.phone { font-size: 14px; font-weight: 700; letter-spacing: .01em; }
 .res .act { display: flex; gap: 5px; align-items: center; justify-content: space-between; margin-top: 2px; flex-wrap: wrap; }
+/* 예약자 카드 (사장님 10/21): 이름만 굵게 · 나머지는 보통 글씨 · 글씨 한 단계(1px) 작게 — 줄이 겹쳐 잘려 보이던 것 (결제완료 칸 등) */
+.res .name { font-size: 14.5px; }
+.res .name .badge { font-weight: 400; }
+.res .badge { font-size: 10.5px; font-weight: 400; }
+.res .visits, .res .visits * { font-size: 11px; font-weight: 400; }
+.res .chain { font-size: 11.5px; font-weight: 400; }
+.res .kv { font-size: 11.5px; line-height: 1.5; row-gap: 1px; }
+.res .kv dd, .res .kv dd.phone, .res dd.visitor, .res .kv b, .res .qmany { font-weight: 400; }
+.res .kv dd.phone { font-size: 13px; }
+.res .kv .badge { display: inline-block; line-height: 1.35; padding: 0 5px; }
+.res .go { font-size: 11.5px; font-weight: 400; }
+.res .kchip { font-size: 10.5px; font-weight: 400; }
+.res .help, .res .npend, .res .moved { font-size: 10.5px; font-weight: 400; }
 .kchips { display: inline-flex; gap: 3px; flex-wrap: wrap; }
 .kchip { font-size: 11.5px; font-weight: 700; border-radius: 5px; padding: 0 6px; background: var(--ink); color: var(--on-ink); }
 .empty { color: var(--muted); font-size: 13px; padding: 10px; background: var(--surface-2); border-radius: 8px; text-align: center; }
@@ -596,8 +613,9 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 <div id="stage">
 <div class="app">
   <header class="top">
-    <h1>통합 데스크</h1>
-    <span class="tag" title="체험판 · 예시 데이터 · 네이버·POS·아마노는 실제로 연결되지 않음">체험판</span>
+    <!-- 사장님 10/21: [바탕화면] 대신 — '통합 데스크 ver.n'을 한 번 누르면 데스크만 작업표시줄로 내림 (다른 창은 그대로) -->
+    <div class="brand" data-act="minimize" role="button" tabindex="0" title="누르면 통합 데스크만 작업표시줄로 내려요 (POS 등 다른 창은 그대로)"><h1>통합 데스크</h1>
+    <span class="tag" title="체험판 · 예시 데이터 · 네이버·POS·아마노는 실제로 연결되지 않음">체험판</span></div>
     <button class="btn btn-sm posgo" data-act="posGo" title="POS 화면으로 (POS를 작업표시줄로 내리면 데스크로 돌아옴)">포스 전환</button>
     <button class="btn btn-sm posgo" data-act="drawer" title="POS와 연결된 현금통을 엶 (POS가 꺼져 있어도)">환전 오픈</button>
     <!-- 사장님 10/21: 사람이 몰리는 비수기 평일 — 근무자가 체크하면 그날만 네이버 판매 수량 자동조절 (다음 날은 다시 꺼짐 · 시간제인 날은 저절로 켜져 있음) -->
@@ -607,7 +625,6 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     <button class="btn btn-sm" data-act="time" data-min="30">+30분</button>
     <span class="rgrp">
     <button class="sold manualbtn" data-act="manual" title="입장 · 퇴장 · 화면 위치별 조작 방법">근무자 메뉴얼</button>
-    <button class="sold" id="desktop-btn" data-act="desktop" title="모든 창을 내리고 PC 바탕화면으로 (데스크는 작업표시줄에서 다시)">바탕화면</button>
     <button class="sold" id="sold" data-act="soldList" aria-live="polite" title="누르면 오늘 입장권 목록"></button>
     <!-- V2.0 (사장님 10/21): 시계는 맨 오른쪽 · 1.5초 안에 두 번 누르면 운영 설정 (관리자만 앎 — 버튼은 없앰) -->
     <button class="now num" id="now" data-act="clock" aria-label="지금 시각">13:50</button>
@@ -3296,7 +3313,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   /* 맨 위 [근무자 메뉴얼] → 입장 · 퇴장 · 화면 위치별 조작 (내려 보며 읽기)
      그림 = prototype/manual/*.jpg (체험판 화면 · apps/desk/tools/manual-shots.js 로 다시 찍음 · 설치본은 desk.html 옆 manual/)
      MANUAL_MARKS = 그림 1의 번호 자리 (% · 찍을 때 나온 값) */
-  const MANUAL_MARKS = [[14.4, 0.6], [38.7, 0], [1, 5.4], [1, 12.4], [23.4, 12.4], [48.7, 9.8], [48.7, 59.5], [48.7, 66.5], [62.4, 0.6]];
+  const MANUAL_MARKS = [[14.8, 0.6], [38.7, 0], [1, 5.4], [1, 12.4], [23.4, 12.4], [48.7, 9.8], [48.7, 59.5], [48.7, 66.5], [69.3, 0.6]];
   const MANUAL_TOC = [["man1", "① 화면 한눈에"], ["man2", "② 예약 손님 입장"], ["man3", "③ 현장 손님 입장"], ["man4", "④ 퇴장 · 열쇠 반납"], ["man5", "⑤ 마감 · 일괄 반납"], ["man6", "⑥ 주차등록"], ["man7", "⑦ 메모장"], ["man8", "⑧ 이럴 땐"]];
   const manImg = (f, alt) => `<img src="manual/${f}" alt="${alt}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'help',textContent:'(그림을 못 불러옴 — ${alt})'}))">`;
   const manSteps = (rows, tip) => `<div class="mansteps">${rows.map((r, i) => `<div><span class="n">${i + 1}</span><span>${r}</span></div>`).join("")}${tip ? `<div class="tip">${tip}</div>` : ""}</div>`;
@@ -3310,7 +3327,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       ["6", "<b>열쇠판</b> — 숫자 = 열쇠 번호 · 바탕색 = 이용 시간 · 테두리 = 네이버(흰색) / 현장(파랑) / 서비스(흰 점선)"],
       ["7", "<b>키즈상담 · 카페상담</b> (붉은 숫자 = 새 상담) · <b>열쇠 일괄 반납처리</b> (마감)"],
       ["8", "<b>주차등록</b> — 차량번호로 찾아 할인 (뒤에 열린 아마노와 같이 움직임)"],
-      ["9", "<b>근무자 메뉴얼 · 바탕화면 · 총 판매수</b> (누르면 입장권 목록) · 지금 시각"],
+      ["9", "<b>근무자 메뉴얼 · 총 판매수</b> (누르면 입장권 목록) · 지금 시각 · 맨 왼쪽 <b>통합 데스크</b> 글자를 누르면 데스크만 작업표시줄로"],
     ];
     const tile = (bg, line, fg, dash) => `<span class="mankey" style="background:${bg};border:2px ${dash ? "dashed" : "solid"} ${line};color:${fg}">12</span>`;
     return `<h3 id="sheet-title">근무자 메뉴얼 <span class="help">내려 보면서 읽어요 · 그림의 번호 = 화면 위치</span><button class="x" data-act="close" aria-label="닫기">×</button></h3>
@@ -3849,11 +3866,11 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       toast(`${b.name}님 카드를 ${hm(from)} → ${hm(to)}로 옮겼어요${b.naverSlot !== to ? ` (네이버 예약은 ${hm(b.naverSlot)} 그대로 · 이용완료도 그 칸에서)` : " (네이버 원래 시간)"}`);
     },
     goldenOk() { $("golden").hidden = true; },
-    // 맨 위 '바탕화면': 모든 창을 내리고 PC 바탕화면으로 (사장님 10/9) — 데스크는 작업표시줄에서 다시 올림
-    async desktop() {
-      if (!(window.desk && window.desk.win)) { toast("체험판: 설치한 앱에서는 모든 창을 내리고 바탕화면으로 가요"); return; }
-      const r = await window.desk.win.desktop().catch((e) => ({ ok: false, why: String(e) }));
-      if (!r || !r.ok) toast(`바탕화면으로 못 갔어요: ${(r && r.why) || ""}`);
+    // 맨 위 '통합 데스크 ver.n' 한 번 누르기 = 데스크만 작업표시줄로 (사장님 10/21 — [바탕화면]은 다른 창까지 내려서 뺌)
+    async minimize() {
+      if (!(window.desk && window.desk.win && window.desk.win.minimize)) { toast("체험판: 설치한 앱에서는 통합 데스크만 작업표시줄로 내려가요 (다른 창은 그대로)"); return; }
+      const r = await window.desk.win.minimize().catch((e) => ({ ok: false, why: String(e) }));
+      if (!r || !r.ok) toast(`작업표시줄로 못 내렸어요: ${(r && r.why) || ""}`);
     },
     /* 열쇠 창 반납 시각 (사장님 10/9): 현장 손님이 네이버로 이어 예약하거나 현장에서 다시 사면 이름 · 전화로 이어 붙일 수 없어 근무자가 직접
        ◀ ▶ 10분씩 → [변경] = 반납 시각만 (판매수 · 인원 그대로) · [+1타임] = 반납을 1시간 50분(1타임) 늘림 + 입장권을 열쇠 수만큼 더 산 것으로

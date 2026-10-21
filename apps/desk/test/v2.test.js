@@ -77,8 +77,8 @@ test("시계를 1.5초 안에 두 번 → 운영 설정 (버튼 없음) · 왼�
     await page.clock.install({ time: new Date("2026-10-05T13:50:00") });
     await page.goto(DESK);
     assert.strictEqual(await page.$(".top button:has-text('운영 설정')"), null, "맨 위 운영 설정 버튼 없음");
-    const top = await page.evaluate(() => { const r = (s) => document.querySelector(s).getBoundingClientRect(); return { clockRight: r("#now").right, manualLeft: r("[data-act=manual]").right <= r("#desktop-btn").left, last: [...document.querySelectorAll(".top .rgrp > *")].pop().id }; });
-    assert.deepStrictEqual([top.manualLeft, top.last], [true, "now"], "시계가 맨 오른쪽 · [근무자 메뉴얼]은 바탕화면 왼쪽");
+    const top = await page.evaluate(() => { const r = (s) => document.querySelector(s).getBoundingClientRect(); return { clockRight: r("#now").right, manualLeft: r("[data-act=manual]").right <= r("#sold").left, last: [...document.querySelectorAll(".top .rgrp > *")].pop().id }; });
+    assert.deepStrictEqual([top.manualLeft, top.last], [true, "now"], "시계가 맨 오른쪽 · [근무자 메뉴얼]은 총 판매수 왼쪽 ([바탕화면]은 뺌)");
     // 한 번만 → 안 열림 · 1.5초 넘겨 두 번째 → 안 열림
     await page.click("#now");
     await page.clock.runFor(1600);
@@ -279,6 +279,29 @@ test("평일 [오늘 수량조절]: 비수기 평일에 체크하면 그날만 �
     assert.deepStrictEqual([s.checked, s.disabled, s.skip], [true, true, ""]);
     assert.match(await page.getAttribute("#capforce", "title"), /시간제인 날.*저절로/);
     assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("예약자 카드: 이름만 굵게 · 나머지는 보통 글씨 · 글씨 한 단계 작게 · 결제완료 칸이 윗줄에 안 겹침 (사장님 10/21)", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    await page.goto(DESK);
+    await page.click('.slot[data-s="840"]');
+    const r = await page.evaluate(() => [...document.querySelectorAll("#res .res")].map((c) => {
+      const leaves = [...c.querySelectorAll("*")].filter((e) => e.childElementCount === 0 && e.textContent.trim());
+      const nm = c.querySelector(".name");
+      const bold = leaves.filter((e) => +getComputedStyle(e).fontWeight >= 600 && !nm.contains(e) ? true : false).map((e) => e.textContent.trim());
+      const nameBold = +getComputedStyle(nm).fontWeight >= 700;
+      const dds = [...c.querySelectorAll(".kv dd")].map((d) => d.getBoundingClientRect());
+      const paid = c.querySelector(".kv .badge.paid").getBoundingClientRect();
+      const above = dds[dds.length - 2];
+      return { bold, nameBold, kv: getComputedStyle(c.querySelector(".kv")).fontSize, name: getComputedStyle(nm).fontSize, overlap: paid.top < above.bottom - 0.5 };
+    }));
+    assert.ok(r.length >= 3);
+    for (const c of r) assert.deepStrictEqual(c, { bold: [], nameBold: true, kv: "11.5px", name: "14.5px", overlap: false });
   } finally {
     await browser.close();
   }

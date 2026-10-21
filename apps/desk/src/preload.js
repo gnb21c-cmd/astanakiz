@@ -33,7 +33,7 @@ contextBridge.exposeInMainWorld("desk", {
     dump: (kind) => ipcRenderer.invoke("talk:dump", kind),
   },
   pos: { show: () => ipcRenderer.invoke("pos:show") },
-  win: { desktop: () => ipcRenderer.invoke("win:desktop") }, // 바탕화면으로 (모든 창 최소화)
+  win: { minimize: () => ipcRenderer.invoke("win:minimize") }, // 데스크만 작업표시줄로 (맨 위 '통합 데스크 ver.n' 누르기)
   // 오늘의 열쇠 · 입장 기록 저장 (파일)
   state: {
     load: (day) => ipcRenderer.sendSync("state:load", day),
