@@ -765,7 +765,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     /* 네이버 판매 수량 자동 조절 (시간제인 날 · 시간제 타임만): 2시간(4타임) 안의 손님(네이버 예약 + 현장)이 target 에 가깝게
        10분마다 지금 · 앞 3타임의 네이버 '회차당 수량'을 바꿈. 한 타임 최대 max (현장으로 갑자기 오는 손님 · 10분 사이 예약을 생각해서) */
     // target = 맞추려는 2시간 손님 수, ceiling = 절대 넘지 않는 상한 (40~43 · 사용자 지시 10/6)
-    capAuto: { v: 2, on: false, target: 40, ceiling: 43, max: 13, visible: 10, ahead: 3, every: 10, product: "1시간 50분", today: { day: "", on: false }, prio: { p1: "10:00, 12:00~15:30, 18:00", p2: "10:30~11:00, 16:00~17:00, 18:30", p3: "11:30, 17:30, 19:00, 19:30" }, nightProduct: "야간자유" }, // target: 네이버만 합쳐 (사장님 10/24 · 현장은 그 위로 45개까지) · max: 황금 타임 · 빨리 차는 타임 최대 (그 밖은 기본 10) · prio: 손님이 고르는 순위 1 · 2 · 3 (사장님 10/24 성수기 휴일 · 적지 않은 타임 = 3순위) · nightProduct: 18:00 부터 타임의 네이버 상품 // visible: 고객에게 보이는 잔여 최대 (안내 '최대 10팀') · today: 맨 위 [오늘 수량조절] 스위치로 그날만 켜고 끈 것 (on = 기본: 시간제인 날)
+    capAuto: { v: 3, on: false, target: 40, ceiling: 43, max: 13, visible: 10, ahead: 3, every: 10, product: "1시간 50분", today: { day: "", on: false }, prio: { p1: "10:00, 12:00~15:30, 18:00", p2: "10:30~11:00, 16:00~16:30, 18:30", p3: "11:30, 17:00, 17:30, 19:00, 19:30" }, boost: "18:00, 18:30", nightProduct: "야간자유" }, // target: 네이버만 합쳐 (사장님 10/24 · 현장은 그 위로 45개까지) · max: 황금 타임 · 빨리 차는 타임 최대 (그 밖은 기본 10) · prio: 손님이 고르는 순위 1 · 2 · 3 (사장님 10/24 성수기 휴일 · 적지 않은 타임 = 3순위) · nightProduct: 18:00 부터 타임의 네이버 상품 // visible: 고객에게 보이는 잔여 최대 (안내 '최대 10팀') · today: 맨 위 [오늘 수량조절] 스위치로 그날만 켜고 끈 것 (on = 기본: 시간제인 날)
   };
   /* 이용시간: 성수기 — 평일·휴일 모두 17:30 입장까지 1시간 50분, 18:00 입장부터 무제한
               비수기 — 평일은 무제한, 휴일은 성수기와 같음 */
@@ -1315,21 +1315,14 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   function projection() {
     let worst = Infinity;
     // 사장님 10/24: 수량 자동조절을 하는 날은 아직 시작 안 한 타임의 네이버 남은 수량도 다 팔린다고 셈 → 현장 키는 네이버가 30분 단위로 덜 판 자리(타임이 시작한 뒤) · 일찍 나간 자리에서만
+    // 사장님 10/24 밤: 근무자에게 '빈 좌석 확인' 선택을 주지 않음 — 열쇠 45개 안에서 계산한 수만큼 초록(그만큼 판매) · 0이면 빨강
     const openLeft = capToday() ? slotStats(TODAY).filter((x) => x.s > now && x.left > 0) : [];
-    for (let x = now; x <= now + RULES.useMinutes; x += 5) {
-      let used = 0;
-      for (const h of holders()) for (const k of h.keys) { const m = useOf(h, k); if (m == null || h.slot + m > x || x < now + 10) used++; }
-      for (const b of bookings[TODAY]) {
-        if (b.status !== "확정") continue;
-        const m = baseMinutes(TODAY, b.slot); // 아직 안 온 예약은 골든벨이어도 원래 시간 안에만 올 수 있다고 (안 온 지난 예약이 계속 자리를 막지 않게)
-        if (b.slot - RULES.earlyMinutes <= x && (m == null || x < b.slot + m)) used += b.qty;
-      }
-      for (const o of openLeft) { const m = baseMinutes(TODAY, o.s); if (o.s - RULES.earlyMinutes <= x && (m == null || x < o.s + m)) used += o.left; }
-      worst = Math.min(worst, RULES.keys - used);
-    }
+    for (let x = now; x <= now + RULES.useMinutes; x += 5) worst = Math.min(worst, RULES.keys - capKeysAt(x, openLeft));
     const free = freeKeys().length;
-    return { base: Math.max(0, Math.min(worst - (RULES.keys - RULES.baseKeys), free)), all: Math.max(0, Math.min(worst, free)) };
+    const all = Math.max(0, Math.min(worst, free));
+    return { base: all, all };
   }
+
 
   // ── 그리기 ───────────────────────────────────────
   const $ = (id) => document.getElementById(id);
@@ -1647,97 +1640,105 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   }
 
   // ── 네이버 판매 수량 자동 조절 ─────────────────────
-  /* 사장님 10/24 다시 짠 계산 — 네이버는 '예약 합' 기준 · 좌석은 40
-     어느 입장 시각 t 에도 [앞 3타임 + t] 네이버 수 ≤ 목표(40)
-       - 시작한 타임 = 예약 수 (일찍 나간 사람 · 안 온 사람도 그대로 — 그 자리는 현장 키 몫: projection)
-       - 안 시작한 타임 = 수량이 다 팔린다고 (바꾸는 타임은 계획한 수량)
-     바꾸는 타임(adj) = 곧 다가오는 타임(u) + 그 뒤 타임들. 손님이 고르는 순위(o.prio · 사장님 10/24 성수기 휴일):
-       1순위 10:00 · 12:00 ~ 15:30 · 18:00 / 2순위 10:30 ~ 11:00 · 16:00 ~ 17:00 · 18:30 / 3순위 그 밖(11:30 · 17:30 · 19:00 · 19:30)
-       예약이 빨리 차면(예상(예약 속도 · 지난 같은 요일) ≥ 지금 수량) 한 순위 올림
-     나누는 차례 (한 장씩 · 같은 차례 안에서는 예상이 큰 타임 먼저):
-       ① 1순위 기본(o.base, 10)까지 → ② 1순위 최대(o.max, 13 · 저녁 무제한 1순위는 묶음 목표까지)까지 → ③ 2순위는 남는 자리만큼 기본까지 → ④ 3순위는 그다음 남는 만큼
-       (2 · 3순위는 기본 10을 넘지 않음 · 인기 없는 타임은 많이 열어도 그만큼 안 오므로 높은 순위가 쓰고 남는 만큼만)
-     곧 다가오는 타임(u)은 늘리지 않음 — 뒤 타임을 다 나눈 뒤 남는 자리까지만 (모자라면 예약 수까지 줄임 · 남는 자리는 현장 키 몫)
-       단 u 가 더 높은 순위면 낮은 순위 타임 때문에는 안 줄임
-       u 가 1순위이고 매진이면 먼저 하나 더 (사장님 수동 방식 10/24 — 황금시간엔 3분에 1개꼴로 예약): 뒤 같은 순위 타임은 지금 수량대로,
-       낮은 순위 타임은 예약 수로(양보) 보고 u 손님이 있는 동안의 묶음이 목표를 안 넘을 때만 · 10분마다 하나씩
-     머무는 시간: 타임마다 stay(분 · 기본 110) — 무제한(null · 18:00 부터 입장)은 문 닫을 때까지 있다고 → 그 뒤 묶음에 계속 들어감 (사장님 10/24)
-     현장 열쇠가 현장 몫(o.pool = 열쇠 45 − 목표 40)보다 많이 나가 있으면 넘은 열쇠(반납이 늦은 것부터)가 안에 있는 동안 그 시각 목표를 그만큼 낮춤 (6 → 39 · 7 → 38)
-     바꾸는 타임 밖 먼 타임은 열린 수량이 다 팔린다고 셈 · 그래도 묶음이 목표를 넘으면 먼 타임 수량을 줄임 (예약 밑으로는 안 줄임) */
+  /* 사장님 10/24 밤에 다시 정한 방법 — 미리 예상하지 않고 '지금까지 들어온 예약'만 보고 조금씩
+     (네이버 예약은 누가 · 언제 할지 모름 → 매진된 타임에만 한 장씩 · 그만큼 인기 없는 타임에서 한 장씩)
+     처음(09:50)엔 모든 타임 10장 → 네 타임(2시간) 합 40. 매시 5 · 15 · 25 · 35 · 45 · 55분에:
+     ⓪ 갚기: 매진이라 늘렸던 타임(A)이 시작했는데 늘린 자리가 안 팔렸으면 그때 줄였던 타임에 한 장 돌려줌
+     ① 곧 다가오는 타임 A 가 매진이면 +1 (최대 13 · 한 번에 한 장 — 30분 사이 3번)
+        - 뒤 3타임이 모두 1순위면: A 예약 중 한 팀(같은 이름 · 전화번호는 합침)이 여러 장 산 만큼 — (장수 − 1)의 합 2장마다 1장 더
+          (줄이지 않고 늘림 · 그 뒤 3타임은 '일찍 반납한 열쇠'가 생길 때까지 더 조절하지 않음)
+        - 그 밖 / 위가 안 되면: 뒤 3타임 중 예약이 가장 적은 타임(잔여가 있는)을 1장 줄임 (순위 상관없이) → 네 타임 합은 그대로
+        - 뒤 3타임에 줄일 곳이 없으면(모두 매진): 최대 11까지만 줄이지 않고 늘림
+     ② 18:00 · 18:30 (저녁 몰림 · o.boost): 곧 다가오지 않아도 매진이면 +1 · 13 제한 없이 —
+        17:00 ~ 18:30 · 18:00 ~ 19:30 처럼 그 타임이 든 네 타임 합이 40을 넘지 않게 3순위 타임(17:00 · 17:30 · 19:00 · 19:30)에서 예약이 적은 순으로 줄임 · 못 줄이면 안 늘림
+     늘리기 전에 그 타임 시작 때 열쇠가 남는지(45개 · 안에 있는 손님 + 아직 안 온 예약 + 열린 잔여) 확인 — 모자라면 안 늘림
+     네 타임 합: 시작한 타임 = 예약 수 (안 팔린 자리는 공회전) · 안 시작한 타임 = 회차당 수량 (예약 + 잔여) · 머무는 시간 1시간 50분 (저녁도 같은 셈)
+     o = { max: 13, max11: 11, base: 10, target: 40, prio: [1순위 [[시작, 끝], …], 2순위 […]], boost: [[시작, 끝], …], state: { loans, bonus, locks }, seatOk(t), bonus(t) } */
   function planCaps(slots, adj, o) {
     const n = slots.length, idx = new Map(slots.map((x, i) => [x.t, i]));
-    const dem = (i) => (slots[i].demand != null ? slots[i].demand : slots[i].used);
-    const fast = (i) => dem(i) >= slots[i].cap - 1e-9; // 예약 속도 · 지난 같은 요일로 보면 지금 수량이 다 팔림
-    const stay = (j) => (slots[j].stay !== undefined ? slots[j].stay : 110); // null = 무제한
-    const inWin = (j, k) => j <= k && (stay(j) == null || slots[j].t + stay(j) > slots[k].t); // 시각 k 에 j 손님이 안에 있음
+    const st = o.state || { loans: [], bonus: {}, locks: [] };
+    const target = o.target != null ? o.target : 40, max = o.max != null ? o.max : 13, max11 = o.max11 != null ? o.max11 : 11;
+    const stay = (j) => (slots[j].stay != null ? slots[j].stay : 110);
+    const inWin = (j, k) => j <= k && slots[j].t + stay(j) > slots[k].t; // 시각 k 에 j 손님이 안에 있음 (k 와 앞 3타임)
     const H = adj.map((t) => idx.get(t)).filter((i) => i != null && !slots[i].started).sort((a, b) => a - b);
-    const u = H.length ? H[0] : -1; // 곧 다가오는 타임
-    const add = new Map(H.map((i) => [i, 0])); // 예약(used) 위로 더 연 수
-    const cut = new Map(); // 먼 타임 수량을 줄인 수
-    const base = o.base != null ? o.base : 10;
-    // 손님이 고르는 차례 (사장님 10/24 성수기 휴일): o.prio = [1순위 [[시작, 끝], …], 2순위 […]] · 나머지 = 3순위
-    //   o.popular(예전 · 시험)는 1순위만 준 것과 같음 · 예약이 빨리 차면(예상 ≥ 지금 수량) 한 순위 올림
+    const can = new Set(H);
+    const A = H.length ? H[0] : -1; // 곧 다가오는 타임
     const rng = (v) => (!v ? [] : Array.isArray(v[0]) ? v : [v]);
-    const pr = o.prio ? o.prio.map(rng) : [rng(o.popular)];
+    const pr = (o.prio || []).map(rng);
     const has = (list, j) => list.some((r) => r && slots[j].t >= r[0] && slots[j].t <= r[1]);
-    const rank0 = (j) => { for (let r = 0; r < pr.length; r++) if (has(pr[r], j)) return r + 1; return pr.length + 1; };
-    const rank = (j) => Math.max(1, rank0(j) - (fast(j) ? 1 : 0));
-    const pop = (j) => rank(j) === 1;
-    const maxOf = (j) => (rank(j) === 1 ? (stay(j) == null ? Infinity : o.max) : Math.max(base, slots[j].mainUsed)); // 1순위 최대 13 · 저녁 1순위(무제한 타임)는 묶음 목표까지 · 그 밖은 기본 10
-    const open = (j) => { const x = slots[j]; return x.used - x.mainUsed + Math.max(x.cap - (cut.get(j) || 0), x.mainUsed); }; // 열린 수량이 다 팔린다고 (다른 상품 예약 포함)
-    const wo = (o.walkOut || []).map((w) => w.to).sort((a, b) => b - a), extra = Math.max(0, wo.length - (o.pool != null ? o.pool : Infinity));
-    const borrowed = (T) => { let c = 0; for (let i = 0; i < extra; i++) if (wo[i] > T) c++; return c; }; // 그 시각에 아직 안에 있는 '빌린' 현장 열쇠
-    const goal = (k) => o.target - borrowed(slots[k].t);
-    // keepU: 곧 다가오는 타임(u)이 더 높은 순위면 낮은 순위 타임 때문에 줄이지 않게 — u 를 지금 열린 수량으로 셈
-    const q = (j, keepU) => { const x = slots[j]; if (x.started) return x.used; if (add.has(j)) return j === u && keepU ? Math.max(x.used + add.get(j), open(j)) : x.used + add.get(j); return open(j); }; // keepU: 곧 다가오는 타임을 지금 열린 수량으로
-    const tail = (j) => (slots[j].started ? slots[j].tail || 0 : 0); // 골든벨: 머무는 시간이 끝나도 문 닫을 때까지 있는 손님 (지금 안에 있는 사람만)
-    const at = (k, keepU) => { let v = 0; for (let j = 0; j <= k; j++) v += inWin(j, k) ? q(j, keepU) : tail(j); return v; }; // 시각 k 에 안에 있을 네이버 손님 (시간제는 k 와 앞 3타임)
-    const room = (i, keepU) => { let r = Infinity; for (let k = i; k < n && inWin(i, k); k++) r = Math.min(r, goal(k) - at(k, keepU)); return r; };
-    const tier = (list, lim, keepU) => {
-      for (let guard = 0; guard < 600; guard++) {
-        let best = null, bv = -1;
-        for (const i of list) {
-          const a = add.get(i);
-          if (slots[i].mainUsed + a >= Math.min(lim, maxOf(i)) || room(i, keepU) < 1) continue;
-          const v = (1 + dem(i)) / (a + 1);
-          if (v > bv) { bv = v; best = i; }
+    const rank = (j) => { for (let r = 0; r < pr.length; r++) if (has(pr[r], j)) return r + 1; return pr.length + 1; };
+    const boost = (j) => has(rng(o.boost), j);
+    const locked = new Set((st.locks || []).map((t) => idx.get(t)).filter((i) => i != null));
+    const capOf = (i) => Math.max(slots[i].cap, slots[i].mainUsed);
+    const to = new Map(H.map((i) => [i, capOf(i)]));
+    const q = (j) => { const x = slots[j]; if (x.started) return x.used; return x.used - x.mainUsed + (to.has(j) ? to.get(j) : capOf(j)); };
+    const tail = (j) => (slots[j].started ? slots[j].tail || 0 : 0); // 골든벨: 머무는 시간이 끝나도 문 닫을 때까지 있는 손님
+    const at = (k) => { let v = 0; for (let j = 0; j <= k; j++) v += inWin(j, k) ? q(j) : tail(j); return v; };
+    const soldOut = (i) => slots[i].mainUsed > 0 && slots[i].mainUsed >= to.get(i);
+    const left = (i) => to.get(i) - slots[i].mainUsed;
+    const fewest = (a, b) => (slots[a].mainUsed - slots[b].mainUsed) || (rank(b) - rank(a)) || (b - a); // 예약이 적은 타임 → 덜 인기(순위 숫자 큰) → 뒤 타임
+    const seatOk = (i) => !o.seatOk || o.seatOk(slots[i].t);
+    const why = new Map(), ops = [];
+    const note = (i, w) => why.set(i, why.has(i) ? `${why.get(i)} · ${w}` : w);
+    // ⓪ 갚기: 시작한 A 의 늘린 자리가 안 팔렸으면 줄였던 타임에 돌려줌 (A 의 +1 이 안 됐던 빌림은 모두 돌려줌)
+    const loans = st.loans || [];
+    for (const ta of [...new Set(loans.map((L) => L.a))]) {
+      const ia = idx.get(ta);
+      if (ia == null || !slots[ia].started) continue;
+      let unsold = Math.max(0, slots[ia].cap - slots[ia].mainUsed);
+      for (const L of loans.filter((x) => x.a === ta).reverse()) {
+        const iv = idx.get(L.v);
+        const back = !L.ok || unsold > 0;
+        if (L.ok && back) unsold--;
+        if (back && iv != null && can.has(iv)) { to.set(iv, to.get(iv) + 1); note(iv, `${hm(ta)} 늘린 자리가 안 팔려 돌려받음`); ops.push({ type: "repay", a: ta, v: L.v, id: L.id }); }
+        else ops.push({ type: "drop", a: ta, v: L.v, id: L.id }); // 팔렸음 (또는 이미 시작) → 빌림 끝
+      }
+    }
+    // 늘리기 (A · 저녁 몰림): 한 번에 한 장
+    const grow = (X, kind, victims, extra) => { to.set(X, to.get(X) + 1); for (const v of victims) { to.set(v, to.get(v) - 1); note(v, `${hm(slots[X].t)} 매진이라 한 장 양보`); } ops.push(Object.assign({ type: "grow", a: slots[X].t, kind, victims: victims.map((v) => slots[v].t) }, extra || {})); };
+    const retry = (X) => { const L = loans.find((x) => x.a === slots[X].t && !x.ok && !ops.some((p) => p.id === x.id)); if (!L) return false; to.set(X, to.get(X) + 1); note(X, "매진 · 한 장 더 (다시)"); ops.push({ type: "grow", a: slots[X].t, kind: "retry", victims: [], id: L.id }); return true; };
+    if (A >= 0 && locked.has(A) && soldOut(A)) note(A, "매진 · 묶음이라 그대로 (일찍 반납한 열쇠가 생기면 다시)");
+    if (A >= 0 && !boost(A) && !locked.has(A) && soldOut(A)) {
+      const x = slots[A], next = [A + 1, A + 2, A + 3].filter((j) => j < n && !slots[j].started);
+      if (retry(A)) { /* 지난번에 줄인 자리로 다시 늘림 */ }
+      else if (to.get(A) >= max) note(A, `매진 · 최대 ${max}`);
+      else if (!seatOk(A)) note(A, "매진 · 그때 열쇠가 모자라 안 늘림");
+      else {
+        const free = Math.floor((o.bonus ? o.bonus(x.t) : 0) / 2) - ((st.bonus || {})[x.t] || 0); // 여러 장 산 팀 (장수 − 1)의 합 2장마다 1장
+        const room = next.filter((j) => can.has(j) && !locked.has(j) && !boost(j) && left(j) > 0).sort(fewest); // 잔여가 있는 뒤 타임 (18:00 · 18:30 은 양보하지 않음)
+        // 앞 타임 손님(아직 안에 있는)까지 넣은 네 타임 합도 목표 이하가 되는 타임만 줄임 — A 가 든 네 타임 합이 하나라도 넘으면 그 타임으로는 안 됨
+        const fits = (v) => { to.set(A, to.get(A) + 1); to.set(v, to.get(v) - 1); let ok = true; for (let k = A; k < n && inWin(A, k); k++) if (at(k) > target) ok = false; to.set(A, to.get(A) - 1); to.set(v, to.get(v) + 1); return ok; };
+        const cands = o.strict === false ? room : room.filter(fits);
+        if (next.length && next.every((j) => rank(j) === 1) && free >= 1) { grow(A, "bonus", [], { lock: next.map((j) => slots[j].t) }); note(A, "매진 · 여러 장 예약 팀만큼 한 장 더 (뒤 1순위 3타임은 묶음)"); }
+        else if (cands.length) { grow(A, "swap", [cands[0]]); note(A, `매진 · 한 장 더 (${hm(slots[cands[0]].t)}에서 한 장)`); }
+        else if (room.length) note(A, `매진 · 앞 손님까지 넣으면 네 타임 합이 ${target}을 넘어 안 늘림`);
+        else if (to.get(A) < max11) { grow(A, "max11", []); note(A, `매진 · 뒤가 모두 매진이라 줄이지 않고 한 장 더 (최대 ${max11})`); }
+        else note(A, `매진 · 뒤가 모두 매진 · 최대 ${max11}`);
+      }
+    }
+    for (const X of H) {
+      if (!boost(X) || locked.has(X) || !soldOut(X)) continue;
+      if (retry(X)) continue;
+      if (!seatOk(X)) { note(X, "매진 · 그때 열쇠가 모자라 안 늘림"); continue; }
+      // +1 해 보고 X 가 든 네 타임 합이 목표를 넘으면 3순위 타임에서 줄임 (예약이 적은 순) — 못 줄이면 되돌림
+      const snap = new Map(to), vic = [];
+      to.set(X, to.get(X) + 1);
+      let ok = true;
+      for (let k = X; ok && k < n && inWin(X, k); k++) {
+        for (let g = 0; g < 50 && at(k) > target; g++) {
+          const js = []; for (let j = 0; j <= k; j++) if (inWin(j, k) && j !== X && can.has(j) && !boost(j) && !locked.has(j) && rank(j) >= 3 && left(j) > 0) js.push(j);
+          if (!js.length) { ok = false; break; }
+          js.sort(fewest); to.set(js[0], to.get(js[0]) - 1); vic.push(js[0]);
         }
-        if (best == null) return;
-        add.set(best, add.get(best) + 1);
       }
-    };
-    const fut = H.filter((i) => i !== u), r1 = fut.filter((i) => rank(i) === 1), r2 = fut.filter((i) => rank(i) === 2), r3 = fut.filter((i) => rank(i) >= 3);
-    const keepFor = (r) => u >= 0 && rank(u) < r; // 곧 다가오는 타임이 더 높은 순위면 낮은 순위 타임 때문에는 안 줄임
-    // ⓪ 곧 다가오는 1순위 타임이 매진이면 하나 더 — 뒤 같은 순위 타임은 지금 수량, 낮은 순위 타임은 예약 수로 보고 (그 뒤 차례에서 u 는 정해진 수)
-    let fixedU = false;
-    if (u >= 0 && pop(u) && slots[u].mainUsed >= slots[u].cap) {
-      const x = slots[u], capU = Math.max(x.cap, x.mainUsed);
-      const q0 = (j) => (j === u ? capU + 1 - x.mainUsed + x.used : slots[j].started ? slots[j].used : add.has(j) && rank(j) > rank(u) ? slots[j].used : open(j));
-      let ok = capU + 1 <= maxOf(u);
-      for (let k = u; ok && k < n && inWin(u, k); k++) { let v = 0; for (let j = 0; j <= k; j++) v += inWin(j, k) ? q0(j) : tail(j); if (v > goal(k) + 1e-9) ok = false; }
-      add.set(u, capU - x.mainUsed + (ok ? 1 : 0)); fixedU = true;
+      for (const [k2, v] of snap) to.set(k2, v);
+      if (!ok) { note(X, `매진 · 네 타임 합 ${target}을 넘어 안 늘림`); continue; }
+      grow(X, "boost", vic); note(X, `매진 · 저녁 몰림이라 한 장 더${vic.length ? ` (${vic.map((v) => hm(slots[v].t)).join(" · ")}에서)` : ""}`);
     }
-    tier(r1, base, keepFor(1)); // ① 1순위 기본까지 (같은 순위인 곧 다가오는 타임은 양보)
-    tier(r1, Infinity, keepFor(1)); // ② 1순위 최대까지 (낮 13 · 저녁 1순위는 묶음 목표까지 — maxOf)
-    tier(r2, base, keepFor(2)); // ③ 2순위는 남는 자리만큼 기본까지
-    tier(r3, base, keepFor(3)); // ④ 3순위는 그다음 남는 자리만큼 기본까지
-    if (u >= 0 && !fixedU) { const x = slots[u]; add.set(u, Math.max(0, Math.min(Math.max(x.cap, x.mainUsed) - x.mainUsed, Math.floor(room(u, false) + 1e-9)))); } // 곧 다가오는 타임: 남는 자리까지만 (늘리지 않음)
-    // 먼 타임: 열린 수량이 다 팔려도 묶음이 목표를 넘으면 그 수량을 줄임 (안 팔린 수가 많은 타임부터)
-    for (let k = 0; k < n; k++) {
-      if (slots[k].started) continue;
-      for (let guard = 0; guard < 100 && at(k, false) > goal(k) + 1e-9; guard++) {
-        const js = []; for (let j = 0; j <= k; j++) if (inWin(j, k) && !slots[j].started && !add.has(j) && open(j) > slots[j].used) js.push(j);
-        if (!js.length) break; // 이미 팔린 것만으로 넘음
-        const f = js.sort((p2, q2) => (open(q2) - slots[q2].used) - (open(p2) - slots[p2].used))[0];
-        cut.set(f, (cut.get(f) || 0) + 1);
-      }
-    }
-    const worst = (i) => { let m = -Infinity; for (let k = i; k < n && inWin(i, k); k++) m = Math.max(m, at(k, false)); return Math.round(m); }; // 이 타임 손님이 있는 동안 가장 많을 때
-    const out = H.map((i) => { const x = slots[i]; return { t: x.t, product: x.product, from: x.cap, to: x.mainUsed + add.get(i), used: x.used, walk: x.walk, open: add.get(i), demand: x.demand, soon: i === u, gold: pop(i), rank: rank(i), worst: worst(i) }; });
-    for (const [i, c] of cut) { const x = slots[i]; out.push({ t: x.t, product: x.product, from: x.cap, to: Math.max(x.mainUsed, x.cap - c), used: x.used, walk: x.walk, open: Math.max(0, x.cap - c - x.mainUsed), far: true, gold: pop(i), rank: rank(i), worst: worst(i) }); }
-    out.sort((p2, q2) => p2.t - q2.t);
-    out.inside = (t) => { const k = idx.get(t); return k == null ? 0 : Math.round(at(k, false)); }; // 그 시각 묶음의 네이버 수 (화면용)
-    out.goal = (t) => { const k = idx.get(t); return k == null ? o.target : goal(k); }; // 그 시각의 네이버 목표 (빌린 현장 열쇠만큼 낮음)
+    const out = H.map((i) => { const x = slots[i]; return { t: x.t, product: x.product, from: x.cap, to: to.get(i), used: x.used, mainUsed: x.mainUsed, walk: x.walk, soon: i === A, rank: rank(i), boost: boost(i), locked: locked.has(i), why: why.get(i) || "" }; });
+    out.ops = ops;
+    out.inside = (t) => { const k = idx.get(t); return k == null ? 0 : Math.round(at(k)); }; // 그 시각 네 타임 합 (화면용)
+    out.goal = () => target;
     return out;
   }
   /* 예약 속도 · 과거 실제 수: 이 PC에 저장
@@ -1799,14 +1800,11 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   }
   /** 수량조절 계획에 쓰는 이용시간(분): 시간제는 원래대로 · 체크한 평일(손님은 그대로 무제한)은 18:00 전 입장을 1시간 50분 머문다고 봄 */
   const capMinutes = (t) => { const m = minutesFor(TODAY, t); return m != null ? m : capForce() && t < toMin(RULES.unlimitedFrom) ? RULES.useMinutes : null; };
-  // 계획(예약 합)에 쓰는 머무는 시간: 골든벨이 켜져도 원래 판 시간 (사장님 10/24 저녁 — 골든벨 뒤 모든 손님을 문 닫을 때까지로 세어 저녁 잔여가 모두 0이 됨)
-  //   골든벨로 길어진 손님은 지금 안에 있는 사람만 tail 로 따로 셈
-  const capStay = (t) => { const m = baseMinutes(TODAY, t); return m != null ? m : capForce() && t < toMin(RULES.unlimitedFrom) ? RULES.useMinutes : null; };
   /** 오늘 시간제 타임마다 { t, used(네이버 확정+완료 · 입장권 전부), mainUsed(조절할 상품), cap(조절할 상품의 회차당 수량), walk(현장), started } */
   const capMain = (name, t) => new RegExp(String(t != null && t >= toMin(RULES.unlimitedFrom) ? RULES.capAuto.nightProduct || "야간자유" : RULES.capAuto.product).replace(/\s+/g, "\\s*")).test(name || ""); // 18:00 부터 타임은 야간자유 상품 (사장님 10/24)
   function capSlots(day) {
     const list = bookings[day] || [];
-    // 시간제인 날 오늘: 저녁 무제한 타임(18:00 ~)도 넣음 — stay = 머무는 분 (무제한 = null · 문 닫을 때까지 있다고) (사장님 10/24)
+    // 시간제인 날 오늘: 저녁 타임(18:00 ~)도 넣음 — 네 타임 합은 저녁도 낮과 같이 1시간 50분으로 셈 (사장님 10/24 밤: 17:00 ~ 18:30 · 18:00 ~ 19:30 합 40)
     // [오늘 수량조절]을 켠 평일(하루 내내 무제한)은 18:00 전 타임만 (10/21 그대로)
     return SLOTS.filter((t) => (day === TODAY ? timedDay(TODAY) || capMinutes(t) != null : minutesFor(day, t) != null)).map((t) => {
       const ns = (naverSlots[day] || {})[t];
@@ -1816,7 +1814,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       const walk = day === TODAY ? walkins.filter((w) => w.slot === t && !w.extra).reduce((a, w) => a + (w.qty || Math.max(1, w.keys.length)), 0) : 0; // +1타임은 연장된 열쇠로 이미 셈
       // 골든벨: 이 타임 손님 중 지금 안에 있는(열쇠) · 아직 안 온(30분 안) 네이버 손님은 머무는 시간이 끝나도 문 닫을 때까지 (서비스 키 · 현장 · 시험 손님 빼고)
       const tail = day === TODAY && golden && t <= now ? holders().filter((h) => h.slot === t && !h.walk && !h.svc && !(h.no && testOut.has(h.no))).reduce((a, h) => a + h.keys.length, 0) + list.filter((b) => b.slot === t && b.slot >= now - 30 && b.status === "확정" && !b.chainHead && !b.keys.length && b.outAt == null && !testOut.has(b.no)).reduce((a, b) => a + b.qty, 0) : 0; // 아직 안 온 예약은 30분 전 타임까지 (그보다 오래되면 노쇼 — restBooked 와 같게)
-      return { t, used, mainUsed: raw ? raw.conf + raw.done : used, cap: raw ? raw.cap : capDemo[t] ?? (ns ? ns.cap : RULES.slotCap), product: raw ? raw.product : "", walk, started: day === TODAY && t <= now, stay: day === TODAY ? capStay(t) : minutesFor(day, t), tail };
+      return { t, used, mainUsed: raw ? raw.conf + raw.done : used, cap: raw ? raw.cap : capDemo[t] ?? (ns ? ns.cap : RULES.slotCap), product: raw ? raw.product : "", walk, started: day === TODAY && t <= now, stay: RULES.useMinutes, tail };
     });
   }
   /** 네이버에 넣을 회차당 수량 (사장님 10/9): 고객에게 보이는 잔여(회차당 수량 − 예약)는 10장을 넘지 않게 — 안내 '최대 10팀'과 맞게.
@@ -1865,19 +1863,44 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     return out;
   }
   /** 지금 계획: { skip } 또는 { slots, adj, plan, changes, walkAvg, win } */
+  /* 늘린 · 줄인 기록 (오늘만 · 이 PC) — loans: 매진이라 A 를 늘리며 v 에서 빌린 한 장 { id, a, v, ok(A 를 실제로 늘림) }
+     bonus: 여러 장 예약 팀으로 늘린 수 { 시각: n } · locks: 그 뒤 1순위 3타임 (일찍 반납한 열쇠가 생길 때까지 조절 안 함) */
+  const capState = (() => { try { const v = JSON.parse(localStorage.getItem("astanakiz-capstate-" + TODAY)); if (v && Array.isArray(v.loans)) return Object.assign({ bonus: {}, locks: [] }, v); } catch (e) { /* 없음 */ } return { loans: [], bonus: {}, locks: [], seq: 0 }; })();
+  const saveCapState = () => { try { localStorage.setItem("astanakiz-capstate-" + TODAY, JSON.stringify(capState)); } catch (e) { /* 저장 못 해도 동작 */ } };
+  /** 그 시각 t 의 열쇠 (안에 있는 손님 반납 전 · 아직 안 온 예약 · 열린 네이버 잔여) — 현장 판매 가능(projection)과 같은 셈 */
+  function capKeysAt(x, openLeft) {
+    let used = 0;
+    for (const h of holders()) for (const k of h.keys) { const m = useOf(h, k); if (m == null || h.slot + m > x || x < now + 10) used++; }
+    for (const b of bookings[TODAY]) {
+      if (b.status !== "확정") continue;
+      const m = baseMinutes(TODAY, b.slot); // 아직 안 온 예약은 골든벨이어도 원래 시간 안에만 올 수 있다고 (안 온 지난 예약이 계속 자리를 막지 않게)
+      if (b.slot - RULES.earlyMinutes <= x && (m == null || x < b.slot + m)) used += b.qty;
+    }
+    for (const o of openLeft) { const m = baseMinutes(TODAY, o.s); if (o.s - RULES.earlyMinutes <= x && (m == null || x < o.s + m)) used += o.left; }
+    return used;
+  }
+  /** 한 팀(같은 전화번호 · 없으면 이름 — 나눠 예약해도 합침)이 여러 장 산 만큼: (장수 − 1)의 합 (사장님 10/24 — 2장 2건 · 3장 1건 → 2 → 한 장 더) */
+  function capTeamExtra(t) {
+    const m = new Map();
+    for (const b of bookings[TODAY] || []) {
+      if (b.slot !== t || b.chainHead || testOut.has(b.no) || !(b.status === "확정" || b.status === "완료")) continue;
+      const k = digits(b.phone || "") || b.name || b.id;
+      m.set(k, (m.get(k) || 0) + b.qty);
+    }
+    let x = 0; for (const q of m.values()) x += Math.max(0, q - 1);
+    return x;
+  }
+  /** 지금 계획: { skip } 또는 { slots, adj, plan, changes, win } */
   function capPlan() {
     const A = RULES.capAuto;
     // 가동하는 날: 성수기(평일 · 휴일) · 비수기 주말 · 휴일 = 시간제인 날. 비수기 평일은 제외 (사용자 지시 10/6) — 근무자가 [오늘 수량조절]을 체크한 날만 (10/21)
     if (!capDay()) return { skip: "오늘은 비수기 평일(무제한)이라 조절하지 않아요 — 사람이 몰리면 맨 위 [오늘 수량조절]을 켜요 (오늘만)" };
     const slots = capSlots(TODAY);
-    // 바꾸는 타임 = 곧 다가오는 타임 + 그 뒤 (앞 3타임 × 2 = 3시간) — 영업 전(새벽 · 아침)이면 그날 첫 타임부터 (현장 10/7)
-    // 네이버에 그 상품 칸(낮 '1시간 50분' · 18:00 부터 '야간자유')이 없는 타임은 바꿀 수 없으니 빼고 (먼 타임처럼 셈) — 넣으면 10분마다 실패로 쌓여 30분씩 쉼
-    const adj = slots.filter((x) => !x.started && (!APP || x.product)).slice(0, A.ahead * 2).map((x) => x.t);
+    // 바꾸는 타임 = 아직 시작 안 한 오늘 타임 모두 (첫째 = 곧 다가오는 타임) — 네이버에 그 상품 칸(낮 '1시간 50분' · 18:00 부터 '야간자유')이 없는 타임은 빼고
+    const adj = slots.filter((x) => !x.started && (!APP || x.product)).map((x) => x.t);
     if (!adj.length) return { skip: "조절할 타임이 없어요 (시간제 타임이 끝남)" };
-    // 사장님 10/24: 네이버는 예약 합 기준 목표(40) — 현장 손님은 계획에 안 넣음 (현장은 데스크 판매 가능 수 · 유동 열쇠로)
-    // 예상(예약 속도 · 지난 같은 요일)은 같은 차례 안에서 누구를 먼저 늘릴지 · 빨리 차는 타임을 한 순위 올릴지에만 씀
-    for (const x of slots) if (!x.started) Object.assign(x, capForecast(x, 0));
     const prio = [capRanges(A.prio && A.prio.p1), capRanges(A.prio && A.prio.p2)]; // 1 · 2순위 (그 밖 = 3순위)
+    const boost = capRanges(A.boost);
     // 계획에 쓰는 예약 수는 데스크 시간 기준 (옮긴 예약 · 연속예약의 뒤 예약은 앞 열쇠로 셈) — 네이버 칸 숫자와 큰 쪽
     const list = (bookings[TODAY] || []).filter((b) => (b.status === "확정" || b.status === "완료") && !testOut.has(b.no));
     const sumQ = (f) => list.filter(f).reduce((a, b) => a + b.qty, 0);
@@ -1886,21 +1909,18 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       const naver = x.used - sumQ((b) => (b.naverSlot ?? b.slot) === x.t && (b.slot !== x.t || b.chainHead));
       return Object.assign({}, x, { used: Math.max(0, desk, naver), walk: 0 });
     });
-    // 네이버는 목표(40)를 넘지 않음 — 상한이 더 커도 목표까지 · 현장 열쇠가 현장 몫(45 − 40 = 5)보다 많이 나가 있으면 그만큼 낮춤
-    const walkOut = capWalkOut(), pool = Math.max(0, RULES.keys - A.target);
-    const plan = planCaps(pslots, adj, { target: Math.min(A.target, A.ceiling), max: A.max, prio, walkOut, pool, base: RULES.slotCap });
-    const win = (t) => plan.inside(t); // 그 시각 묶음(그 타임 + 앞 3타임)의 네이버 수 (시작한 타임은 예약 · 안 시작한 타임은 계획한 수량)
-    // 고객에게 보이는 잔여 10장 이하: 계획(목표)은 그대로 두고 네이버에 넣는 수량만 천천히 · 먼 타임에 이미 10장 넘게 보이면 예약 + 10 으로
+    // 늘리기 전 열쇠 확인: 그 타임 손님이 있는 동안(1시간 50분) 열쇠 45개 안에서 한 장 더 들어갈 수 있는지 (현장 손님 · 열린 잔여 포함)
+    const openLeft = slotStats(TODAY).filter((x) => x.s > now && x.left > 0);
+    const seatOk = (t) => { for (let x = Math.max(t, now); x < t + RULES.useMinutes; x += 10) if (capKeysAt(x, openLeft) + 1 > RULES.keys) return false; return true; };
+    const plan = planCaps(pslots, adj, { target: Math.min(A.target, A.ceiling), max: A.max, max11: 11, base: RULES.slotCap, prio, boost, state: capState, seatOk, bonus: capTeamExtra });
+    const win = (t) => plan.inside(t); // 그 시각 네 타임 합 (시작한 타임은 예약 · 안 시작한 타임은 계획한 수량)
+    // 고객에게 보이는 잔여 10장 이하 (예약마다 줄어듦)
     const mainOf = (t) => (slots.find((x) => x.t === t) || {}).mainUsed || 0;
     for (const c of plan) { c.target = c.to; c.to = Math.min(c.to, capVisible(c.to, mainOf(c.t))); }
-    for (const x of slots) {
-      if (x.started || !x.product && APP || plan.some((c) => c.t === x.t)) continue;
-      if (x.cap - x.mainUsed > RULES.capAuto.visible) plan.push({ t: x.t, product: x.product, from: x.cap, to: x.mainUsed + RULES.capAuto.visible, target: x.mainUsed + RULES.capAuto.visible, used: x.used, walk: x.walk, open: RULES.capAuto.visible, far: true, visible: true });
-    }
     plan.sort((p, q) => p.t - q.t);
     const inNaver = capPresent(true).reduce((a, p) => a + p.n, 0);
     const rankOf = (t) => (prio[0].some((r) => t >= r[0] && t <= r[1]) ? 1 : prio[1].some((r) => t >= r[0] && t <= r[1]) ? 2 : 3);
-    return { slots, adj, prio, rankOf, plan, win, goal: (t) => plan.goal(t), pool, walkOut: walkOut.length, inside: inNaver, insideWalk: capPresent().reduce((a, p) => a + p.n, 0) - inNaver, changes: plan.filter((c) => c.to !== c.from && (!APP || c.product)) };
+    return { slots, adj, prio, boost, rankOf, plan, ops: plan.ops, win, goal: () => plan.goal(), inside: inNaver, insideWalk: capPresent().reduce((a, p) => a + p.n, 0) - inNaver, changes: plan.filter((c) => c.to !== c.from && (!APP || c.product)) };
   }
   const capTry = { day: shiftDay(TODAY, 7), time: "10:00", n: 11 }; // 한 칸 시험 (기본: 다음 주 같은 요일 10:00)
   let capBusy = false, capLastAt = null, capMark = null, capFails = 0, capPauseUntil = -1;
@@ -1920,36 +1940,62 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       capLastAt = now;
       if (p.skip) { if (manual) toast(p.skip); return; }
       capRemember(p.slots);
-      if (!p.changes.length) { capNote({ ok: true, msg: `바꿀 것 없음 (${p.plan.map((c) => `${hm(c.t)} ${c.to}`).join(" · ")})` }); return; }
-      const done = [];
+      if (!p.changes.length) { capCommit(p, () => true); capNote({ ok: true, msg: `바꿀 것 없음${p.plan.some((c) => c.why) ? ` (${p.plan.filter((c) => c.why).map((c) => `${hm(c.t)} ${c.why}`).join(" · ")})` : ""}` }); return; }
+      const done = [], okSet = new Set(), failSet = new Set();
+      const victimsOf = new Map(); for (const op of p.ops || []) if (op.type === "grow") victimsOf.set(op.a, op.victims);
       let bad = 0; // 실패한 칸 (이용완료 때문에 다음 차례로 미룬 칸은 실패가 아님)
       // 줄이는 것부터 (여러 칸을 바꾸는 동안에도 2시간 합이 상한을 넘지 않게)
       for (const c of p.changes.slice().sort((x, y) => (x.to - x.from) - (y.to - y.from))) {
         if (!manual && APP && completeWaiting()) { capNote({ ok: true, msg: "이용완료 먼저 — 남은 수량 조절은 다음 차례에" }); break; } // 줄이는 칸이 먼저라 여기서 멈춰도 합은 안 넘음
         // 조절할 상품 칸을 못 찾았으면 손대지 않음 (다른 상품 칸을 바꾸지 않게)
-        if (APP && !c.product) { bad++; capNote({ t: hm(c.t), from: c.from, to: c.to, ok: false, why: `네이버에서 '${c.t >= toMin(RULES.unlimitedFrom) ? RULES.capAuto.nightProduct : RULES.capAuto.product}' 상품 칸을 못 찾음` }); continue; }
+        // 늘리는 칸은 양보할 칸이 먼저 바뀌었을 때만 (줄이는 칸부터 하므로 이미 끝났음)
+        if (c.to > c.from && (victimsOf.get(c.t) || []).some((v) => failSet.has(v))) { bad++; failSet.add(c.t); capNote({ t: hm(c.t), from: c.from, to: c.to, ok: false, why: "양보할 칸을 못 바꿔 안 늘림" }); continue; }
+        if (APP && !c.product) { bad++; failSet.add(c.t); capNote({ t: hm(c.t), from: c.from, to: c.to, ok: false, why: `네이버에서 '${c.t >= toMin(RULES.unlimitedFrom) ? RULES.capAuto.nightProduct : RULES.capAuto.product}' 상품 칸을 못 찾음` }); continue; }
         const r = APP ? await window.desk.naver.setCap({ day: TODAY, product: c.product, time: hm(c.t), n: c.to }).catch((e) => ({ ok: false, why: String(e) })) : { ok: true, from: c.from, to: c.to };
         capNote({ t: hm(c.t), from: c.from, to: c.to, ok: !!(r && r.ok), why: r && !r.ok ? r.why : "" });
-        if (!(r && r.ok)) bad++;
+        if (!(r && r.ok)) { bad++; failSet.add(c.t); }
         if (r && r.ok) {
+          okSet.add(c.t);
           done.push(`${hm(c.t)} ${c.from}→${c.to}`);
           const raw = (naverRaw[TODAY] || []).find((x) => toMin(x.time) === c.t && capMain(x.product, c.t));
           if (raw) raw.cap = c.to; else capDemo[c.t] = c.to;
           const ns = (naverSlots[TODAY] || {})[c.t]; if (ns) ns.cap += c.to - c.from;
         }
       }
+      const changing = new Set(p.changes.map((c) => c.t));
+      capCommit(p, (t) => !changing.has(t) || okSet.has(t)); // 네이버에 실제로 들어간 것만 기록 (빌린 자리 · 여러 장 · 묶음)
       // 계속 실패하면 30분 쉼 (네이버 창을 붙잡고 있으면 이용완료 · 불러오기가 늦어져 현장 통제에 지장)
       capFails = bad ? capFails + 1 : 0;
       if (capFails >= 3) { capPauseUntil = now + 30; capFails = 0; capNote({ ok: false, why: "3번 연속 실패 — 30분 쉬었다가 다시 해요 (네이버 화면 확인)" }); }
       toast(`네이버 판매 수량 조절${done.length ? `: ${done.join(" · ")}` : ""}${bad ? ` · 실패 ${bad}건 (운영 설정 → 네이버 설정)` : ""}`);
     } finally { capBusy = false; renderAll(); if (sheet.mode === "settings" && sheet.tab === "naver") renderSheet(); if (APP) naverFlush(); }
   }
-  /** 매분: 켜져 있으면 10분마다 (실패 · 바쁨이면 다음 분에 다시) */
+  /** 계획대로 네이버가 바뀐 뒤 기록 남기기 — okT(시각) = 그 칸이 계획한 수가 됨 (바꿀 필요가 없었거나 바꾸기 성공) */
+  function capApply(st, ops, okT) {
+    let changed = false;
+    for (const op of ops || []) {
+      if (op.type === "drop" || (op.type === "repay" && okT(op.v))) { st.loans = st.loans.filter((L) => L.id !== op.id); changed = true; continue; }
+      if (op.type !== "grow") continue;
+      const aOk = okT(op.a);
+      if (op.kind === "retry") { const L = st.loans.find((x) => x.id === op.id); if (L && aOk) { L.ok = true; changed = true; } continue; }
+      for (const v of op.victims) if (okT(v)) { st.seq = (st.seq || 0) + 1; st.loans.push({ id: st.seq, a: op.a, v, ok: aOk }); changed = true; } // A 가 못 늘었으면 다음에 다시 (ok: false)
+      if (aOk && op.kind === "bonus") { st.bonus[op.a] = (st.bonus[op.a] || 0) + 1; st.locks = [...new Set(st.locks.concat(op.lock || []))]; changed = true; }
+    }
+    return changed;
+  }
+  function capCommit(p, okT) { if (capApply(capState, p.ops, okT)) saveCapState(); }
+  /** 일찍 반납한 열쇠가 생기면 묶어 둔 1순위 타임을 다시 조절 (사장님 10/24) */
+  function capUnlock(why) {
+    if (!capState.locks.length) return;
+    capState.locks = []; saveCapState();
+    capNote({ ok: true, msg: `${why} → 묶어 둔 타임을 다시 조절해요` });
+  }
+  /** 매분: 켜져 있으면 매시 5 · 15 · 25 · 35 · 45 · 55분에 (사장님 10/24 · 실패 · 바쁨이면 다음 분에 다시) */
   function capTick() {
     const A = RULES.capAuto;
     if (!capToday()) return; // 맨 위 스위치 (기본: 시간제인 날 = 설정의 자동조절)
-    const mark = Math.floor(now / A.every) * A.every;
-    if (capMark === mark || now < toMin(RULES.naverAuto.from) || now > SLOTS[SLOTS.length - 1] || now < capPauseUntil) return; // 저녁 무제한 타임까지 (사장님 10/24)
+    const mark = Math.floor((now - 5) / A.every) * A.every + 5;
+    if (capMark === mark || mark < toMin(RULES.naverAuto.from) || now > SLOTS[SLOTS.length - 1] || now < capPauseUntil) return; // 09:55 부터 마지막 타임(19:30) 전까지
     capMark = mark; // 같은 10분에 두 번 안 돌게 — 바빠서 못 했으면 다음 분에 다시
     capRun(false).then((r) => { if (r === "wait" && capMark === mark) capMark = null; });
   }
@@ -2436,27 +2482,27 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       }
       if (tab === "naver") {
         const A = RULES.capAuto, p = capPlan();
-        const rows = p.skip ? "" : p.slots.filter((x) => x.t >= Math.floor(now / 30) * 30 - 90 && x.t <= (p.adj.length ? p.adj[p.adj.length - 1] : now)).map((x) => {
+        const rows = p.skip ? "" : p.slots.filter((x) => x.t >= Math.floor(now / 30) * 30 - 60).map((x) => {
           const c = p.plan.find((y) => y.t === x.t);
-          const w = p.win(x.t);
-          const rk = p.rankOf(x.t), c2 = c && c.rank != null ? c.rank : rk; // 순위 (빨리 차면 한 순위 올림 ↑)
-          return `<tr class="${c && !c.far ? "adj" : ""}"><td class="num">${hm(x.t)}${x.started ? "" : c && c.soon ? " ◐" : c && !c.far ? " ●" : ""}<small> ${rk}순위${c2 < rk ? "↑" : ""}</small></td><td class="num">${x.used}${x.started ? "" : `<small> (예상 ${x.demand}${x.demand >= x.cap ? " · 빨리 참" : ""}${x.past ? "" : " · 지금 수준"})</small>`}</td><td class="num">${x.walk}</td><td class="num">${x.cap}</td><td class="num">${c ? `<b>${c.to}</b>${c.to !== c.from ? ` <span class="${c.to > c.from ? "up" : "down"}">${c.to > c.from ? "▲" : "▼"}${Math.abs(c.to - c.from)}</span>` : ""}${c.target > c.to ? `<small> (목표 ${c.target})</small>` : ""}` : x.started ? "시작함" : "—"}</td><td class="num ${w > p.goal(x.t) ? "over" : ""}">${x.started ? "—" : `${w}${p.goal(x.t) < Math.min(A.target, A.ceiling) ? `<small> / ${p.goal(x.t)}</small>` : ""}`}</td></tr>`;
+          const w = p.win(x.t), rk = p.rankOf(x.t), bo = p.boost.some((r) => x.t >= r[0] && x.t <= r[1]);
+          const mark = x.started ? "" : c && c.soon ? " ◐" : "";
+          return `<tr class="${c && c.soon ? "adj" : ""}"><td class="num">${hm(x.t)}${mark}<small> ${rk}순위${bo ? " · 저녁 몰림" : ""}${c && c.locked ? " · 묶음" : ""}</small></td><td class="num">${x.mainUsed}${x.used > x.mainUsed ? `<small> (+${x.used - x.mainUsed})</small>` : ""}</td><td class="num">${x.walk}</td><td class="num">${x.cap}<small> (잔여 ${Math.max(0, x.cap - x.mainUsed)})</small></td><td class="num">${c ? `<b>${c.to}</b>${c.to !== c.from ? ` <span class="${c.to > c.from ? "up" : "down"}">${c.to > c.from ? "▲" : "▼"}${Math.abs(c.to - c.from)}</span>` : ""}${c.why ? `<small> ${esc(c.why)}</small>` : ""}` : x.started ? "시작함" : "—"}</td><td class="num ${!x.started && w > p.goal() ? "over" : ""}">${x.started ? "—" : w}</td></tr>`;
         }).join("");
         const html = `
           <div class="field setcard plain"><span class="label">매일 재고 열기 <span class="help">기준의 상품 · 기간 · 재고로 네이버 예약상품 날짜를 열어요</span></span><div id="st-row" class="field">${stRow()}</div></div>
           <div class="setcard plain stack">
-          <div class="field"><span class="label">판매 수량 자동조절</span><label class="chk"><input type="checkbox" id="cap-on" ${A.on ? "checked" : ""}> <b>10분마다 네이버 판매 수량 자동 조절</b> <span class="help">(시간제인 날: 성수기 · 휴일 기본 · 그날만 바꾸려면 맨 위 [오늘 수량조절])</span></label>
-            <div class="help longhelp" data-q="수량 자동조절이란">안에는 좌석 40개. 네이버는 <b>어느 입장 시각에도 그 타임 + 앞 3타임 예약 합이 ${A.target}</b>을 넘지 않게 (일찍 나간 사람 · 안 온 사람도 예약대로 셈 — 그 자리는 현장 키 몫). <b>곧 다가오는 타임은 늘리지 않고</b>, 그 뒤 타임을 <b>손님이 고르는 순위대로</b> 열어요: 1순위 기본 ${RULES.slotCap} → 1순위 최대 ${A.max} → 2순위는 남는 만큼 ${RULES.slotCap}까지 → 3순위는 그다음 남는 만큼 (예약이 빨리 차면 한 순위 올림). 곧 다가오는 1순위 타임이 매진이면 10분마다 하나씩 더 열어요(뒤 묶음을 확인하고). ${esc(RULES.unlimitedFrom)}부터 입장은 무제한이라 문 닫을 때까지 있다고 보고, 저녁 1순위는 최대 없이 묶음 ${A.target}까지 — 그만큼 뒤 저녁 타임을 미리 줄여요. 현장 열쇠가 ${Math.max(0, RULES.keys - A.target)}개를 넘게 나가면 넘은 열쇠가 있는 동안 그만큼 네이버를 낮춰요. 고객에게 보이는 잔여는 최대 ${A.visible}팀처럼 예약마다 줄어요. 비수기 평일은 하지 않아요.</div>
-            <div class="btns" style="align-items:center"><label class="help" for="cap-target">네이버 목표</label><input id="cap-target" type="number" min="30" max="50" value="${A.target}" class="cfg" style="width:76px">
+          <div class="field"><span class="label">판매 수량 자동조절</span><label class="chk"><input type="checkbox" id="cap-on" ${A.on ? "checked" : ""}> <b>매시 5 · 15 · 25 · 35 · 45 · 55분에 네이버 판매 수량 자동 조절</b> <span class="help">(시간제인 날: 성수기 · 휴일 기본 · 그날만 바꾸려면 맨 위 [오늘 수량조절])</span></label>
+            <div class="help longhelp" data-q="수량 자동조절이란">미리 예상하지 않고 <b>지금까지 들어온 예약만 보고</b> 조금씩 바꿔요. 처음엔 모든 타임 ${RULES.slotCap}장(네 타임 합 ${A.target}). <b>곧 다가오는 타임이 매진</b>이면 한 장 더(10분에 한 장 · 최대 ${A.max}) — 그만큼 뒤 3타임 중 <b>예약이 가장 적은 타임</b>에서 한 장 줄여 네 타임 합은 그대로. 늘린 자리가 안 팔리고 그 타임이 시작하면 줄였던 타임에 돌려줘요. 뒤 3타임이 모두 1순위면 줄이지 않고 <b>여러 장 산 팀</b>(같은 이름 · 전화번호는 합침 · 2장 2건 또는 3장 1건마다 한 장)만큼 늘리고, 그 3타임은 일찍 반납한 열쇠가 생길 때까지 더 바꾸지 않아요. 뒤가 모두 매진이면 최대 11까지만. <b>저녁 몰림 시간</b>(${esc(A.boost || "")})은 곧 다가오지 않아도 매진이면 ${A.max} 넘게 늘리고, 17:00 ~ 18:30 · 18:00 ~ 19:30 처럼 네 타임 합이 ${A.target}을 넘지 않게 3순위 타임에서 줄여요. 늘리기 전에 그 손님이 있는 동안 열쇠 ${RULES.keys}개가 모자라지 않는지 봐요. 현장 판매는 같은 셈으로 초록(그 수만큼) · 빨강. 비수기 평일은 하지 않아요.</div>
+            <div class="btns" style="align-items:center"><label class="help" for="cap-target">네 타임 합</label><input id="cap-target" type="number" min="30" max="50" value="${A.target}" class="cfg" style="width:76px">
               <label class="help" for="cap-ceil">상한</label><input id="cap-ceil" type="number" min="30" max="50" value="${A.ceiling}" class="cfg" style="width:76px">
-              <label class="help" for="cap-max" title="1순위 타임을 여기까지 · 2 · 3순위는 기본 ${RULES.slotCap}장 · 저녁 무제한 1순위는 묶음 목표까지">1순위 최대</label><input id="cap-max" type="number" min="5" max="20" value="${A.max}" class="cfg" style="width:76px">
+              <label class="help" for="cap-max" title="곧 다가오는 타임이 매진일 때 여기까지 (저녁 몰림 시간은 제한 없이 네 타임 합까지)">곧 다가오는 타임 최대</label><input id="cap-max" type="number" min="5" max="20" value="${A.max}" class="cfg" style="width:76px">
               <label class="help" for="cap-vis">보이는 잔여 최대</label><input id="cap-vis" type="number" min="1" max="20" value="${A.visible}" class="cfg" style="width:76px">
               <button class="btn btn-sm btn-ink" data-act="capNow" ${capBusy ? "disabled" : ""}>${capBusy ? "조절 중…" : "지금 한 번 조절"}</button></div>
-            <div class="capprio">${[["p1", "1순위"], ["p2", "2순위"], ["p3", "3순위"]].map(([k, t]) => `<label class="help" for="cap-${k}">${t}</label><input id="cap-${k}" class="cfg" value="${esc((A.prio && A.prio[k]) || "")}" placeholder="10:00, 12:00~15:30, 18:00">`).join("")}
-              <span class="help">손님이 고르는 차례 (성수기 휴일) · 쉼표로 나눔 · 12:00~15:30 = 그 사이 모두 · 적지 않은 타임은 3순위 · 예약이 빨리 차면 한 순위 올림 ↑ · 1순위를 먼저 기본 ${RULES.slotCap} → 최대 ${A.max}(저녁 ${esc(RULES.unlimitedFrom)} 무제한 1순위는 묶음 ${A.target}까지), 그다음 2순위 · 3순위 차례로 남는 만큼 ${RULES.slotCap}까지</span></div></div>
+            <div class="capprio">${[["p1", "1순위"], ["p2", "2순위"], ["p3", "3순위"], ["boost", "저녁 몰림"]].map(([k, t]) => `<label class="help" for="cap-${k}">${t}</label><input id="cap-${k}" class="cfg" value="${esc((k === "boost" ? A.boost : A.prio && A.prio[k]) || "")}" placeholder="${k === "boost" ? "18:00, 18:30" : "10:00, 12:00~15:30, 18:00"}">`).join("")}
+              <span class="help">손님이 고르는 차례 (성수기 휴일) · 쉼표로 나눔 · 12:00~15:30 = 그 사이 모두 · 적지 않은 타임은 3순위 · 순위는 '뒤 3타임이 모두 1순위인지'와 저녁 몰림 시간에서 줄일 타임(3순위)을 고를 때 씀 · 저녁 몰림 = 매진이면 미리부터 ${A.max} 넘게</span></div></div>
           ${p.skip ? `<div class="banner">${esc(p.skip)}</div>` : `
-          <div class="help longhelp" data-q="표 읽는 법">지금 ${hm(now)} · 안에 있는 손님(열쇠) 네이버 <b class="num">${p.inside}</b> · 현장 <b class="num">${p.insideWalk}</b> (나간 현장 열쇠 ${p.walkOut}개) · <b>그때 안</b> = 그 타임과 앞 3타임 네이버 수(시작한 타임은 예약 수 · 안 시작한 타임은 수량) — <b>목표 ${A.target}</b>을 넘지 않게 (현장 열쇠가 ${p.pool}개를 넘게 나가 있으면 '/ 38'처럼 그 시각 목표가 낮아짐) · ◐ = 곧 다가오는 타임 (늘리지 않음 · 남는 자리는 현장 키 몫) · ● = 바꾸는 타임: ① 1순위 ${RULES.slotCap}까지 → ② 1순위 ${A.max}까지(저녁 무제한 1순위는 묶음 ${A.target}까지) → ③ 2순위는 남는 만큼 ${RULES.slotCap}까지 → ④ 3순위는 그다음 남는 만큼 · ↑ = 예약이 빨리 차서 한 순위 올림 · 예상 = 같은 요일 지난주 70% · 3주 평균 10% · 추세 10% · 오늘 예약 속도 10%</div>
-          <table class="captable"><tr><th>타임</th><th>네이버 예약</th><th>현장</th><th>지금 수량</th><th>계획</th><th>그때 안</th></tr>${rows}</table>`}
+          <div class="help longhelp" data-q="표 읽는 법">지금 ${hm(now)} · 안에 있는 손님(열쇠) 네이버 <b class="num">${p.inside}</b> · 현장 <b class="num">${p.insideWalk}</b> · ◐ = 곧 다가오는 타임 · 네이버 예약 = 조절하는 상품 (괄호 = 다른 상품) · 계획 = 이번에 넣을 수량과 까닭 · <b>네 타임 합</b> = 그 타임과 앞 3타임 (시작한 타임은 예약 수 · 안 시작한 타임은 수량) · 묶음 = 일찍 반납한 열쇠가 생길 때까지 안 바꿈</div>
+          <table class="captable"><tr><th>타임</th><th>네이버 예약</th><th>현장</th><th>지금 수량</th><th>계획</th><th>네 타임 합</th></tr>${rows}</table>`}
           <div class="field"><span class="label">한 칸 시험 <span class="help">네이버 수량을 실제로 바꿀 수 있는지 — 손님 영향이 없는 먼 날짜로 해 보고, 끝나면 원래 수량으로 되돌리세요</span></span>
             <div class="btns" style="align-items:center"><input type="date" id="cap-t-day" value="${esc(capTry.day)}" class="date-in">
               <select id="cap-t-time" class="cfg" style="width:96px">${SLOTS.map((t) => `<option ${hm(t) === capTry.time ? "selected" : ""}>${hm(t)}</option>`).join("")}</select>
@@ -2614,6 +2660,12 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     if ((Number(v.v) || 1) < 2) {
       if (RULES.capAuto.target === 42) RULES.capAuto.target = 40;
       RULES.capAuto.v = 2; saveCapAuto();
+    }
+    // 사장님 10/24 밤: 17:00 도 3순위 (17:00 · 17:30 이 가장 낮음) — 예전 기본값 그대로면 한 번만 바꿈
+    if ((Number(RULES.capAuto.v) || 1) < 3) {
+      const P = RULES.capAuto.prio || {};
+      if (P.p2 === "10:30~11:00, 16:00~17:00, 18:30" && P.p3 === "11:30, 17:30, 19:00, 19:30") RULES.capAuto.prio = Object.assign({}, P, { p2: "10:30~11:00, 16:00~16:30, 18:30", p3: "11:30, 17:00, 17:30, 19:00, 19:30" });
+      RULES.capAuto.v = 3; saveCapAuto();
     }
   }
   if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c && Array.isArray(c.peaks) && c.peaks.length) { RULES.peaks = c.peaks; renderAll(); } if (c && c.capAuto) capAutoLoad(c.capAuto); if (c && c.unpaidCancel) Object.assign(RULES.unpaidCancel, c.unpaidCancel); }).catch(() => {});
@@ -3907,6 +3959,8 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     return free.filter((k) => k >= from).concat(free.filter((k) => k < from))[0];
   }
   function returnKeys(h, ks) {
+    // 예정 시간보다 일찍 반납 → 열쇠 여분이 생김 → 묶어 둔 타임을 다시 조절 (사장님 10/24)
+    if (!h.svc && ks.some((k) => { const m = useOf(h, k); return m != null && now < h.slot + m; })) capUnlock(`${ks.join(", ")}번 열쇠 일찍 반납`);
     noteKeys(h);
     h.keys = h.keys.filter((k) => !ks.includes(k));
     if (!h.keys.length) h.outAt = now;
@@ -4560,6 +4614,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     }
     if (t.id === "cap-on") { RULES.capAuto.on = t.checked; capMark = null; saveCapAuto(); renderAll(); toast(t.checked ? "네이버 판매 수량 자동 조절을 켰어요 (10분마다)" : "자동 조절을 껐어요"); }
     if (/^cap-p[123]$/.test(t.id)) { RULES.capAuto.prio = Object.assign({}, RULES.capAuto.prio, { [t.id.slice(4)]: t.value.slice(0, 120) }); saveCapAuto(); } // 손님이 고르는 순위 (사장님 10/24)
+    if (t.id === "cap-boost") { RULES.capAuto.boost = t.value.slice(0, 60); saveCapAuto(); } // 저녁 몰림 시간 (사장님 10/24 밤)
     if ((t.id === "cap-target" || t.id === "cap-max" || t.id === "cap-ceil" || t.id === "cap-vis") && t.value) { RULES.capAuto[{ "cap-target": "target", "cap-max": "max", "cap-ceil": "ceiling", "cap-vis": "visible" }[t.id]] = Math.max(1, Math.min(60, Number(t.value) || 0)); saveCapAuto(); }
     if (t.id === "com-baud") { PRINT.baud = Number(t.value); savePrint(); }
     if (t.id === "w-phone") { sheet.phone = walkPhone(t.value); t.value = walkFmt(sheet.phone); updateWalkButtons(); }
@@ -4618,8 +4673,8 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   }
 
   // 시험용: 입장권을 만드는 함수들 (자동 시험이 실제 입장 손님으로 출력 내용을 확인)
-  document.addEventListener("change", (e) => { if (/^cap-(target|max|ceil|p1|p2|p3)$/.test(e.target.id)) renderSheet(); if (e.target.id === "note-m") noteFlush(); }); // 숫자를 다 넣으면 계획 다시
-  window.__deskTest = { projection, capWalkOut, notes: () => Object.fromEntries(NOTES), evLoadCfg, today: () => TODAY, useDueText, printSecs, PRINT_: () => PRINT, sealOf, withSeal, SEAL, evSample: (i) => evSample(i), sealClear: () => sealCache.clear(), EV_: () => EV, liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, bk: (id) => (bookings[TODAY] || []).find((b) => b.id === id), useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capRanges, capPlan, capRun, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => enterText(), holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, sheet, evOf: (b) => evOf(b),
+  document.addEventListener("change", (e) => { if (/^cap-(target|max|ceil|p1|p2|p3|boost)$/.test(e.target.id)) renderSheet(); if (e.target.id === "note-m") noteFlush(); }); // 숫자를 다 넣으면 계획 다시
+  window.__deskTest = { projection, capWalkOut, notes: () => Object.fromEntries(NOTES), evLoadCfg, today: () => TODAY, useDueText, printSecs, PRINT_: () => PRINT, sealOf, withSeal, SEAL, evSample: (i) => evSample(i), sealClear: () => sealCache.clear(), EV_: () => EV, liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, bk: (id) => (bookings[TODAY] || []).find((b) => b.id === id), useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capRanges, capPlan, capRun, capApply, capTick, capTeamExtra, capState: () => JSON.parse(JSON.stringify(capState)), capLock: (ts) => { capState.locks = ts.slice(); saveCapState(); }, capKeysAt, returnKeys: (id, ks) => { const h = holders().find((x) => x.id === id); if (h) { returnKeys(h, ks); renderAll(); } }, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => enterText(), holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, sheet, evOf: (b) => evOf(b),
     evLog: (from) => { const L = evLog(from); return { from: L.from, count: L.count, people: Object.fromEntries([...L.people].map(([k, p]) => [k, JSON.parse(JSON.stringify(p))])) }; },
     // 장부에 지난 방문 한 줄 넣기: o = { day, n(네이버 순번, 기본 = 지금 완료 수), base, st("안내" | "성공"), due, from(장부 · 기본 지금 이벤트), no }
     evInject: (name, o = {}) => {

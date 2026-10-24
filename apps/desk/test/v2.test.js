@@ -102,7 +102,7 @@ test("시계를 1.5초 안에 두 번 → 운영 설정 (버튼 없음) · 왼�
     // 네이버 설정 = 기준(대상 상품 · 재고 · 기간) + 매일 재고 열기 + 판매 수량 자동조절 + 입금대기 자동 취소
     await page.click("[data-t=naver]");
     const nv = (await page.textContent("#setbody")).replace(/\s+/g, " ");
-    assert.match(nv, /기준.*대상 상품.*평일 무제한.*야간자유.*회차당 기본 재고.*열어 둘 기간.*네이버 재고 자동 오픈.*10분마다 네이버 판매 수량 자동 조절.*입금대기 예약 자동 취소/);
+    assert.match(nv, /기준.*대상 상품.*평일 무제한.*야간자유.*회차당 기본 재고.*열어 둘 기간.*네이버 재고 자동 오픈.*매시 5 · 15 · 25 · 35 · 45 · 55분에 네이버 판매 수량 자동 조절.*입금대기 예약 자동 취소/);
     // 예전 탭 이름 (rules · cap · event · link · survey) → 새 메뉴
     for (const [old, now, psub] of [["cap", "naver"], ["survey", "etc"], ["link", "api"], ["rules", "season"], ["event", "prints", "event"]]) {
       await page.evaluate((o) => { window.__deskTest.sheet.tab = o; window.__deskTest.renderSheet(); }, old);
@@ -255,12 +255,12 @@ test("맨 위 [오늘 수량조절] 스위치: 설정과 상관없이 그날만 
     await page.click("#capforce");
     assert.match(await page.textContent("#toast"), /오늘 네이버 판매 수량 자동조절을 켰어요 — 10분마다 .*손님 이용은 그대로 무제한 · 내일은 기본으로/);
     assert.strictEqual(await page.evaluate(() => window.__deskTest.RULES.capAuto.on), false, "설정은 그대로");
-    const p = await page.evaluate(() => { const p = window.__deskTest.capPlan(); return { skip: p.skip || "", slots: p.slots.map((x) => x.t), worst: p.plan.map((c) => c.worst), present: window.__deskTest.capPresent().map((x) => x.to) }; });
+    const p = await page.evaluate(() => { const p = window.__deskTest.capPlan(); return { skip: p.skip || "", slots: p.slots.map((x) => x.t), worst: p.plan.map((c) => [c.to, c.mainUsed]), present: window.__deskTest.capPresent().map((x) => x.to) }; });
     assert.strictEqual(p.skip, "");
     assert.ok(p.slots.length && p.slots.every((t) => t < 18 * 60), "18:00 전 타임만");
     assert.ok(p.present.length && p.present.every(Number.isFinite), "안에 있는 무제한 손님도 끝이 있다고 봄 (계속 있으면 10분마다 다시)");
-    assert.ok(p.worst.every((w) => Number.isFinite(w) && w <= 43), `상한 43 안 ${p.worst}`);
-    await page.waitForFunction(() => /네이버 판매 수량 조절/.test(document.getElementById("toast").textContent), null, { timeout: 5000 }); // 10분마다 도는 것이 바로 한 번
+    assert.ok(p.worst.length && p.worst.every(([to, b]) => Number.isFinite(to) && to >= b), `예약 밑으로 안 줄임 ${p.worst}`);
+    await page.waitForFunction(() => /수량조절 \d\d:\d\d/.test(document.getElementById("refresh-at").textContent), null, { timeout: 70000 }); // 매시 5분 단위 차례가 바로 한 번 (지난 차례를 늦게라도)
     assert.match((await state(page)).refresh, /수량조절 \d\d:\d\d/);
     assert.deepStrictEqual(await page.evaluate(() => JSON.parse(localStorage.getItem("astanakiz-capauto")).today), { day: "2026-10-06", on: true }, "그날 날짜로 저장 (다시 켜도 그날은 그대로)");
     await page.reload();
