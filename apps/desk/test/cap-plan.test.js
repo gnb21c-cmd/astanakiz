@@ -1,6 +1,8 @@
 /* 네이버 판매 수량 자동 조절 시험
    1) 계산(planCaps): 4타임(2시간) 합이 목표를 넘지 않게 · 한 타임 최대 · 예약보다 적게는 안 함 · 인기 타임에 더
-   2) 데스크 → 가짜 네이버 예약현황: [지금 한 번 조절] 하면 네이버 칸의 회차당 수량이 실제로 바뀜 */
+   2) 데스크 → 가짜 네이버 예약현황: [지금 한 번 조절] 하면 네이버 칸의 회차당 수량이 실제로 바뀜
+   3) 10/24: 네이버만 합쳐 목표(40) · 가까운 타임부터 · 뒤 3타임은 남는 자리만큼 · 인기 시간 (현장 손님은 계획에 안 넣음)
+      현장 몫 5장(45 − 40) · 넘게 나간 현장 열쇠만큼 그 동안 네이버 목표를 낮춤 · 네이버 40 + 현장 5 면 현장 판매 불가 */
 const test = require("node:test");
 const assert = require("node:assert");
 const path = require("path");
@@ -141,6 +143,166 @@ test("좌석 기준: 일찍 나간 자리는 다시 팖 · 비인기 먼 타임�
     // 같은 요일: 월~금 각각 · 토 · 일 · 평일에 낀 공휴일
     const types = await page.evaluate(() => ["2026-10-08", "2026-10-10", "2026-10-11", "2026-10-09", "2026-10-07"].map(window.__deskTest.dayType));
     assert.deepStrictEqual(types, ["목", "토", "일", "공휴일", "수"], "10/9 한글날 = 공휴일");
+  } finally {
+    await browser.close();
+  }
+});
+
+// 사장님 10/24: 네이버만 합쳐 40 (현장 손님은 그 위로 45개까지) · 앞 타임에 덜 온 만큼 가까운 타임부터 채움 · 뒤 3타임은 남는 자리만큼 · 인기 시간(12:30~15:30) 최대한
+test("네이버만 40: 가까운 타임부터 · 뒤 3타임은 남는 자리만큼 · 인기 시간은 앞(인기 밖) 타임이 못 가져감 · 상한 안 (무작위)", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage();
+    await page.goto(DESK);
+    const run = (slots, adj, o) => page.evaluate(([s, a, x]) => { const p = window.__deskTest.planCaps(s, a, x); return { plan: p.map((c) => ({ ...c })), inside: Object.fromEntries(s.filter((y) => !y.started).map((y) => [y.t, p.inside(y.t)])) }; }, [slots, adj, o]);
+    const m = (s) => { const [h, mm] = s.split(":").map(Number); return h * 60 + mm; };
+    const to = (r, t) => (r.plan.find((c) => c.t === m(t)) || {}).to;
+    // 10/24(토) 12:35 사장님 폰 화면 그대로: 시각 · 완료 · 미입장 · 잔여
+    const rows = [["11:00", 6, 0, 4], ["11:30", 4, 0, 5], ["12:00", 8, 0, 4], ["12:30", 5, 3, 0], ["13:00", 0, 8, 0], ["13:30", 1, 9, 0], ["14:00", 0, 10, 0], ["14:30", 0, 3, 7], ["15:00", 0, 5, 5], ["15:30", 0, 7, 3], ["16:00", 0, 0, 10], ["16:30", 0, 0, 10], ["17:00", 0, 2, 8], ["17:30", 0, 0, 10]];
+    const now = m("12:35");
+    const present = rows.filter(([t]) => m(t) <= now && m(t) + 110 > now).map(([t, d, u]) => ({ from: now, to: m(t) + 110, n: d + u }));
+    const slots = rows.map(([t, d, u, rem]) => ({ t: m(t), used: d + u, mainUsed: d + u, cap: d + u + rem, walk: 0, started: m(t) <= now, product: "P", demand: d + u, fc: m(t) >= m("12:30") && m(t) <= m("15:30") ? null : d + u }));
+    const adj = [m("13:00"), m("13:30"), m("14:00")];
+    const O = { target: 40, ceiling: 43, max: 13, walkAvg: 0, present, forecast: true, near: true, popular: [m("12:30"), m("15:30")] };
+    const r = await run(slots, adj, O);
+    assert.deepStrictEqual(["13:00", "13:30", "14:00"].map((t) => to(r, t)), [12, 10, 10], "가까운 13:00 부터 — 14:00 때 네이버 40 (12:30 8 + 12 + 10 + 10)");
+    assert.strictEqual(r.inside[m("14:00")], 40);
+    assert.deepStrictEqual(["14:30", "15:00", "15:30"].map((t) => to(r, t)), [8, 12, 10], "뒤 3타임은 남는 자리만큼 (늘리거나 줄임)");
+    assert.ok(["14:30", "15:00", "15:30"].every((t) => r.plan.find((c) => c.t === m(t)).near));
+    for (const t of ["14:00", "14:30", "15:00", "15:30"]) assert.strictEqual(r.inside[m(t)], 40, `${t} 때 네이버 40`);
+    // 예전(현장 예상 타임당 2명을 비워 둠)이면 13:00 ~ 14:00 이 닫혔음 (폰 화면 잔여 0)
+    const old = await run(slots.map((x) => ({ ...x, fc: x.used })), adj, { target: 42, ceiling: 43, max: 13, walkAvg: 2, present, forecast: true });
+    assert.deepStrictEqual(["13:00", "13:30", "14:00"].map((t) => to(old, t)), [8, 10, 10], "예전: 현장 몫 때문에 닫힘");
+
+    // 인기 시간 지키기: 아침 10:35 · 앞 3타임(11:00~12:00, 인기 밖)이 뒤 인기 타임(12:30~13:30) 열린 수량을 못 가져감
+    const morning = [["10:00", 4, 10], ["10:30", 6, 10], ["11:00", 2, 10], ["11:30", 2, 10], ["12:00", 3, 10], ["12:30", 6, 10], ["13:00", 6, 10], ["13:30", 6, 10], ["14:00", 4, 10]];
+    const now2 = m("10:35");
+    const pres2 = morning.filter(([t]) => m(t) <= now2).map(([t, u]) => ({ from: now2, to: m(t) + 110, n: u }));
+    const s2 = morning.map(([t, u, cap]) => ({ t: m(t), used: u, mainUsed: u, cap, walk: 0, started: m(t) <= now2, product: "P", demand: u, fc: m(t) >= m("12:30") && m(t) <= m("15:30") ? null : u }));
+    const adj2 = [m("11:00"), m("11:30"), m("12:00")];
+    const guard = await run(s2, adj2, { ...O, present: pres2 });
+    const noGuard = await run(s2, adj2, { ...O, present: pres2, popular: null });
+    assert.ok(to(guard, "12:30") >= 10, "인기 첫 타임 12:30 은 열린 10장 그대로 (12:00 이 못 가져감) " + to(guard, "12:30"));
+    assert.ok(to(noGuard, "12:30") < 10, "인기 시간을 안 정하면 12:00 이 가져가 12:30 이 닫힘 " + to(noGuard, "12:30"));
+    const sumAdj = (x) => ["11:00", "11:30", "12:00"].reduce((a, t) => a + to(x, t), 0);
+    assert.ok(sumAdj(guard) < sumAdj(noGuard), `인기 밖 앞 타임은 남는 만큼만 ${sumAdj(guard)} < ${sumAdj(noGuard)}`);
+    assert.ok(Object.values(guard.inside).every((v) => v <= 43), JSON.stringify(guard.inside));
+
+    // 무작위 300번: 시작 안 한 어느 시각도 상한 안 (이미 팔린 것만으로 넘는 때 빼고) · 예약 밑으로 안 줄임 · 한 타임 최대
+    let seed = 11; const rnd = (n) => (seed = (seed * 1103515245 + 12345) % 2147483648) % n;
+    for (let k = 0; k < 300; k++) {
+      const n = 12, nowR = 600 + 30 * rnd(4) + 5;
+      const ss = Array.from({ length: n }, (_, i) => { const t = 600 + 30 * i, st = t <= nowR, used = rnd(st ? 12 : 11); return { t, used, mainUsed: used, cap: Math.max(used, 6 + rnd(8)), walk: 0, started: st, product: "P", demand: used + rnd(4), fc: rnd(3) ? used + rnd(4) : null }; });
+      const pr = ss.filter((x) => x.started && x.t + 110 > nowR).map((x) => ({ from: nowR, to: x.t + 110, n: Math.max(0, x.used - rnd(3)) }));
+      const aj = ss.filter((x) => !x.started).slice(0, 3).map((x) => x.t);
+      const o = { target: 38 + rnd(4), ceiling: 43, max: 13, walkAvg: 0, present: pr, forecast: true, near: true, popular: rnd(2) ? [720, 930] : null };
+      const res = await run(ss, aj, o);
+      const toOf = (x) => { const c = res.plan.find((p) => p.t === x.t); return c ? c.to : null; };
+      for (const c of res.plan) { const x = ss.find((y) => y.t === c.t); assert.ok(c.to >= x.mainUsed, `경우 ${k}: ${c.t} 예약 밑`); assert.ok(c.to <= Math.max(o.max, x.mainUsed), `경우 ${k}: ${c.t} 최대 넘음`); }
+      // 계획대로(바꾼 칸) · 안 바꾼 먼 칸은 열린 수량이 다 팔려도
+      for (let i = 0; i < n; i++) {
+        if (ss[i].started) continue;
+        let v = pr.reduce((a, p) => a + (p.from <= ss[i].t && ss[i].t < p.to ? p.n : 0), 0), sold = v;
+        for (let j = Math.max(0, i - 3); j <= i; j++) { if (ss[j].started) continue; const t = toOf(ss[j]); v += t != null ? Math.max(t, ss[j].used) : Math.max(ss[j].cap, ss[j].used); sold += ss[j].used; }
+        assert.ok(v <= Math.max(o.ceiling, sold), `경우 ${k}: ${ss[i].t} 때 ${v} (이미 팔린 ${sold})`);
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+});
+
+test("데스크 계획(네이버만): 현장 손님은 네이버 수에 안 들어감 · 현장 몫 5장을 넘게 나가면 그만큼 목표를 낮춤 · 표에 네이버 · 현장 따로", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK); // 체험판 10/5(휴일) 13:50
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    const plan = () => page.evaluate(() => { const p = window.__deskTest.capPlan(); return { to: p.plan.map((c) => `${c.t}:${c.to}`).join(" "), inside: p.inside, walk: p.insideWalk, out: p.walkOut, goal: p.goal(840), win: p.slots.filter((x) => !x.started).map((x) => p.win(x.t)) }; });
+    const a = await plan();
+    assert.ok(a.win.every((v) => v <= 43), a.win.join(" "));
+    // 현장 손님 6명(13:30 타임 · 15:20 반납) 더 들어옴 → 네이버 손님 수는 그대로 · 현장만 늘어남
+    await page.evaluate(() => { const T = window.__deskTest; T.walkin("01011110000", [41, 42, 43], 830, 810); T.walkin("01011110001", [44, 45, 40], 830, 810); });
+    const b = await plan();
+    assert.deepStrictEqual([b.inside, b.walk, b.out], [a.inside, a.walk + 6, a.out + 6], "안에 있는 손님: 네이버 그대로 · 현장 +6");
+    // 현장 몫 5장을 넘은 열쇠(반납이 늦은 새 손님 것)만큼 14:00 네이버 목표가 낮아짐
+    assert.strictEqual(a.goal, 40 - Math.max(0, a.out - 5));
+    assert.strictEqual(b.goal, 40 - Math.max(0, b.out - 5), `현장 열쇠 ${b.out}개 → 14:00 목표 ${b.goal}`);
+    assert.ok(b.win.every((v) => v <= 40), b.win.join(" "));
+    // 기본: 네이버 목표 40 · 인기 시간 12:30 ~ 15:30
+    const A = await page.evaluate(() => window.__deskTest.RULES.capAuto);
+    assert.deepStrictEqual([A.target, A.popular], [40, { from: "12:30", to: "15:30" }]);
+    // 운영 설정 → 네이버 설정: 네이버 목표 · 인기 시간 · 표(● 앞 3타임 · ○ 뒤 3타임 · 인기)
+    await page.dblclick("#now"); await page.click('[data-t="naver"]');
+    assert.match(await page.textContent("#sheet"), /네이버 목표/);
+    const marks = await page.$$eval("#sheet .captable tr td:first-child", (e) => e.map((x) => x.textContent.replace(/\s+/g, " ").trim()));
+    assert.ok(marks.some((x) => /● 인기/.test(x)) && marks.some((x) => /○/.test(x)), marks.join(" | "));
+    assert.match(await page.textContent("#sheet"), /네이버만 합쳐 목표 40 \(현장은 계획에 안 넣고 늘 5장을 씀/);
+    await page.selectOption("#cap-pop-to", "16:00");
+    assert.deepStrictEqual(await page.evaluate(() => JSON.parse(localStorage.getItem("astanakiz-capauto")).popular), { from: "12:30", to: "16:00" }, "인기 시간 저장");
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+// 사장님 10/24: 현장은 늘 5장(열쇠 45 − 네이버 40)을 알아서 씀 · 6개 나가면 넘은 1개(반납이 늦은 것)가 있는 동안 네이버 39 · 7개면 38
+test("현장 몫 5장: 현장 열쇠가 5개를 넘게 나가면 넘은 열쇠(반납이 늦은 것부터)가 안에 있는 동안 네이버 목표를 그만큼 낮춤 (6 → 39 · 7 → 38)", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage();
+    await page.goto(DESK);
+    const m = (s) => { const [h, mm] = s.split(":").map(Number); return h * 60 + mm; };
+    const r = await page.evaluate(([M]) => {
+      const T = window.__deskTest, m = (s) => M[s];
+      const rows = [["11:00", 6, 0, 4], ["11:30", 4, 0, 5], ["12:00", 8, 0, 4], ["12:30", 5, 3, 0], ["13:00", 0, 8, 0], ["13:30", 1, 9, 0], ["14:00", 0, 10, 0], ["14:30", 0, 3, 7], ["15:00", 0, 5, 5], ["15:30", 0, 7, 3], ["16:00", 0, 0, 10], ["16:30", 0, 0, 10]];
+      const now = m("12:35");
+      const present = rows.filter(([t]) => m(t) <= now && m(t) + 110 > now).map(([t, d, u]) => ({ from: now, to: m(t) + 110, n: d + u }));
+      const slots = rows.map(([t, d, u, rem]) => ({ t: m(t), used: d + u, mainUsed: d + u, cap: d + u + rem, walk: 0, started: m(t) <= now, product: "P", demand: d + u, fc: null }));
+      const run = (walkOut) => { const p = T.planCaps(slots, [m("13:00"), m("13:30"), m("14:00")], { target: 40, ceiling: 40, max: 13, walkAvg: 0, present, forecast: true, near: true, popular: [m("12:30"), m("15:30")], walkOut, pool: 5 }); return { to: p.map((c) => c.to), goal: ["13:00", "13:30", "14:00", "14:30", "15:00"].map((t) => p.goal(m(t))), inside: ["13:00", "13:30", "14:00", "14:30", "15:00"].map((t) => p.inside(m(t))) }; };
+      const five = [m("13:50"), m("13:50"), m("13:50"), m("14:20"), m("14:20")].map((to) => ({ to }));
+      return { none: run([]), five: run(five), six: run(five.concat([{ to: m("14:20") }])), seven: run(five.concat([{ to: m("14:20") }, { to: m("15:10") }])) };
+    }, [Object.fromEntries(["11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "13:50", "14:00", "14:20", "14:30", "15:00", "15:10", "15:30", "16:00", "16:30"].map((t) => [t, m(t)]))]);
+    assert.deepStrictEqual(r.five, r.none, "현장 5개까지는 현장 몫 — 네이버 그대로 40");
+    assert.deepStrictEqual(r.six.goal, [39, 39, 39, 40, 40], "6개: 넘은 1개(14:20 반납)가 있는 동안 39");
+    assert.deepStrictEqual(r.seven.goal, [38, 38, 38, 39, 39], "7개: 넘은 2개 — 14:20 까지 38 · 15:10 까지 39 (반납이 늦은 2개)");
+    for (const k of ["six", "seven"]) r[k].inside.forEach((v, i) => assert.ok(v <= r[k].goal[i], `${k}: 그때 안 ${v} ≤ 목표 ${r[k].goal[i]}`));
+    assert.ok(r.seven.to[0] < r.none.to[0], `빌린 만큼 가까운 13:00 을 덜 엶 ${r.none.to[0]} → ${r.seven.to[0]}`);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("데스크: 네이버가 40(아직 안 온 예약 포함) + 현장 5 = 열쇠 45 → 빈 열쇠가 있어도 현장입장 판매 불가 · [POS로 이동] 빨강 · 계획은 현장 열쇠로 목표를 낮춤", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK); // 체험판 10/5(휴일) 13:50
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    const p0 = await page.evaluate(() => window.__deskTest.projection());
+    assert.ok(p0.all > 0, "처음엔 현장 판매 가능 " + JSON.stringify(p0));
+    // 13:30 예약 손님이 아직 안 옴 (남은 자리만큼) → 빈 열쇠는 있어도 그 손님 몫
+    await page.evaluate((n) => window.__deskTest.addBooking(window.__deskTest.today(), "13:30", "아직안옴", "01077770000", n, {}), p0.all);
+    const p1 = await page.evaluate(() => window.__deskTest.projection());
+    assert.strictEqual(p1.all, 0, "아직 안 온 예약 몫까지 남겨 둠 → 현장 판매 0");
+    const free = await page.$$eval(".key", (e) => e.filter((x) => !/현장|[가-힣]{2,}/.test(x.textContent.replace(/^\d+/, ""))).length);
+    assert.ok(free > 0, "빈 열쇠는 있음");
+    await page.click(".key[data-k='41']");
+    assert.match(await page.textContent("#sheet .banner"), /지금은 판매 불가/);
+    assert.match(await page.getAttribute("#sheet [data-act=pay]", "class"), /\bno\b/, "[POS로 이동] 빨강");
+    await page.click("#sheet [data-act=pay]", { force: true });
+    assert.ok(await page.isHidden("#pos"), "POS로 안 넘어감");
+    await page.click("#sheet [data-act=close]");
+    // 계획: 지금 나간 현장 열쇠 수 · 현장 몫(45 − 40 = 5)
+    const c = await page.evaluate(() => { const p = window.__deskTest.capPlan(); return { pool: p.pool, out: p.walkOut, n: window.__deskTest.capWalkOut().length, walkKeys: window.__deskTest.holders().filter((h) => h.walk && !h.svc).reduce((a, h) => a + h.keys.length, 0) }; });
+    assert.deepStrictEqual([c.pool, c.out], [5, c.walkKeys]);
+    assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();
   }
