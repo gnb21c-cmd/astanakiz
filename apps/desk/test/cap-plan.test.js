@@ -188,6 +188,21 @@ test("네이버만 40: 가까운 타임부터 · 뒤 3타임은 남는 자리만
     assert.ok(sumAdj(guard) < sumAdj(noGuard), `인기 밖 앞 타임은 남는 만큼만 ${sumAdj(guard)} < ${sumAdj(noGuard)}`);
     assert.ok(Object.values(guard.inside).every((v) => v <= 43), JSON.stringify(guard.inside));
 
+    // 인기 시간 바로 앞 타임은 예약이 많아도 기본 10장까지만 — 늘리는 몫은 인기 시간에 (사장님 10/24)
+    const busy = [["10:00", 8], ["10:30", 9], ["11:00", 9], ["11:30", 9], ["12:00", 9], ["12:30", 4], ["13:00", 5], ["13:30", 6], ["14:00", 6], ["14:30", 3]];
+    const pres3 = busy.filter(([t]) => m(t) <= now2).map(([t, u]) => ({ from: now2, to: m(t) + 110, n: u }));
+    const s3 = busy.map(([t, u]) => ({ t: m(t), used: u, mainUsed: u, cap: 10, walk: 0, started: m(t) <= now2, product: "P", demand: u, fc: m(t) >= m("12:30") ? null : u }));
+    const lead = await run(s3, adj2, { ...O, present: pres3, base: 10 });
+    const noBase = await run(s3, adj2, { ...O, present: pres3 });
+    assert.deepStrictEqual(["11:00", "11:30", "12:00"].map((t) => to(lead, t)), [10, 10, 10], "11:00 ~ 12:00 (손님이 12:30 뒤까지 남음) = 기본 10까지만");
+    assert.deepStrictEqual(["12:30", "13:00", "13:30"].map((t) => to(lead, t)), [10, 10, 10], "인기 타임 몫 그대로");
+    assert.ok(["11:00", "11:30", "12:00"].some((t) => to(noBase, t) > 10) && ["12:30", "13:00", "13:30"].some((t) => to(noBase, t) < 10), "기본 수량을 안 정하면 앞 타임이 늘고 인기 타임이 줄어듦");
+    // 인기 시간과 겹치지 않는 아침 타임(10:30 손님은 12:20 반납)은 늘릴 수 있음
+    const early = busy.map(([t, u]) => ({ t: m(t), used: Math.min(u, 3), mainUsed: Math.min(u, 3), cap: 10, walk: 0, started: m(t) <= m("09:30"), product: "P", demand: Math.min(u, 3), fc: m(t) >= m("12:30") ? null : Math.min(u, 3) }));
+    const ear = await run(early, [m("10:00"), m("10:30"), m("11:00")], { ...O, present: [], base: 10 });
+    assert.ok(to(ear, "10:00") > 10, "10:00 은 인기 시간 전에 나가서 늘릴 수 있음 " + to(ear, "10:00"));
+    assert.ok(to(ear, "11:00") <= 10, "11:00 은 12:30 뒤까지 남아 기본까지만 " + to(ear, "11:00"));
+
     // 무작위 300번: 시작 안 한 어느 시각도 상한 안 (이미 팔린 것만으로 넘는 때 빼고) · 예약 밑으로 안 줄임 · 한 타임 최대
     let seed = 11; const rnd = (n) => (seed = (seed * 1103515245 + 12345) % 2147483648) % n;
     for (let k = 0; k < 300; k++) {
