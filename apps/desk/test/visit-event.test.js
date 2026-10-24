@@ -335,6 +335,8 @@ test("재방문 이벤트(앱): 장부는 POS PC 파일(시작일.jsonl)에 이�
     await page.goto(DESK + "?again=1");
     await page.waitForFunction(() => /불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 15000 });
     await openEvent(page);
+    // 다시 켠 뒤 장부는 따로(비동기) 읽음 — 읽을 때까지 기다림 (전체 시험을 함께 돌려 느릴 때 바로 보면 빈칸)
+    await page.waitForFunction(() => /기록 2명 · 이용완료 2건/.test(document.getElementById("sheet").textContent), null, { timeout: 10000 });
     assert.match(await page.textContent("#sheet"), /기록 2명 · 이용완료 2건/);
     assert.match(await find(page, "0001"), /박새로 010-5555-0001 · 마일리지 3 \(네이버 완료 4 − 이벤트 1\).*방문 1일 · 성공 0번 · 다음 기한 10\/31 — 10\/14 안내/);
     assert.match(await find(page, "김기"), /김기록 .*마일리지 6 \(네이버 완료 7 − 이벤트 1\).*10\/12 안내/);

@@ -21,18 +21,21 @@ const launch = () => chromium.launch(process.env.CHROME ? { executablePath: proc
 // 사장님 10/24 다시 짠 계산: 네이버는 예약 합 기준 — 어느 입장 시각도 그 타임 + 앞 3타임 ≤ 40 · 곧 다가오는 타임은 안 늘림 · 황금시간 먼저
 const m = (s) => { const [h, mm] = s.split(":").map(Number); return h * 60 + mm; };
 /** 행 [시각, 예약, 수량, 예상?] · 지금 시각 → planCaps 결과 + 묶음 합 (시작한 타임은 예약 · 안 시작한 타임은 계획 수량 · 바꾸지 않은 타임은 수량) */
-const runPlan = (page, rows, nowS, extra = {}) => page.evaluate(([rows, now, extra, gold]) => {
+// 사장님 10/24 성수기 휴일 손님이 고르는 순위: 1순위 10:00 · 12:00~15:30 · 18:00 / 2순위 10:30~11:00 · 16:00~17:00 · 18:30 / 3순위 그 밖
+const PRIO = [[[600, 600], [720, 930], [1080, 1080]], [[630, 660], [960, 1020], [1110, 1110]]];
+const runPlan = (page, rows, nowS, extra = {}) => page.evaluate(([rows, now, extra, prio]) => {
   const T = window.__deskTest;
-  const slots = rows.map(([t, used, cap, demand]) => ({ t, used, mainUsed: used, cap, walk: 0, started: t <= now, product: "P", demand: demand ?? used }));
+  const slots = rows.map(([t, used, cap, demand]) => ({ t, used, mainUsed: used, cap, walk: 0, started: t <= now, product: "P", demand: demand ?? used, stay: t >= 1080 ? null : 110 }));
   const adj = slots.filter((x) => !x.started).slice(0, 6).map((x) => x.t);
-  const p = T.planCaps(slots, adj, Object.assign({ target: 40, max: 13, popular: gold, base: 10, walkOut: [], pool: 5 }, extra));
+  const p = T.planCaps(slots, adj, Object.assign({ target: 40, max: 13, prio, base: 10, walkOut: [], pool: 5 }, extra));
   const to = Object.fromEntries(p.map((c) => [c.t, c.to]));
   const q = slots.map((x) => (x.started ? x.used : to[x.t] != null ? to[x.t] : Math.max(x.cap, x.used)));
-  const wins = Object.fromEntries(slots.map((x, i) => [x.t, i >= 3 ? q.slice(i - 3, i + 1).reduce((a, b) => a + b, 0) : null]));
+  const inWin = (j, k) => j <= k && (slots[j].stay == null || slots[j].t + slots[j].stay > slots[k].t);
+  const wins = Object.fromEntries(slots.map((x, k) => [x.t, k >= 3 || x.t >= 1080 ? q.reduce((a, v, j) => a + (inWin(j, k) ? v : 0), 0) : null]));
   return { plan: p.map((c) => ({ ...c })), to, wins, goal: Object.fromEntries(slots.map((x) => [x.t, p.goal(x.t)])), adj };
-}, [rows.map(([t, ...r]) => [m(t), ...r]), m(nowS), extra, [m("12:30"), m("15:30")]]);
+}, [rows.map(([t, ...r]) => [m(t), ...r]), m(nowS), extra, PRIO]);
 
-test("예약 합 40 (사장님 10/24): 10/24 15:30 화면 — 예전엔 14:00~15:30 이 42 · 이제 곧 다가오는 15:00 은 그대로, 황금 15:30 은 13, 인기 없는 16:30 은 줄임 · 어느 묶음도 40 이하", async () => {
+test("예약 합 40 (사장님 10/24): 10/24 15:30 화면 — 예전엔 14:00~15:30 이 42 · 이제 매진인 곧 다가오는 황금 15:00 은 하나만 더, 황금 15:30 은 13, 인기 없는 16:30 은 줄임 · 어느 묶음도 40 이하", async () => {
   const browser = await launch();
   try {
     const page = await browser.newPage();
@@ -41,11 +44,65 @@ test("예약 합 40 (사장님 10/24): 10/24 15:30 화면 — 예전엔 14:00~15
     const day = [["10:00", 4, 10], ["10:30", 8, 12], ["11:00", 6, 10], ["11:30", 4, 9], ["12:00", 8, 12], ["12:30", 8, 8], ["13:00", 8, 8], ["13:30", 10, 10], ["14:00", 10, 10], ["14:30", 6, 7], ["15:00", 10, 10], ["15:30", 8, 10], ["16:00", 5, 10], ["16:30", 3, 10], ["17:00", 1, 10], ["17:30", 0, 10]];
     const r = await runPlan(page, day, "14:35");
     const at = (t) => r.to[m(t)];
-    assert.deepStrictEqual(["15:00", "15:30", "16:00", "16:30", "17:00", "17:30"].map(at), [10, 13, 10, 7, 10, 10], "◐ 15:00 그대로 · 황금 15:30 → 13 · 16:30 → 7");
+    assert.deepStrictEqual(["15:00", "15:30", "16:00", "16:30", "17:00", "17:30"].map(at), [11, 13, 10, 6, 10, 10], "◐ 15:00 매진 → 하나 더 (11) · 황금 15:30 → 13 · 16:30 → 6");
     assert.ok(r.plan.find((c) => c.t === m("15:00")).soon, "15:00 = 곧 다가오는 타임");
-    assert.strictEqual(r.wins[m("15:30")], 39, "14:00~15:30 = 10 + 6 + 10 + 13 (예전 42)");
+    assert.strictEqual(r.wins[m("15:30")], 40, "14:00~15:30 = 10 + 6 + 11 + 13 (예전 42)");
     for (const t of ["15:00", "15:30", "16:00", "16:30", "17:00", "17:30"]) assert.ok(r.wins[m(t)] <= 40, `${t} 묶음 ${r.wins[m(t)]}`);
     // 일찍 나간 사람이 있어도 네이버는 예약 합 그대로 (계산에 '안에 있는 손님'을 안 씀) — 같은 결과
+  } finally {
+    await browser.close();
+  }
+});
+
+test("저녁 (사장님 10/24 16:48 화면): 18:00 부터는 무제한이라 문 닫을 때까지 있음 · 저녁 황금 18:00 을 묶음 40까지 크게 · 인기 없는 17:00 · 17:30 은 예약 수로 · 18:30 ~ 19:30 은 미리 줄임", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage();
+    await page.goto(DESK);
+    const eve = [["13:00", 8, 8], ["13:30", 10, 10], ["14:00", 10, 10], ["14:30", 6, 7], ["15:00", 13, 13], ["15:30", 13, 13], ["16:00", 8, 8], ["16:30", 7, 7], ["17:00", 3, 10], ["17:30", 1, 10], ["18:00", 8, 10], ["18:30", 0, 10], ["19:00", 0, 10], ["19:30", 0, 10]];
+    const r = await runPlan(page, eve, "16:48");
+    const at = (t) => r.to[m(t)];
+    assert.deepStrictEqual([at("17:00"), at("17:30")], [3, 1], "곧 다가오는 17:00 · 인기 없는 17:30 은 예약 수로 (18:00 에 양보)");
+    assert.strictEqual(at("18:00"), 29, "18:00 = 40 − (16:30 7 + 17:00 3 + 17:30 1) — 13 제한 없이");
+    assert.strictEqual(r.wins[m("18:00")], 40);
+    assert.ok(at("18:30") + at("19:00") + at("19:30") <= 11, "18:30 ~ 19:30 은 미리 줄임 (18:00 손님이 계속 있으므로)");
+    assert.deepStrictEqual([at("18:30"), at("19:00") + at("19:30")], [7, 4], "2순위 18:30 이 3순위 19:00 · 19:30 보다 먼저");
+    for (const t of ["18:30", "19:00", "19:30"]) assert.ok(r.wins[m(t)] <= 40, `${t} 때 ${r.wins[m(t)]} (무제한 손님 누적)`);
+    assert.strictEqual(r.wins[m("19:30")], 29 + at("18:30") + at("19:00") + at("19:30"), "19:30 = 18:00 부터 들어온 무제한 손님 모두");
+    // 고객에게 보이는 잔여는 최대 10 (18:00 목표 29 · 예약 8 → 수량 15, 잔여 7)
+    assert.strictEqual(await page.evaluate(() => window.__deskTest.capVisible(29, 8)), 15);
+    // 17:35: 18:00 이 곧 다가오는 타임 · 매진 15/15 → 하나 더 (10분마다 하나씩)
+    const r2 = await runPlan(page, [["16:00", 8, 8], ["16:30", 7, 7], ["17:00", 3, 3], ["17:30", 1, 1], ["18:00", 15, 15], ["18:30", 1, 5], ["19:00", 0, 4], ["19:30", 0, 2]], "17:35");
+    assert.strictEqual(r2.to[m("18:00")], 16, "매진인 곧 다가오는 저녁 황금 → 16");
+    for (const t of ["18:00", "18:30", "19:00", "19:30"]) assert.ok(r2.wins[m(t)] <= 40, `${t} ${r2.wins[m(t)]}`);
+    // 13:35: 곧 다가오는 황금 14:00 매진(10/10) → 11 (뒤 4번 묶음 확인)
+    const r3 = await runPlan(page, [["12:00", 8, 12], ["12:30", 8, 8], ["13:00", 8, 8], ["13:30", 10, 10], ["14:00", 10, 10], ["14:30", 6, 6], ["15:00", 6, 10], ["15:30", 7, 10], ["16:00", 0, 10], ["16:30", 0, 10], ["17:00", 0, 10], ["17:30", 0, 10]], "13:35");
+    assert.strictEqual(r3.to[m("14:00")], 11);
+    for (const t of ["14:00", "14:30", "15:00", "15:30", "16:00", "16:30"]) assert.ok(r3.wins[m(t)] <= 40, `${t} ${r3.wins[m(t)]}`);
+    // 매진이어도 뒤 묶음이 40을 넘으면 안 늘림
+    const r4 = await runPlan(page, [["12:30", 10, 10], ["13:00", 10, 10], ["13:30", 10, 10], ["14:00", 10, 10], ["14:30", 10, 10], ["15:00", 10, 10], ["15:30", 10, 10]], "13:35");
+    assert.strictEqual(r4.to[m("14:00")], 10, "꽉 찬 날은 그대로");
+  } finally {
+    await browser.close();
+  }
+});
+
+test("손님이 고르는 순위 (사장님 10/24 성수기 휴일): 1순위 기본 10 → 1순위 최대 → 2순위 → 3순위 차례로 남는 만큼 · 순위 칸 글 읽기", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage();
+    await page.goto(DESK);
+    assert.deepStrictEqual(await page.evaluate(() => window.__deskTest.capRanges("10:00, 12:00~15:30 · 18:00，9:30-9:00, 틀림, 16:00 ~ 17:00")), [[600, 600], [720, 930], [1080, 1080], [960, 1020]], "쉼표 · 가운뎃점으로 나눔 · ~ 는 사이 모두 · 거꾸로 · 틀린 조각은 버림");
+    // 17:05 · 16:30 ~ 17:30 손님이 18:00 때도 안에 있음 → 남는 자리를 1순위 18:00 이 먼저, 그다음 2순위 18:30, 3순위 19:00 · 19:30 은 남는 만큼
+    const day = [["15:30", 10, 10], ["16:00", 10, 10], ["16:30", 10, 10], ["17:00", 8, 10], ["17:30", 2, 10], ["18:00", 5, 10], ["18:30", 0, 10], ["19:00", 0, 10], ["19:30", 0, 10]];
+    const r = await runPlan(page, day, "17:05");
+    const at = (x, t) => x.to[m(t)];
+    assert.deepStrictEqual(["17:30", "18:00", "18:30", "19:00", "19:30"].map((t) => at(r, t)), [2, 20, 10, 5, 5], "◐ 3순위 17:30 은 예약 수로 · 1순위 18:00 = 20 · 2순위 18:30 = 10 · 3순위 19:00 · 19:30 = 5");
+    assert.deepStrictEqual(["17:30", "18:00", "18:30", "19:00"].map((t) => r.plan.find((c) => c.t === m(t)).rank), [3, 1, 2, 3]);
+    // 18:30 과 19:00 의 순위를 바꾸면 2순위가 된 19:00 이 먼저 10
+    const swap = await runPlan(page, day, "17:05", { prio: [PRIO[0], [[630, 660], [960, 1020], [1140, 1140]]] });
+    assert.deepStrictEqual(["18:00", "18:30", "19:00"].map((t) => at(swap, t)), [20, 5, 10]);
+    for (const x of [r, swap]) for (const t of ["17:30", "18:00", "18:30", "19:00", "19:30"]) assert.ok(x.wins[m(t)] <= 40, `${t} ${x.wins[m(t)]}`);
   } finally {
     await browser.close();
   }
@@ -72,12 +129,12 @@ test("곧 다가오는 타임은 늘리지 않음 · 황금 타임에 자리가 
     const slow = await runPlan(page, after(9), "15:35");
     assert.ok(quick.to[m("16:30")] > 10, "빨리 차는 16:30 → 10 넘게 " + quick.to[m("16:30")]);
     assert.ok(slow.to[m("16:30")] <= 10, "보통 16:30 → 10까지 " + slow.to[m("16:30")]);
-    // 황금 밖 타임은 황금 타임이 쓰고 남는 만큼 — 아침(인기 없는 11:30 · 12:00)이 황금 12:30 ~ 13:30 의 10장을 못 가져감
+    // 2 · 3순위 타임은 1순위 타임이 쓰고 남는 만큼 — 아침(3순위 11:30)이 1순위 12:00 ~ 13:30 의 10장을 못 가져감
     // (황금시간 안은 4타임이 다 황금이라 묶음 40 = 10장씩 — 13은 황금 밖 타임과 같은 묶음일 때 그 몫으로: 위 15:30 처럼)
     const morning = [["10:00", 8, 10], ["10:30", 9, 10], ["11:00", 9, 10], ["11:30", 9, 10], ["12:00", 9, 10], ["12:30", 4, 10], ["13:00", 5, 10], ["13:30", 6, 10], ["14:00", 2, 10]];
     r = await runPlan(page, morning, "10:35");
     assert.deepStrictEqual(["12:30", "13:00", "13:30"].map((t) => r.to[m(t)]), [10, 10, 10], "황금 타임 10장씩 그대로");
-    const noGold = await runPlan(page, morning, "10:35", { popular: null });
+    const noGold = await runPlan(page, morning, "10:35", { prio: [[], []] });
     assert.ok(noGold.to[m("11:30")] + noGold.to[m("12:00")] >= r.to[m("11:30")] + r.to[m("12:00")], "황금시간을 안 정하면 아침 타임이 더 가져갈 수 있음");
     for (const t of ["11:30", "12:00", "12:30", "13:00", "13:30", "14:00"]) assert.ok(r.wins[m(t)] <= 40, `${t} 묶음 ${r.wins[m(t)]}`);
   } finally {
@@ -94,23 +151,25 @@ test("무작위 300번: 어느 입장 시각도 그 타임 + 앞 3타임 ≤ 목
       const T = window.__deskTest, bad = [];
       let seed = 23; const rnd = (n) => (seed = (seed * 1103515245 + 12345) % 2147483648) % n;
       for (let k = 0; k < 300; k++) {
-        const n = 16, now = 600 + 30 * rnd(10) + 5, gold = rnd(4) ? [750, 930] : null;
-        const slots = Array.from({ length: n }, (_, i) => { const t = 600 + 30 * i, st = t <= now, used = rnd(st ? 13 : 12); return { t, used, mainUsed: used, cap: Math.max(used, 6 + rnd(8)), walk: 0, started: st, product: "P", demand: used + rnd(5) }; });
+        const n = 20, now = 600 + 30 * rnd(16) + 5, gold = rnd(4) ? [[600, 600], [720, 930], [1080, 1080]] : null, two = rnd(2) ? [[630, 660], [960, 1020], [1110, 1110]] : [];
+        const slots = Array.from({ length: n }, (_, i) => { const t = 600 + 30 * i, st = t <= now, used = rnd(st ? 13 : 12); return { t, used, mainUsed: used, cap: Math.max(used, 6 + rnd(8)), walk: 0, started: st, product: "P", demand: used + rnd(5), stay: t >= 1080 ? null : 110 }; });
         const adj = slots.filter((x) => !x.started).slice(0, 6).map((x) => x.t);
         const walkOut = Array.from({ length: rnd(8) }, () => ({ to: now + 10 + rnd(110) }));
-        const o = { target: 38 + rnd(4), max: 13, popular: gold, base: 10, walkOut, pool: 5 };
+        const o = { target: 38 + rnd(4), max: 13, prio: [gold || [], two], base: 10, walkOut, pool: 5 };
         const p = T.planCaps(slots, adj, o);
         const to = Object.fromEntries(p.map((c) => [c.t, c.to]));
         const q = slots.map((x) => (x.started ? x.used : to[x.t] != null ? to[x.t] : Math.max(x.cap, x.used)));
         for (const c of p) {
           const x = slots.find((y) => y.t === c.t);
           if (c.to < x.mainUsed) bad.push(`${k}: ${c.t} 예약 밑`);
-          if (c.to > Math.max(o.max, x.mainUsed)) bad.push(`${k}: ${c.t} 최대 넘음`);
-          if (c.soon && c.to > Math.max(x.cap, x.mainUsed)) bad.push(`${k}: ${c.t} 곧 다가오는 타임을 늘림`);
+          if (c.to > Math.max(x.stay == null && gold && gold.some((g) => x.t >= g[0] && x.t <= g[1]) ? Infinity : o.max, x.mainUsed)) bad.push(`${k}: ${c.t} 최대 넘음`);
+          const goldU = gold && gold.some((g) => x.t >= g[0] && x.t <= g[1]);
+          if (c.soon && c.to > Math.max(x.cap, x.mainUsed) + (goldU && x.mainUsed >= x.cap ? 1 : 0)) bad.push(`${k}: ${c.t} 곧 다가오는 타임을 늘림 (매진인 황금만 하나)`);
         }
+        const inWin = (j, kk) => j <= kk && (slots[j].stay == null || slots[j].t + slots[j].stay > slots[kk].t);
         for (let i = 3; i < n; i++) {
           if (slots[i].started) continue;
-          const v = q.slice(i - 3, i + 1).reduce((a, b) => a + b, 0), sold = slots.slice(i - 3, i + 1).reduce((a, x) => a + x.used, 0);
+          let v = 0, sold = 0; for (let j = 0; j <= i; j++) if (inWin(j, i)) { v += q[j]; sold += slots[j].used; }
           if (v > Math.max(p.goal(slots[i].t), sold)) bad.push(`${k}: ${slots[i].t} 묶음 ${v} > 목표 ${p.goal(slots[i].t)} (이미 팔린 ${sold})`);
         }
       }
@@ -163,7 +222,7 @@ test("현장 몫 5장: 현장 열쇠가 5개를 넘게 나가면 넘은 열쇠(�
   }
 });
 
-test("데스크 계획: 현장 손님은 네이버 수에 안 들어감 · 현장 몫 5장을 넘게 나가면 목표를 낮춤 · 표(◐ 곧 다가오는 타임 · ● 바꾸는 타임 · 황금) · 황금시간 저장", async () => {
+test("데스크 계획: 현장 손님은 네이버 수에 안 들어감 · 현장 몫 5장을 넘게 나가면 목표를 낮춤 · 표(◐ 곧 다가오는 타임 · ● 바꾸는 타임 · 순위) · 순위 저장", async () => {
   const browser = await launch();
   try {
     const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
@@ -181,14 +240,22 @@ test("데스크 계획: 현장 손님은 네이버 수에 안 들어감 · 현�
     assert.deepStrictEqual([b.inside, b.walk, b.out], [a.inside, a.walk + 6, a.out + 6], "안에 있는 손님: 네이버 그대로 · 현장 +6");
     assert.strictEqual(b.goal, 40 - Math.max(0, b.out - 5), `현장 열쇠 ${b.out}개 → 14:00 목표 ${b.goal}`);
     const A = await page.evaluate(() => window.__deskTest.RULES.capAuto);
-    assert.deepStrictEqual([A.target, A.max, A.popular], [40, 13, { from: "12:30", to: "15:30" }]);
+    assert.deepStrictEqual([A.target, A.max, A.prio], [40, 13, { p1: "10:00, 12:00~15:30, 18:00", p2: "10:30~11:00, 16:00~17:00, 18:30", p3: "11:30, 17:30, 19:00, 19:30" }]);
+    const rk = await page.evaluate(() => { const p = window.__deskTest.capPlan(); return ["10:00", "10:30", "11:00", "11:30", "12:00", "15:30", "16:00", "17:00", "17:30", "18:00", "18:30", "19:00"].map((t) => p.rankOf(+t.slice(0, 2) * 60 + +t.slice(3))); });
+    assert.deepStrictEqual(rk, [1, 2, 2, 3, 1, 1, 2, 2, 3, 1, 2, 3], "사장님 10/24 순위");
     await page.dblclick("#now"); await page.click('[data-t="naver"]');
     const marks = await page.$$eval("#sheet .captable tr td:first-child", (e) => e.map((x) => x.textContent.replace(/\s+/g, " ").trim()));
-    assert.ok(marks.some((x) => /◐/.test(x)) && marks.some((x) => /● 황금/.test(x)), marks.join(" | "));
-    assert.match(await page.textContent("#sheet"), /황금시간/);
+    assert.ok(marks.some((x) => /◐/.test(x)) && marks.some((x) => /● 1순위/.test(x)), marks.join(" | "));
+    assert.ok(marks.every((x) => /[123]순위/.test(x)), marks.join(" | "));
+    assert.strictEqual(await page.inputValue("#cap-p2"), "10:30~11:00, 16:00~17:00, 18:30");
     assert.match(await page.textContent("#sheet"), /곧 다가오는 타임 \(늘리지 않음 · 남는 자리는 현장 키 몫\)/);
-    await page.selectOption("#cap-pop-to", "16:00");
-    assert.deepStrictEqual(await page.evaluate(() => JSON.parse(localStorage.getItem("astanakiz-capauto")).popular), { from: "12:30", to: "16:00" }, "황금시간 저장");
+    await page.fill("#cap-p1", "10:00, 12:00~16:00, 18:00");
+    await page.press("#cap-p1", "Tab");
+    assert.strictEqual(await page.evaluate(() => JSON.parse(localStorage.getItem("astanakiz-capauto")).prio.p1), "10:00, 12:00~16:00, 18:00", "1순위 저장");
+    assert.strictEqual(await page.evaluate(() => window.__deskTest.capPlan().rankOf(960)), 1, "16:00 → 1순위로");
+    await page.fill("#cap-p1", "");
+    await page.press("#cap-p1", "Tab");
+    assert.strictEqual(await page.evaluate(() => window.__deskTest.capPlan().rankOf(960)), 2, "비우면 2순위 (적은 그대로)");
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();
