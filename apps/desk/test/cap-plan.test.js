@@ -357,6 +357,37 @@ test("네이버에 보이는 잔여는 10장 이하: 목표 13이면 10 → 예�
   }
 });
 
+test("골든벨이 켜져도 저녁 잔여를 모두 0으로 만들지 않음 (사장님 10/24 저녁 ver.2.5): 계획은 원래 판 시간(1시간 50분)으로 · 지금 안에 있는 손님만 문 닫을 때까지", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK); // 체험판 10/5(휴일)
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    const at = (t) => page.evaluate((t) => {
+      const T = window.__deskTest; T.setNow(t);
+      const p = T.capPlan();
+      const keys = T.holders().filter((h) => !h.walk && !h.svc).reduce((a, h) => a + h.keys.length, 0);
+      return { golden: !document.getElementById("golden").hidden, stays: p.slots.filter((x) => x.t < 1080).map((x) => x.stay), tail: p.slots.reduce((a, x) => a + (x.tail || 0), 0), keys, plan: p.plan.filter((c) => c.t >= 1080).map((c) => ({ t: c.t, to: c.to, used: c.used })), win: p.slots.filter((x) => !x.started).map((x) => p.win(x.t)) };
+    }, t);
+    const before = await at(990);
+    assert.strictEqual(before.golden, false);
+    for (const t of [1050, 1085]) {
+      const r = await at(t);
+      assert.ok(r.golden, "골든벨 켜짐 (16:00 뒤 · 열쇠 20개 이하 · 남은 예약 5장 이하)");
+      assert.ok(r.stays.every((v) => v === 110), "계획은 원래 판 시간 " + r.stays.join(","));
+      assert.ok(r.tail <= r.keys + 5, `문 닫을 때까지 있는 손님 ${r.tail} = 지금 안에 있는 네이버 손님(${r.keys}) + 아직 안 온 예약(5장 이하)`);
+      assert.ok(r.plan.some((c) => c.to > c.used), "저녁 타임에 잔여가 남음 " + JSON.stringify(r.plan));
+      assert.ok(r.win.every((v) => v <= 40), r.win.join(" "));
+    }
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
 test("데스크: 열쇠를 일찍 반납하면 — 네이버 계획(예약 합)은 그대로 · 그 자리는 현장 판매 가능 수로 (사장님 10/24)", async () => {
   const browser = await launch();
   try {
@@ -438,6 +469,68 @@ test("데스크 [지금 한 번 조절] → 네이버 칸의 회차당 수량이
     // 새벽(02:27)에 눌러도 그날 첫 3타임을 조절 (현장 10/7)
     const adj = await desk.evaluate(() => { window.__deskTest.setNow(147); return window.__deskTest.capPlan().adj; });
     assert.deepStrictEqual(adj, [600, 630, 660, 690, 720, 750], "그날 첫 타임부터 6타임");
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("이용완료가 먼저 (사장님 10/24 저녁 ver.2.5 — 이용완료가 갑자기 안 됨): 이용완료할 예약이 있으면 자동 수량 조절은 기다리고 이용완료부터 · 조절하는 중에 생기면 남은 칸은 다음 차례로", async () => {
+  const browser = await launch();
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+    const naverPage = await ctx.newPage();
+    await naverPage.goto(NAVER);
+    await naverPage.evaluate(() => localStorage.clear());
+    await naverPage.goto(NAVER);
+    const naver = new NaverSync((code) => naverPage.evaluate(code), { urls: { list: NAVER + "?view=list", calendar: NAVER + "?view=calendar" } });
+    const desk = await ctx.newPage();
+    await desk.clock.install({ time: new Date("2026-10-05T13:56:00") });
+    let q = Promise.resolve();
+    const serial = (fn) => (q = q.then(fn, fn));
+    const calls = [];
+    let inject = false;
+    const pend = (no) => desk.evaluate((no) => { const T = window.__deskTest; const id = T.addBooking(T.today(), "13:30", "완료대기", "0105555" + no.slice(-4), 1, {}); Object.assign(T.bk(id), { no, status: "완료", naverPending: true, naverWhy: "" }); }, no);
+    await desk.exposeFunction("__naverLoad", (day, only) => serial(() => naver.loadDay(day, { only })));
+    await desk.exposeFunction("__naverComplete", (b) => serial(async () => { calls.push("완료 " + b.no); return { ok: true }; }));
+    await desk.exposeFunction("__naverSetCap", (c) => serial(async () => {
+      calls.push("수량 " + c.time);
+      const r = await naver.setCap(c);
+      if (inject) { inject = false; await pend("999002"); } // 조절하는 중에 근무자가 입장시킴
+      return r;
+    }));
+    await desk.addInitScript(() => {
+      window.desk = {
+        naver: { load: (d, o) => window.__naverLoad(d, o), complete: (b) => window.__naverComplete(b), setCap: (c) => window.__naverSetCap(c) },
+        state: { load: () => null, save: () => {} },
+      };
+    });
+    const errs = [];
+    desk.on("pageerror", (e) => errs.push(e.message));
+    await desk.goto(DESK);
+    await desk.waitForFunction(() => /불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 30000 });
+
+    // ① 이용완료할 예약이 있으면 10분 자동 조절은 기다리고(wait) 이용완료부터
+    await pend("999001");
+    assert.strictEqual(await desk.evaluate(() => window.__deskTest.capRun(false)), "wait");
+    for (let i = 0; i < 50 && !calls.includes("완료 999001"); i++) await new Promise((r) => setTimeout(r, 100));
+    assert.deepStrictEqual(calls, ["완료 999001"], "수량 조절 없이 이용완료만");
+
+    // ② 조절하는 중에 이용완료할 예약이 생기면 → 그 칸까지만 하고 멈춤 → 이용완료 → 남은 칸은 다음 차례
+    calls.length = 0; inject = true;
+    await desk.evaluate(() => window.__deskTest.capRun(false));
+    for (let i = 0; i < 50 && !calls.includes("완료 999002"); i++) await new Promise((r) => setTimeout(r, 100));
+    assert.strictEqual(calls.filter((x) => /^수량/.test(x)).length, 1, "수량 한 칸만 바꾸고 멈춤: " + calls.join(" · "));
+    assert.strictEqual(calls[calls.length - 1], "완료 999002", calls.join(" · "));
+    const log = await desk.evaluate(() => window.__deskTest.capLog.slice());
+    assert.ok(log.some((x) => /이용완료 먼저/.test(x.msg || "")), JSON.stringify(log));
+    assert.ok(log.every((x) => x.ok), "미룬 칸은 실패로 안 셈 " + JSON.stringify(log));
+
+    // ③ 근무자가 [지금 한 번 조절]을 누르면 기다리지 않음
+    await pend("999003");
+    calls.length = 0;
+    await desk.evaluate(() => window.__deskTest.capRun(true));
+    assert.ok(calls.some((x) => /^수량/.test(x)) || (await desk.evaluate(() => window.__deskTest.capLog[0].msg || "")).includes("바꿀 것 없음"), calls.join(" · "));
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();

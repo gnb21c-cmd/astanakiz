@@ -72,6 +72,20 @@ class NaverSync {
     }
     return { ok: false, why: "네이버 화면이 응답하지 않음" };
   }
+  /** 앞 작업이 남긴 '예약가능 설정'(판매 수량) 창을 닫음 — 수량 조절이 중간에 실패해 창이 열린 채 남으면
+      그 뒤 이용완료 · 불러오기 · 취소가 칸을 못 누름 (사장님 10/24 저녁 ver.2.5: 이용완료가 갑자기 안 됨) */
+  async tidy() {
+    let s = null;
+    try {
+      s = await this.read();
+    } catch (e) {
+      return;
+    }
+    if (s && s.cap) {
+      this.step("네이버에 열려 있던 판매 수량 창 닫음");
+      await this.act("window.__naver.closeCap()");
+    }
+  }
   step(msg) {
     try {
       this.onStep(msg);
@@ -156,6 +170,7 @@ class NaverSync {
   async loadDay(day, opts = {}) {
     let g = await this.goView("calendar");
     if (!g.ok) return g;
+    await this.tidy();
     g = await this.goDate(day);
     if (!g.ok) return g;
     const slots = g.state.slots.filter((s) => this.isTicket(s.product));
@@ -219,6 +234,7 @@ class NaverSync {
   async complete(b) {
     let g = await this.goView("calendar");
     if (!g.ok) return g;
+    await this.tidy();
     g = await this.goDate(b.day);
     if (!g.ok) return g;
     // 그 칸의 확정 · 이용완료 숫자 (누르기 전) — 이용완료가 정말 됐는지는 이 숫자가 바뀌었는지로 확인 (현장 10/6: 버튼만 누르고 안 된 일이 있었음)
@@ -273,6 +289,17 @@ class NaverSync {
   /** 판매 수량(회차당 수량) 바꾸기: 예약현황 → 그 날짜 → 칸의 [예약가능]/[잔여예약] → 수량 n → [설정변경] → 확인 창 → 칸 숫자로 확인
       c = { day, product, time, n } · 칸의 판매 수량 = 예약가능(잔여) + 확정 + 이용완료 + 신청 */
   async setCap(c) {
+    // 어디서 실패하든 판매 수량 창을 열어 둔 채 끝내지 않음 (다음 이용완료가 막히지 않게)
+    let r;
+    try {
+      r = await this.setCapOnce(c);
+    } catch (e) {
+      r = { ok: false, why: String(e.message || e) };
+    }
+    if (!r || !r.ok) await this.tidy();
+    return r || { ok: false, why: "응답 없음" };
+  }
+  async setCapOnce(c) {
     let g = await this.goView("calendar");
     if (!g.ok) return g;
     g = await this.goDate(c.day);
@@ -344,6 +371,7 @@ class NaverSync {
   async cancel(b) {
     let g = await this.goView("calendar");
     if (!g.ok) return g;
+    await this.tidy();
     g = await this.goDate(b.day);
     if (!g.ok) return g;
     const cellOf = (s) => s.slots.find((x) => x.time === b.time && (!b.product || x.product === b.product));

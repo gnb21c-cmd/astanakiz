@@ -54,3 +54,37 @@ test("판매 수량 바꾸기: 예약 없는 칸 10 → 13, 예약 있는 칸 10
     await browser.close();
   }
 });
+
+test("판매 수량 창이 열린 채 남아도 (수량 조절이 중간에 실패) 이용완료 · 불러오기 전에 닫음 · 수량 조절이 실패하면 창을 닫고 끝냄 (사장님 10/24 저녁 ver.2.5)", async () => {
+  const browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
+  try {
+    const page = await browser.newPage();
+    await page.goto(MOCK);
+    await page.evaluate(() => localStorage.clear());
+    await page.goto(MOCK);
+    const sync = new NaverSync((code) => page.evaluate(code), { urls: { list: MOCK + "?view=list", calendar: MOCK + "?view=calendar" } });
+    await sync.goView("calendar");
+    await sync.goDate("2026-10-05");
+    // ① 수량 칸에 값을 못 넣는 화면(바뀐 네이버) → 실패해도 창은 닫혀 있어야 함
+    const call = sync.call.bind(sync);
+    sync.call = (expr) => (/setCapQty/.test(expr) ? Promise.resolve({ ok: false, why: "수량 입력칸을 못 찾음" }) : call(expr));
+    const r = await sync.setCap({ day: "2026-10-05", product: P0, time: "11:00", n: 12 });
+    sync.call = call;
+    assert.ok(!r.ok && /입력칸/.test(r.why), JSON.stringify(r));
+    assert.strictEqual((await sync.read()).cap, null, "실패해도 수량 창을 닫음");
+    // ② 창이 열린 채 남아 있으면 이용완료 전에 닫음
+    await sync.act(`window.__naver.openCap(${JSON.stringify(P0)}, "11:00")`);
+    assert.ok((await sync.read()).cap, "수량 창이 열려 있음");
+    const c = await sync.complete({ day: "2026-10-05", no: "1368155282", time: "14:00", product: P0 });
+    assert.ok(c.ok, c.why);
+    assert.strictEqual((await sync.read()).cap, null);
+    // ③ 불러오기도
+    await sync.act(`window.__naver.openCap(${JSON.stringify(P0)}, "11:00")`);
+    const d = await sync.loadDay("2026-10-05");
+    assert.ok(d.ok !== false, d.why);
+    assert.strictEqual(d.bookings.find((x) => x.no === "1368155282").status, "완료");
+    assert.strictEqual((await sync.read()).cap, null);
+  } finally {
+    await browser.close();
+  }
+});
