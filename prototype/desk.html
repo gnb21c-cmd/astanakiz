@@ -762,7 +762,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     /* 네이버 판매 수량 자동 조절 (시간제인 날 · 시간제 타임만): 2시간(4타임) 안의 손님(네이버 예약 + 현장)이 target 에 가깝게
        10분마다 지금 · 앞 3타임의 네이버 '회차당 수량'을 바꿈. 한 타임 최대 max (현장으로 갑자기 오는 손님 · 10분 사이 예약을 생각해서) */
     // target = 맞추려는 2시간 손님 수, ceiling = 절대 넘지 않는 상한 (40~43 · 사용자 지시 10/6)
-    capAuto: { on: false, target: 40, ceiling: 43, max: 13, visible: 10, ahead: 3, every: 10, product: "1시간 50분", today: { day: "", on: false }, popular: { from: "12:30", to: "15:30" } }, // target: 네이버만 합쳐 (사장님 10/24 · 현장은 그 위로 45개까지) · popular: 인기 시간 // visible: 고객에게 보이는 잔여 최대 (안내 '최대 10팀') · today: 맨 위 [오늘 수량조절] 스위치로 그날만 켜고 끈 것 (on = 기본: 시간제인 날)
+    capAuto: { v: 2, on: false, target: 40, ceiling: 43, max: 13, visible: 10, ahead: 3, every: 10, product: "1시간 50분", today: { day: "", on: false }, popular: { from: "12:30", to: "15:30" } }, // target: 네이버만 합쳐 (사장님 10/24 · 현장은 그 위로 45개까지) · max: 곧 있을 타임 최대 (그 밖 타임은 기본 10) · popular: 인기 시간 // visible: 고객에게 보이는 잔여 최대 (안내 '최대 10팀') · today: 맨 위 [오늘 수량조절] 스위치로 그날만 켜고 끈 것 (on = 기본: 시간제인 날)
   };
   /* 이용시간: 성수기 — 평일·휴일 모두 17:30 입장까지 1시간 50분, 18:00 입장부터 무제한
               비수기 — 평일은 무제한, 휴일은 성수기와 같음 */
@@ -1660,6 +1660,8 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
          뒤 3타임은 남는 자리만큼으로 늘리거나 줄임 (이미 예약된 것 밑으로는 안 줄임 · 앞으로 다가오면 다시 계산)
        - 인기 시간(o.popular = [시작, 끝] 타임) 안의 뒤 타임은 인기 시간 밖의 앞 타임이 가져가지 못함 (열린 수량 · 적어도 기본 o.base 장이 다 팔린다고 봄)
        - 인기 시간 바로 앞 타임(손님이 인기 시간까지 남는 인기 밖 타임)은 예약이 많아도 기본 수량(o.base)까지만 — 늘리는 몫은 인기 시간에 (사장님 10/24)
+       - 기본 수량(o.base)을 넘게 늘리는 것은 곧 있을 타임(바로 다음 타임) 하나만 — 앞 타임에 덜 팔린 만큼을 o.max(13)까지 채움.
+         나머지 타임은 기본 수량까지만 (모든 타임을 한꺼번에 13으로 열면 큰 타임이 4타임마다 되풀이되고 사이 타임이 줄어 버리는 시간대가 생김 · 사장님 10/24)
      o.walkOut · o.pool (사장님 10/24): 현장은 늘 pool(열쇠 45 − 네이버 목표 40 = 5)장을 알아서 씀 — 지금 나간 현장 열쇠가 pool 보다 많으면
        넘은 수만큼(반납이 늦은 열쇠부터) 네이버 몫을 빌린 것 → 그 열쇠가 안에 있는 동안 그 시각의 네이버 목표 · 상한을 그만큼 낮춤 (6개 → 39 · 7개 → 38) */
   function planCaps(slots, adj, o) {
@@ -1683,7 +1685,8 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     const keepN = (j) => Math.max(farSold(j), o.base != null ? slots[j].used - slots[j].mainUsed + o.base : 0); // 인기 타임 몫: 열린 수량 · 적어도 기본 수량
     // 인기 시간 바로 앞 타임: 이 타임 손님이 있는 동안(4타임) 인기 시간이 시작되는 인기 밖 타임 → 기본 수량까지만
     const lead = (i) => { if (!o.popular || pop(i)) return false; for (let k = i; k < Math.min(n, i + K); k++) if (pop(k)) return true; return false; };
-    const lim = (i) => (o.base != null && lead(i) ? Math.max(0, o.base - slots[i].mainUsed) : Infinity);
+    const first = add.size ? Math.min(...add.keys()) : -1; // 곧 있을 타임
+    const lim = (i) => (o.base != null && (lead(i) || (o.near && i !== first)) ? Math.max(0, o.base - slots[i].mainUsed) : Infinity);
     const occ = (j, i) => {
       const x = slots[j];
       if (x.started) return o.present ? 0 : x.used + x.walk; // 좌석 기준이면 ① ② 로 셈
@@ -1811,7 +1814,8 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   /** 네이버에 넣을 회차당 수량 (사장님 10/9): 고객에게 보이는 잔여(회차당 수량 − 예약)는 10장을 넘지 않게 — 안내 '최대 10팀'과 맞게.
       목표 P(최대 13)를 한 번에 열지 않고 예약 b 가 늘수록 천천히: b + ⌈10 × (P − b) ÷ P⌉ (P 13: 10 → 예약 2명 11(잔여 9) → 6명 12 → 12명 13)
       10 이하 목표는 그대로 · 예약이 목표보다 많으면 예약 수 */
-  const capVisible = (P, b, lim = RULES.capAuto.visible) => (P <= b ? Math.max(P, b) : P <= lim ? P : b + Math.min(lim, Math.ceil((lim * (P - b)) / P - 1e-9)));
+  // 사장님 10/24: 예약할 때마다 보이는 잔여가 줄어야 함 (예약 0 → 10 · 1 → 9 · 2 → 9 · 3 → 8 …) — 10 × 남은 자리 ÷ 목표, 소수 0.4 이상 올림
+  const capVisible = (P, b, lim = RULES.capAuto.visible) => (P <= b ? Math.max(P, b) : P <= lim ? P : b + Math.min(lim, Math.floor((lim * (P - b)) / P + 0.6)));
   /** 지금 안에 있는 손님 (좌석 · 열쇠 기준 · 사장님 10/9) — [{ from, to, n }]
       - 열쇠를 가진 손님: 열쇠마다 반납 시각까지 (일찍 나간 사람은 이미 빠짐 · 옮긴 시간 · 연장 반영 · 반납 시간이 지났으면 10분 안에 나간다고)
       - 시작한 타임인데 아직 안 온 예약 · 데스크 없이 네이버에서만 이용완료한 예약: 끝 시간까지 (늦게라도 올 수 있어서)
@@ -2423,10 +2427,10 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
           <div class="field setcard plain"><span class="label">매일 재고 열기 <span class="help">기준의 상품 · 기간 · 재고로 네이버 예약상품 날짜를 열어요</span></span><div id="st-row" class="field">${stRow()}</div></div>
           <div class="setcard plain stack">
           <div class="field"><span class="label">판매 수량 자동조절</span><label class="chk"><input type="checkbox" id="cap-on" ${A.on ? "checked" : ""}> <b>10분마다 네이버 판매 수량 자동 조절</b> <span class="help">(시간제인 날: 성수기 · 휴일 기본 · 그날만 바꾸려면 맨 위 [오늘 수량조절])</span></label>
-            <div class="help longhelp" data-q="수량 자동조절이란"><b>네이버 손님만 합쳐</b>(지금 안의 손님은 열쇠 반납 시각까지 · 아직 안 온 예약 · 앞으로 팔릴 수) 어느 시각에도 <b>목표</b>가 되게 — 현장은 늘 열쇠 ${RULES.keys} − 목표 = ${Math.max(0, RULES.keys - A.target)}장을 알아서 써요. 현장 열쇠가 그보다 많이 나가면 넘은 열쇠(반납이 늦은 것부터)가 있는 동안 그 수만큼 네이버 목표를 낮추고(6개 → 39 · 7개 → 38), 네이버가 목표에 닿고 현장도 다 나가면 아직 안 온 예약 자리는 현장입장 창에서 '판매 불가'로 막아요. 상한은 목표보다 크게 해도 목표까지만 열어요. 아직 시작 안 한 앞 ${A.ahead}타임을 <b>가까운 타임부터</b> 채우고(앞 타임에 덜 온 만큼도), 그 뒤 3타임은 남는 자리만큼 늘리거나 줄여요. <b>인기 시간</b> 타임은 인기 시간 밖 앞 타임이 자리를 못 가져가고, 인기 시간 바로 앞 타임(손님이 인기 시간까지 남는 타임)은 예약이 많아도 기본 ${RULES.slotCap}장까지만 — 늘리는 몫은 인기 시간에. 일찍 나간 자리는 바로 다시 팔아요. 비수기 평일은 하지 않아요.</div>
+            <div class="help longhelp" data-q="수량 자동조절이란"><b>네이버 손님만 합쳐</b>(지금 안의 손님은 열쇠 반납 시각까지 · 아직 안 온 예약 · 앞으로 팔릴 수) 어느 시각에도 <b>목표</b>가 되게 — 현장은 늘 열쇠 ${RULES.keys} − 목표 = ${Math.max(0, RULES.keys - A.target)}장을 알아서 써요. 현장 열쇠가 그보다 많이 나가면 넘은 열쇠(반납이 늦은 것부터)가 있는 동안 그 수만큼 네이버 목표를 낮추고(6개 → 39 · 7개 → 38), 네이버가 목표에 닿고 현장도 다 나가면 아직 안 온 예약 자리는 현장입장 창에서 '판매 불가'로 막아요. 상한은 목표보다 크게 해도 목표까지만 열어요. 아직 시작 안 한 앞 ${A.ahead}타임을 <b>가까운 타임부터</b> 채우고(앞 타임에 덜 온 만큼도), 그 뒤 3타임은 남는 자리만큼 늘리거나 줄여요. <b>인기 시간</b> 타임은 인기 시간 밖 앞 타임이 자리를 못 가져가고, 인기 시간 바로 앞 타임(손님이 인기 시간까지 남는 타임)은 예약이 많아도 기본 ${RULES.slotCap}장까지만 — 늘리는 몫은 인기 시간에. 기본 ${RULES.slotCap}장을 넘게 늘리는 건 <b>곧 있을 타임 하나만</b>(다음 타임 최대 ${A.max}) — 여러 타임을 한꺼번에 늘리면 사이 타임이 줄어 버리는 시간대가 생겨요. 고객에게 보이는 잔여는 최대 ${A.visible}팀처럼 예약마다 줄어요(0 → 10 · 1 → 9 · 2 → 9 · 3 → 8 …). 일찍 나간 자리는 바로 다시 팔아요. 비수기 평일은 하지 않아요.</div>
             <div class="btns" style="align-items:center"><label class="help" for="cap-target">네이버 목표</label><input id="cap-target" type="number" min="30" max="50" value="${A.target}" class="cfg" style="width:76px">
               <label class="help" for="cap-ceil">상한</label><input id="cap-ceil" type="number" min="30" max="50" value="${A.ceiling}" class="cfg" style="width:76px">
-              <label class="help" for="cap-max">한 타임 최대</label><input id="cap-max" type="number" min="5" max="20" value="${A.max}" class="cfg" style="width:76px">
+              <label class="help" for="cap-max" title="앞 타임에 덜 팔린 만큼 곧 있을 타임 하나만 여기까지 · 다른 타임은 기본 ${RULES.slotCap}장까지">다음 타임 최대</label><input id="cap-max" type="number" min="5" max="20" value="${A.max}" class="cfg" style="width:76px">
               <label class="help" for="cap-vis">보이는 잔여 최대</label><input id="cap-vis" type="number" min="1" max="20" value="${A.visible}" class="cfg" style="width:76px">
               <button class="btn btn-sm btn-ink" data-act="capNow" ${capBusy ? "disabled" : ""}>${capBusy ? "조절 중…" : "지금 한 번 조절"}</button></div>
             <div class="btns" style="align-items:center"><label class="help" for="cap-pop-from">인기 시간</label><select id="cap-pop-from" class="cfg" style="width:92px">${SLOTS.map((t) => `<option ${A.popular && hm(t) === A.popular.from ? "selected" : ""}>${hm(t)}</option>`).join("")}</select><span class="help">~</span><select id="cap-pop-to" class="cfg" style="width:92px">${SLOTS.map((t) => `<option ${A.popular && hm(t) === A.popular.to ? "selected" : ""}>${hm(t)}</option>`).join("")}</select>
@@ -2584,9 +2588,18 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     if (APP && window.desk.config) window.desk.config.set({ peaks: v });
     else try { localStorage.setItem("astanakiz-peaks", JSON.stringify(v)); } catch (e) { /* 저장 못 해도 동작 */ }
   }
-  if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c && Array.isArray(c.peaks) && c.peaks.length) { RULES.peaks = c.peaks; renderAll(); } if (c && c.capAuto) Object.assign(RULES.capAuto, c.capAuto); if (c && c.unpaidCancel) Object.assign(RULES.unpaidCancel, c.unpaidCancel); }).catch(() => {});
+  /** 저장된 수량조절 설정 읽기 — 2번 모양(10/24) 전에 저장된 것: 예전 기본 목표 42 이면 새 기본(네이버만 40)으로 한 번 바꿔 저장 */
+  function capAutoLoad(v) {
+    if (!v || typeof v !== "object") return;
+    Object.assign(RULES.capAuto, v);
+    if ((Number(v.v) || 1) < 2) {
+      if (RULES.capAuto.target === 42) RULES.capAuto.target = 40;
+      RULES.capAuto.v = 2; saveCapAuto();
+    }
+  }
+  if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c && Array.isArray(c.peaks) && c.peaks.length) { RULES.peaks = c.peaks; renderAll(); } if (c && c.capAuto) capAutoLoad(c.capAuto); if (c && c.unpaidCancel) Object.assign(RULES.unpaidCancel, c.unpaidCancel); }).catch(() => {});
   else try { const v = JSON.parse(localStorage.getItem("astanakiz-peaks")); if (Array.isArray(v) && v.length) RULES.peaks = v; } catch (e) { /* 없음 */ }
-  if (!APP) try { const v = JSON.parse(localStorage.getItem("astanakiz-capauto")); if (v) Object.assign(RULES.capAuto, v); } catch (e) { /* 없음 */ }
+  if (!APP) try { capAutoLoad(JSON.parse(localStorage.getItem("astanakiz-capauto"))); } catch (e) { /* 없음 */ }
   const feedHelp = () => `약 ${Math.round(PRINT.feed * 4.2)}mm${PRINT.feed === 4 ? " (처음)" : ""}`; // 자르기 전 여백 (1줄 ≈ 4.2mm)
   const savePrint = () => { if (APP && window.desk.config) window.desk.config.set({ printer: PRINT.sel, printCut: PRINT.cut, printFeed: PRINT.feed, printMode: PRINT.mode, comPort: PRINT.port, comBaud: PRINT.baud, drawerPin: PRINT.drawerPin, printForm: { text: PRINT.forms.enter.text, auto: PRINT.forms.enter.auto, ver: ENTER_FORM_VER } }); };
   // 영수증 프린터처럼 보이는 이름 (처음 찾을 때 자동으로 고름)

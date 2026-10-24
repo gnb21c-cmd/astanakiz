@@ -163,13 +163,16 @@ test("네이버만 40: 가까운 타임부터 · 뒤 3타임은 남는 자리만
     const present = rows.filter(([t]) => m(t) <= now && m(t) + 110 > now).map(([t, d, u]) => ({ from: now, to: m(t) + 110, n: d + u }));
     const slots = rows.map(([t, d, u, rem]) => ({ t: m(t), used: d + u, mainUsed: d + u, cap: d + u + rem, walk: 0, started: m(t) <= now, product: "P", demand: d + u, fc: m(t) >= m("12:30") && m(t) <= m("15:30") ? null : d + u }));
     const adj = [m("13:00"), m("13:30"), m("14:00")];
-    const O = { target: 40, ceiling: 43, max: 13, walkAvg: 0, present, forecast: true, near: true, popular: [m("12:30"), m("15:30")] };
+    const O = { target: 40, ceiling: 43, max: 13, walkAvg: 0, present, forecast: true, near: true, popular: [m("12:30"), m("15:30")], base: 10 };
     const r = await run(slots, adj, O);
-    assert.deepStrictEqual(["13:00", "13:30", "14:00"].map((t) => to(r, t)), [12, 10, 10], "가까운 13:00 부터 — 14:00 때 네이버 40 (12:30 8 + 12 + 10 + 10)");
+    assert.deepStrictEqual(["13:00", "13:30", "14:00"].map((t) => to(r, t)), [12, 10, 10], "곧 있을 13:00 이 덜 팔린 만큼 (13까지) — 14:00 때 네이버 40 (12:30 8 + 12 + 10 + 10) · 나머지는 기본 10까지");
     assert.strictEqual(r.inside[m("14:00")], 40);
-    assert.deepStrictEqual(["14:30", "15:00", "15:30"].map((t) => to(r, t)), [8, 12, 10], "뒤 3타임은 남는 자리만큼 (늘리거나 줄임)");
+    assert.deepStrictEqual(["14:30", "15:00", "15:30"].map((t) => to(r, t)), [8, 10, 10], "뒤 3타임은 남는 자리만큼 줄이고 · 기본 10을 넘게는 안 늘림");
     assert.ok(["14:30", "15:00", "15:30"].every((t) => r.plan.find((c) => c.t === m(t)).near));
-    for (const t of ["14:00", "14:30", "15:00", "15:30"]) assert.strictEqual(r.inside[m(t)], 40, `${t} 때 네이버 40`);
+    assert.strictEqual(r.inside[m("14:30")], 40);
+    for (const t of ["14:00", "14:30", "15:00", "15:30"]) assert.ok(r.inside[m(t)] <= 40, `${t} 때 네이버 ${r.inside[m(t)]} ≤ 40`);
+    // 한꺼번에 여러 타임을 13으로 열지 않음 (큰 타임이 4타임마다 되풀이되며 사이 타임이 줄어드는 것 막기)
+    assert.strictEqual(r.plan.filter((c) => c.to > 10).length, 1, "기본 10을 넘는 타임은 곧 있을 타임 하나뿐");
     // 예전(현장 예상 타임당 2명을 비워 둠)이면 13:00 ~ 14:00 이 닫혔음 (폰 화면 잔여 0)
     const old = await run(slots.map((x) => ({ ...x, fc: x.used })), adj, { target: 42, ceiling: 43, max: 13, walkAvg: 2, present, forecast: true });
     assert.deepStrictEqual(["13:00", "13:30", "14:00"].map((t) => to(old, t)), [8, 10, 10], "예전: 현장 몫 때문에 닫힘");
@@ -181,7 +184,7 @@ test("네이버만 40: 가까운 타임부터 · 뒤 3타임은 남는 자리만
     const s2 = morning.map(([t, u, cap]) => ({ t: m(t), used: u, mainUsed: u, cap, walk: 0, started: m(t) <= now2, product: "P", demand: u, fc: m(t) >= m("12:30") && m(t) <= m("15:30") ? null : u }));
     const adj2 = [m("11:00"), m("11:30"), m("12:00")];
     const guard = await run(s2, adj2, { ...O, present: pres2 });
-    const noGuard = await run(s2, adj2, { ...O, present: pres2, popular: null });
+    const noGuard = await run(s2, adj2, { ...O, present: pres2, popular: null, base: null });
     assert.ok(to(guard, "12:30") >= 10, "인기 첫 타임 12:30 은 열린 10장 그대로 (12:00 이 못 가져감) " + to(guard, "12:30"));
     assert.ok(to(noGuard, "12:30") < 10, "인기 시간을 안 정하면 12:00 이 가져가 12:30 이 닫힘 " + to(noGuard, "12:30"));
     const sumAdj = (x) => ["11:00", "11:30", "12:00"].reduce((a, t) => a + to(x, t), 0);
@@ -193,7 +196,7 @@ test("네이버만 40: 가까운 타임부터 · 뒤 3타임은 남는 자리만
     const pres3 = busy.filter(([t]) => m(t) <= now2).map(([t, u]) => ({ from: now2, to: m(t) + 110, n: u }));
     const s3 = busy.map(([t, u]) => ({ t: m(t), used: u, mainUsed: u, cap: 10, walk: 0, started: m(t) <= now2, product: "P", demand: u, fc: m(t) >= m("12:30") ? null : u }));
     const lead = await run(s3, adj2, { ...O, present: pres3, base: 10 });
-    const noBase = await run(s3, adj2, { ...O, present: pres3 });
+    const noBase = await run(s3, adj2, { ...O, present: pres3, base: null });
     assert.deepStrictEqual(["11:00", "11:30", "12:00"].map((t) => to(lead, t)), [10, 10, 10], "11:00 ~ 12:00 (손님이 12:30 뒤까지 남음) = 기본 10까지만");
     assert.deepStrictEqual(["12:30", "13:00", "13:30"].map((t) => to(lead, t)), [10, 10, 10], "인기 타임 몫 그대로");
     assert.ok(["11:00", "11:30", "12:00"].some((t) => to(noBase, t) > 10) && ["12:30", "13:00", "13:30"].some((t) => to(noBase, t) < 10), "기본 수량을 안 정하면 앞 타임이 늘고 인기 타임이 줄어듦");
@@ -323,8 +326,43 @@ test("데스크: 네이버가 40(아직 안 온 예약 포함) + 현장 5 = 열�
   }
 });
 
+test("수량조절 설정 2번 모양 (사장님 10/24): 다음 타임 최대 13 그대로 · 예전에 저장된 목표 42는 한 번만 네이버 40으로 바꿔 저장 · 그 뒤에 바꾼 값은 그대로", async () => {
+  const browser = await launch();
+  try {
+    const load = async (saved) => {
+      const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+      const page = await ctx.newPage();
+      await page.addInitScript((sv) => {
+        window.__sets = [];
+        const cfg = { build: "2.3", capAuto: sv };
+        window.desk = {
+          naver: { load: async (day) => ({ ok: true, day, slots: [], bookings: [] }), complete: async () => ({ ok: true }) },
+          state: { load: () => null, save: () => {} },
+          config: { get: async () => cfg, set: async (patch) => { window.__sets.push(JSON.parse(JSON.stringify(patch))); Object.assign(cfg, patch); return { ok: true }; } },
+        };
+      }, saved);
+      await page.goto(DESK);
+      await page.waitForFunction(() => /불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 15000 });
+      const r = await page.evaluate(() => ({ A: window.__deskTest.RULES.capAuto, sets: window.__sets.filter((x) => x.capAuto).map((x) => x.capAuto) }));
+      await ctx.close();
+      return r;
+    };
+    const old = await load({ on: true, target: 42, ceiling: 43, max: 13, visible: 10, ahead: 3, every: 10, product: "1시간 50분" });
+    assert.deepStrictEqual([old.A.max, old.A.target, old.A.v, old.A.on], [13, 40, 2, true], "예전 기본 목표 42 → 네이버 40 · 최대 13 그대로 (켜 둔 것도 그대로)");
+    assert.ok(old.sets.some((x) => x.target === 40 && x.v === 2), "바꾼 값을 저장");
+    const mine = await load({ on: true, target: 38, ceiling: 43, max: 12, v: 1 });
+    assert.deepStrictEqual([mine.A.max, mine.A.target], [12, 38], "사장님이 바꾼 값(예전 기본이 아님)은 그대로");
+    const now = await load({ v: 2, on: true, target: 42, ceiling: 43, max: 13 });
+    assert.deepStrictEqual([now.A.target, now.sets.length], [42, 0], "새 모양으로 저장한 값은 사장님이 고른 값 → 그대로 · 저장 안 함");
+    const none = await load(undefined);
+    assert.deepStrictEqual([none.A.max, none.A.target], [13, 40], "처음 설치 = 다음 타임 최대 13 · 네이버 40");
+  } finally {
+    await browser.close();
+  }
+});
+
 // 사장님 10/9: 고객에게 보이는 잔여(회차당 수량 − 예약)는 10장을 넘지 않게 — 목표 13이어도 한 번에 열지 않고 예약이 늘수록 천천히
-test("네이버에 보이는 잔여는 10장 이하: 목표 13이면 10 → 예약 2명 때 잔여 9 → … → 13 · 이미 13 열린 먼 타임은 예약 + 10으로", async () => {
+test("네이버에 보이는 잔여는 10장 이하: 목표 13이면 10 → 예약 1명 잔여 9 → 2명 9 → 3명 8 → … → 13 · 이미 13 열린 먼 타임은 예약 + 10으로", async () => {
   const browser = await launch();
   try {
     const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
@@ -332,9 +370,11 @@ test("네이버에 보이는 잔여는 10장 이하: 목표 13이면 10 → 예�
     page.on("pageerror", (e) => errs.push(e.message));
     await page.goto(DESK); // 체험판 10/5(휴일) 13:50
     const v = await page.evaluate(() => [[13, 0], [13, 1], [13, 2], [13, 6], [13, 12], [13, 13], [8, 0], [10, 3], [13, 15]].map(([p, b]) => window.__deskTest.capVisible(p, b)));
-    assert.deepStrictEqual(v, [10, 11, 11, 12, 13, 13, 8, 10, 15], "회차당 수량 = 예약 + ⌈10 × (목표 − 예약) ÷ 목표⌉, 10 이하 목표는 그대로");
-    const left = [[13, 0], [13, 2], [13, 6], [13, 12]].map(([p, b], i) => v[[0, 2, 3, 4][i]] - b);
-    assert.deepStrictEqual(left, [10, 9, 6, 1], "보이는 잔여가 천천히 줄어듦");
+    assert.deepStrictEqual(v, [10, 10, 11, 11, 13, 13, 8, 10, 15], "회차당 수량 = 예약 + ⌊10 × (목표 − 예약) ÷ 목표 + 0.6⌋, 10 이하 목표는 그대로");
+    // 사장님 10/24: 예약할 때마다 보이는 잔여가 줄어야 — 예약 0 → 10 · 1 → 9 · 2 → 9 · 3 → 8 … (예약한 사람이 다시 봐도 '10팀'이 맞게)
+    const left = await page.evaluate(() => Array.from({ length: 14 }, (_, b) => window.__deskTest.capVisible(13, b) - b));
+    assert.deepStrictEqual(left, [10, 9, 9, 8, 7, 6, 5, 5, 4, 3, 2, 2, 1, 0], "보이는 잔여가 예약마다 줄어듦");
+    assert.ok(left.every((x, i) => i === 0 || x <= left[i - 1]), "늘어나지 않음");
     // 먼 타임(17:30)에 이미 13장 · 예약 0 → 잔여 13이 보임 → 예약 + 10 = 10으로 줄임
     const p = await page.evaluate(() => { window.__deskTest.capDemo[1050] = 13; const r = window.__deskTest.capPlan(); return { plan: r.plan.map((c) => ({ ...c })), slots: r.slots.map((x) => ({ t: x.t, mainUsed: x.mainUsed, started: x.started })) }; });
     const fix = p.plan.find((c) => c.t === 1050);

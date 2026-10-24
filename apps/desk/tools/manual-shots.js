@@ -26,7 +26,7 @@ const shot = (loc, name) => loc.screenshot({ path: path.join(OUT, name), type: "
   // 앱처럼: 체험판 시간 버튼 숨김 · 버전 표시
   await page.evaluate(() => {
     document.querySelectorAll("[data-act=time]").forEach((x) => (x.hidden = true));
-    const t = document.querySelector(".top .tag"); if (t) t.textContent = "ver.2.2";
+    const t = document.querySelector(".top .tag"); if (t) t.textContent = "ver.2.3";
   });
   // 메모 상자: 예시 근무자 3명 + 관리자 전달 · 메모 (상자 숫자가 보이게)
   await page.dblclick("#now");
