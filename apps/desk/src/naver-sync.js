@@ -372,7 +372,7 @@ class NaverSync {
   }
   /** 입금대기 예약 취소: 그 칸의 [확정] → 카드를 지금 다시 읽어 아직 입금대기([이용완료] 없음 · 결제완료 아님)인지 확인 → [예약취소] → 확인 창 → 칸 숫자로 확인
       b = { day, time, product, no, qty } · 결제했으면 누르지 않음 */
-  /** BC 3아웃 손님 예약 전액 취소 (사장님 10/26) — 네이버를 불러올 때 데스크가 알아서 · 결제한 예약도
+  /** BC 쓰리아웃 손님 예약 전액 취소 (사장님 10/26) — 네이버를 불러올 때 데스크가 알아서 · 결제한 예약도
       [예약취소] → '예약 취소' 화면 → ○ 전액환불 → [예약 취소] (refundFull) → 칸 숫자로 확인 */
   cancelPaid(b) {
     return this.cancel(Object.assign({}, b, { paidOk: true }));
@@ -393,12 +393,12 @@ class NaverSync {
     const paid = !!(card.canComplete || /결제완료/.test(card.pay || ""));
     if (!b.paidOk && paid) return { ok: false, paid: true, why: "결제한 예약 — 취소 안 함" };
     if (!card.canCancel) return { ok: false, why: "[예약취소] 버튼이 없음" };
-    this.step(`네이버 ${b.paidOk ? "3아웃 손님" : "입금대기"} ${b.time} 예약 취소`);
+    this.step(`네이버 ${b.paidOk ? "쓰리아웃 손님" : "입금대기"} ${b.time} 예약 취소`);
     r = await this.act(`window.__naver.cancel(${JSON.stringify(b.no)}, ${b.paidOk ? "true" : "false"})`);
     if (!r.ok) return r;
     this.snap("예약취소 누른 뒤");
     if (paid) {
-      // 결제한 예약 (BC 3아웃): '예약 취소' 화면에서 전액환불을 고른 뒤에만 [예약 취소]
+      // 결제한 예약 (BC 쓰리아웃): '예약 취소' 화면에서 전액환불을 고른 뒤에만 [예약 취소]
       const f = await this.refundFull(b);
       if (!f.ok) return f;
     } else
@@ -438,7 +438,7 @@ class NaverSync {
     let s = null;
     for (let i = 0; i < 24 && !(s = (await this.read()).refund); i++) await sleep(250);
     if (!s) return this.refundBack("네이버 '예약 취소'(환불기준) 화면이 안 열림 — 아무것도 누르지 않음", "환불 화면 안 열림");
-    this.step(`네이버 ${b.time} 3아웃 손님 — 전액환불 고르는 중`);
+    this.step(`네이버 ${b.time} 쓰리아웃 손님 — 전액환불 고르는 중`);
     for (let k = 0; k < 2 && !s.sure; k++) {
       const p = await this.call("window.__naver.pickFullRefund()").catch(() => null);
       if (!p || p.ok === false) break;
@@ -452,7 +452,7 @@ class NaverSync {
     this.snap("전액환불 고른 뒤");
     const r = await this.call("window.__naver.submitRefund()").catch(() => null);
     if (!r || !r.ok) return this.refundBack((r && r.why) || "[예약 취소]를 누르지 못함", "예약 취소 못 누름");
-    this.step(`네이버 ${b.time} 3아웃 손님 — 전액환불로 [예약 취소] 누름`);
+    this.step(`네이버 ${b.time} 쓰리아웃 손님 — 전액환불로 [예약 취소] 누름`);
     // 바로 끝남 (현장 10/26). 혹시 확인 창이 뜨면 그 창의 [확인]만 (cancelConfirm 은 '예약 취소' 화면 단추를 누르지 않음)
     for (let i = 0; i < 16; i++) {
       await sleep(250);

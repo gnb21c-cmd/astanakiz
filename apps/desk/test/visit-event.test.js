@@ -307,7 +307,9 @@ test("재방문 이벤트(앱): 장부는 POS PC 파일(시작일.jsonl)에 이�
     await page.waitForFunction(() => /불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 15000 });
     // 김기록: 10/12 방문 → 오늘 10/14 기한 안 → 성공 · 박새로: 기록 없음 → 안내 (10/14 + 20일 = 11/3 → 종료일 10/31 까지)
     assert.match(await card(page, 840, "김기록"), /수제돈까스 쿠폰 지급하세요/);
-    assert.strictEqual(await page.locator('.res:has-text("김기록") .evcoupon').evaluate((e) => [getComputedStyle(e).color, getComputedStyle(e).backgroundColor].join()), "rgb(27, 27, 27),rgb(232, 203, 142)", "옅은 황토색 네모 · 검은 글씨");
+    // 한 번에 찾고 읽음 (찾은 뒤 화면이 다시 그려지면 떨어진 칸의 색이 빈칸으로 읽힘 — 시험을 여럿 같이 돌릴 때)
+    const coupon = () => page.evaluate(() => { const r = [...document.querySelectorAll(".res")].find((x) => /김기록/.test(x.textContent)); const e = r && r.querySelector(".evcoupon"); return e ? [getComputedStyle(e).color, getComputedStyle(e).backgroundColor].join() : ""; });
+    assert.strictEqual(await coupon(), "rgb(27, 27, 27),rgb(232, 203, 142)", "옅은 황토색 네모 · 검은 글씨");
     assert.match(await card(page, 840, "박새로"), /이벤트 시작/);
     assert.strictEqual(await tip(page, 840, "박새로"), "이벤트 안내 · 10/31까지");
     assert.deepStrictEqual(await page.evaluate(() => window.__adds), [], "아직 아무도 이용완료 안 함 → 기록 없음");

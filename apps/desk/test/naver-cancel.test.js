@@ -1,7 +1,7 @@
 /* 대리예약 읽기 · 입금대기 예약 취소 (현장 화면 10/8 본뜸)
    - 대리예약: 예약자 옆 '대리예약' 스티커 + 방문자 "박소희(010-…)" → 둘 다 읽음
    - 입금대기: [이용완료] 없이 [예약취소]만 → 취소하면 칸의 확정 숫자가 줆 · 결제한 예약은 취소하지 않음
-   - BC 3아웃 결제한 예약 (현장 화면 10/26): '예약 취소' 화면에서 전액환불을 고른 뒤에만 [예약 취소] */
+   - BC 쓰리아웃 결제한 예약 (현장 화면 10/26): '예약 취소' 화면에서 전액환불을 고른 뒤에만 [예약 취소] */
 const test = require("node:test");
 const assert = require("node:assert");
 const path = require("path");
@@ -80,7 +80,7 @@ test("데스크: 네이버를 불러오면 2시간 안의 입금대기 예약을
   }
 });
 
-test("BC 3아웃 [전액 취소] (사장님 10/26): 결제한 예약도 cancelPaid 로만 취소 (cancel 은 그대로 안 함) · 칸 숫자로 확인", async () => {
+test("BC 쓰리아웃 [전액 취소] (사장님 10/26): 결제한 예약도 cancelPaid 로만 취소 (cancel 은 그대로 안 함) · 칸 숫자로 확인", async () => {
   const browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
   try {
     const page = await browser.newPage();

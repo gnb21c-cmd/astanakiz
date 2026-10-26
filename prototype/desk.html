@@ -394,7 +394,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .notechk label { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; cursor: pointer; }
 .notechk input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
 .notechk .k3 { color: var(--nm-k3); } .notechk .bl { color: var(--red); }
-/* BC(블랙컨슈머) 1 · 2 · 3아웃 (사장님 10/26): 이름 옆 동그라미 ①②③ (야구 아웃처럼 차례로 채움) · 1아웃 = 카드 테두리 빨강 · 3아웃 = 예약 불가 알림 */
+/* BC(블랙컨슈머) 원아웃 · 투아웃 · 쓰리아웃 (사장님 10/26): 이름 옆 동그라미 ①②③ (야구 아웃처럼 차례로 채움) · 원아웃 = 카드 테두리 빨강 · 쓰리아웃 = 예약 불가 알림 */
 .notechk .bcset { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 800; color: var(--red); }
 .bcdot { width: 22px; height: 22px; min-height: 0; padding: 0; border-radius: 50%; border: 2px solid var(--red); background: transparent; color: var(--red); font-size: 12px; font-weight: 800; line-height: 1; display: inline-grid; place-items: center; cursor: pointer; flex: none; }
 .bcdot.on { background: var(--red); color: #fff; }
@@ -409,7 +409,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .bclist .dots { display: inline-flex; gap: 3px; }
 .bcdot:disabled { opacity: .35; cursor: not-allowed; }
 .bcwhy { color: var(--red); font-weight: 700; overflow-wrap: anywhere; }
-/* 3아웃 사유 창 (고객 카드에서 ③ 누르는 순간 · 사장님 10/26) */
+/* 쓰리아웃 사유 창 (고객 카드에서 ③ 누르는 순간 · 사장님 10/26) */
 .bcask { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(0, 0, 0, .5); }
 .bcask > div { width: min(440px, 92%); display: grid; gap: 8px; padding: 14px; border-radius: 12px; border: 2px solid var(--red); background: var(--surface); box-shadow: var(--shadow); }
 .bcask textarea { width: 100%; min-height: 72px; resize: vertical; font: inherit; font-size: 14px; padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); box-sizing: border-box; }
@@ -759,6 +759,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 <script>
 (() => {
   // ── 규칙 ─────────────────────────────────────────
+  const OUTN = ["", "원아웃", "투아웃", "쓰리아웃"]; // BC 단계 이름 (사장님 10/26: 1 · 2 · 3 아웃 → 원 · 투 · 쓰리)
   const RULES = {
     keys: 45,               // 보유 열쇠
     baseKeys: 40,           // 기본 운영 열쇠, 나머지 5개는 유동 (빈 좌석 보고)
@@ -784,7 +785,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     /* 네이버 판매 수량 자동 조절 (시간제인 날 · 시간제 타임만): 2시간(4타임) 안의 손님(네이버 예약 + 현장)이 target 에 가깝게
        10분마다 지금 · 앞 3타임의 네이버 '회차당 수량'을 바꿈. 한 타임 최대 max (현장으로 갑자기 오는 손님 · 10분 사이 예약을 생각해서) */
     // target = 맞추려는 2시간 손님 수, ceiling = 절대 넘지 않는 상한 (40~43 · 사용자 지시 10/6)
-    bc: { o1: true, o2: true, o3: true }, // BC(블랙컨슈머) 1 · 2 · 3아웃 대응 켬/끔 (사장님 10/26) — 운영 설정 → 고객 세부 관리 → BC 관리
+    bc: { o1: true, o2: true, o3: true }, // BC(블랙컨슈머) 원아웃 · 투아웃 · 쓰리아웃 대응 켬/끔 (사장님 10/26) — 운영 설정 → 고객 세부 관리 → BC 관리
     capAuto: { v: 3, on: false, target: 40, ceiling: 43, max: 13, visible: 10, ahead: 3, every: 10, product: "1시간 50분", today: { day: "", on: false }, prio: { p1: "10:00, 12:00~15:30, 18:00", p2: "10:30~11:00, 16:00~16:30, 18:30", p3: "11:30, 17:00, 17:30, 19:00, 19:30" }, boost: "18:00, 18:30", nightProduct: "야간자유" }, // target: 네이버만 합쳐 (사장님 10/24 · 현장은 그 위로 45개까지) · max: 황금 타임 · 빨리 차는 타임 최대 (그 밖은 기본 10) · prio: 손님이 고르는 순위 1 · 2 · 3 (사장님 10/24 성수기 휴일 · 적지 않은 타임 = 3순위) · nightProduct: 18:00 부터 타임의 네이버 상품 // visible: 고객에게 보이는 잔여 최대 (안내 '최대 10팀') · today: 맨 위 [오늘 수량조절] 스위치로 그날만 켜고 끈 것 (on = 기본: 시간제인 날)
   };
   /* 이용시간: 성수기 — 평일·휴일 모두 17:30 입장까지 1시간 50분, 18:00 입장부터 무제한
@@ -1030,7 +1031,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     if (day === TODAY) restoreState();
     if (day === TODAY) setTimeout(extScan, 0); // 이용 중 손님의 추가 예약 (사장님 10/7)
     if (day === TODAY) setTimeout(unpaidSweep, 500); // 입금대기 예약 자동 취소 (사장님 10/8)
-    bcScan++; // 3아웃 자동 전액 취소: 실패한 예약은 다음 네이버 불러오기 때 다시 (사장님 10/26)
+    bcScan++; // 쓰리아웃 자동 전액 취소: 실패한 예약은 다음 네이버 불러오기 때 다시 (사장님 10/26)
     if (!only) { lastRefresh = now; if (day === TODAY) todayAt = now; }
     renderAll();
     if (loud) toast(only ? `${only} 예약 ${r.bookings.filter((b) => b.time === only).length}건 다시 불러옴` : `네이버 예약 ${r.bookings.length}건 불러옴`);
@@ -1288,7 +1289,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   }
   /* 추가 예약이 10번째 (사장님 10/20): 이용 중인 손님의 뒤 타임 예약을 이용완료하면 마일리지 10 · 20 …번째가 되는지
      → 알림에 '사은권을 드려야 해요 · 손님은 이용 중 — 연락해 전달' · 확인하면 그 예약에 giftDue (전달하면 giftGiven 시각) — [사은권 전달함]까지 열쇠 창 · 카드에 남고 반납 전에 물음 (열쇠판 칸 표시는 10/21 사장님 말씀으로 뺌) */
-  const extGift = (e) => { const x = e.x; if (!x || x.prevDone == null || evFrozen(x)) return 0; const n = doneSoFar(x) + 1 - evSub(x); return giftFor(x, n) ? n : 0; }; // BC 2아웃 · 마일리지 SKIP 은 빼고
+  const extGift = (e) => { const x = e.x; if (!x || x.prevDone == null || evFrozen(x)) return 0; const n = doneSoFar(x) + 1 - evSub(x); return giftFor(x, n) ? n : 0; }; // BC 투아웃 · 마일리지 SKIP 은 빼고
   const extGiftHtml = (e) => { const n = extGift(e); return n ? `<div class="banner giftwarn"><b>이 예약을 이용완료하면 ${n}번째 예약완료 — ${RULES.giftName}을 드려야 해요</b><br>손님은 이용 중 — <b class="num">${fmtPhone(e.x.phone || e.h.phone)}</b> 로 연락해 전달하세요</div>` : ""; };
   /** 이 열쇠 손님이 아직 못 받은 사은권 (본인 · 함께 이용완료한 추가 예약) */
   const giftPend = (h) => (h ? (bookings[TODAY] || []).filter((x) => x.giftDue && !x.giftGiven && (x === h || x.chainHead === h.id)) : []);
@@ -1413,7 +1414,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     const n = (done ? b.visitNo : P.n) - sub, last = (done ? b.visitEnd || b.visitNo : P.n + P.group - 1) - sub;
     let g = 0, sk = 0;
     for (let k = n; k <= last && !g; k++) if (giftFor(b, k)) g = k; else if (isGift(k) && !sk) sk = k;
-    // BC 2아웃 = 마일리지 미적용 · 마일리지 SKIP = 그 회차 사은권을 이미 드림 (사장님 10/26)
+    // BC 투아웃 = 마일리지 미적용 · 마일리지 SKIP = 그 회차 사은권을 이미 드림 (사장님 10/26)
     const gift = g ? ` <span class="gift">${RULES.giftName} 증정</span>` : bcHit(b, 2) ? ` <span class="help bcmile">마일리지 미적용 (BC)</span>` : sk ? ` <span class="help">${sk}번째 사은권 SKIP (이미 드림)</span>` : "";
     const nums = last <= n ? `${n}` : last === n + 1 ? `${n} · ${last}` : `${n} ~ ${last}`;
     return done ? `<b>${nums}번째 예약완료</b>${gift}${sub ? ` <span class="help">(네이버 ${b.visitNo} − 이벤트 ${sub})</span>` : ""}`
@@ -1448,7 +1449,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     return { n: b.prevDone + 1 + ahead, group: h === b ? grp.length : 1, sep };
   }
   /** 이번 입장으로 함께 이용완료되는 예약들 중 사은권 회차가 있는지 (예: 8 → 같은 시간 2건이면 9, 10) — 마일리지 기준(이벤트 기간 이용완료는 뺌) · 이벤트 기간엔 없음 */
-  const giftIn = (h) => { if (!h.visitNo || evFrozen(h)) return 0; const s = evSub(h), a = h.visitNo - s, z = (h.visitEnd || h.visitNo) - s; for (let n = Math.max(1, a); n <= z; n++) if (giftFor(h, n)) return n; return 0; }; // BC 2아웃 · 마일리지 SKIP 은 빼고
+  const giftIn = (h) => { if (!h.visitNo || evFrozen(h)) return 0; const s = evSub(h), a = h.visitNo - s, z = (h.visitEnd || h.visitNo) - s; for (let n = Math.max(1, a); n <= z; n++) if (giftFor(h, n)) return n; return 0; }; // BC 투아웃 · 마일리지 SKIP 은 빼고
   /** 대리예약: 예약자 정보와 함께 방문자 이름 · 전화번호도 (네이버 '방문자' 줄 "박소희(010-2785-4295)") */
   /** 예약 수량: 2장 이상이면 숫자만 노랑 네모 · 빨강 글씨 (열쇠를 여러 개 줘야 함 · 사장님 10/9 빨강 글씨 → 10/16 노랑 네모) */
   const qtyNum = (q) => (q >= 2 ? `<b class="qmany num">${q}</b>` : String(q));
@@ -2106,7 +2107,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     el.classList.toggle("setsheet", sheet.mode === "settings");
     el.classList.toggle("memosheet", sheet.mode === "memo");
     el.classList.toggle("mansheet", sheet.mode === "manual");
-    { const t = sheet.mode === "enter" || sheet.mode === "key" ? noteTarget() : null; el.classList.toggle("bcred", !!t && bcHit(t, 1)); if (!t) sheet.bcAsk = false; } // BC 1아웃 = 고객 카드 테두리 빨강 (사장님 10/26)
+    { const t = sheet.mode === "enter" || sheet.mode === "key" ? noteTarget() : null; el.classList.toggle("bcred", !!t && bcHit(t, 1)); if (!t) sheet.bcAsk = false; } // BC 원아웃 = 고객 카드 테두리 빨강 (사장님 10/26)
     if (sheet.mode === "memo") { el.innerHTML = memoSheetHtml(); return; }
     if (sheet.mode === "manual") { el.innerHTML = manualHtml(); return; }
     if (sheet.mode === "enter") {
@@ -2472,16 +2473,16 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
         }
         const q = String(sheet.bcq || "").trim(), qd = digits(q);
         const hit = (x) => !q || (qd ? (qd.length >= 4 ? x.p4 === qd.slice(-4) : String(x.p4).includes(qd)) : String(x.nm || "").includes(q));
-        const rows = L.filter((x) => x.bc && hit(x)).map((x) => `<div class="it"><span class="dots">${[1, 2, 3].map((k) => `<button class="bcdot ${x.bc >= k ? "on" : ""}" data-act="bcLevel" data-id="${esc(x.id)}" data-n="${k}" aria-pressed="${x.bc >= k}" aria-label="${k}아웃" ${k === 3 && x.bc < 3 ? `disabled title="3아웃은 고객 카드에서 사유를 쓰고 올려요"` : ""}>${k}</button>`).join("")}</span><span><b>${esc(x.nm || "(이름 없음)")}</b> · <span class="num">${p4(x)}</span>${x.r3 ? ` · <span class="bcwhy">${x.bc >= 3 ? "3아웃 사유" : "지난 3아웃 사유"}: ${bcWhyText(x)}</span>` : ""}${x.m ? ` · <span class="help">${esc(x.m)}</span>` : ""}</span><span class="help num">${esc(x.bcAt || "")}</span></div>`).join("");
+        const rows = L.filter((x) => x.bc && hit(x)).map((x) => `<div class="it"><span class="dots">${[1, 2, 3].map((k) => `<button class="bcdot ${x.bc >= k ? "on" : ""}" data-act="bcLevel" data-id="${esc(x.id)}" data-n="${k}" aria-pressed="${x.bc >= k}" aria-label="${OUTN[k]}" ${k === 3 && x.bc < 3 ? `disabled title="쓰리아웃은 고객 카드에서 사유를 쓰고 올려요"` : ""}>${k}</button>`).join("")}</span><span><b>${esc(x.nm || "(이름 없음)")}</b> · <span class="num">${p4(x)}</span>${x.r3 ? ` · <span class="bcwhy">${x.bc >= 3 ? "쓰리아웃 사유" : "지난 쓰리아웃 사유"}: ${bcWhyText(x)}</span>` : ""}${x.m ? ` · <span class="help">${esc(x.m)}</span>` : ""}</span><span class="help num">${esc(x.bcAt || "")}</span></div>`).join("");
         return { html: head + `
           <div class="setcard plain stack"><b>BC(블랙컨슈머) 대응</b>
-            <span class="help">예약자 창 · 열쇠 창 이름 옆 <b>BC ①②③</b>을 눌러 정해요 — 야구 아웃처럼 쌓여요 (2아웃이면 1 · 2아웃 대응 모두 · 같은 단계를 다시 누르면 한 단계 내림) · <b>③은 사유를 쓰고 [확인]해야</b> 3아웃 (아래 목록에서는 내리기만)</span>
-            ${[[1, "고객 카드 테두리 빨강", "예약 카드 · 예약자 창 · 열쇠 창"], [2, "마일리지 미적용", `누계 · ${RULES.giftEvery}회 사은권을 안 띄움 (입장권에도 없음)`], [3, "예약 불가", "네이버는 예약을 못 막아요 → 정해진 네이버 불러오기 때 3아웃 손님 예약(입장 전)이 보이면 앱이 알아서 취소 — 네이버 '예약 취소' 화면에서 ○ 전액환불을 고른 것을 확인한 뒤에만 [예약 취소] (기본 '동의된 환불기준'은 0% 환불 · 되돌릴 수 없음 · 두 번 안 되면 카드에 [다시 취소])"]].map(([k, t, h]) => `<div class="bcrow"><span class="bcdot on">${k}</span><button type="button" class="svswitch ${RULES.bc["o" + k] ? "on" : ""}" role="switch" aria-checked="${!!RULES.bc["o" + k]}" data-act="bcToggle" data-k="${k}" aria-label="${k}아웃 대응"><span class="knob"></span><b>${RULES.bc["o" + k] ? "켜짐" : "꺼짐"}</b></button><span><b>${k}아웃 — ${t}</b> <span class="help">${h}</span></span></div>`).join("")}</div>
-          <div class="setcard plain stack"><b>BC 손님 <span class="help">${L.filter((x) => x.bc === 3).length ? `3아웃 ${L.filter((x) => x.bc === 3).length}명 · ` : ""}모두 ${L.filter((x) => x.bc).length}명 · 3아웃부터</span></b>
+            <span class="help">예약자 창 · 열쇠 창 이름 옆 <b>BC ①②③</b>을 눌러 정해요 — 야구 아웃처럼 쌓여요 (투아웃이면 원아웃 · 투아웃 대응 모두 · 같은 단계를 다시 누르면 한 단계 내림) · <b>③은 사유를 쓰고 [확인]해야</b> 쓰리아웃 (아래 목록에서는 내리기만)</span>
+            ${[[1, "고객 카드 테두리 빨강", "예약 카드 · 예약자 창 · 열쇠 창"], [2, "마일리지 미적용", `누계 · ${RULES.giftEvery}회 사은권을 안 띄움 (입장권에도 없음)`], [3, "예약 불가", "네이버는 예약을 못 막아요 → 정해진 네이버 불러오기 때 쓰리아웃 손님 예약(입장 전)이 보이면 앱이 알아서 취소 — 네이버 '예약 취소' 화면에서 ○ 전액환불을 고른 것을 확인한 뒤에만 [예약 취소] (기본 '동의된 환불기준'은 0% 환불 · 되돌릴 수 없음 · 두 번 안 되면 카드에 [다시 취소])"]].map(([k, t, h]) => `<div class="bcrow"><span class="bcdot on">${k}</span><button type="button" class="svswitch ${RULES.bc["o" + k] ? "on" : ""}" role="switch" aria-checked="${!!RULES.bc["o" + k]}" data-act="bcToggle" data-k="${k}" aria-label="${OUTN[k]} 대응"><span class="knob"></span><b>${RULES.bc["o" + k] ? "켜짐" : "꺼짐"}</b></button><span><b>${OUTN[k]} — ${t}</b> <span class="help">${h}</span></span></div>`).join("")}</div>
+          <div class="setcard plain stack"><b>BC 손님 <span class="help">${L.filter((x) => x.bc === 3).length ? `쓰리아웃 ${L.filter((x) => x.bc === 3).length}명 · ` : ""}모두 ${L.filter((x) => x.bc).length}명 · 쓰리아웃부터</span></b>
             <input id="bc-q" class="cfg" placeholder="이름 · 전화번호(뒷 4자리)로 찾기" autocomplete="off" value="${esc(sheet.bcq || "")}">
             <div class="bclist">${custList ? rows || `<span class="help">${q ? "찾는 손님이 없어요" : "BC 손님이 없어요"}</span>` : `<span class="help">읽는 중…</span>`}</div>
             <span class="help">이름 · 전화 뒷 4자리는 BC · SKIP 손님만 이 PC 에 저장 (전체 번호 · 클라우드 없음)</span></div>
-          <div class="setcard plain stack"><b>3아웃 자동 전액 취소 기록 <span class="help">오늘 · 이 PC</span></b>
+          <div class="setcard plain stack"><b>쓰리아웃 자동 전액 취소 기록 <span class="help">오늘 · 이 PC</span></b>
             <div class="caplog">${bcLog.length ? bcLog.slice(0, 20).map((x) => `<div class="${x.ok ? "" : "bad"}"><span class="num">${esc(String(x.at).slice(11))}</span> ${esc(x.name)} ${x.day && x.day !== TODAY ? `${+x.day.slice(5, 7)}/${+x.day.slice(8)} ` : ""}${esc(x.time)} ${x.qty}장 ${x.ok ? `<b>전액 취소</b>${x.auto ? "" : " (다시 취소)"}` : `실패: ${esc(x.why || "")}`}</div>`).join("") : `<span class="help">없음</span>`}</div></div>` };
       }
       if (tab === "etc") {
@@ -2948,7 +2949,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     const extra = main == null ? [] : ends.filter((e) => e.m !== main);
     const out = main == null ? "시간제한 없음" : krTime(h.slot + main) + (extra.length ? ` (${extra.map((e) => `${e.k}번 ${krTime(h.slot + e.m)}`).join(", ")})` : "");
     const naver = !h.walk, ev = naver ? evOf(h) : null, frozen = naver && evFrozen(h), sub = naver && !frozen ? evSub(h) : 0;
-    const noMile = naver && bcHit(h, 2); // BC 2아웃 = 마일리지 미적용 → 입장권에 누계 · 사은권 줄 없음 (사장님 10/26)
+    const noMile = naver && bcHit(h, 2); // BC 투아웃 = 마일리지 미적용 → 입장권에 누계 · 사은권 줄 없음 (사장님 10/26)
     return {
       // 현장 이용자는 이름을 모름 → 고객명은 빈칸 (줄은 그대로)
       구분: naver ? "네이버" : walkTag(h), 고객: h.walk ? "   " : maskName(h.name), 전화뒤4: digits(h.phone).slice(-4), 열쇠: h.keys.join(", "),
@@ -3046,25 +3047,25 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   /** 이름 색 (블랙컨슈머가 먼저) */
   const nameCls = (b) => { const n = noteOf(b); return !n ? "" : n.bl || Number(n.bc) > 0 ? "nm-bl" : n.k3 ? "nm-k3" : ""; };
   const nameHtml = (b) => { const c = nameCls(b); return c ? `<span class="${c}" title="${c === "nm-bl" ? "BC" : "3자녀"}">${esc(b.name)}</span>` : esc(b.name); };
-  /* BC(블랙컨슈머) 1 · 2 · 3아웃 (사장님 10/26) — 이름 옆 ①②③ (야구 아웃처럼 쌓임: 2아웃 = 1 · 2아웃 대응 모두)
+  /* BC(블랙컨슈머) 원아웃 · 투아웃 · 쓰리아웃 (사장님 10/26) — 이름 옆 ①②③ (야구 아웃처럼 쌓임: 투아웃 = 원아웃 · 투아웃 대응 모두)
      운영 설정 → 고객 세부 관리 → BC 관리 스위치(RULES.bc.o1 ~ o3)를 켠 대응만:
-       1아웃 = 고객 카드 테두리 빨강 · 2아웃 = 마일리지 미적용(누계 · 사은권 없음) · 3아웃 = 예약 불가 (네이버는 못 막으니 네이버를 불러올 때 앱이 알아서 전액환불로 취소)
+       원아웃 = 고객 카드 테두리 빨강 · 투아웃 = 마일리지 미적용(누계 · 사은권 없음) · 쓰리아웃 = 예약 불가 (네이버는 못 막으니 네이버를 불러올 때 앱이 알아서 전액환불로 취소)
      마일리지 SKIP (사장님 10/26): 그 손님의 n번째 예약완료에는 사은권을 안 띄움 (사은권을 미리 드린 손님) */
   const bcOf = (b) => { const n = noteOf(b); return !n ? 0 : Math.max(0, Math.min(3, Number(n.bc) || 0)) || (n.bl ? 1 : 0); };
   const bcHit = (b, k) => !!(RULES.bc && RULES.bc["o" + k]) && bcOf(b) >= k;
   const skipOf = (b) => { const n = noteOf(b); return n && Array.isArray(n.sk) ? n.sk : []; };
-  /** 이 손님에게 n번째 예약완료가 사은권 회차인가 (2아웃 마일리지 미적용 · 마일리지 SKIP 은 빼고) */
+  /** 이 손님에게 n번째 예약완료가 사은권 회차인가 (투아웃 마일리지 미적용 · 마일리지 SKIP 은 빼고) */
   const giftFor = (b, n) => isGift(n) && !bcHit(b, 2) && !skipOf(b).includes(n);
   const bcWhat = (k) => [[1, "카드 테두리 빨강"], [2, "마일리지 미적용"], [3, "예약 불가"]].filter(([i]) => i <= k && RULES.bc["o" + i]).map(([, t]) => t).join(" · ") || "대응 꺼짐 (운영 설정 → 고객 세부 관리)";
-  /** 3아웃 손님 예약 (입장 전): 네이버를 불러올 때 앱이 알아서 전액 취소 (사장님 10/26) · 두 번 실패하면 [다시 취소] */
+  /** 쓰리아웃 손님 예약 (입장 전): 네이버를 불러올 때 앱이 알아서 전액 취소 (사장님 10/26) · 두 번 실패하면 [다시 취소] */
   const bc3Html = (b) => {
     if (!b || !bcHit(b, 3) || b.status !== "확정") return "";
     const t = bcTried.get(b.no) || { n: 0, why: "" };
     const st = b.bcBusy ? "네이버에서 전액 취소하는 중…" : !APP ? "설치한 앱은 네이버를 불러올 때 자동으로 전액 취소" : t.n >= BC_TRIES ? `자동 전액 취소 실패${t.why ? `: ${esc(t.why)}` : ""} — <button class="btn btn-sm" data-act="bcCancel" data-id="${b.id}">다시 취소</button> 또는 네이버에서 직접` : t.n ? `자동 전액 취소 다시 하는 중 (${t.n}번 실패${t.why ? `: ${esc(t.why)}` : ""})` : "네이버를 불러올 때 자동으로 전액 취소";
-    return `<div class="bc3">③ 3아웃 · 예약 불가 — ${st}</div>`;
+    return `<div class="bc3">③ 쓰리아웃 · 예약 불가 — ${st}</div>`;
   };
-  /* 3아웃 자동 전액 취소 (사장님 10/26 — 근무자가 하지 않고 정해진 네이버 불러오기 때 알아서)
-     대상 = 3아웃 대응이 켜졌고 · 입장 전(확정 · 열쇠 없음) · 예약번호가 있는 3아웃 손님 예약 → naver:cancelPaid · 한 예약에 하루 두 번까지 (실패하면 카드에 [다시 취소])
+  /* 쓰리아웃 자동 전액 취소 (사장님 10/26 — 근무자가 하지 않고 정해진 네이버 불러오기 때 알아서)
+     대상 = 쓰리아웃 대응이 켜졌고 · 입장 전(확정 · 열쇠 없음) · 예약번호가 있는 쓰리아웃 손님 예약 → naver:cancelPaid · 한 예약에 하루 두 번까지 (실패하면 카드에 [다시 취소])
      기록 = 이 PC 날마다 'astanakiz-bc3-날짜' (운영 설정 → 고객 세부 관리 → BC 관리 맨 아래) */
   const BC_TRIES = 2;
   const bcTried = new Map(); // 예약번호 → { n: 시도 수, why, scan: 실패한 불러오기 차례 }
@@ -3093,21 +3094,21 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       const arr = bookings[b.day] || [], i = arr.indexOf(b); if (i >= 0) arr.splice(i, 1);
       const ns = (naverSlots[b.day] || {})[b.slot]; if (ns) ns.conf = Math.max(0, ns.conf - b.qty);
       if (sheet.mode === "enter" && sheet.id === b.id) closeSheet();
-      toast(`3아웃 고객 예약 ${auto ? "자동 " : ""}전액 취소: ${b.name} ${b.day === TODAY ? "" : `${+b.day.slice(5, 7)}/${+b.day.slice(8)} `}${hm(b.slot)} ${b.qty}장`, 8000);
+      toast(`쓰리아웃 고객 예약 ${auto ? "자동 " : ""}전액 취소: ${b.name} ${b.day === TODAY ? "" : `${+b.day.slice(5, 7)}/${+b.day.slice(8)} `}${hm(b.slot)} ${b.qty}장`, 8000);
     } else {
       const t = bcTried.get(b.no) || { n: 0, why: "" }; t.n++; t.why = why; t.scan = bcScan; bcTried.set(b.no, t);
-      toast(`3아웃 고객 예약 전액 취소 실패: ${b.name} ${hm(b.slot)} — ${why}${t.n >= BC_TRIES ? " (카드에서 [다시 취소] 또는 네이버에서 직접)" : " (다음에 다시)"}`, 9000);
+      toast(`쓰리아웃 고객 예약 전액 취소 실패: ${b.name} ${hm(b.slot)} — ${why}${t.n >= BC_TRIES ? " (카드에서 [다시 취소] 또는 네이버에서 직접)" : " (다음에 다시)"}`, 9000);
     }
     return ok;
   }
-  /** 처음 보인 3아웃 손님 예약은 알림 한 번 */
+  /** 처음 보인 쓰리아웃 손님 예약은 알림 한 번 */
   const bcSeen = new Set();
   function bcWatch() {
     if (!RULES.bc.o3) return;
     for (const b of (bookings[TODAY] || []).concat(viewDay !== TODAY ? bookings[viewDay] || [] : [])) {
       if (b.status !== "확정" || bcSeen.has(b.id) || !bcHit(b, 3)) continue;
       bcSeen.add(b.id);
-      toast(`③ 3아웃 고객 예약 — ${b.name} ${b.day === TODAY ? "" : `${+b.day.slice(5, 7)}/${+b.day.slice(8)} `}${hm(b.slot)} ${b.qty}장 · ${APP ? "네이버에서 자동 전액 취소해요" : "설치한 앱은 자동 전액 취소"}`, 8000);
+      toast(`③ 쓰리아웃 고객 예약 — ${b.name} ${b.day === TODAY ? "" : `${+b.day.slice(5, 7)}/${+b.day.slice(8)} `}${hm(b.slot)} ${b.qty}장 · ${APP ? "네이버에서 자동 전액 취소해요" : "설치한 앱은 자동 전액 취소"}`, 8000);
     }
     if (APP) setTimeout(bcSweep, 0); // 손님 표시(메모)를 읽은 뒤 · 네이버를 불러올 때마다
   }
@@ -3135,7 +3136,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     const prev = NOTES.get(k) || {};
     const n = Object.assign({ m: "", k3: false, bl: false, bc: 0, at: "" }, prev, patch);
     if (patch.bc != null && Number(patch.bc) !== Number(prev.bc || 0)) n.bcAt = n.bc ? TODAY : ""; // 단계를 바꾼 날 (체험판 · 앱은 본체가 정함)
-    if (patch.bc != null && !Number(patch.bc)) { delete n.r3; delete n.r3At; } // BC 를 다 풀면 3아웃 사유도 지움 (2 · 1아웃으로 내리면 남김)
+    if (patch.bc != null && !Number(patch.bc)) { delete n.r3; delete n.r3At; } // BC 를 다 풀면 쓰리아웃 사유도 지움 (투아웃 · 원아웃으로 내리면 남김)
     NOTES.set(k, n);
     clearTimeout(noteTimers.get(k));
     if (soon) noteSave(k); else noteTimers.set(k, setTimeout(() => noteSave(k), 600));
@@ -3179,12 +3180,12 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   /** 지금 창의 네이버 손님 (예약자 창 · 열쇠 창) */
   const noteTarget = () => (sheet.mode === "enter" ? findB(sheet.id) : sheet.mode === "key" ? holderById(sheet.hid) : null);
   /** 이름 옆 체크 두 개 — [3자녀] [BC](블랙컨슈머) (사장님 10/20) */
-  const noteChecks = (b) => { if (!noteKey(b)) return ""; const n = noteOf(b) || {}, lv = bcOf(b); return `<span class="notechk"><label class="k3"><input type="checkbox" id="note-k3" ${n.k3 ? "checked" : ""}> 3자녀</label><span class="bcset" title="블랙컨슈머 1 · 2 · 3아웃 — 누르면 그 단계 · 같은 단계를 다시 누르면 한 단계 내림">BC ${[1, 2, 3].map((k) => `<button type="button" class="bcdot ${lv >= k ? "on" : ""}" data-act="bcSet" data-n="${k}" aria-pressed="${lv >= k}" aria-label="BC ${k}아웃">${k}</button>`).join("")}</span></span>`; };
+  const noteChecks = (b) => { if (!noteKey(b)) return ""; const n = noteOf(b) || {}, lv = bcOf(b); return `<span class="notechk"><label class="k3"><input type="checkbox" id="note-k3" ${n.k3 ? "checked" : ""}> 3자녀</label><span class="bcset" title="블랙컨슈머 원아웃 · 투아웃 · 쓰리아웃 — 누르면 그 단계 · 같은 단계를 다시 누르면 한 단계 내림">BC ${[1, 2, 3].map((k) => `<button type="button" class="bcdot ${lv >= k ? "on" : ""}" data-act="bcSet" data-n="${k}" aria-pressed="${lv >= k}" aria-label="BC ${OUTN[k]}">${k}</button>`).join("")}</span></span>`; };
   /** 메모 2줄 (스크롤 없이 · 2줄을 넘으면 더 안 써짐) */
   const bcWhyText = (n) => (n && n.r3 ? `${esc(n.r3)} <span class="help">${n.r3At ? `${+n.r3At.slice(5, 7)}/${+n.r3At.slice(8, 10)} ${n.r3At.slice(11, 16)}` : ""}</span>` : "");
-  /** 3아웃 사유 창 (고객 카드에서 ③ 누르는 순간) — 쓰고 [확인]해야 3아웃 */
-  const bcAskHtml = () => (!sheet.bcAsk ? "" : `<div class="bcask" role="dialog" aria-modal="true" aria-labelledby="bc-ask-t"><div><b id="bc-ask-t" class="bcwhy">③ 3아웃 사유</b><span class="help">사유를 남겨야 3아웃이 돼요 — 그때부터 예약 불가 대응 (나중에도 이유를 볼 수 있어요)</span><textarea id="bc-why" maxlength="200" placeholder="예: 직원에게 폭언 · 규칙 위반 반복 …"></textarea><div class="btns" style="justify-content:flex-end"><button class="btn" data-act="bc3No">취소</button><button class="btn btn-ink" data-act="bc3Ok">확인 — 3아웃</button></div></div></div>`);
-  const noteRow = (b) => { if (!noteKey(b)) return ""; const n = noteOf(b) || {}; return `${n.r3 && bcOf(b) >= 1 ? `<dt>${bcOf(b) >= 3 ? "3아웃 사유" : "지난 3아웃 사유"}</dt><dd class="bcwhy">${bcWhyText(n)}</dd>` : ""}<dt>메모</dt><dd class="notecell"><textarea id="note-m" class="notein" rows="2" maxlength="${NOTE_MAX}" spellcheck="false" aria-label="고객 메모" placeholder="고객 메모 (2줄) — 이 PC에 저장 · 다음 방문에도 보여요">${esc(n.m || "")}</textarea><span class="help" id="note-at">${n.at ? `${noteAtText(n.at)} 저장` : ""}</span></dd>`; };
+  /** 쓰리아웃 사유 창 (고객 카드에서 ③ 누르는 순간) — 쓰고 [확인]해야 쓰리아웃 */
+  const bcAskHtml = () => (!sheet.bcAsk ? "" : `<div class="bcask" role="dialog" aria-modal="true" aria-labelledby="bc-ask-t"><div><b id="bc-ask-t" class="bcwhy">③ 쓰리아웃 사유</b><span class="help">사유를 남겨야 쓰리아웃이 돼요 — 그때부터 예약 불가 대응 (나중에도 이유를 볼 수 있어요)</span><textarea id="bc-why" maxlength="200" placeholder="예: 직원에게 폭언 · 규칙 위반 반복 …"></textarea><div class="btns" style="justify-content:flex-end"><button class="btn" data-act="bc3No">취소</button><button class="btn btn-ink" data-act="bc3Ok">확인 — 쓰리아웃</button></div></div></div>`);
+  const noteRow = (b) => { if (!noteKey(b)) return ""; const n = noteOf(b) || {}; return `${n.r3 && bcOf(b) >= 1 ? `<dt>${bcOf(b) >= 3 ? "쓰리아웃 사유" : "지난 쓰리아웃 사유"}</dt><dd class="bcwhy">${bcWhyText(n)}</dd>` : ""}<dt>메모</dt><dd class="notecell"><textarea id="note-m" class="notein" rows="2" maxlength="${NOTE_MAX}" spellcheck="false" aria-label="고객 메모" placeholder="고객 메모 (2줄) — 이 PC에 저장 · 다음 방문에도 보여요">${esc(n.m || "")}</textarea><span class="help" id="note-at">${n.at ? `${noteAtText(n.at)} 저장` : ""}</span></dd>`; };
   /** 2줄 칸에 맞춤: 줄바꿈은 한 번까지 · 칸을 넘는 글자는 뒤에서 뺌 (스크롤 없음) */
   function noteFit(t) {
     const p = t.value.split("\n");
@@ -4521,25 +4522,25 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     // ── 고객 세부 관리 (사장님 10/26) ──
     csub(btn) { sheet.csub = btn.dataset.s === "skip" ? "skip" : "bc"; renderSheet(); },
     /** BC 아웃별 대응 스위치 (켜짐 · 꺼짐) */
-    bcToggle(btn) { const k = "o" + btn.dataset.k; RULES.bc[k] = !RULES.bc[k]; saveBc(); renderAll(); renderSheet(); toast(`BC ${btn.dataset.k}아웃 대응 ${RULES.bc[k] ? "켬" : "끔"}`); },
+    bcToggle(btn) { const k = "o" + btn.dataset.k; RULES.bc[k] = !RULES.bc[k]; saveBc(); renderAll(); renderSheet(); toast(`BC ${OUTN[btn.dataset.k]} 대응 ${RULES.bc[k] ? "켬" : "끔"}`); },
     /** 예약자 창 · 열쇠 창 이름 옆 BC ①②③ — 그 단계로 · 같은 단계를 다시 누르면 한 단계 내림 */
     bcSet(btn) {
       const b = noteTarget(); if (!b) return;
       const k = Number(btn.dataset.n), lv = bcOf(b), nv = lv === k ? k - 1 : k;
-      if (nv === 3 && lv < 3) { sheet.bcAsk = true; renderSheet(); setTimeout(() => { const t = $("bc-why"); if (t) t.focus(); }, 30); return; } // 3아웃은 사유를 쓰고 [확인]해야 (사장님 10/26)
+      if (nv === 3 && lv < 3) { sheet.bcAsk = true; renderSheet(); setTimeout(() => { const t = $("bc-why"); if (t) t.focus(); }, 30); return; } // 쓰리아웃은 사유를 쓰고 [확인]해야 (사장님 10/26)
       noteChange(b, { bc: nv, bl: nv > 0, nm: b.name || "", p4: digits(b.phone || "").slice(-4) }, true);
       renderRes(); renderSheet();
-      toast(nv ? `${b.name}님 BC ${nv}아웃 — ${bcWhat(nv)}` : `${b.name}님 BC 표시를 뺐어요`, 6000);
+      toast(nv ? `${b.name}님 BC ${OUTN[nv]} — ${bcWhat(nv)}` : `${b.name}님 BC 표시를 뺐어요`, 6000);
     },
-    /** 3아웃 사유 창 [확인] → 그때부터 3아웃 대응 · 사유 · 시각을 남김 */
+    /** 쓰리아웃 사유 창 [확인] → 그때부터 쓰리아웃 대응 · 사유 · 시각을 남김 */
     bc3Ok() {
       const b = noteTarget(); if (!b) return;
       const why = String(($("bc-why") || {}).value || "").replace(/\s+/g, " ").trim();
-      if (why.length < 2) { toast("3아웃 사유를 적어 주세요"); const t = $("bc-why"); if (t) t.focus(); return; }
+      if (why.length < 2) { toast("쓰리아웃 사유를 적어 주세요"); const t = $("bc-why"); if (t) t.focus(); return; }
       sheet.bcAsk = false;
       noteChange(b, { bc: 3, bl: true, r3: why.slice(0, 200), r3At: `${TODAY} ${hm(now)}`, nm: b.name || "", p4: digits(b.phone || "").slice(-4) }, true);
       renderRes(); renderSheet();
-      toast(`${b.name}님 BC 3아웃 — ${bcWhat(3)} · 사유를 남겼어요`, 7000);
+      toast(`${b.name}님 BC 쓰리아웃 — ${bcWhat(3)} · 사유를 남겼어요`, 7000);
     },
     bc3No() { sheet.bcAsk = false; renderSheet(); },
     /** 자동 전액 취소가 두 번 안 됐을 때 근무자가 [다시 취소] (확인 한 번 · 결제 금액 환불 · 되돌릴 수 없음) */
@@ -4554,9 +4555,9 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     async bcLevel(btn) {
       const x = (custList || []).find((y) => y.id === btn.dataset.id); if (!x) return;
       const k = Number(btn.dataset.n), nv = x.bc === k ? k - 1 : k;
-      if (nv === 3 && x.bc < 3) { toast("3아웃은 고객 카드(예약자 창 · 열쇠 창)에서 사유를 쓰고 올려요"); return; }
+      if (nv === 3 && x.bc < 3) { toast("쓰리아웃은 고객 카드(예약자 창 · 열쇠 창)에서 사유를 쓰고 올려요"); return; }
       await custPatch(x, { bc: nv });
-      toast(nv ? `${x.nm || "손님"} BC ${nv}아웃 — ${bcWhat(nv)}` : `${x.nm || "손님"} BC 표시를 뺐어요`);
+      toast(nv ? `${x.nm || "손님"} BC ${OUTN[nv]} — ${bcWhat(nv)}` : `${x.nm || "손님"} BC 표시를 뺐어요`);
     },
     /** 마일리지 SKIP 등록: 고객명 · 전화번호 · N번째 → 그 손님의 N번째 예약완료에 사은권을 안 띄움 */
     async skipAdd() {

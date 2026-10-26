@@ -35,7 +35,7 @@ test("고객 메모(체험판): 체크 두 개 → 이름 노랑 · 빨강 · �
     assert.strictEqual(await page.$eval("#sheet .facts .nm-k3", (e) => getComputedStyle(e).color), "rgb(168, 116, 0)");
     assert.match(await page.textContent("#toast"), /3자녀 표시 — 이름이 노랑/);
     assert.ok(await page.$(`.res .name .nm-k3`), "예약 카드 이름도 노랑");
-    // 블랙컨슈머(BC 1아웃) → 빨강 (둘 다면 빨강)
+    // 블랙컨슈머(BC 원아웃) → 빨강 (둘 다면 빨강)
     await page.click('#sheet [data-act=bcSet][data-n="1"]');
     assert.ok(await page.$("#sheet .facts .nm-bl"));
     assert.strictEqual(await page.$("#sheet .facts .nm-k3"), null, "둘 다면 빨강");
@@ -126,7 +126,7 @@ test("고객 메모(앱): 앱 본체에 손님 메모를 한 번에 물음 · �
     assert.match(await page.textContent("#note-at"), /10\/12 저장/);
     // 3자녀가정 체크 → 바로 저장
     await page.check("#note-k3");
-    assert.deepStrictEqual((await nt()).set, [{ key: "01031346005", m: "지난번 열쇠 늦게 반납", k3: true, bc: 1, bl: true, nm: "", p4: "", sk: [] }], "예전 BC 체크 = 1아웃");
+    assert.deepStrictEqual((await nt()).set, [{ key: "01031346005", m: "지난번 열쇠 늦게 반납", k3: true, bc: 1, bl: true, nm: "", p4: "", sk: [] }], "예전 BC 체크 = 원아웃");
     // 메모 쓰기 → 쓰는 동안은 안 보내고 0.6초 뒤 한 번
     await page.click("#note-m");
     await page.keyboard.press("End");
