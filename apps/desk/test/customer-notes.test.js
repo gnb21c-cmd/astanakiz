@@ -42,7 +42,7 @@ test("쓰기 · 지우기 · 저장 · 다시 읽기 (해시만) · 깨지면 ba
   assert.deepStrictEqual(N.load(dir), { v: 1, notes: {} });
 });
 
-test("BC 원아웃 · 투아웃 · 쓰리아웃 · 마일리지 SKIP (사장님 10/26): 단계 0 ~ 3 · 예전 bl = 원아웃 · BC · SKIP 손님만 이름 · 뒷 4자리 (전체 번호 없음) · 목록 쓰리아웃부터 · 목록에서 바꾸기 · 다 풀면 지움", () => {
+test("BC 원아웃 · 투아웃 · 쓰리아웃 · 마일리지 SKIP (사장님 10/26): 단계 0 ~ 3 · 예전 bl = 원아웃 · BC · SKIP 손님만 이름 · 뒷 4자리 (전체 번호 없음) · 목록 쓰리아웃부터 · 같은 단계는 가나다 순 · 목록에서 바꾸기 · 다 풀면 지움", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cn-"));
   const d = N.load(dir);
   const a = hashKey("salt", "01011112222"), b = hashKey("salt", "01033334444"), c = hashKey("salt", "01055556666");
@@ -54,6 +54,11 @@ test("BC 원아웃 · 투아웃 · 쓰리아웃 · 마일리지 SKIP (사장님 
   assert.deepStrictEqual(N.get(d, a), { m: "", k3: false, bc: 3, bl: true, at: "2026-10-26 10:00", nm: "가나다", p4: "2222", bcAt: "2026-10-26" }, "뒷 4자리만");
   assert.deepStrictEqual(N.get(d, c).sk, [10, 20], "SKIP 회차: 겹침 · 0 은 빼고 작은 순");
   assert.deepStrictEqual(N.list(d).map((x) => [x.nm, x.bc, x.sk]), [["가나다", 3, []], ["라마바", 1, []], ["사아자", 0, [10, 20]]], "쓰리아웃부터 · 그다음 SKIP 만 있는 손님");
+  // 같은 단계 안에서는 이름 가나다 순 (사장님 10/26) — 나중에 표시한 '타파하'도 '라마바' 뒤
+  const e = hashKey("salt", "01077778888");
+  N.set(d, e, { m: "", bc: 1, nm: "타파하", p4: "8888" }, "2026-10-28 09:00");
+  assert.deepStrictEqual(N.list(d).map((x) => x.nm), ["가나다", "라마바", "타파하", "사아자"]);
+  assert.strictEqual(N.set(d, e, { m: "", bc: 0 }, "2026-10-28 09:01"), null);
   // 메모 · 3자녀만 있는 손님은 이름 · 번호를 안 둠
   N.set(d, b, { m: "메모", k3: true, bc: 0 }, "2026-10-26 13:00");
   assert.deepStrictEqual(Object.keys(N.get(d, b)).sort(), ["at", "bc", "bl", "k3", "m"], "BC 를 풀면 이름 · 번호도 지움");

@@ -408,6 +408,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .bclist .it { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
 .bclist .dots { display: inline-flex; gap: 3px; }
 .bcdot:disabled { opacity: .35; cursor: not-allowed; }
+.bclist .it.bc4 { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+.bcdot.bcone { cursor: default; }
+.bcfind { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.bcfind .dots { display: inline-flex; gap: 4px; margin-left: 6px; }
+.bcfind .bcdot { width: 28px; height: 28px; font-size: 14px; }
+.bcfind .help { margin-left: 4px; }
 .bcwhy { color: var(--red); font-weight: 700; overflow-wrap: anywhere; }
 /* 쓰리아웃 사유 창 (고객 카드에서 ③ 누르는 순간 · 사장님 10/26) */
 .bcask { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(0, 0, 0, .5); }
@@ -794,6 +800,29 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   const SLOTS = []; for (let h = 10; h <= 19; h++) SLOTS.push(h * 60, h * 60 + 30);
   // 설치한 앱 안에서 열리면 실제 네이버·아마노·POS 와 연결 (window.desk), 아니면 체험판(예시 자료 · 가짜 시계)
   const APP = !!(window.desk && window.desk.naver);
+  /* 글 칸 커서 되살리기 (사장님 10/26: 메모 칸을 눌러도 커서가 어쩌다 생기고 어쩌다 안 생겨 글이 안 써짐)
+     설치한 앱(Electron · Windows)은 확인 창(confirm)을 닫은 뒤나 숨은 창(네이버 · 아마노 · 톡톡)이 잠깐 앞에 왔다 간 뒤
+     창은 앞인데 키보드 포커스가 없어 글 칸에 커서가 안 생기는 일이 있음 →
+     ① 글 칸을 누른 뒤 커서가 그 칸에 없거나 창에 포커스가 없으면 앱 본체에 창 포커스를 다시 달라고 하고(desk:refocus) 그 칸에 커서
+     ② 확인 창 · 알림 창을 닫은 뒤에도 다시 달라고 하고 쓰던 칸에 커서 그대로 */
+  const typable = (el) => !!el && !el.disabled && !el.readOnly && (el.tagName === "TEXTAREA" || (el.tagName === "INPUT" && !/^(button|checkbox|radio|submit|reset|file|range|color|image|hidden)$/i.test(el.type)));
+  if (window.desk && window.desk.refocus) {
+    const refocus = (el) => Promise.resolve(window.desk.refocus()).catch(() => null).then(() => { if (el && el.isConnected && document.activeElement !== el) el.focus(); });
+    document.addEventListener("pointerup", (e) => {
+      const t = e.target && e.target.closest && e.target.closest("input, textarea");
+      if (!typable(t)) return;
+      setTimeout(() => {
+        if (!t.isConnected) return; // 다시 그려졌으면 renderSheet 가 같은 칸에 커서를 둠
+        if (document.activeElement === t && document.hasFocus()) return;
+        t.focus();
+        refocus(t);
+      }, 0);
+    }, true);
+    for (const k of ["confirm", "alert"]) {
+      const native = window[k].bind(window);
+      window[k] = (...a) => { const el = document.activeElement, r = native(...a); refocus(typable(el) ? el : null); return r; };
+    }
+  }
   const _d0 = new Date();
   // 체험판 오늘 = 2026-10-05 (시험은 window.__today 로 다른 날 — 이벤트 전 · 기간 · 끝난 뒤를 하루씩 · 사장님 10/19 시나리오)
   const TODAY = APP ? `${_d0.getFullYear()}-${String(_d0.getMonth() + 1).padStart(2, "0")}-${String(_d0.getDate()).padStart(2, "0")}` : /^\d{4}-\d{2}-\d{2}$/.test(window.__today || "") ? window.__today : "2026-10-05";
@@ -2473,14 +2502,19 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
         }
         const q = String(sheet.bcq || "").trim(), qd = digits(q);
         const hit = (x) => !q || (qd ? (qd.length >= 4 ? x.p4 === qd.slice(-4) : String(x.p4).includes(qd)) : String(x.nm || "").includes(q));
-        const rows = L.filter((x) => x.bc && hit(x)).map((x) => `<div class="it"><span class="dots">${[1, 2, 3].map((k) => `<button class="bcdot ${x.bc >= k ? "on" : ""}" data-act="bcLevel" data-id="${esc(x.id)}" data-n="${k}" aria-pressed="${x.bc >= k}" aria-label="${OUTN[k]}" ${k === 3 && x.bc < 3 ? `disabled title="쓰리아웃은 고객 카드에서 사유를 쓰고 올려요"` : ""}>${k}</button>`).join("")}</span><span><b>${esc(x.nm || "(이름 없음)")}</b> · <span class="num">${p4(x)}</span>${x.r3 ? ` · <span class="bcwhy">${x.bc >= 3 ? "쓰리아웃 사유" : "지난 쓰리아웃 사유"}: ${bcWhyText(x)}</span>` : ""}${x.m ? ` · <span class="help">${esc(x.m)}</span>` : ""}</span><span class="help num">${esc(x.bcAt || "")}</span></div>`).join("");
+        // 스위치 밑 ①②③ 로 거르기 (사장님 10/26) — 여러 개 고를 수 있고 아무것도 안 고르면 모두 · 고른 단계 안에서 이름 · 뒷 4자리로 찾기
+        const bcf = Array.isArray(sheet.bcf) ? sheet.bcf : [], inF = (x) => !bcf.length || bcf.includes(x.bc);
+        const nOf = (k) => L.filter((x) => x.bc === k).length, fName = bcf.map((k) => OUTN[k]).join(" · ");
+        // 줄마다 자기 단계 숫자 하나만 (② 가나다 · 010-****-2222) — 셋을 다 두고 칠한 것만 다르면 헷갈림 (사장님 10/26) · 목록에서는 [내리기]만
+        const rows = L.filter((x) => x.bc && inF(x) && hit(x)).map((x) => `<div class="it bc4"><span class="bcdot on bcone" role="img" aria-label="${OUTN[x.bc]}">${x.bc}</span><span><b>${esc(x.nm || "(이름 없음)")}</b> · <span class="num">${p4(x)}</span>${x.r3 ? ` · <span class="bcwhy">${x.bc >= 3 ? "쓰리아웃 사유" : "지난 쓰리아웃 사유"}: ${bcWhyText(x)}</span>` : ""}${x.m ? ` · <span class="help">${esc(x.m)}</span>` : ""}</span><span class="help num">${esc(x.bcAt || "")}</span><button type="button" class="btn btn-sm" data-act="bcDown" data-id="${esc(x.id)}" title="${x.bc > 1 ? `${OUTN[x.bc - 1]}으로 내리기` : "BC 표시 빼기"}">${x.bc > 1 ? "내리기" : "BC 풀기"}</button></div>`).join("");
         return { html: head + `
           <div class="setcard plain stack"><b>BC(블랙컨슈머) 대응</b>
             <span class="help">예약자 창 · 열쇠 창 이름 옆 <b>BC ①②③</b>을 눌러 정해요 — 야구 아웃처럼 쌓여요 (투아웃이면 원아웃 · 투아웃 대응 모두 · 같은 단계를 다시 누르면 한 단계 내림) · <b>③은 사유를 쓰고 [확인]해야</b> 쓰리아웃 (아래 목록에서는 내리기만)</span>
             ${[[1, "고객 카드 테두리 빨강", "예약 카드 · 예약자 창 · 열쇠 창"], [2, "마일리지 미적용", `누계 · ${RULES.giftEvery}회 사은권을 안 띄움 (입장권에도 없음)`], [3, "예약 불가", "네이버는 예약을 못 막아요 → 정해진 네이버 불러오기 때 쓰리아웃 손님 예약(입장 전)이 보이면 앱이 알아서 취소 — 네이버 '예약 취소' 화면에서 ○ 전액환불을 고른 것을 확인한 뒤에만 [예약 취소] (기본 '동의된 환불기준'은 0% 환불 · 되돌릴 수 없음 · 두 번 안 되면 카드에 [다시 취소])"]].map(([k, t, h]) => `<div class="bcrow"><span class="bcdot on">${k}</span><button type="button" class="svswitch ${RULES.bc["o" + k] ? "on" : ""}" role="switch" aria-checked="${!!RULES.bc["o" + k]}" data-act="bcToggle" data-k="${k}" aria-label="${OUTN[k]} 대응"><span class="knob"></span><b>${RULES.bc["o" + k] ? "켜짐" : "꺼짐"}</b></button><span><b>${OUTN[k]} — ${t}</b> <span class="help">${h}</span></span></div>`).join("")}</div>
-          <div class="setcard plain stack"><b>BC 손님 <span class="help">${L.filter((x) => x.bc === 3).length ? `쓰리아웃 ${L.filter((x) => x.bc === 3).length}명 · ` : ""}모두 ${L.filter((x) => x.bc).length}명 · 쓰리아웃부터</span></b>
-            <input id="bc-q" class="cfg" placeholder="이름 · 전화번호(뒷 4자리)로 찾기" autocomplete="off" value="${esc(sheet.bcq || "")}">
-            <div class="bclist">${custList ? rows || `<span class="help">${q ? "찾는 손님이 없어요" : "BC 손님이 없어요"}</span>` : `<span class="help">읽는 중…</span>`}</div>
+          <div class="setcard plain stack"><div class="bcfind"><b>BC 손님</b><span class="dots" role="group" aria-label="아웃 단계로 거르기">${[1, 2, 3].map((k) => `<button type="button" class="bcdot ${bcf.includes(k) ? "on" : ""}" role="checkbox" aria-checked="${bcf.includes(k)}" data-act="bcFilter" data-n="${k}" aria-label="${OUTN[k]} 고객만">${k}</button>`).join("")}</span><b>아웃 고객 검색</b>
+              <span class="help">${bcf.length ? `${bcf.map((k) => `${OUTN[k]} ${nOf(k)}명`).join(" · ")} · 모두 ${L.filter((x) => x.bc).length}명` : `동그라미를 누르면 그 단계만 · 모두 ${L.filter((x) => x.bc).length}명 · 쓰리아웃부터`}</span></div>
+            <input id="bc-q" class="cfg" placeholder="${bcf.length ? `${fName} 고객 중에서 ` : ""}이름 · 전화번호(뒷 4자리)로 찾기" autocomplete="off" value="${esc(sheet.bcq || "")}">
+            <div class="bclist">${custList ? rows || `<span class="help">${q ? "찾는 손님이 없어요" : bcf.length ? `${fName} 고객이 없어요` : "BC 손님이 없어요"}</span>` : `<span class="help">읽는 중…</span>`}</div>
             <span class="help">이름 · 전화 뒷 4자리는 BC · SKIP 손님만 이 PC 에 저장 (전체 번호 · 클라우드 없음)</span></div>
           <div class="setcard plain stack"><b>쓰리아웃 자동 전액 취소 기록 <span class="help">오늘 · 이 PC</span></b>
             <div class="caplog">${bcLog.length ? bcLog.slice(0, 20).map((x) => `<div class="${x.ok ? "" : "bad"}"><span class="num">${esc(String(x.at).slice(11))}</span> ${esc(x.name)} ${x.day && x.day !== TODAY ? `${+x.day.slice(5, 7)}/${+x.day.slice(8)} ` : ""}${esc(x.time)} ${x.qty}장 ${x.ok ? `<b>전액 취소</b>${x.auto ? "" : " (다시 취소)"}` : `실패: ${esc(x.why || "")}`}</div>`).join("") : `<span class="help">없음</span>`}</div></div>` };
@@ -3144,12 +3178,14 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   /** 고객 세부 관리 목록 (BC · 마일리지 SKIP) 읽기 — 앱: 본체 customer-notes · 체험판: 이 브라우저 */
   function custLoad() {
     if (custLoading) return;
+    // 쓰리아웃 → 투아웃 → 원아웃 → SKIP 만, 같은 단계는 이름 가나다 순 (이름 없는 손님은 맨 뒤 · 사장님 10/26)
+    const order = (a, b) => b.bc - a.bc || !a.nm - !b.nm || String(a.nm).localeCompare(String(b.nm), "ko");
     if (!NOTE_APP()) {
-      custList = [...NOTES].filter(([, n]) => n && ((Number(n.bc) || (n.bl ? 1 : 0)) > 0 || (n.sk && n.sk.length))).map(([id, n]) => ({ id, bc: Math.max(0, Math.min(3, Number(n.bc) || 0)) || (n.bl ? 1 : 0), sk: n.sk || [], nm: n.nm || "", p4: n.p4 || "", m: n.m || "", bcAt: n.bcAt || "", r3: n.r3 || "", r3At: n.r3At || "", at: n.at || "" })).sort((a, b) => b.bc - a.bc || String(b.bcAt || b.at).localeCompare(String(a.bcAt || a.at)));
+      custList = [...NOTES].filter(([, n]) => n && ((Number(n.bc) || (n.bl ? 1 : 0)) > 0 || (n.sk && n.sk.length))).map(([id, n]) => ({ id, bc: Math.max(0, Math.min(3, Number(n.bc) || 0)) || (n.bl ? 1 : 0), sk: n.sk || [], nm: n.nm || "", p4: n.p4 || "", m: n.m || "", bcAt: n.bcAt || "", r3: n.r3 || "", r3At: n.r3At || "", at: n.at || "" })).sort(order);
       return;
     }
     custLoading = true;
-    window.desk.notes.list().then((r) => { custLoading = false; custList = r && r.ok ? r.list : []; if (sheet.mode === "settings") renderSheet(); }, () => { custLoading = false; custList = []; });
+    window.desk.notes.list().then((r) => { custLoading = false; custList = r && r.ok && Array.isArray(r.list) ? r.list.slice().sort(order) : []; if (sheet.mode === "settings") renderSheet(); }, () => { custLoading = false; custList = []; });
   }
   /** 목록에서 바꾸기 (BC 단계 · SKIP 지우기) — 앱은 해시 id 로 · 바꾼 뒤 손님 메모를 다시 물음 */
   async function custPatch(x, patch) {
@@ -4521,6 +4557,8 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     psub(btn) { sheet.psub = btn.dataset.s === "event" ? "event" : "ticket"; renderSheet(); },
     // ── 고객 세부 관리 (사장님 10/26) ──
     csub(btn) { sheet.csub = btn.dataset.s === "skip" ? "skip" : "bc"; renderSheet(); },
+    /** BC 손님 목록 거르기 ①②③ — 누르면 켬 · 다시 누르면 끔 (여러 개 · 아무것도 안 고르면 모두) */
+    bcFilter(btn) { const k = Number(btn.dataset.n), f = (sheet.bcf || []).filter((v) => v !== k); if (f.length === (sheet.bcf || []).length) f.push(k); sheet.bcf = f.sort(); renderSheet(); },
     /** BC 아웃별 대응 스위치 (켜짐 · 꺼짐) */
     bcToggle(btn) { const k = "o" + btn.dataset.k; RULES.bc[k] = !RULES.bc[k]; saveBc(); renderAll(); renderSheet(); toast(`BC ${OUTN[btn.dataset.k]} 대응 ${RULES.bc[k] ? "켬" : "끔"}`); },
     /** 예약자 창 · 열쇠 창 이름 옆 BC ①②③ — 그 단계로 · 같은 단계를 다시 누르면 한 단계 내림 */
@@ -4551,11 +4589,11 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       await bcCancelOne(b, false);
       renderAll(); if (sheet.mode) renderSheet();
     },
-    /** 목록에서 BC 단계 바꾸기 */
-    async bcLevel(btn) {
-      const x = (custList || []).find((y) => y.id === btn.dataset.id); if (!x) return;
-      const k = Number(btn.dataset.n), nv = x.bc === k ? k - 1 : k;
-      if (nv === 3 && x.bc < 3) { toast("쓰리아웃은 고객 카드(예약자 창 · 열쇠 창)에서 사유를 쓰고 올려요"); return; }
+    /** 목록에서 한 단계 내리기 (원아웃이면 BC 풀기) — 확인 한 번 · 올리기는 고객 카드에서만 (사장님 10/26) */
+    async bcDown(btn) {
+      const x = (custList || []).find((y) => y.id === btn.dataset.id); if (!x || !x.bc) return;
+      const nv = x.bc - 1, who = `${x.nm || "손님"}님`;
+      if (!confirm(nv ? `${who}을 ${OUTN[x.bc]}에서 ${OUTN[nv]}으로 내릴까요?` : `${who} BC 표시를 뺄까요? (원아웃 대응이 없어져요)`)) return;
       await custPatch(x, { bc: nv });
       toast(nv ? `${x.nm || "손님"} BC ${OUTN[nv]} — ${bcWhat(nv)}` : `${x.nm || "손님"} BC 표시를 뺐어요`);
     },

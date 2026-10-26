@@ -68,10 +68,10 @@ function set(d, key, note, at) {
   return n;
 }
 const get = (d, key) => view(d.notes[key]);
-/** BC · 마일리지 SKIP 손님 목록 (BC 쓰리아웃 → 원아웃 · 최근 표시한 순, 그다음 SKIP 만 있는 손님) — id = 해시 */
+/** BC · 마일리지 SKIP 손님 목록 (BC 쓰리아웃 → 원아웃, 그다음 SKIP 만 있는 손님 · 같은 단계는 이름 가나다 순 · 이름 없으면 뒤 · 사장님 10/26) — id = 해시 */
 function list(d) {
   return Object.entries(d.notes).filter(([, n]) => bcOf(n) > 0 || cleanSkip(n.sk).length).map(([id, n]) => ({ id, bc: bcOf(n), sk: cleanSkip(n.sk), nm: n.nm || "", p4: n.p4 || "", m: n.m || "", bcAt: n.bcAt || "", r3: n.r3 || "", r3At: n.r3At || "", at: n.at || "" }))
-    .sort((a, b) => b.bc - a.bc || String(b.bcAt || b.at).localeCompare(String(a.bcAt || a.at)));
+    .sort((a, b) => b.bc - a.bc || !a.nm - !b.nm || a.nm.localeCompare(b.nm, "ko"));
 }
 /** 목록에서 바꿈 (해시 id) — patch = { bc?, sk? } → 남은 것 */
 function patch(d, id, p, at) {

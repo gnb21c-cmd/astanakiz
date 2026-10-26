@@ -139,7 +139,7 @@ test("BC (앱): 쓰리아웃 손님 예약은 네이버를 불러올 때 알아�
         notes: {
           get: async (j) => { const notes = {}; for (const k of j.keys) if (store[k]) notes[k] = store[k]; return { ok: true, notes }; },
           set: async () => ({ ok: true, note: null }),
-          list: async () => ({ ok: true, list: [{ id: "a1b2c3d4e5f60718", bc: store["01099990001"].bc, sk: [], nm: "자동취소손님", p4: "0001", m: "", bcAt: "2026-10-20", r3: "환불 요구하며 소란", r3At: "2026-10-20 10:00", at: "" }, { id: "0000aaaa1111bbbb", bc: 1, sk: [], nm: "일아웃", p4: "0002", m: "", bcAt: "2026-10-21", at: "" }] }),
+          list: async () => ({ ok: true, list: [{ id: "a1b2c3d4e5f60718", bc: store["01099990001"].bc, sk: [], nm: "자동취소손님", p4: "0001", m: "", bcAt: "2026-10-20", r3: "환불 요구하며 소란", r3At: "2026-10-20 10:00", at: "" }, { id: "0000aaaa1111bbbb", bc: 1, sk: [], nm: "테두리손님", p4: "0002", m: "", bcAt: "2026-10-21", at: "" }, { id: "0000cccc2222dddd", bc: 2, sk: [], nm: "마일손님", p4: "0003", m: "", bcAt: "2026-10-22", at: "" }, { id: "0000eeee3333ffff", bc: 1, sk: [], nm: "가람손님", p4: "0004", m: "", bcAt: "2026-10-19", at: "" }] }),
           patch: async (j) => { window.__nt.patch.push(j); if (j.bc != null) store["01099990001"].bc = j.bc; return { ok: true, note: null }; },
         },
       };
@@ -173,15 +173,41 @@ test("BC (앱): 쓰리아웃 손님 예약은 네이버를 불러올 때 알아�
     assert.match(await page.textContent("#sheet"), /쓰리아웃 자동 전액 취소 기록[\s\S]*실패손님 12:00 2장 전액 취소 \(다시 취소\)[\s\S]*실패: 확인 창을 못 찾음[\s\S]*자동취소손님 12:00 2장 전액 취소/);
     await page.waitForFunction(() => /자동취소손님/.test(document.querySelector("#sheet .bclist").textContent));
     assert.match(await page.textContent("#sheet .bclist"), /쓰리아웃 사유: 환불 요구하며 소란 10\/20 10:00/, "목록에 쓰리아웃 사유 · 때");
-    assert.ok(await page.isDisabled('#sheet .bclist [data-act=bcLevel][data-id="0000aaaa1111bbbb"][data-n="3"]'), "목록에서는 쓰리아웃으로 못 올림 (고객 카드에서 사유와 함께)");
+    // 줄마다 자기 단계 숫자 하나만 (사장님 10/26: 셋 다 있고 칠해진 것만 다르면 헷갈림) · 목록에서는 올리지 못하고 [내리기]만
+    assert.deepStrictEqual(await page.$$eval("#sheet .bclist .it", (r) => r.map((x) => [...x.querySelectorAll(".bcdot")].map((d) => d.textContent).join("") + " " + x.querySelector("b").textContent)), ["3 자동취소손님", "2 마일손님", "1 가람손님", "1 테두리손님"], "② 마일손님 처럼 · 쓰리아웃부터 · 같은 단계는 가나다 순 (먼저 표시한 순이 아님)");
+    assert.deepStrictEqual(await page.$$eval("#sheet .bclist [data-act=bcDown]", (e) => e.map((x) => x.textContent)), ["내리기", "내리기", "BC 풀기", "BC 풀기"]);
     await page.fill("#bc-q", "0001");
     assert.match(await page.textContent("#sheet .bclist"), /자동취소손님/);
     await page.fill("#bc-q", "없는사람");
     assert.match(await page.textContent("#sheet .bclist"), /찾는 손님이 없어요/);
     await page.fill("#bc-q", "");
-    await page.click('#sheet .bclist [data-act=bcLevel][data-id="a1b2c3d4e5f60718"][data-n="3"]');
+    // 스위치 밑 ①②③ 거르기 + '아웃 고객 검색' (사장님 10/26): ①을 누르면 원아웃 고객만 · 그 안에서 찾기 · 여러 개 · 다 풀면 모두
+    const names = async () => (await page.$$eval("#sheet .bclist .it b", (e) => e.map((x) => x.textContent))).join(",");
+    assert.strictEqual(await names(), "자동취소손님,마일손님,가람손님,테두리손님", "고르지 않으면 모두 · 쓰리아웃부터 · 가나다 순");
+    assert.match(await page.textContent("#sheet .bcfind"), /BC 손님\s*1\s*2\s*3\s*아웃 고객 검색/, "동그라미 바로 옆에 '아웃 고객 검색'");
+    await page.click('#sheet .bcfind [data-act=bcFilter][data-n="1"]');
+    assert.strictEqual(await names(), "가람손님,테두리손님", "원아웃만 · 가나다 순");
+    assert.strictEqual(await page.getAttribute('#sheet .bcfind [data-n="1"]', "aria-checked"), "true");
+    assert.match(await page.textContent("#sheet .bcfind"), /아웃 고객 검색\s*원아웃 2명/);
+    assert.match(await page.getAttribute("#bc-q", "placeholder"), /^원아웃 고객 중에서/);
+    await page.fill("#bc-q", "0001");
+    assert.match(await page.textContent("#sheet .bclist"), /찾는 손님이 없어요/, "쓰리아웃 손님은 원아웃 안에서 안 찾아짐");
+    await page.fill("#bc-q", "테두리");
+    assert.strictEqual(await names(), "테두리손님");
+    await page.fill("#bc-q", "");
+    await page.click('#sheet .bcfind [data-act=bcFilter][data-n="3"]');
+    assert.strictEqual(await names(), "자동취소손님,가람손님,테두리손님", "원아웃 + 쓰리아웃");
+    await page.click('#sheet .bcfind [data-act=bcFilter][data-n="1"]');
+    await page.click('#sheet .bcfind [data-act=bcFilter][data-n="3"]');
+    assert.strictEqual(await page.$$eval("#sheet .bcfind .bcdot.on", (e) => e.length), 0);
+    assert.strictEqual(await names(), "자동취소손님,마일손님,가람손님,테두리손님", "다 풀면 모두");
+    page.__accept = false;
+    await page.click('#sheet .bclist [data-act=bcDown][data-id="a1b2c3d4e5f60718"]');
+    assert.deepStrictEqual(await page.evaluate(() => window.__nt.patch), [], "확인 창에서 [취소]면 그대로");
+    page.__accept = true;
+    await page.click('#sheet .bclist [data-act=bcDown][data-id="a1b2c3d4e5f60718"]');
     await page.waitForFunction(() => window.__nt.patch.length === 1);
-    assert.deepStrictEqual(await page.evaluate(() => window.__nt.patch), [{ id: "a1b2c3d4e5f60718", bc: 2 }], "쓰리아웃을 다시 누르면 투아웃");
+    assert.deepStrictEqual(await page.evaluate(() => window.__nt.patch), [{ id: "a1b2c3d4e5f60718", bc: 2 }], "쓰리아웃 [내리기] → 투아웃");
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();

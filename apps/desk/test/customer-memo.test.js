@@ -149,3 +149,52 @@ test("고객 메모(앱): 앱 본체에 손님 메모를 한 번에 물음 · �
     await browser.close();
   }
 });
+
+test("글 칸 커서 되살리기 (사장님 10/26 · 메모 칸을 눌러도 커서가 어쩌다 안 생김): 창에 키보드 포커스가 없거나 칸에 커서가 안 가면 앱 본체에 다시 달라고 하고 그 칸에 커서 · 확인 창(confirm) 뒤에도", async () => {
+  const browser = await launch();
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+    const page = await ctx.newPage();
+    await page.clock.install({ time: new Date("2026-10-20T11:50:00") });
+    await page.addInitScript(() => {
+      window.__rf = 0;
+      const BK = (no, time, name, phone, done) => ({ no, time, name, phone, qty: 1, qtyText: "1시간 50분 1", product: "1시간 50분", status: "확정", pay: "결제완료", doneCount: done, cancelCount: 0 });
+      window.desk = {
+        refocus: async () => { window.__rf++; return { ok: true }; },
+        naver: { load: async (day) => ({ ok: true, day, slots: day === "2026-10-20" ? [{ time: "12:00", product: "1시간 50분", cap: 10, conf: 1, done: 0 }] : [], bookings: day === "2026-10-20" ? [BK("N1", "12:00", "메모손님", "010-3134-6005", 2)] : [] }), complete: async () => ({ ok: true }) },
+        state: { load: () => null, save: () => {} },
+        config: { get: async () => ({ build: "2.7" }), set: async () => ({ ok: true }) },
+        notes: { get: async () => ({ ok: true, notes: {} }), set: async (j) => ({ ok: true, note: j.m ? { m: j.m, at: "2026-10-20 11:50" } : null }) },
+      };
+    });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    page.on("dialog", (d) => d.accept());
+    await page.goto(DESK);
+    await page.waitForFunction(() => /불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 15000 });
+    await page.click('.slot[data-s="720"]');
+    await page.click('.res:has-text("메모손님")');
+    const active = () => page.evaluate(() => (document.activeElement || {}).id || "");
+    // 1) 보통: 누르면 바로 커서 · 앱 본체는 안 부름
+    await page.click("#note-m");
+    assert.strictEqual(await active(), "note-m");
+    assert.strictEqual(await page.evaluate(() => window.__rf), 0, "잘 되면 부르지 않음");
+    // 2) 칸을 눌렀는데 커서가 안 감 (창에 키보드 포커스가 없을 때처럼) → 그 칸에 커서 + 앱 본체에 창 포커스를 다시 달라고 함
+    await page.evaluate(() => { document.activeElement.blur(); document.hasFocus = () => false; });
+    await page.dispatchEvent("#note-m", "pointerup");
+    await page.waitForFunction(() => window.__rf >= 1 && document.activeElement && document.activeElement.id === "note-m");
+    await page.evaluate(() => { delete document.hasFocus; });
+    await page.keyboard.type("열쇠 늦게");
+    assert.strictEqual(await page.inputValue("#note-m"), "열쇠 늦게", "커서가 생겨 글이 써짐");
+    // 3) 확인 창(confirm)을 닫은 뒤에도 → 다시 달라고 하고 쓰던 칸에 커서 그대로
+    const before = await page.evaluate(() => window.__rf);
+    assert.strictEqual(await page.evaluate(() => confirm("시험 확인 창")), true);
+    await page.waitForFunction((n) => window.__rf > n, before);
+    assert.strictEqual(await active(), "note-m");
+    await page.keyboard.type(" 반납");
+    assert.strictEqual(await page.inputValue("#note-m"), "열쇠 늦게 반납");
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});

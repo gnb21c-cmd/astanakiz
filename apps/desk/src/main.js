@@ -161,6 +161,9 @@ function createDesk() {
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true },
   });
   deskWin.setMenuBarVisibility(false);
+  // 창이 앞으로 올 때마다 화면(웹 페이지)에도 키보드 포커스를 줌 (사장님 10/26: 메모 칸을 눌러도 커서가 어쩌다 안 생김)
+  //   Windows 에서 숨은 창(네이버 · 아마노 · 톡톡)이 잠깐 앞에 왔다 가거나 deskWin.focus() 만 하면 창은 앞인데 글 칸에 키가 안 가는 일이 있음
+  deskWin.on("focus", () => { if (deskWin && !deskWin.isDestroyed() && !deskWin.webContents.isFocused()) deskWin.webContents.focus(); });
   deskWin.loadFile(DESK_HTML());
   // 데스크 창을 닫으면 프로그램 전체(뒤의 아마노 · 네이버 창 포함)를 끝냄
   deskWin.on("closed", () => {
@@ -870,6 +873,16 @@ ipcMain.handle("history:send", async (_e, job) => {
   if (json.length >= 20000) return { ok: false, code: 0, why: "글이 너무 길어요" };
   return boardPatch("deskStats/revisit", json, job && job.at, "deskStats");
 });
+// ── 글 칸 커서 되살리기 (사장님 10/26): 확인 창(confirm) 뒤나 다른 창이 앞에 왔다 간 뒤 글 칸을 눌러도 커서가 안 생길 때
+//   데스크가 부름 → 창을 잠깐 놓았다가 다시 잡고 화면에 키보드 포커스 (Electron · Windows 에서 알려진 문제의 해결법)
+ipcMain.handle("desk:refocus", () => {
+  if (!deskWin || deskWin.isDestroyed()) return { ok: false };
+  if (deskWin.isFocused()) deskWin.blur();
+  deskWin.focus();
+  deskWin.webContents.focus();
+  return { ok: true };
+});
+
 // ── 고객 메모 (사장님 10/20): 네이버 예약 손님마다 근무자가 적는 메모(2줄) · 3자녀가정 · 블랙컨슈머 → 이 PC 앱 폴더 customer-notes.json 에만 ──
 //   손님 = 전화번호(없으면 '이름:…') — 재방문 기록과 같은 비밀값으로 섞은 해시로만 찾음 (파일에 전화번호 · 이름 없음) · 클라우드로 안 보냄
 const customerNotes = require("./customer-notes");

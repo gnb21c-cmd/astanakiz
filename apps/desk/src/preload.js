@@ -3,6 +3,7 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("desk", {
+  refocus: () => ipcRenderer.invoke("desk:refocus"), // 글 칸 커서 되살리기 (사장님 10/26)
   amano: {
     search: (day, no) => ipcRenderer.invoke("amano:search", { day, no }),
     select: (id) => ipcRenderer.invoke("amano:select", id),
