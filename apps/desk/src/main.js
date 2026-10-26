@@ -416,7 +416,8 @@ const nwrap = (fn, limit = 120000) => async (_e, ...args) => {
 ipcMain.handle("naver:load", nwrap((day, only) => naver.loadDay(day, { only }), 300000)); // 처음엔 칸을 다 열어 오래 걸릴 수 있음
 ipcMain.handle("naver:complete", nwrap((b) => naver.complete(b)));
 ipcMain.handle("naver:setCap", nwrap((c) => naver.setCap(c)));
-ipcMain.handle("naver:cancel", nwrap((b) => naver.cancel(b))); // 입금대기 예약 자동 취소 { day, time, product, no, qty } // 판매 수량 자동 조절 { day, product, time, n }
+ipcMain.handle("naver:cancel", nwrap((b) => naver.cancel(Object.assign({}, b, { paidOk: false })))); // 입금대기 예약 자동 취소 { day, time, product, no, qty } // 판매 수량 자동 조절 { day, product, time, n }
+ipcMain.handle("naver:cancelPaid", nwrap((b) => naver.cancelPaid(b))); // BC 3아웃 [전액 취소] (근무자가 확인한 뒤만 · 사장님 10/26)
 ipcMain.handle("naver:show", () => {
   if (naverWin) {
     naverWin.show();
@@ -897,6 +898,22 @@ ipcMain.handle("notes:set", (_e, job) => {
     if (!key) return { ok: false, why: "손님 전화번호 · 이름이 없음" };
     const d = notesGet();
     const note = customerNotes.set(d, visitHistory.hashKey(histSalt(), key), job, localNow());
+    customerNotes.save(histDir(), d);
+    return { ok: true, note };
+  } catch (e) {
+    return { ok: false, why: String(e.message || e) };
+  }
+});
+
+/** BC(블랙컨슈머) · 마일리지 SKIP 손님 목록 — 운영 설정 → 고객 세부 관리 (사장님 10/26 · 이름 · 전화 뒷 4자리 · 이 PC 에만) */
+ipcMain.handle("notes:list", () => {
+  try { return { ok: true, list: customerNotes.list(notesGet()) }; } catch (e) { return { ok: false, why: String(e.message || e) }; }
+});
+/** 목록에서 바꾸기 { id(해시), bc?, sk? } — BC 단계 · 마일리지 SKIP 지우기 */
+ipcMain.handle("notes:patch", (_e, job) => {
+  try {
+    const d = notesGet();
+    const note = customerNotes.patch(d, job && job.id, { bc: job && job.bc, sk: job && job.sk }, localNow());
     customerNotes.save(histDir(), d);
     return { ok: true, note };
   } catch (e) {

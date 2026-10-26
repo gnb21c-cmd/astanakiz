@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld("desk", {
     complete: (b) => ipcRenderer.invoke("naver:complete", b),
     setCap: (c) => ipcRenderer.invoke("naver:setCap", c),
     cancel: (b) => ipcRenderer.invoke("naver:cancel", b), // 입금대기 예약 취소 // 판매 수량 바꾸기 { day, product, time, n }
+    cancelPaid: (b) => ipcRenderer.invoke("naver:cancelPaid", b), // BC 3아웃 전액 취소 (근무자가 확인한 뒤 · 사장님 10/26)
     show: () => ipcRenderer.invoke("naver:show"),
     setHome: () => ipcRenderer.invoke("naver:setHome"),
     dump: () => ipcRenderer.invoke("naver:dump"),
@@ -64,6 +65,8 @@ contextBridge.exposeInMainWorld("desk", {
   notes: {
     get: (job) => ipcRenderer.invoke("notes:get", job),
     set: (job) => ipcRenderer.invoke("notes:set", job),
+    list: () => ipcRenderer.invoke("notes:list"), // BC · 마일리지 SKIP 손님 목록 (사장님 10/26)
+    patch: (job) => ipcRenderer.invoke("notes:patch", job), // 목록에서 { id, bc?, sk? }
   },
   // 근무자 메모장 (V2.0): 평일 ↔ 주말 전달 · 근무자마다 메모 — 이 PC 에만
   memo: {

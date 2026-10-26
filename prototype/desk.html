@@ -394,6 +394,25 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .notechk label { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; cursor: pointer; }
 .notechk input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
 .notechk .k3 { color: var(--nm-k3); } .notechk .bl { color: var(--red); }
+/* BC(블랙컨슈머) 1 · 2 · 3아웃 (사장님 10/26): 이름 옆 동그라미 ①②③ (야구 아웃처럼 차례로 채움) · 1아웃 = 카드 테두리 빨강 · 3아웃 = 예약 불가 알림 */
+.notechk .bcset { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 800; color: var(--red); }
+.bcdot { width: 22px; height: 22px; min-height: 0; padding: 0; border-radius: 50%; border: 2px solid var(--red); background: transparent; color: var(--red); font-size: 12px; font-weight: 800; line-height: 1; display: inline-grid; place-items: center; cursor: pointer; flex: none; }
+.bcdot.on { background: var(--red); color: #fff; }
+.res.bc1 { border: 2px solid var(--red) !important; }
+#sheet.bcred { outline: 3px solid var(--red); outline-offset: -3px; }
+.bc3 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; padding: 6px 8px; border-radius: 8px; border: 1.5px solid var(--red); color: var(--red); font-weight: 800; font-size: 13px; }
+.bc3 .btn { border-color: var(--red); color: var(--red); font-weight: 800; }
+.bcrow { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.bcrow .svswitch { flex: none; }
+.bclist { display: grid; gap: 4px; max-height: 300px; overflow: auto; }
+.bclist .it { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
+.bclist .dots { display: inline-flex; gap: 3px; }
+.bcdot:disabled { opacity: .35; cursor: not-allowed; }
+.bcwhy { color: var(--red); font-weight: 700; overflow-wrap: anywhere; }
+/* 3아웃 사유 창 (고객 카드에서 ③ 누르는 순간 · 사장님 10/26) */
+.bcask { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(0, 0, 0, .5); }
+.bcask > div { width: min(440px, 92%); display: grid; gap: 8px; padding: 14px; border-radius: 12px; border: 2px solid var(--red); background: var(--surface); box-shadow: var(--shadow); }
+.bcask textarea { width: 100%; min-height: 72px; resize: vertical; font: inherit; font-size: 14px; padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); box-sizing: border-box; }
 .notecell { display: grid; gap: 2px; }
 textarea.notein { width: 100%; box-sizing: border-box; height: calc(2 * 1.4em + 10px); line-height: 1.4; font: inherit; font-size: 14px; font-weight: 500; padding: 4px 8px; resize: none; overflow: hidden; border: 1.5px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); }
 textarea.notein:focus { outline: none; border-color: var(--accent); }
@@ -765,6 +784,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     /* 네이버 판매 수량 자동 조절 (시간제인 날 · 시간제 타임만): 2시간(4타임) 안의 손님(네이버 예약 + 현장)이 target 에 가깝게
        10분마다 지금 · 앞 3타임의 네이버 '회차당 수량'을 바꿈. 한 타임 최대 max (현장으로 갑자기 오는 손님 · 10분 사이 예약을 생각해서) */
     // target = 맞추려는 2시간 손님 수, ceiling = 절대 넘지 않는 상한 (40~43 · 사용자 지시 10/6)
+    bc: { o1: true, o2: true, o3: true }, // BC(블랙컨슈머) 1 · 2 · 3아웃 대응 켬/끔 (사장님 10/26) — 운영 설정 → 고객 세부 관리 → BC 관리
     capAuto: { v: 3, on: false, target: 40, ceiling: 43, max: 13, visible: 10, ahead: 3, every: 10, product: "1시간 50분", today: { day: "", on: false }, prio: { p1: "10:00, 12:00~15:30, 18:00", p2: "10:30~11:00, 16:00~16:30, 18:30", p3: "11:30, 17:00, 17:30, 19:00, 19:30" }, boost: "18:00, 18:30", nightProduct: "야간자유" }, // target: 네이버만 합쳐 (사장님 10/24 · 현장은 그 위로 45개까지) · max: 황금 타임 · 빨리 차는 타임 최대 (그 밖은 기본 10) · prio: 손님이 고르는 순위 1 · 2 · 3 (사장님 10/24 성수기 휴일 · 적지 않은 타임 = 3순위) · nightProduct: 18:00 부터 타임의 네이버 상품 // visible: 고객에게 보이는 잔여 최대 (안내 '최대 10팀') · today: 맨 위 [오늘 수량조절] 스위치로 그날만 켜고 끈 것 (on = 기본: 시간제인 날)
   };
   /* 이용시간: 성수기 — 평일·휴일 모두 17:30 입장까지 1시간 50분, 18:00 입장부터 무제한
@@ -1267,7 +1287,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   }
   /* 추가 예약이 10번째 (사장님 10/20): 이용 중인 손님의 뒤 타임 예약을 이용완료하면 마일리지 10 · 20 …번째가 되는지
      → 알림에 '사은권을 드려야 해요 · 손님은 이용 중 — 연락해 전달' · 확인하면 그 예약에 giftDue (전달하면 giftGiven 시각) — [사은권 전달함]까지 열쇠 창 · 카드에 남고 반납 전에 물음 (열쇠판 칸 표시는 10/21 사장님 말씀으로 뺌) */
-  const extGift = (e) => { const x = e.x; if (!x || x.prevDone == null || evFrozen(x)) return 0; const n = doneSoFar(x) + 1 - evSub(x); return isGift(n) ? n : 0; };
+  const extGift = (e) => { const x = e.x; if (!x || x.prevDone == null || evFrozen(x)) return 0; const n = doneSoFar(x) + 1 - evSub(x); return giftFor(x, n) ? n : 0; }; // BC 2아웃 · 마일리지 SKIP 은 빼고
   const extGiftHtml = (e) => { const n = extGift(e); return n ? `<div class="banner giftwarn"><b>이 예약을 이용완료하면 ${n}번째 예약완료 — ${RULES.giftName}을 드려야 해요</b><br>손님은 이용 중 — <b class="num">${fmtPhone(e.x.phone || e.h.phone)}</b> 로 연락해 전달하세요</div>` : ""; };
   /** 이 열쇠 손님이 아직 못 받은 사은권 (본인 · 함께 이용완료한 추가 예약) */
   const giftPend = (h) => (h ? (bookings[TODAY] || []).filter((x) => x.giftDue && !x.giftGiven && (x === h || x.chainHead === h.id)) : []);
@@ -1390,9 +1410,10 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
        입장 전: 그날 이 손님 예약 중 먼저 이용완료될 미입장 예약까지 셈 — 대표 카드는 함께 처리하는 묶음 전체 '9 · 10번' · 입장 뒤 대표 카드도 '9 · 10번째' */
     const P = done ? null : planOf(b);
     const n = (done ? b.visitNo : P.n) - sub, last = (done ? b.visitEnd || b.visitNo : P.n + P.group - 1) - sub;
-    let g = 0;
-    for (let k = n; k <= last && !g; k++) if (isGift(k)) g = k;
-    const gift = g ? ` <span class="gift">${RULES.giftName} 증정</span>` : "";
+    let g = 0, sk = 0;
+    for (let k = n; k <= last && !g; k++) if (giftFor(b, k)) g = k; else if (isGift(k) && !sk) sk = k;
+    // BC 2아웃 = 마일리지 미적용 · 마일리지 SKIP = 그 회차 사은권을 이미 드림 (사장님 10/26)
+    const gift = g ? ` <span class="gift">${RULES.giftName} 증정</span>` : bcHit(b, 2) ? ` <span class="help bcmile">마일리지 미적용 (BC)</span>` : sk ? ` <span class="help">${sk}번째 사은권 SKIP (이미 드림)</span>` : "";
     const nums = last <= n ? `${n}` : last === n + 1 ? `${n} · ${last}` : `${n} ~ ${last}`;
     return done ? `<b>${nums}번째 예약완료</b>${gift}${sub ? ` <span class="help">(네이버 ${b.visitNo} − 이벤트 ${sub})</span>` : ""}`
       : `완료 ${b.prevDone - sub}${c} → <b>${nums}번 완료 예정</b>${last > n ? ` · 함께 ${last - n + 1}건` : ""}${gift}${P.sep ? ` <span class="help">(오늘 앞 예약 ${P.sep}건 포함)</span>` : ""}${sub ? ` <span class="help">(네이버 완료 ${b.prevDone} − 이벤트 ${sub})</span>` : ""}`;
@@ -1426,7 +1447,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     return { n: b.prevDone + 1 + ahead, group: h === b ? grp.length : 1, sep };
   }
   /** 이번 입장으로 함께 이용완료되는 예약들 중 사은권 회차가 있는지 (예: 8 → 같은 시간 2건이면 9, 10) — 마일리지 기준(이벤트 기간 이용완료는 뺌) · 이벤트 기간엔 없음 */
-  const giftIn = (h) => { if (!h.visitNo || evFrozen(h)) return 0; const s = evSub(h), a = h.visitNo - s, z = (h.visitEnd || h.visitNo) - s; for (let n = Math.max(1, a); n <= z; n++) if (isGift(n)) return n; return 0; };
+  const giftIn = (h) => { if (!h.visitNo || evFrozen(h)) return 0; const s = evSub(h), a = h.visitNo - s, z = (h.visitEnd || h.visitNo) - s; for (let n = Math.max(1, a); n <= z; n++) if (giftFor(h, n)) return n; return 0; }; // BC 2아웃 · 마일리지 SKIP 은 빼고
   /** 대리예약: 예약자 정보와 함께 방문자 이름 · 전화번호도 (네이버 '방문자' 줄 "박소희(010-2785-4295)") */
   /** 예약 수량: 2장 이상이면 숫자만 노랑 네모 · 빨강 글씨 (열쇠를 여러 개 줘야 함 · 사장님 10/9 빨강 글씨 → 10/16 노랑 네모) */
   const qtyNum = (q) => (q >= 2 ? `<b class="qmany num">${q}</b>` : String(q));
@@ -1462,9 +1483,9 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       else if (b.chainHead) act = `<span class="help num">연속예약 — ${hm(b.enteredAt)} 첫 예약으로 입장</span>`;
       if (b.giftDue) act += b.giftGiven ? `<span class="help num">${RULES.giftName} ${b.giftGiven} 전달</span>` : `<span class="npend">${b.giftDue}번째 ${RULES.giftName} 전달 전 — 손님께 연락해 전달 (열쇠 창 [사은권 전달함])</span>`;
       if (b.naverPending) act += `<span class="npend">${b.naverBusy ? "네이버 이용완료 처리 중…" : `네이버 이용완료 대기${b.naverWhy ? ` — ${esc(b.naverWhy)}` : ""} (자동으로 다시)`}</span>`;
-      return `<article class="res ${b.status === "완료" ? "done" : ""}" data-act="openRes" data-id="${b.id}" tabindex="0" role="button" aria-label="${esc(b.name)} 예약 열기">
+      return `<article class="res ${b.status === "완료" ? "done" : ""}${bcHit(b, 1) ? " bc1" : ""}" data-act="openRes" data-id="${b.id}" tabindex="0" role="button" aria-label="${esc(b.name)} 예약 열기">
         <div class="head"><span class="name">${nameHtml(b)}${b.proxy ? ` <span class="badge proxy">대리예약</span>` : ""}${noteOf(b) && noteOf(b).m ? ` <span class="badge memo" title="${esc(noteOf(b).m)}">메모</span>` : ""}</span>${b.unpaid && b.status === "확정" ? `<span class="badge unpaid">입금대기</span>` : `<span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span>`}</div>
-        ${partyTag}${chainTag}<div class="visits num">${visitText(b)}</div>
+        ${partyTag}${chainTag}<div class="visits num">${visitText(b)}</div>${bc3Html(b)}
         <dl class="kv">
           <dt>전화번호</dt><dd class="phone num">${fmtPhone(b.phone)}</dd>${visitorRow(b)}
           <dt>이용일시</dt><dd class="num">${when}${b.naverSlot != null && b.naverSlot !== b.slot ? ` <span class="moved">네이버 ${hm(b.naverSlot)}</span>` : ""}</dd>
@@ -2040,7 +2061,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     $("golden").hidden = false;
     renderAll();
   }
-  function renderAll() { saveState(); evSync(); hvSync(); notesSync(); $("now").textContent = hm(now); $("refresh-at").textContent = refreshText(); $("refresh-at").style.color = (naverErr || (bookings[TODAY] || []).some((b) => b.naverPending && b.naverWhy)) && !naverBusy ? "var(--red)" : ""; renderSlots(); renderRes(); renderKeys(); renderCars(); goldenCheck(); renderMemoBoxes(); renderCapForce(); }
+  function renderAll() { saveState(); evSync(); hvSync(); notesSync(); bcWatch(); $("now").textContent = hm(now); $("refresh-at").textContent = refreshText(); $("refresh-at").style.color = (naverErr || (bookings[TODAY] || []).some((b) => b.naverPending && b.naverWhy)) && !naverBusy ? "var(--red)" : ""; renderSlots(); renderRes(); renderKeys(); renderCars(); goldenCheck(); renderMemoBoxes(); renderCapForce(); }
   /** 맨 위 [오늘 수량조절] 스위치 (사장님 10/21): 설정과 상관없이 근무자가 그날만 켜고 끔 · 다음 날은 기본(시간제인 날 = 설정 · 평일 = 꺼짐) */
   function renderCapForce() {
     const el = $("capforce"), cb = $("capforce-on");
@@ -2084,6 +2105,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     el.classList.toggle("setsheet", sheet.mode === "settings");
     el.classList.toggle("memosheet", sheet.mode === "memo");
     el.classList.toggle("mansheet", sheet.mode === "manual");
+    { const t = sheet.mode === "enter" || sheet.mode === "key" ? noteTarget() : null; el.classList.toggle("bcred", !!t && bcHit(t, 1)); if (!t) sheet.bcAsk = false; } // BC 1아웃 = 고객 카드 테두리 빨강 (사장님 10/26)
     if (sheet.mode === "memo") { el.innerHTML = memoSheetHtml(); return; }
     if (sheet.mode === "manual") { el.innerHTML = manualHtml(); return; }
     if (sheet.mode === "enter") {
@@ -2115,7 +2137,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       const note = oddNote + chainNote + (b.status !== "확정" ? "" : b.day !== TODAY ? `<div class="banner warn">이용일(${b.day.slice(5).replace("-", "/")})에 입장 처리할 수 있어요</div>`
         : early ? `<div class="banner">예약 ${hm(b.slot)}보다 일찍 입장 — 근무자 판단으로 가능해요 (손님 안내 기준은 ${hm(b.slot - RULES.earlyMinutes)}). ${m == null ? "" : `이용시간은 예약 시간부터라 일찍 온 만큼 더 놀 수 있어요 (반납 ${hm(b.slot + m)})`}</div>` : "");
       el.innerHTML = `
-        <h3 id="sheet-title">네이버 예약자 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
+        <h3 id="sheet-title">네이버 예약자 <button class="x" data-act="close" aria-label="닫기">×</button></h3>${bcAskHtml()}
         <div class="${sv ? "svgrid" : ""}"><dl class="facts">
           <dt>예약자</dt><dd style="font-size:18px">${nameHtml(b)} <span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span>${noteChecks(b)}</dd>
           <dt>${evActive() && evIn(b.day) ? "이벤트" : "이용완료"}</dt><dd class="num visits big">${visitText(b)}</dd>
@@ -2126,7 +2148,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
           <dt>결제상태</dt><dd>${b.pay}</dd>${noteRow(b)}
           ${b.status === "완료" ? `<dt>열쇠</dt><dd>${b.keys.length ? `<div class="bigkeys">${b.keys.map((k) => `<span class="bigkey num">${k}</span>`).join("")}</div>` : b.outAt != null ? `<span class="num">${b.enteredAt != null ? hm(b.enteredAt) + " 입장 · " : ""}${hm(b.outAt)} 퇴장 (반납함)</span>` : "-"}</dd>` : ""}
         </dl>${sv ? `<div class="svbox ${svLock ? "need" : "ok"}">${svButtons(sv)}</div>` : ""}</div>
-        ${note}${pickHtml}
+        ${bc3Html(b)}${note}${pickHtml}
         <div class="sheet-foot">${b.status === "확정"
           ? `${sheet.naverErr ? `<div class="banner warn" style="flex-basis:100%">네이버 이용완료 실패: ${esc(sheet.naverErr)}</div><button class="btn" data-act="doEnter" data-skip-naver="1">네이버 없이 열쇠만 등록</button>` : ""}
              <button class="btn" data-act="close">닫기</button><button class="btn btn-ink" id="enter-done" data-act="doEnter" ${canEnter && sheet.keys.length === need && !sheet.busy && !svLock ? "" : "disabled"}>${sheet.busy ? "네이버 이용완료 중…" : sheet.naverErr ? "다시 시도" : "등록 완료"}</button>`
@@ -2308,7 +2330,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
           <button class="btn btn-ink extok" data-act="extOk" ${sheet.extPick ? "" : "disabled"}>확인</button>`;
       })();
       el.innerHTML = `
-        <h3 id="sheet-title">${h.svc ? `<span>${h.keys.join(", ")}번 서비스 키 <span class="badge svcb">판매 아님</span></span>` : `${h.keys.join(", ")}번 열쇠`} <button class="x" data-act="close" aria-label="닫기">×</button></h3>
+        <h3 id="sheet-title">${h.svc ? `<span>${h.keys.join(", ")}번 서비스 키 <span class="badge svcb">판매 아님</span></span>` : `${h.keys.join(", ")}번 열쇠`} <button class="x" data-act="close" aria-label="닫기">×</button></h3>${h.svc || h.walk ? "" : bcAskHtml()}
         <div class="${e ? "extgrid" : ""}"><div>${giftDueHtml(h)}
         <dl class="facts">
           ${h.svc ? svcFacts(h) : `<dt>${h.walk ? "고객명" : "예약자"}</dt><dd class="whorow"><span>${h.walk ? esc(h.name) : nameHtml(h)}${h.walk ? ` · ${h.posNo}` : noteChecks(h)}</span><button class="btn btn-sm reprint" data-act="reprint" title="감열지가 다 돼 중간에 끊겼을 때 — 이 손님 입장권을 다시 출력">입장권 다시 출력</button></dd>`}
@@ -2346,7 +2368,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     }
   }
   // ── 운영 설정 V2.0 (사장님 10/21): 왼쪽 메뉴 · [?] 설명 · 기준 · 근무자 ─────────────
-  const SET_MENU = [["season", "비성수기 설정"], ["printer", "프린터 설정"], ["prints", "프린트물 설정"], ["staff", "근무자 등록"], ["api", "API 연결 설정"], ["naver", "네이버 설정"], ["etc", "기타"]];
+  const SET_MENU = [["season", "비성수기 설정"], ["printer", "프린터 설정"], ["prints", "프린트물 설정"], ["staff", "근무자 등록"], ["api", "API 연결 설정"], ["naver", "네이버 설정"], ["cust", "고객 세부 관리"], ["etc", "기타"]];
   /** 메뉴 옆 작은 상태 (들어가 보지 않아도 켜졌는지) */
   function setBadge(k) {
     if (k === "season") return `기간 ${RULES.peaks.length}`;
@@ -2356,6 +2378,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     if (k === "api") return REAL ? "" : "체험판";
     if (k === "naver") { const n = (RULES.capAuto.on ? 1 : 0) + (ST.view && ST.view.cfg && ST.view.cfg.on ? 1 : 0); return n ? `켜짐 ${n}` : "꺼짐"; }
     if (k === "etc") return [WEV.name ? `${WEV.name} 이벤트` : "", SV.on ? "설문 켜짐" : ""].filter(Boolean).join(" · ");
+    if (k === "cust") { if (!custList) { custLoad(); return ""; } const n = custList.filter((x) => x.bc).length; return n ? `BC ${n}명` : "BC · 마일리지 SKIP"; }
     return "";
   }
   /** 프린트물 설정 위쪽: 입장권 양식 / 재방문 이벤트 · 쿠폰 */
@@ -2432,6 +2455,31 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
             <div class="field"><span class="label">미리보기 <span class="help">${i === EV_BASE ? "공통 양식 + 1번 안내" : EV_NAMES[i]} · 예시 값 · 칠한 줄이 이벤트 안내</span></span><div class="paper" id="ev-paper">${evPrev()}</div>${formHelp()}</div>
           </div>`;
         return { html: psubHtml() + html, after: () => { if (i !== EV_BASE) evScroll("ev-paper"); } };
+      }
+      if (tab === "cust") {
+        const sub = sheet.csub === "skip" ? "skip" : "bc";
+        const head = `<div class="seg2 psub"><button class="${sub === "bc" ? "on" : ""}" data-act="csub" data-s="bc" aria-pressed="${sub === "bc"}">BC 관리</button><button class="${sub === "skip" ? "on" : ""}" data-act="csub" data-s="skip" aria-pressed="${sub === "skip"}">마일리지 SKIP</button></div>`;
+        if (!custList) custLoad();
+        const L = custList || [], p4 = (x) => `010-****-${esc(x.p4 || "????")}`;
+        if (sub === "skip") {
+          const rows = L.filter((x) => x.sk && x.sk.length).map((x) => `<div class="it"><span class="num">${x.sk.map((n) => `<b>${n}</b>`).join(" · ")}번째</span><span><b>${esc(x.nm || "(이름 없음)")}</b> · <span class="num">${p4(x)}</span></span><span class="btns">${x.sk.map((n) => `<button class="btn btn-sm" data-act="skipDel" data-id="${esc(x.id)}" data-n="${n}">${n}번째 지우기</button>`).join("")}</span></div>`).join("");
+          return { html: head + `
+          <div class="setcard plain stack"><b>마일리지 SKIP</b>
+            <div class="help longhelp" data-q="마일리지 SKIP 이란">사은권(${esc(RULES.giftName)} · ${RULES.giftEvery}회마다)을 미리 드린 손님 — 등록한 <b>N번째 예약완료</b>에는 예약 카드 · 입장권에 사은권 안내를 띄우지 않아요 (카드에 'N번째 사은권 SKIP'). 손님은 전화번호로 찾아요 (이 PC 에만 · 이름 · 뒷 4자리만 목록에 보임).</div>
+            <div class="btns" style="align-items:center"><input id="sk-name" class="cfg" placeholder="고객명" autocomplete="off" style="width:110px"><input id="sk-phone" class="cfg" placeholder="010-0000-0000" inputmode="numeric" autocomplete="off" style="width:150px"><input id="sk-n" type="number" min="1" max="999" class="cfg" placeholder="N" style="width:76px"><span class="help">번째</span><button class="btn btn-sm btn-ink" data-act="skipAdd">등록</button></div>
+            <div class="bclist">${custList ? rows || `<span class="help">등록한 손님이 없어요</span>` : `<span class="help">읽는 중…</span>`}</div></div>` };
+        }
+        const q = String(sheet.bcq || "").trim(), qd = digits(q);
+        const hit = (x) => !q || (qd ? (qd.length >= 4 ? x.p4 === qd.slice(-4) : String(x.p4).includes(qd)) : String(x.nm || "").includes(q));
+        const rows = L.filter((x) => x.bc && hit(x)).map((x) => `<div class="it"><span class="dots">${[1, 2, 3].map((k) => `<button class="bcdot ${x.bc >= k ? "on" : ""}" data-act="bcLevel" data-id="${esc(x.id)}" data-n="${k}" aria-pressed="${x.bc >= k}" aria-label="${k}아웃" ${k === 3 && x.bc < 3 ? `disabled title="3아웃은 고객 카드에서 사유를 쓰고 올려요"` : ""}>${k}</button>`).join("")}</span><span><b>${esc(x.nm || "(이름 없음)")}</b> · <span class="num">${p4(x)}</span>${x.r3 ? ` · <span class="bcwhy">${x.bc >= 3 ? "3아웃 사유" : "지난 3아웃 사유"}: ${bcWhyText(x)}</span>` : ""}${x.m ? ` · <span class="help">${esc(x.m)}</span>` : ""}</span><span class="help num">${esc(x.bcAt || "")}</span></div>`).join("");
+        return { html: head + `
+          <div class="setcard plain stack"><b>BC(블랙컨슈머) 대응</b>
+            <span class="help">예약자 창 · 열쇠 창 이름 옆 <b>BC ①②③</b>을 눌러 정해요 — 야구 아웃처럼 쌓여요 (2아웃이면 1 · 2아웃 대응 모두 · 같은 단계를 다시 누르면 한 단계 내림) · <b>③은 사유를 쓰고 [확인]해야</b> 3아웃 (아래 목록에서는 내리기만)</span>
+            ${[[1, "고객 카드 테두리 빨강", "예약 카드 · 예약자 창 · 열쇠 창"], [2, "마일리지 미적용", `누계 · ${RULES.giftEvery}회 사은권을 안 띄움 (입장권에도 없음)`], [3, "예약 불가", "네이버는 예약을 못 막아요 → 3아웃 손님 예약이 보이면 알림 · 카드에 [전액 취소] (확인 한 번 · 결제 금액 환불)"]].map(([k, t, h]) => `<div class="bcrow"><span class="bcdot on">${k}</span><button type="button" class="svswitch ${RULES.bc["o" + k] ? "on" : ""}" role="switch" aria-checked="${!!RULES.bc["o" + k]}" data-act="bcToggle" data-k="${k}" aria-label="${k}아웃 대응"><span class="knob"></span><b>${RULES.bc["o" + k] ? "켜짐" : "꺼짐"}</b></button><span><b>${k}아웃 — ${t}</b> <span class="help">${h}</span></span></div>`).join("")}</div>
+          <div class="setcard plain stack"><b>BC 손님 <span class="help">${L.filter((x) => x.bc === 3).length ? `3아웃 ${L.filter((x) => x.bc === 3).length}명 · ` : ""}모두 ${L.filter((x) => x.bc).length}명 · 3아웃부터</span></b>
+            <input id="bc-q" class="cfg" placeholder="이름 · 전화번호(뒷 4자리)로 찾기" autocomplete="off" value="${esc(sheet.bcq || "")}">
+            <div class="bclist">${custList ? rows || `<span class="help">${q ? "찾는 손님이 없어요" : "BC 손님이 없어요"}</span>` : `<span class="help">읽는 중…</span>`}</div>
+            <span class="help">이름 · 전화 뒷 4자리는 BC · SKIP 손님만 이 PC 에 저장 (전체 번호 · 클라우드 없음)</span></div>` };
       }
       if (tab === "etc") {
         const c = svCounts(), st = !SV.on ? `<b>꺼짐</b> — 설문 없이 바로 입장` : !SV.from || !SV.to ? "기간을 정하면 시작해요" : svOn() ? `<b class="on">진행 중</b> — ${krDate(SV.from)} ~ ${krDate(SV.to)}` : TODAY < SV.from ? `${krDate(SV.from)}부터 시작해요` : TODAY > SV.to ? `끝났어요 (${krDate(SV.to)}까지)` : "대상을 하나 이상 골라 주세요";
@@ -2668,9 +2716,11 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       RULES.capAuto.v = 3; saveCapAuto();
     }
   }
-  if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c && Array.isArray(c.peaks) && c.peaks.length) { RULES.peaks = c.peaks; renderAll(); } if (c && c.capAuto) capAutoLoad(c.capAuto); if (c && c.unpaidCancel) Object.assign(RULES.unpaidCancel, c.unpaidCancel); }).catch(() => {});
+  if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c && Array.isArray(c.peaks) && c.peaks.length) { RULES.peaks = c.peaks; renderAll(); } if (c && c.capAuto) capAutoLoad(c.capAuto); if (c && c.bc && typeof c.bc === "object") Object.assign(RULES.bc, c.bc); if (c && c.unpaidCancel) Object.assign(RULES.unpaidCancel, c.unpaidCancel); }).catch(() => {});
   else try { const v = JSON.parse(localStorage.getItem("astanakiz-peaks")); if (Array.isArray(v) && v.length) RULES.peaks = v; } catch (e) { /* 없음 */ }
   if (!APP) try { capAutoLoad(JSON.parse(localStorage.getItem("astanakiz-capauto"))); } catch (e) { /* 없음 */ }
+  if (!APP) try { Object.assign(RULES.bc, JSON.parse(localStorage.getItem("astanakiz-bc")) || {}); } catch (e) { /* 없음 */ }
+  const saveBc = () => { if (APP && window.desk.config) window.desk.config.set({ bc: Object.assign({}, RULES.bc) }); else try { localStorage.setItem("astanakiz-bc", JSON.stringify(RULES.bc)); } catch (e) { /* 저장 못 해도 동작 */ } };
   const feedHelp = () => `약 ${Math.round(PRINT.feed * 4.2)}mm${PRINT.feed === 4 ? " (처음)" : ""}`; // 자르기 전 여백 (1줄 ≈ 4.2mm)
   const savePrint = () => { if (APP && window.desk.config) window.desk.config.set({ printer: PRINT.sel, printCut: PRINT.cut, printFeed: PRINT.feed, printMode: PRINT.mode, comPort: PRINT.port, comBaud: PRINT.baud, drawerPin: PRINT.drawerPin, printForm: { text: PRINT.forms.enter.text, auto: PRINT.forms.enter.auto, ver: ENTER_FORM_VER } }); };
   // 영수증 프린터처럼 보이는 이름 (처음 찾을 때 자동으로 고름)
@@ -2895,15 +2945,16 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     const extra = main == null ? [] : ends.filter((e) => e.m !== main);
     const out = main == null ? "시간제한 없음" : krTime(h.slot + main) + (extra.length ? ` (${extra.map((e) => `${e.k}번 ${krTime(h.slot + e.m)}`).join(", ")})` : "");
     const naver = !h.walk, ev = naver ? evOf(h) : null, frozen = naver && evFrozen(h), sub = naver && !frozen ? evSub(h) : 0;
+    const noMile = naver && bcHit(h, 2); // BC 2아웃 = 마일리지 미적용 → 입장권에 누계 · 사은권 줄 없음 (사장님 10/26)
     return {
       // 현장 이용자는 이름을 모름 → 고객명은 빈칸 (줄은 그대로)
       구분: naver ? "네이버" : walkTag(h), 고객: h.walk ? "   " : maskName(h.name), 전화뒤4: digits(h.phone).slice(-4), 열쇠: h.keys.join(", "),
       // 입장시간 = 예약한 입장 시간 (현장은 입장한 시각)
       // 누계 = 마일리지 (네이버 완료 − 이벤트 기간 이용완료 · 10/15) · 이벤트 기간엔 멈춤 → 빈칸
-      입장시간: krTime(h.slot), 퇴장시간: out, 누계: h.visitNo && !frozen ? String((h.visitEnd || h.visitNo) - sub) : "", 기준회: String(RULES.giftEvery), 사은권: RULES.giftName,
+      입장시간: krTime(h.slot), 퇴장시간: out, 누계: h.visitNo && !frozen && !noMile ? String((h.visitEnd || h.visitNo) - sub) : "", 기준회: String(RULES.giftEvery), 사은권: RULES.giftName,
       날짜: TODAY, 시각: hm(now), _현장: !naver,
       // 방문 이벤트 기간(10/15): 입장권 양식의 [네이버] 누계 · [사은권] 줄(마일리지)은 빼고 그 자리에 이벤트 안내 (evText) — 안내 안에서는 조건을 똑같이 씀
-      _네이버: naver && !!h.visitNo, _사은권: naver && !!giftIn(h),
+      _네이버: naver && !!h.visitNo && !noMile, _사은권: naver && !!giftIn(h),
       ...evVals(ev, frozen),
     };
   };
@@ -2982,15 +3033,38 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
      - 손님 = 장부와 같은 키(전화번호, 없으면 '이름:…') · 네이버 예약 메모는 불러오지 않음 (손님마다 읽으면 점점 느려짐 — 이제부터 직접 적음)
      - 이름 색: 블랙컨슈머 = 빨강 · 3자녀가정 = 노랑 (둘 다면 빨강) — 예약 카드 · 예약자 창 · 열쇠 창 · 메모가 있으면 카드에 [메모]
      - 설치한 앱: 앱 본체 customer-notes.json (해시로 찾음 · 전화번호 없음 · 클라우드로 안 보냄) · 체험판: 브라우저 저장소 */
-  const NOTES = new Map(); // 손님 키 → { m, k3, bl, at } · null = 물어봤는데 없음
+  const NOTES = new Map(); // 손님 키 → { m, k3, bl, bc, sk, nm, p4, at } · null = 물어봤는데 없음
+  let custList = null, custLoading = false; // 고객 세부 관리 목록 (BC · 마일리지 SKIP) — 앱 본체에서 읽음 (사장님 10/26)
   const NOTE_MAX = 120, NOTE_LS = "astanakiz-notes";
   const NOTE_APP = () => APP && !!(window.desk && window.desk.notes);
   if (!APP) try { for (const [k, n] of Object.entries(JSON.parse(localStorage.getItem(NOTE_LS)) || {})) NOTES.set(k, n); } catch (e) { /* 없음 */ }
   const noteKey = (b) => (b && !b.walk && !b.svc ? evKey(b) : "");
   const noteOf = (b) => { const k = noteKey(b); return (k && NOTES.get(k)) || null; };
   /** 이름 색 (블랙컨슈머가 먼저) */
-  const nameCls = (b) => { const n = noteOf(b); return !n ? "" : n.bl ? "nm-bl" : n.k3 ? "nm-k3" : ""; };
+  const nameCls = (b) => { const n = noteOf(b); return !n ? "" : n.bl || Number(n.bc) > 0 ? "nm-bl" : n.k3 ? "nm-k3" : ""; };
   const nameHtml = (b) => { const c = nameCls(b); return c ? `<span class="${c}" title="${c === "nm-bl" ? "BC" : "3자녀"}">${esc(b.name)}</span>` : esc(b.name); };
+  /* BC(블랙컨슈머) 1 · 2 · 3아웃 (사장님 10/26) — 이름 옆 ①②③ (야구 아웃처럼 쌓임: 2아웃 = 1 · 2아웃 대응 모두)
+     운영 설정 → 고객 세부 관리 → BC 관리 스위치(RULES.bc.o1 ~ o3)를 켠 대응만:
+       1아웃 = 고객 카드 테두리 빨강 · 2아웃 = 마일리지 미적용(누계 · 사은권 없음) · 3아웃 = 예약 불가 (네이버는 못 막으니 카드에 알림 + [전액 취소])
+     마일리지 SKIP (사장님 10/26): 그 손님의 n번째 예약완료에는 사은권을 안 띄움 (사은권을 미리 드린 손님) */
+  const bcOf = (b) => { const n = noteOf(b); return !n ? 0 : Math.max(0, Math.min(3, Number(n.bc) || 0)) || (n.bl ? 1 : 0); };
+  const bcHit = (b, k) => !!(RULES.bc && RULES.bc["o" + k]) && bcOf(b) >= k;
+  const skipOf = (b) => { const n = noteOf(b); return n && Array.isArray(n.sk) ? n.sk : []; };
+  /** 이 손님에게 n번째 예약완료가 사은권 회차인가 (2아웃 마일리지 미적용 · 마일리지 SKIP 은 빼고) */
+  const giftFor = (b, n) => isGift(n) && !bcHit(b, 2) && !skipOf(b).includes(n);
+  const bcWhat = (k) => [[1, "카드 테두리 빨강"], [2, "마일리지 미적용"], [3, "예약 불가"]].filter(([i]) => i <= k && RULES.bc["o" + i]).map(([, t]) => t).join(" · ") || "대응 꺼짐 (운영 설정 → 고객 세부 관리)";
+  /** 3아웃 손님 예약 (입장 전): 알림 + [전액 취소] */
+  const bc3Html = (b) => (b && bcHit(b, 3) && b.status === "확정" ? `<div class="bc3">③ 3아웃 · 예약 불가 — ${b.bcBusy ? "네이버에서 취소하는 중…" : `<button class="btn btn-sm" data-act="bcCancel" data-id="${b.id}">전액 취소</button>`}</div>` : "");
+  /** 처음 보인 3아웃 손님 예약은 알림 한 번 */
+  const bcSeen = new Set();
+  function bcWatch() {
+    if (!RULES.bc.o3) return;
+    for (const b of (bookings[TODAY] || []).concat(viewDay !== TODAY ? bookings[viewDay] || [] : [])) {
+      if (b.status !== "확정" || bcSeen.has(b.id) || !bcHit(b, 3)) continue;
+      bcSeen.add(b.id);
+      toast(`③ 3아웃 고객 예약 — ${b.name} ${b.day === TODAY ? "" : `${+b.day.slice(5, 7)}/${+b.day.slice(8)} `}${hm(b.slot)} ${b.qty}장 · 카드에서 [전액 취소]`, 8000);
+    }
+  }
   const noteAtText = (at) => (!at ? "" : at.slice(0, 10) === TODAY ? at.slice(11, 16) : `${+at.slice(5, 7)}/${+at.slice(8, 10)}`);
   let notesAsking = false;
   /** 화면을 그릴 때마다: 보이는 날 · 오늘 예약 손님 중 아직 안 물어본 손님의 메모를 앱 본체에 한 번에 물음 */
@@ -3012,23 +3086,45 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   function noteChange(b, patch, soon) {
     const k = noteKey(b);
     if (!k) return;
-    NOTES.set(k, Object.assign({ m: "", k3: false, bl: false, at: "" }, NOTES.get(k) || {}, patch));
+    const prev = NOTES.get(k) || {};
+    const n = Object.assign({ m: "", k3: false, bl: false, bc: 0, at: "" }, prev, patch);
+    if (patch.bc != null && Number(patch.bc) !== Number(prev.bc || 0)) n.bcAt = n.bc ? TODAY : ""; // 단계를 바꾼 날 (체험판 · 앱은 본체가 정함)
+    if (patch.bc != null && !Number(patch.bc)) { delete n.r3; delete n.r3At; } // BC 를 다 풀면 3아웃 사유도 지움 (2 · 1아웃으로 내리면 남김)
+    NOTES.set(k, n);
     clearTimeout(noteTimers.get(k));
     if (soon) noteSave(k); else noteTimers.set(k, setTimeout(() => noteSave(k), 600));
+  }
+  /** 고객 세부 관리 목록 (BC · 마일리지 SKIP) 읽기 — 앱: 본체 customer-notes · 체험판: 이 브라우저 */
+  function custLoad() {
+    if (custLoading) return;
+    if (!NOTE_APP()) {
+      custList = [...NOTES].filter(([, n]) => n && ((Number(n.bc) || (n.bl ? 1 : 0)) > 0 || (n.sk && n.sk.length))).map(([id, n]) => ({ id, bc: Math.max(0, Math.min(3, Number(n.bc) || 0)) || (n.bl ? 1 : 0), sk: n.sk || [], nm: n.nm || "", p4: n.p4 || "", m: n.m || "", bcAt: n.bcAt || "", r3: n.r3 || "", r3At: n.r3At || "", at: n.at || "" })).sort((a, b) => b.bc - a.bc || String(b.bcAt || b.at).localeCompare(String(a.bcAt || a.at)));
+      return;
+    }
+    custLoading = true;
+    window.desk.notes.list().then((r) => { custLoading = false; custList = r && r.ok ? r.list : []; if (sheet.mode === "settings") renderSheet(); }, () => { custLoading = false; custList = []; });
+  }
+  /** 목록에서 바꾸기 (BC 단계 · SKIP 지우기) — 앱은 해시 id 로 · 바꾼 뒤 손님 메모를 다시 물음 */
+  async function custPatch(x, patch) {
+    if (!NOTE_APP()) { const b = { phone: /^\d+$/.test(x.id) ? x.id : "", name: x.id.startsWith("이름:") ? x.id.slice(3) : x.nm }; noteChange(b, Object.assign({}, patch, patch.bc != null ? { bl: patch.bc > 0 } : {}), true); }
+    else { const r = await window.desk.notes.patch(Object.assign({ id: x.id }, patch)).catch((e) => ({ ok: false, why: String(e) })); if (!r || !r.ok) { toast(`저장 못 함: ${(r && r.why) || "응답 없음"}`); return; } NOTES.clear(); }
+    custList = null; custLoad(); renderAll(); renderSheet();
   }
   /** 쓰던 메모를 바로 저장 (창을 닫거나 칸을 떠날 때) */
   function noteFlush() { for (const [k, t] of [...noteTimers]) { clearTimeout(t); noteSave(k); } }
   function noteSave(k) {
     noteTimers.delete(k);
-    const n = NOTES.get(k) || { m: "", k3: false, bl: false };
+    const n = NOTES.get(k) || { m: "", k3: false, bl: false, bc: 0 };
+    const bc = Math.max(0, Math.min(3, Number(n.bc) || 0)) || (n.bl ? 1 : 0), sk = Array.isArray(n.sk) ? n.sk : [];
+    custList = null; // 고객 세부 관리 목록은 다시 읽음
     renderRes(); // 카드의 [메모] · 이름 색
     const show = (ok, text) => { const el = $("note-at"); if (el) { el.textContent = text; el.classList.toggle("evwarn", !ok); } };
     if (!NOTE_APP()) {
-      const at = `${TODAY} ${hm(now)}`, gone = !String(n.m || "").trim() && !n.k3 && !n.bl;
-      try { const o = JSON.parse(localStorage.getItem(NOTE_LS)) || {}; if (gone) delete o[k]; else o[k] = { m: n.m, k3: !!n.k3, bl: !!n.bl, at }; localStorage.setItem(NOTE_LS, JSON.stringify(o)); } catch (e) { /* 저장 못 해도 화면은 그대로 */ }
+      const at = `${TODAY} ${hm(now)}`, gone = !String(n.m || "").trim() && !n.k3 && !bc && !sk.length;
+      try { const o = JSON.parse(localStorage.getItem(NOTE_LS)) || {}; if (gone) delete o[k]; else o[k] = Object.assign({ m: n.m, k3: !!n.k3, bl: bc > 0, bc, at }, bc || sk.length ? { nm: n.nm || "", p4: n.p4 || "" } : {}, bc ? { bcAt: n.bcAt || TODAY } : {}, bc && n.r3 ? { r3: n.r3, r3At: n.r3At || at } : {}, sk.length ? { sk } : {}); localStorage.setItem(NOTE_LS, JSON.stringify(o)); } catch (e) { /* 저장 못 해도 화면은 그대로 */ }
       n.at = gone ? "" : at; show(true, gone ? "" : `${hm(now)} 저장`); return;
     }
-    window.desk.notes.set({ key: k, m: n.m, k3: !!n.k3, bl: !!n.bl }).then((r) => {
+    window.desk.notes.set(Object.assign({ key: k, m: n.m, k3: !!n.k3, bc, bl: bc > 0, nm: n.nm || "", p4: n.p4 || "", sk }, bc && n.r3 ? { r3: n.r3, r3At: n.r3At || "" } : {})).then((r) => {
       if (!r || !r.ok) { show(false, `저장 못 함: ${(r && r.why) || "응답 없음"}`); return; }
       const cur = NOTES.get(k); if (cur) cur.at = r.note ? r.note.at : ""; // 쓰는 중인 글은 화면 것을 그대로
       show(true, r.note ? `${noteAtText(r.note.at)} 저장` : "");
@@ -3037,9 +3133,12 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   /** 지금 창의 네이버 손님 (예약자 창 · 열쇠 창) */
   const noteTarget = () => (sheet.mode === "enter" ? findB(sheet.id) : sheet.mode === "key" ? holderById(sheet.hid) : null);
   /** 이름 옆 체크 두 개 — [3자녀] [BC](블랙컨슈머) (사장님 10/20) */
-  const noteChecks = (b) => { if (!noteKey(b)) return ""; const n = noteOf(b) || {}; return `<span class="notechk"><label class="k3"><input type="checkbox" id="note-k3" ${n.k3 ? "checked" : ""}> 3자녀</label><label class="bl" title="블랙컨슈머"><input type="checkbox" id="note-bl" ${n.bl ? "checked" : ""}> BC</label></span>`; };
+  const noteChecks = (b) => { if (!noteKey(b)) return ""; const n = noteOf(b) || {}, lv = bcOf(b); return `<span class="notechk"><label class="k3"><input type="checkbox" id="note-k3" ${n.k3 ? "checked" : ""}> 3자녀</label><span class="bcset" title="블랙컨슈머 1 · 2 · 3아웃 — 누르면 그 단계 · 같은 단계를 다시 누르면 한 단계 내림">BC ${[1, 2, 3].map((k) => `<button type="button" class="bcdot ${lv >= k ? "on" : ""}" data-act="bcSet" data-n="${k}" aria-pressed="${lv >= k}" aria-label="BC ${k}아웃">${k}</button>`).join("")}</span></span>`; };
   /** 메모 2줄 (스크롤 없이 · 2줄을 넘으면 더 안 써짐) */
-  const noteRow = (b) => { if (!noteKey(b)) return ""; const n = noteOf(b) || {}; return `<dt>메모</dt><dd class="notecell"><textarea id="note-m" class="notein" rows="2" maxlength="${NOTE_MAX}" spellcheck="false" aria-label="고객 메모" placeholder="고객 메모 (2줄) — 이 PC에 저장 · 다음 방문에도 보여요">${esc(n.m || "")}</textarea><span class="help" id="note-at">${n.at ? `${noteAtText(n.at)} 저장` : ""}</span></dd>`; };
+  const bcWhyText = (n) => (n && n.r3 ? `${esc(n.r3)} <span class="help">${n.r3At ? `${+n.r3At.slice(5, 7)}/${+n.r3At.slice(8, 10)} ${n.r3At.slice(11, 16)}` : ""}</span>` : "");
+  /** 3아웃 사유 창 (고객 카드에서 ③ 누르는 순간) — 쓰고 [확인]해야 3아웃 */
+  const bcAskHtml = () => (!sheet.bcAsk ? "" : `<div class="bcask" role="dialog" aria-modal="true" aria-labelledby="bc-ask-t"><div><b id="bc-ask-t" class="bcwhy">③ 3아웃 사유</b><span class="help">사유를 남겨야 3아웃이 돼요 — 그때부터 예약 불가 대응 (나중에도 이유를 볼 수 있어요)</span><textarea id="bc-why" maxlength="200" placeholder="예: 직원에게 폭언 · 규칙 위반 반복 …"></textarea><div class="btns" style="justify-content:flex-end"><button class="btn" data-act="bc3No">취소</button><button class="btn btn-ink" data-act="bc3Ok">확인 — 3아웃</button></div></div></div>`);
+  const noteRow = (b) => { if (!noteKey(b)) return ""; const n = noteOf(b) || {}; return `${n.r3 && bcOf(b) >= 1 ? `<dt>${bcOf(b) >= 3 ? "3아웃 사유" : "지난 3아웃 사유"}</dt><dd class="bcwhy">${bcWhyText(n)}</dd>` : ""}<dt>메모</dt><dd class="notecell"><textarea id="note-m" class="notein" rows="2" maxlength="${NOTE_MAX}" spellcheck="false" aria-label="고객 메모" placeholder="고객 메모 (2줄) — 이 PC에 저장 · 다음 방문에도 보여요">${esc(n.m || "")}</textarea><span class="help" id="note-at">${n.at ? `${noteAtText(n.at)} 저장` : ""}</span></dd>`; };
   /** 2줄 칸에 맞춤: 줄바꿈은 한 번까지 · 칸을 넘는 글자는 뒤에서 뺌 (스크롤 없음) */
   function noteFit(t) {
     const p = t.value.split("\n");
@@ -4373,6 +4472,75 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     // 운영 설정 V2.0: [?] 설명 펼치기 · 프린트물 (입장권 양식 / 재방문 이벤트)
     qhelp(btn) { const t = btn.nextElementSibling; if (!t || !t.classList.contains("qtext")) return; t.hidden = !t.hidden; btn.setAttribute("aria-expanded", String(!t.hidden)); },
     psub(btn) { sheet.psub = btn.dataset.s === "event" ? "event" : "ticket"; renderSheet(); },
+    // ── 고객 세부 관리 (사장님 10/26) ──
+    csub(btn) { sheet.csub = btn.dataset.s === "skip" ? "skip" : "bc"; renderSheet(); },
+    /** BC 아웃별 대응 스위치 (켜짐 · 꺼짐) */
+    bcToggle(btn) { const k = "o" + btn.dataset.k; RULES.bc[k] = !RULES.bc[k]; saveBc(); renderAll(); renderSheet(); toast(`BC ${btn.dataset.k}아웃 대응 ${RULES.bc[k] ? "켬" : "끔"}`); },
+    /** 예약자 창 · 열쇠 창 이름 옆 BC ①②③ — 그 단계로 · 같은 단계를 다시 누르면 한 단계 내림 */
+    bcSet(btn) {
+      const b = noteTarget(); if (!b) return;
+      const k = Number(btn.dataset.n), lv = bcOf(b), nv = lv === k ? k - 1 : k;
+      if (nv === 3 && lv < 3) { sheet.bcAsk = true; renderSheet(); setTimeout(() => { const t = $("bc-why"); if (t) t.focus(); }, 30); return; } // 3아웃은 사유를 쓰고 [확인]해야 (사장님 10/26)
+      noteChange(b, { bc: nv, bl: nv > 0, nm: b.name || "", p4: digits(b.phone || "").slice(-4) }, true);
+      renderRes(); renderSheet();
+      toast(nv ? `${b.name}님 BC ${nv}아웃 — ${bcWhat(nv)}` : `${b.name}님 BC 표시를 뺐어요`, 6000);
+    },
+    /** 3아웃 사유 창 [확인] → 그때부터 3아웃 대응 · 사유 · 시각을 남김 */
+    bc3Ok() {
+      const b = noteTarget(); if (!b) return;
+      const why = String(($("bc-why") || {}).value || "").replace(/\s+/g, " ").trim();
+      if (why.length < 2) { toast("3아웃 사유를 적어 주세요"); const t = $("bc-why"); if (t) t.focus(); return; }
+      sheet.bcAsk = false;
+      noteChange(b, { bc: 3, bl: true, r3: why.slice(0, 200), r3At: `${TODAY} ${hm(now)}`, nm: b.name || "", p4: digits(b.phone || "").slice(-4) }, true);
+      renderRes(); renderSheet();
+      toast(`${b.name}님 BC 3아웃 — ${bcWhat(3)} · 사유를 남겼어요`, 7000);
+    },
+    bc3No() { sheet.bcAsk = false; renderSheet(); },
+    /** 3아웃 손님 예약을 네이버에서 전액 취소 (확인 한 번 · 결제 금액 환불 · 되돌릴 수 없음) */
+    async bcCancel(btn) {
+      const b = findB(btn.dataset.id); if (!b || b.bcBusy || b.status !== "확정") return;
+      if (!APP) { toast("체험판: 설치한 앱에서 네이버 예약을 전액 취소해요"); return; }
+      if (!confirm(`${b.name}님 ${b.day === TODAY ? "오늘" : b.day} ${hm(b.naverSlot ?? b.slot)} · ${b.qty}장\n\n3아웃 고객 예약을 네이버에서 전액 취소할까요?\n결제한 금액이 환불되고 되돌릴 수 없어요.`)) return;
+      b.bcBusy = true; renderAll(); if (sheet.mode) renderSheet();
+      const r = await window.desk.naver.cancelPaid({ day: b.day, time: hm(b.naverSlot ?? b.slot), product: b.naverProduct || "", no: b.no, qty: b.qty }).catch((e) => ({ ok: false, why: String(e) }));
+      b.bcBusy = false;
+      if (r && r.ok) {
+        const arr = bookings[b.day] || [], i = arr.indexOf(b); if (i >= 0) arr.splice(i, 1);
+        const ns = (naverSlots[b.day] || {})[b.slot]; if (ns) ns.conf = Math.max(0, ns.conf - b.qty);
+        if (sheet.mode === "enter" && sheet.id === b.id) closeSheet();
+        toast(`3아웃 고객 예약 전액 취소: ${b.name} ${hm(b.slot)} ${b.qty}장`, 7000);
+      } else toast(`전액 취소 실패: ${b.name} — ${(r && r.why) || "응답 없음"} (네이버에서 직접 취소해 주세요)`, 9000);
+      renderAll(); if (sheet.mode) renderSheet();
+    },
+    /** 목록에서 BC 단계 바꾸기 */
+    async bcLevel(btn) {
+      const x = (custList || []).find((y) => y.id === btn.dataset.id); if (!x) return;
+      const k = Number(btn.dataset.n), nv = x.bc === k ? k - 1 : k;
+      if (nv === 3 && x.bc < 3) { toast("3아웃은 고객 카드(예약자 창 · 열쇠 창)에서 사유를 쓰고 올려요"); return; }
+      await custPatch(x, { bc: nv });
+      toast(nv ? `${x.nm || "손님"} BC ${nv}아웃 — ${bcWhat(nv)}` : `${x.nm || "손님"} BC 표시를 뺐어요`);
+    },
+    /** 마일리지 SKIP 등록: 고객명 · 전화번호 · N번째 → 그 손님의 N번째 예약완료에 사은권을 안 띄움 */
+    async skipAdd() {
+      const name = ($("sk-name").value || "").trim(), ph = digits($("sk-phone").value || ""), n = Math.round(Number($("sk-n").value));
+      if (!name) { toast("고객명을 넣어 주세요"); return; }
+      if (!/^01\d{8,9}$/.test(ph)) { toast("전화번호를 다 넣어 주세요 (예: 010-1234-5678)"); return; }
+      if (!(n >= 1 && n <= 999)) { toast("몇 번째인지 숫자로 넣어 주세요"); return; }
+      const b = { name, phone: ph };
+      if (NOTE_APP() && !NOTES.has(ph)) { const r = await window.desk.notes.get({ keys: [ph] }).catch(() => null); NOTES.set(ph, (r && r.ok && r.notes[ph]) || null); } // 있던 메모 · 표시는 그대로
+      const cur = skipOf(b);
+      if (cur.includes(n)) { toast(`이미 등록됨: ${name} ${n}번째`); return; }
+      noteChange(b, { sk: cur.concat([n]).sort((p2, q2) => p2 - q2), nm: (noteOf(b) || {}).nm || name, p4: ph.slice(-4) }, true);
+      $("sk-name").value = ""; $("sk-phone").value = ""; $("sk-n").value = "";
+      toast(`마일리지 SKIP 등록: ${name} ${n}번째 — 그때 사은권을 안 띄워요`, 6000);
+      renderRes(); setTimeout(renderSheet, 300);
+    },
+    async skipDel(btn) {
+      const x = (custList || []).find((y) => y.id === btn.dataset.id); if (!x) return;
+      const n = Number(btn.dataset.n);
+      await custPatch(x, { sk: x.sk.filter((v) => v !== n) });
+      toast(`마일리지 SKIP 지움: ${x.nm || "손님"} ${n}번째`);
+    },
     // 근무자 등록 (메인 화면 상자 · 사장님 10/21)
     staffAdd() {
       if (MEMO.staff.length >= 30) { toast("근무자는 30명까지예요"); return; }
@@ -4575,12 +4743,13 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     // 메모장 (V2.0): 쓰던 글은 다시 그려도 남게 · 찾기는 아래만 다시
     if (sheet.mode === "memo" && (t.id === "memo-new" || t.id === "memo-msg")) sheet.draft[t.id] = t.value;
     if (t.id === "wev-name") { WEV.name = t.value.trim().slice(0, 10); wevSave(); $("wev-preview").textContent = `[${wevLabel()}]`; }
+    if (t.id === "bc-q") { sheet.bcq = t.value; renderSheet(); } // BC 손님 찾기 (사장님 10/26)
     if (t.id === "memo-admin") { MEMO.admin = t.value.trim().slice(0, 12) || "관리자"; memoSaveSoon(); }
     if (t.id === "memo-q") { sheet.q = t.value; $("memo-body").innerHTML = memoBodyHtml(); }
     if (t.classList.contains("staffname")) { const s = MEMO.staff[Number(t.dataset.i)]; if (s) { s.name = t.value.trim().slice(0, 12); memoSaveSoon(); } }
     // 고객 메모 (사장님 10/20): 메모는 2줄에 맞춰 0.6초 뒤 저장 · 체크는 바로 저장하고 이름 색을 바꿈
     if (t.id === "note-m") { const b = noteTarget(); if (b) { noteFit(t); noteChange(b, { m: t.value }); } }
-    if (t.id === "note-k3" || t.id === "note-bl") {
+    if (t.id === "note-k3") {
       const b = noteTarget();
       if (b) { const f = t.id === "note-k3" ? "k3" : "bl"; noteChange(b, { [f]: t.checked }, true); renderRes(); renderSheet(); toast(`${b.name}님 ${f === "k3" ? "3자녀" : "BC"} ${t.checked ? "표시 — 이름이 " + (f === "k3" ? "노랑" : "빨강") + "으로 보여요" : "표시를 뺐어요"}`); }
     }

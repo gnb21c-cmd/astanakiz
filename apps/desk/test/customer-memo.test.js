@@ -28,15 +28,15 @@ test("고객 메모(체험판): 체크 두 개 → 이름 노랑 · 빨강 · �
     const card = page.locator(".res:not(.done)").first();
     const name = (await card.locator(".name").textContent()).trim();
     await card.click();
-    assert.match(await page.textContent("#sheet .facts"), /3자녀\s*BC/, "이름 옆 체크 두 개 (상자 이름 '3자녀' · 'BC')");
+    assert.match(await page.textContent("#sheet .facts"), /3자녀\s*BC\s*123/, "이름 옆 [3자녀] 다음 BC ①②③ (사장님 10/26)");
     assert.strictEqual(await page.inputValue("#note-m"), "", "네이버 메모는 불러오지 않음 — 처음엔 빈칸");
     // 3자녀가정 → 노랑 (밝은 화면은 짙은 노랑)
     await page.check("#note-k3");
     assert.strictEqual(await page.$eval("#sheet .facts .nm-k3", (e) => getComputedStyle(e).color), "rgb(168, 116, 0)");
     assert.match(await page.textContent("#toast"), /3자녀 표시 — 이름이 노랑/);
     assert.ok(await page.$(`.res .name .nm-k3`), "예약 카드 이름도 노랑");
-    // 블랙컨슈머 → 빨강 (둘 다면 빨강)
-    await page.check("#note-bl");
+    // 블랙컨슈머(BC 1아웃) → 빨강 (둘 다면 빨강)
+    await page.click('#sheet [data-act=bcSet][data-n="1"]');
     assert.ok(await page.$("#sheet .facts .nm-bl"));
     assert.strictEqual(await page.$("#sheet .facts .nm-k3"), null, "둘 다면 빨강");
     // 메모: 줄바꿈은 한 번까지 · 2줄을 넘으면 더 안 써짐 (스크롤 없음)
@@ -56,7 +56,7 @@ test("고객 메모(체험판): 체크 두 개 → 이름 노랑 · 빨강 · �
     const saved = await page.evaluate(() => window.__deskTest.notes());
     const key = Object.keys(saved)[0];
     assert.match(key, /^010\d{8}$/, "손님 = 전화번호");
-    assert.deepStrictEqual([saved[key].k3, saved[key].bl, saved[key].m.startsWith("첫 줄\n둘째 줄")], [true, true, true]);
+    assert.deepStrictEqual([saved[key].k3, saved[key].bc, saved[key].m.startsWith("첫 줄\n둘째 줄")], [true, 1, true]);
     const box = await page.evaluate(() => document.getElementById("sheet").getBoundingClientRect().bottom);
     assert.ok(box <= 768, "예약자 창이 화면 안 " + box);
     await close(page);
@@ -68,7 +68,7 @@ test("고객 메모(체험판): 체크 두 개 → 이름 노랑 · 빨강 · �
     assert.ok(await page.$(".res .name .nm-bl"), "다시 켜도 빨강");
     await page.locator(".res:not(.done)").first().click();
     assert.match(await page.inputValue("#note-m"), /^첫 줄\n둘째 줄/);
-    assert.ok(await page.isChecked("#note-k3") && await page.isChecked("#note-bl"));
+    assert.ok(await page.isChecked("#note-k3") && (await page.getAttribute('#sheet [data-act=bcSet][data-n="1"]', "aria-pressed")) === "true");
     // 입장 → 열쇠 창에도 같은 메모 · 체크 (입장 뒤에도 고칠 수 있음)
     for (let i = 0; i < 6 && !(await page.$("#enter-done:not([disabled])")); i++) await page.click(".kpick button:not([disabled]):not(.on) >> nth=0");
     await page.click("#enter-done");
@@ -79,7 +79,7 @@ test("고객 메모(체험판): 체크 두 개 → 이름 노랑 · 빨강 · �
     const kbox = await page.evaluate(() => document.getElementById("sheet").getBoundingClientRect().bottom);
     assert.ok(kbox <= 768, "열쇠 창이 화면 안 " + kbox);
     // 다 지우면 그 손님 메모가 없어짐
-    await page.uncheck("#note-bl");
+    await page.click('#sheet [data-act=bcSet][data-n="1"]'); // 같은 단계를 다시 누르면 한 단계 내림 → 0
     await page.uncheck("#note-k3");
     await page.fill("#note-m", "");
     await close(page);
@@ -126,7 +126,7 @@ test("고객 메모(앱): 앱 본체에 손님 메모를 한 번에 물음 · �
     assert.match(await page.textContent("#note-at"), /10\/12 저장/);
     // 3자녀가정 체크 → 바로 저장
     await page.check("#note-k3");
-    assert.deepStrictEqual((await nt()).set, [{ key: "01031346005", m: "지난번 열쇠 늦게 반납", k3: true, bl: true }]);
+    assert.deepStrictEqual((await nt()).set, [{ key: "01031346005", m: "지난번 열쇠 늦게 반납", k3: true, bc: 1, bl: true, nm: "", p4: "", sk: [] }], "예전 BC 체크 = 1아웃");
     // 메모 쓰기 → 쓰는 동안은 안 보내고 0.6초 뒤 한 번
     await page.click("#note-m");
     await page.keyboard.press("End");

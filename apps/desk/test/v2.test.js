@@ -70,7 +70,7 @@ test("메모 파일(2번 모양): 모르는 칸 · 틀린 값은 버림 · 길�
   assert.deepStrictEqual(M.load(dir).staff, [{ id: "a1", name: "민지" }], "1번 모양 파일도 읽음");
 });
 
-test("시계를 1.5초 안에 두 번 → 운영 설정 (버튼 없음) · 왼쪽 메뉴 7개 · 긴 설명은 [?] · 예전 탭 이름도 받음", async () => {
+test("시계를 1.5초 안에 두 번 → 운영 설정 (버튼 없음) · 왼쪽 메뉴 8개 · 긴 설명은 [?] · 예전 탭 이름도 받음", async () => {
   const browser = await launch();
   try {
     const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
@@ -91,7 +91,7 @@ test("시계를 1.5초 안에 두 번 → 운영 설정 (버튼 없음) · 왼�
     await page.clock.runFor(700);
     await page.click("#now");
     assert.ok(await page.isVisible("#sheet .setnav"), "1.5초 안 두 번 → 운영 설정");
-    assert.deepStrictEqual(await page.$$eval("#sheet .setnav button span", (e) => e.map((x) => x.textContent)), ["비성수기 설정", "프린터 설정", "프린트물 설정", "근무자 등록", "API 연결 설정", "네이버 설정", "기타"]);
+    assert.deepStrictEqual(await page.$$eval("#sheet .setnav button span", (e) => e.map((x) => x.textContent)), ["비성수기 설정", "프린터 설정", "프린트물 설정", "근무자 등록", "API 연결 설정", "네이버 설정", "고객 세부 관리", "기타"]); // 고객 세부 관리 (사장님 10/26)
     // 긴 설명은 숨김 → [?] 를 누르면 보임
     const q = page.locator("#setbody .qhelp").first();
     const t = page.locator("#setbody .qtext").first();

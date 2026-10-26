@@ -34,7 +34,7 @@ test("설문조사: 신규 예약자는 번호를 눌러야 열쇠 · 현장구�
 
     // 운영 설정 → 기타 (왼쪽 메뉴 맨 아래 · V2.0) → 설문조사
     await openSurvey(page);
-    assert.deepStrictEqual(await page.$$eval("#sheet .setnav button span", (e) => e.map((x) => x.textContent.trim())), ["비성수기 설정", "프린터 설정", "프린트물 설정", "근무자 등록", "API 연결 설정", "네이버 설정", "기타"]);
+    assert.deepStrictEqual(await page.$$eval("#sheet .setnav button span", (e) => e.map((x) => x.textContent.trim())), ["비성수기 설정", "프린터 설정", "프린트물 설정", "근무자 등록", "API 연결 설정", "네이버 설정", "고객 세부 관리", "기타"]);
     assert.strictEqual(await page.getAttribute("#sheet .setnav [data-t=etc]", "aria-current"), "page");
     await page.fill("#sv-from", "2026-10-05");
     await page.fill("#sv-to", "2026-10-31");

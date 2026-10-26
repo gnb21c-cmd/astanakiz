@@ -348,10 +348,11 @@ function installNaverDriver() {
       return { ok: true, had: true };
     },
     /** 예약번호 카드의 [예약취소] (입금대기 자동 취소) — 결제한 예약([이용완료]가 있는 카드)은 누르지 않음 */
-    cancel(no) {
+    cancel(no, paidOk) {
       const card = cards().find((c) => field(c, "예약번호") === String(no));
       if (!card) return { ok: false, why: `예약번호 ${no} 카드를 못 찾음` };
-      if (clickables(card).some((e) => textOf(e) === "이용완료")) return { ok: false, paid: true, why: "결제한 예약([이용완료] 있음) — 취소 안 함" };
+      // paidOk = BC 3아웃 [전액 취소] 버튼에서만 (사장님 10/26 · 근무자가 확인한 뒤) — 그 밖에는 결제한 예약을 안 누름
+      if (!paidOk && clickables(card).some((e) => textOf(e) === "이용완료")) return { ok: false, paid: true, why: "결제한 예약([이용완료] 있음) — 취소 안 함" };
       const b = clickables(card).find((e) => textOf(e) === "예약취소");
       if (!b) return { ok: false, why: "[예약취소] 버튼이 없음" };
       b.setAttribute("data-astana-cancel", "1");

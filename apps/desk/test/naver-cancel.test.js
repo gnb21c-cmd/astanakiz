@@ -78,3 +78,22 @@ test("데스크: 네이버를 불러오면 2시간 안의 입금대기 예약을
     await browser.close();
   }
 });
+
+test("BC 3아웃 [전액 취소] (사장님 10/26): 결제한 예약도 cancelPaid 로만 취소 (cancel 은 그대로 안 함) · 칸 숫자로 확인", async () => {
+  const browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
+  try {
+    const page = await browser.newPage();
+    await page.goto(MOCK);
+    await page.evaluate(() => localStorage.clear());
+    await page.goto(MOCK);
+    const sync = new NaverSync((code) => page.evaluate(code), { urls: { list: MOCK + "?view=list", calendar: MOCK + "?view=calendar" } });
+    const b = { day: "2026-10-05", time: "16:00", product: P0, no: "1372961203", qty: 1 };
+    let c = await sync.cancel(b);
+    assert.ok(!c.ok && c.paid, "보통 취소는 결제한 예약을 안 누름");
+    c = await sync.cancelPaid(b); // main.js 는 naver:cancel 에 paidOk 를 늘 false 로 · 결제한 예약은 naver:cancelPaid 로만
+    const r0 = await sync.loadDay("2026-10-05");
+    assert.ok(c.ok && !r0.bookings.some((x) => x.no === b.no), "결제한 예약 취소됨 " + JSON.stringify(c));
+  } finally {
+    await browser.close();
+  }
+});

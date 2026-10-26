@@ -20,7 +20,7 @@ test("쓰기 · 지우기 · 저장 · 다시 읽기 (해시만) · 깨지면 ba
   let d = N.load(dir);
   assert.deepStrictEqual(d, { v: 1, notes: {} });
   const k = hashKey("salt", "01031346005");
-  assert.deepStrictEqual(N.set(d, k, { m: "생일 파티 문의", k3: true }, "2026-10-20 11:52:31"), { m: "생일 파티 문의", k3: true, bl: false, at: "2026-10-20 11:52" });
+  assert.deepStrictEqual(N.set(d, k, { m: "생일 파티 문의", k3: true }, "2026-10-20 11:52:31"), { m: "생일 파티 문의", k3: true, bc: 0, bl: false, at: "2026-10-20 11:52" });
   N.save(dir, d);
   assert.deepStrictEqual(N.load(dir), d);
   const text = fs.readFileSync(path.join(dir, N.FILE), "utf8");
@@ -40,4 +40,30 @@ test("쓰기 · 지우기 · 저장 · 다시 읽기 (해시만) · 깨지면 ba
   // 둘 다 깨짐 → 새로
   fs.writeFileSync(path.join(dir, N.FILE), "x"); fs.writeFileSync(path.join(dir, N.BAK), "y");
   assert.deepStrictEqual(N.load(dir), { v: 1, notes: {} });
+});
+
+test("BC 1 · 2 · 3아웃 · 마일리지 SKIP (사장님 10/26): 단계 0 ~ 3 · 예전 bl = 1아웃 · BC · SKIP 손님만 이름 · 뒷 4자리 (전체 번호 없음) · 목록 3아웃부터 · 목록에서 바꾸기 · 다 풀면 지움", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cn-"));
+  const d = N.load(dir);
+  const a = hashKey("salt", "01011112222"), b = hashKey("salt", "01033334444"), c = hashKey("salt", "01055556666");
+  assert.strictEqual(N.bcOf({ bl: true }), 1, "예전 블랙컨슈머 체크 = 1아웃");
+  assert.deepStrictEqual(N.get({ notes: { [a]: { m: "x", bl: true } } }, a), { m: "x", bl: true, bc: 1 });
+  N.set(d, a, { m: "", bc: 3, nm: "가나다", p4: "01011112222" }, "2026-10-26 10:00");
+  N.set(d, b, { m: "메모", k3: true, bc: 1, nm: "라마바", p4: "4444" }, "2026-10-26 11:00");
+  N.set(d, c, { m: "", sk: [10, 10, 0, 20], nm: "사아자", p4: "6666" }, "2026-10-26 12:00");
+  assert.deepStrictEqual(N.get(d, a), { m: "", k3: false, bc: 3, bl: true, at: "2026-10-26 10:00", nm: "가나다", p4: "2222", bcAt: "2026-10-26" }, "뒷 4자리만");
+  assert.deepStrictEqual(N.get(d, c).sk, [10, 20], "SKIP 회차: 겹침 · 0 은 빼고 작은 순");
+  assert.deepStrictEqual(N.list(d).map((x) => [x.nm, x.bc, x.sk]), [["가나다", 3, []], ["라마바", 1, []], ["사아자", 0, [10, 20]]], "3아웃부터 · 그다음 SKIP 만 있는 손님");
+  // 메모 · 3자녀만 있는 손님은 이름 · 번호를 안 둠
+  N.set(d, b, { m: "메모", k3: true, bc: 0 }, "2026-10-26 13:00");
+  assert.deepStrictEqual(Object.keys(N.get(d, b)).sort(), ["at", "bc", "bl", "k3", "m"], "BC 를 풀면 이름 · 번호도 지움");
+  // 목록에서 단계 · SKIP 바꾸기
+  assert.strictEqual(N.patch(d, a, { bc: 2 }, "2026-10-27 09:00").bc, 2);
+  assert.strictEqual(N.get(d, a).bcAt, "2026-10-27", "단계를 바꾼 날");
+  assert.deepStrictEqual(N.patch(d, c, { sk: [20] }, "x").sk, [20]);
+  assert.strictEqual(N.patch(d, c, { sk: [] }, "x"), null, "다 풀면 지움");
+  assert.strictEqual(N.patch(d, "nothex", { bc: 1 }, "x"), null);
+  N.save(dir, d);
+  const text = fs.readFileSync(path.join(dir, N.FILE), "utf8");
+  assert.ok(!/01011112222|1111/.test(text), "파일에 전체 전화번호 없음");
 });

@@ -368,6 +368,10 @@ class NaverSync {
   }
   /** 입금대기 예약 취소: 그 칸의 [확정] → 카드를 지금 다시 읽어 아직 입금대기([이용완료] 없음 · 결제완료 아님)인지 확인 → [예약취소] → 확인 창 → 칸 숫자로 확인
       b = { day, time, product, no, qty } · 결제했으면 누르지 않음 */
+  /** BC 3아웃 손님 예약 전액 취소 (사장님 10/26) — 근무자가 데스크 [전액 취소]를 누르고 확인했을 때만 · 결제한 예약도 [예약취소] → 확인 창 → 칸 숫자로 확인 */
+  cancelPaid(b) {
+    return this.cancel(Object.assign({}, b, { paidOk: true }));
+  }
   async cancel(b) {
     let g = await this.goView("calendar");
     if (!g.ok) return g;
@@ -381,10 +385,10 @@ class NaverSync {
     for (let i = 0; i < 30 && !(await this.read()).cards.some((c) => c.no === b.no); i++) if (!(await this.moreCards())) break;
     const card = (await this.read()).cards.find((c) => c.no === b.no);
     if (!card) return { ok: false, why: `네이버에서 예약번호 ${b.no} 카드를 못 찾음` };
-    if (card.canComplete || /결제완료/.test(card.pay || "")) return { ok: false, paid: true, why: "결제한 예약 — 취소 안 함" };
+    if (!b.paidOk && (card.canComplete || /결제완료/.test(card.pay || ""))) return { ok: false, paid: true, why: "결제한 예약 — 취소 안 함" };
     if (!card.canCancel) return { ok: false, why: "[예약취소] 버튼이 없음" };
-    this.step(`네이버 입금대기 ${b.time} 예약 취소`);
-    r = await this.act(`window.__naver.cancel(${JSON.stringify(b.no)})`);
+    this.step(`네이버 ${b.paidOk ? "3아웃 손님" : "입금대기"} ${b.time} 예약 취소`);
+    r = await this.act(`window.__naver.cancel(${JSON.stringify(b.no)}, ${b.paidOk ? "true" : "false"})`);
     if (!r.ok) return r;
     this.snap("예약취소 누른 뒤");
     for (let i = 0; i < 20; i++) {
