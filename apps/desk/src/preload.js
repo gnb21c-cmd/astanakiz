@@ -18,7 +18,7 @@ contextBridge.exposeInMainWorld("desk", {
     complete: (b) => ipcRenderer.invoke("naver:complete", b),
     setCap: (c) => ipcRenderer.invoke("naver:setCap", c),
     cancel: (b) => ipcRenderer.invoke("naver:cancel", b), // 입금대기 예약 취소 // 판매 수량 바꾸기 { day, product, time, n }
-    cancelPaid: (b) => ipcRenderer.invoke("naver:cancelPaid", b), // BC 3아웃 전액 취소 (근무자가 확인한 뒤 · 사장님 10/26)
+    cancelPaid: (b) => ipcRenderer.invoke("naver:cancelPaid", b), // BC 3아웃 자동 전액 취소 (전액환불을 고른 뒤 [예약 취소] · 사장님 10/26)
     show: () => ipcRenderer.invoke("naver:show"),
     setHome: () => ipcRenderer.invoke("naver:setHome"),
     dump: () => ipcRenderer.invoke("naver:dump"),

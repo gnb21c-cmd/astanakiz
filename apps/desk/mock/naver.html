@@ -15,6 +15,8 @@
      ?login=need 로그인 화면
      대리예약(예약자 옆 '대리예약' 스티커 + '방문자 박소희(010-…)') · 입금대기(결제상태 '입금대기', [예약취소]만 길게 — 이용완료 없음)
        [예약취소] → "예약을 취소하시겠습니까?" [확인] → 취소 (현장 화면 10/8)
+     결제한 예약의 [예약취소] → 오른쪽이 '예약 취소' 화면: 환불기준 · 선택항목 전체 적용 ○ 전액환불 / ● 동의된 환불기준(이용 당일 0% 환불)
+       · 상품주문번호별 적용(결제금액 정률 % · 정액 원) · 맨 아래 초록 [예약 취소] → 바로 취소 (현장 화면 10/26) · &refund=stuck 전액환불이 안 골라짐
      예약가능 · 잔여예약 버튼 → 오른쪽 "예약정보 / 예약가능 n / 예약가능 설정": 상품 · 적용날짜 · 적용회차 · 수량(회차당 수량 입력칸) · 예약현황 n / n
                      · [변경취소] [설정변경] → "변경하시겠습니까?" 창 [확인] → 그 칸의 판매 수량이 바뀜 (현장 화면 10/6) -->
 <style>
@@ -30,6 +32,11 @@
   [class*="List__contents-box"] { border-bottom: 1px solid #ddd; padding: 8px 0; }
   [class*="Summary__item__"] { display: flex; gap: 8px; }
   [class*="List__list-wrap"] { height: 260px; overflow-y: auto; }
+  .Radio__item__r2 { position: relative; padding: 4px 0 4px 22px; }
+  .Radio__input__r2 { position: absolute; left: 0; top: 6px; width: 14px; height: 14px; margin: 0; opacity: 0; }
+  .Radio__label__r2::before { content: ""; position: absolute; left: 0; top: 6px; width: 12px; height: 12px; border: 1px solid #999; border-radius: 50%; }
+  .Radio__input__r2:checked + .Radio__label__r2::before { background: #03c75a; border-color: #03c75a; }
+  .CancelView__scroll__c7 { max-height: 520px; overflow-y: auto; }
   .layer { position: fixed; top: 30%; left: 35%; background: #fff; border: 2px solid #333; padding: 16px; }
 </style>
 </head>
@@ -184,6 +191,35 @@
       const tab = e.target.closest("[data-tab]");
       if (tab) { e.preventDefault(); setTimeout(() => go({ sel: JSON.stringify(Object.assign(sel, { s: tab.dataset.tab })) }), 150); return; }
       const cx = e.target.closest("[data-cancel]");
+      if (cx && !db[day].find((y) => y.no === cx.dataset.cancel).unpaid) {
+        // 결제한 예약 (현장 화면 10/26): 오른쪽이 '예약 취소' 화면으로 바뀜 → 환불기준 · 선택항목 전체 적용 ○ 전액환불 / ● 동의된 환불기준(기본)
+        //   · 상품주문번호별 적용 · 맨 아래 초록 [예약 취소] → 확인 창 없이 바로 취소 (고른 환불을 x.refund 에 남김)
+        //   &refund=stuck  전액환불을 눌러도 안 바뀜 (그때 [예약 취소]를 누르면 안 됨)
+        const x = db[day].find((y) => y.no === cx.dataset.cancel);
+        const aside = document.querySelector("aside");
+        const [ap, hm] = ampm(x.time);
+        setTimeout(() => {
+          aside.innerHTML = `<div class="CancelView__root__c7"><div class="CancelView__head__c7"><button type="button" class="btn_back" aria-label="뒤로" onclick="go({})">‹</button> <b>예약 취소</b> <button type="button" class="btn_close" aria-label="닫기" onclick="go({sel:''})">×</button></div>
+            <div class="CancelView__scroll__c7"><div><span class="badge">확정</span> <strong>${x.name}</strong> <a href="#">${visitText(x)}</a></div>
+            <dl><dt>예약자</dt><dd>${x.name}</dd><dt>예약번호</dt><dd>${x.no}</dd><dt>상품</dt><dd>${PRODUCTS[x.product]}</dd><dt>이용일시</dt><dd>${D.getFullYear()}. ${D.getMonth() + 1}. ${D.getDate()}.(${DOW[D.getDay()]}) ${ap} ${hm}</dd><dt>수량</dt><dd>[평일할인]4인 입장권 ${x.qty}</dd></dl>
+            <h3>환불기준</h3>
+            <h4>선택항목 전체 적용</h4>
+            <div class="Radio__item__r2"><input type="radio" class="Radio__input__r2" name="refund" id="rf-full" value="full"><label for="rf-full" class="Radio__label__r2">전액환불</label></div>
+            <div class="Radio__item__r2"><input type="radio" class="Radio__input__r2" name="refund" id="rf-agreed" value="agreed" checked><label for="rf-agreed" class="Radio__label__r2">동의된 환불기준</label></div>
+            <div class="CancelView__policy__c7">이용 당일 <em>0%</em> 환불</div>
+            <h4>상품주문번호별 적용</h4>
+            <div class="Radio__item__r2"><input type="radio" class="Radio__input__r2" name="refund" id="rf-rate" value="rate"><label for="rf-rate" class="Radio__label__r2">결제금액</label> <input type="text" placeholder="정률" value="0">% 환불</div>
+            <div class="Radio__item__r2"><input type="radio" class="Radio__input__r2" name="refund" id="rf-amount" value="amount"><label for="rf-amount" class="Radio__label__r2">결제금액</label> <input type="text" placeholder="정액" value="0">원 환불</div>
+            <p class="notice">고객에게 상품주문번호별로 설정한 금액이 환불됩니다.</p>
+            <button type="button" class="green" id="refund-submit">예약 취소</button></div></div>`;
+          if (P.get("refund") === "stuck") aside.querySelector("#rf-full").addEventListener("click", (ev) => ev.preventDefault());
+          aside.querySelector("#refund-submit").onclick = () => {
+            x.status = "취소"; x.cancel += 1; x.refund = aside.querySelector("input[name=refund]:checked").value; save();
+            setTimeout(() => go({ sel: "" }), 200);
+          };
+        }, 300);
+        return;
+      }
       if (cx) {
         const x = db[day].find((y) => y.no === cx.dataset.cancel);
         const layer = document.createElement("div");

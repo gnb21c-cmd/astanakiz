@@ -2476,7 +2476,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
         return { html: head + `
           <div class="setcard plain stack"><b>BC(블랙컨슈머) 대응</b>
             <span class="help">예약자 창 · 열쇠 창 이름 옆 <b>BC ①②③</b>을 눌러 정해요 — 야구 아웃처럼 쌓여요 (2아웃이면 1 · 2아웃 대응 모두 · 같은 단계를 다시 누르면 한 단계 내림) · <b>③은 사유를 쓰고 [확인]해야</b> 3아웃 (아래 목록에서는 내리기만)</span>
-            ${[[1, "고객 카드 테두리 빨강", "예약 카드 · 예약자 창 · 열쇠 창"], [2, "마일리지 미적용", `누계 · ${RULES.giftEvery}회 사은권을 안 띄움 (입장권에도 없음)`], [3, "예약 불가", "네이버는 예약을 못 막아요 → 정해진 네이버 불러오기 때 3아웃 손님 예약(입장 전)이 보이면 앱이 알아서 전액 취소 (결제 금액 환불 · 되돌릴 수 없음 · 두 번 안 되면 카드에 [다시 취소])"]].map(([k, t, h]) => `<div class="bcrow"><span class="bcdot on">${k}</span><button type="button" class="svswitch ${RULES.bc["o" + k] ? "on" : ""}" role="switch" aria-checked="${!!RULES.bc["o" + k]}" data-act="bcToggle" data-k="${k}" aria-label="${k}아웃 대응"><span class="knob"></span><b>${RULES.bc["o" + k] ? "켜짐" : "꺼짐"}</b></button><span><b>${k}아웃 — ${t}</b> <span class="help">${h}</span></span></div>`).join("")}</div>
+            ${[[1, "고객 카드 테두리 빨강", "예약 카드 · 예약자 창 · 열쇠 창"], [2, "마일리지 미적용", `누계 · ${RULES.giftEvery}회 사은권을 안 띄움 (입장권에도 없음)`], [3, "예약 불가", "네이버는 예약을 못 막아요 → 정해진 네이버 불러오기 때 3아웃 손님 예약(입장 전)이 보이면 앱이 알아서 취소 — 네이버 '예약 취소' 화면에서 ○ 전액환불을 고른 것을 확인한 뒤에만 [예약 취소] (기본 '동의된 환불기준'은 0% 환불 · 되돌릴 수 없음 · 두 번 안 되면 카드에 [다시 취소])"]].map(([k, t, h]) => `<div class="bcrow"><span class="bcdot on">${k}</span><button type="button" class="svswitch ${RULES.bc["o" + k] ? "on" : ""}" role="switch" aria-checked="${!!RULES.bc["o" + k]}" data-act="bcToggle" data-k="${k}" aria-label="${k}아웃 대응"><span class="knob"></span><b>${RULES.bc["o" + k] ? "켜짐" : "꺼짐"}</b></button><span><b>${k}아웃 — ${t}</b> <span class="help">${h}</span></span></div>`).join("")}</div>
           <div class="setcard plain stack"><b>BC 손님 <span class="help">${L.filter((x) => x.bc === 3).length ? `3아웃 ${L.filter((x) => x.bc === 3).length}명 · ` : ""}모두 ${L.filter((x) => x.bc).length}명 · 3아웃부터</span></b>
             <input id="bc-q" class="cfg" placeholder="이름 · 전화번호(뒷 4자리)로 찾기" autocomplete="off" value="${esc(sheet.bcq || "")}">
             <div class="bclist">${custList ? rows || `<span class="help">${q ? "찾는 손님이 없어요" : "BC 손님이 없어요"}</span>` : `<span class="help">읽는 중…</span>`}</div>
@@ -3048,7 +3048,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   const nameHtml = (b) => { const c = nameCls(b); return c ? `<span class="${c}" title="${c === "nm-bl" ? "BC" : "3자녀"}">${esc(b.name)}</span>` : esc(b.name); };
   /* BC(블랙컨슈머) 1 · 2 · 3아웃 (사장님 10/26) — 이름 옆 ①②③ (야구 아웃처럼 쌓임: 2아웃 = 1 · 2아웃 대응 모두)
      운영 설정 → 고객 세부 관리 → BC 관리 스위치(RULES.bc.o1 ~ o3)를 켠 대응만:
-       1아웃 = 고객 카드 테두리 빨강 · 2아웃 = 마일리지 미적용(누계 · 사은권 없음) · 3아웃 = 예약 불가 (네이버는 못 막으니 카드에 알림 + [전액 취소])
+       1아웃 = 고객 카드 테두리 빨강 · 2아웃 = 마일리지 미적용(누계 · 사은권 없음) · 3아웃 = 예약 불가 (네이버는 못 막으니 네이버를 불러올 때 앱이 알아서 전액환불로 취소)
      마일리지 SKIP (사장님 10/26): 그 손님의 n번째 예약완료에는 사은권을 안 띄움 (사은권을 미리 드린 손님) */
   const bcOf = (b) => { const n = noteOf(b); return !n ? 0 : Math.max(0, Math.min(3, Number(n.bc) || 0)) || (n.bl ? 1 : 0); };
   const bcHit = (b, k) => !!(RULES.bc && RULES.bc["o" + k]) && bcOf(b) >= k;

@@ -16,10 +16,13 @@
        상품 · 적용날짜 · 적용회차(오전 10:00) · 수량(입력칸 '회차당 수량', 지금 수량이 들어 있음) · 예약현황 0 / 10 · [변경취소] [설정변경]
    - 대리예약 (현장 화면 10/8): 예약자 옆 '대리예약' 스티커 + '방문자' 줄에 "박소희(010-2785-4295)"
    - 입금대기 (현장 화면 10/8): 결제를 안 한 예약은 [이용완료] 없이 [예약취소]만 길게 있음 → 자동 취소 대상(데스크가 정함)
+   - 결제한 예약 취소 (현장 화면 10/26, BC 3아웃 전액 취소): 카드의 [예약취소] → 오른쪽이 '예약 취소' 화면 → 환불기준 '선택항목 전체 적용'의
+       ○ 전액환불을 누르고(기본은 ● 동의된 환불기준 = 이용 당일 0% 환불) → 맨 아래 초록 [예약 취소] → 확인 창 없이 바로 취소.
+       전액환불이 켜진 것을 확인하지 못하면 [예약 취소]를 누르지 않음
    - 이용완료는 두 단계 (현장 화면 10/6): 카드의 [이용완료] → 오른쪽이 '이용완료' 화면("이용완료 시 사용자에게 이용완료 알림이 발송됩니다.")으로 바뀜 → 맨 아래 초록 [이용완료]: window.confirm 이면 자동 확인, 화면 안 창이면 "하시겠습니까" 글자 옆 [확인] */
 
 function installNaverDriver() {
-  if (window.__naver && window.__naver.v === 11) return true;
+  if (window.__naver && window.__naver.v === 12) return true;
 
   const norm = (s) => String(s || "").replace(/\s+/g, "");
   const vis = (el) => !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== "hidden");
@@ -231,11 +234,55 @@ function installNaverDriver() {
     return { open: true, product: val("상품"), date: val("적용날짜"), time: to24(val("적용회차")), qty: inp ? +inp.value || 0 : null };
   };
 
+  // 결제한 예약의 [예약취소] → 오른쪽이 '예약 취소' 화면으로 바뀜 (현장 화면 10/26, 아래로 스크롤):
+  //   환불기준 · 선택항목 전체 적용(○ 전액환불 · ● 동의된 환불기준 = 기본, '이용 당일 0% 환불') · 상품주문번호별 적용(결제금액 정률 % · 정액 원) · 맨 아래 초록 [예약 취소]
+  //   → '환불기준' 글자에서 위로 올라가 [예약 취소]를 품은 가장 작은 칸 (예약 카드를 품은 칸은 아님)
+  const ownText = (root, label) => [...root.querySelectorAll("*")].find((e) => vis(e) && norm(e.textContent) === label && ![...e.children].some((c) => norm(c.textContent) === label));
+  const refundPage = () => {
+    const t = ownText(document, "환불기준");
+    for (let p = t && t.parentElement; p && p !== document.body; p = p.parentElement) {
+      if (cards().some((c) => p.contains(c))) return null;
+      if (clickables(p).some((b) => textOf(b) === "예약취소")) return p;
+    }
+    return null;
+  };
+  // 라디오 한 줄: 글자가 딱 그것(전액환불 · 동의된환불기준)인 요소 → 그 label 의 input, 없으면 가까운 칸에 하나뿐인 input[type=radio] · [role=radio]
+  const optionOf = (root, label) => {
+    const el = ownText(root, label);
+    if (!el) return null;
+    const lab = el.closest("label");
+    let input = lab ? lab.control || lab.querySelector("input[type=radio], [role=radio]") : null;
+    for (let p = el, k = 0; !input && p && p !== root && k < 3; p = p.parentElement, k++) {
+      const ins = p.querySelectorAll("input[type=radio], [role=radio]");
+      if (ins.length === 1) input = ins[0];
+    }
+    return { el, lab, input };
+  };
+  // 켜졌는지: input.checked · aria-checked · (둘 다 없으면) 클래스 checked/selected/active/on — 칸을 못 찾으면 null
+  const isOn = (o) => {
+    if (!o) return null;
+    const i = o.input;
+    if (i && i.tagName === "INPUT") return !!i.checked;
+    if (i && i.hasAttribute("aria-checked")) return i.getAttribute("aria-checked") === "true";
+    const c = [o.lab, o.el, o.el.parentElement].filter(Boolean).map((e) => (typeof e.className === "string" ? e.className : "")).join(" ");
+    return /(^|[\s_-])(checked|selected|active|on)([\s_-]|$)/i.test(c);
+  };
+  // sure = 전액환불이 켜졌고 동의된 환불기준(0% 환불)은 꺼짐 — 동의된 환불기준 칸을 못 찾으면 전액환불이 진짜 라디오일 때만 (같은 묶음은 하나만 켜짐)
+  const refundState = (p) => {
+    const f = optionOf(p, "전액환불");
+    const full = isOn(f), agreed = isOn(optionOf(p, "동의된환불기준"));
+    return { open: true, full, agreed, sure: full === true && (agreed === false || (agreed === null && f.input && f.input.type === "radio")) };
+  };
+  const refundInfo = () => {
+    const p = refundPage();
+    return p ? refundState(p) : null;
+  };
+
   window.confirm = () => true;
   window.alert = () => {};
 
   window.__naver = {
-    v: 11,
+    v: 12,
     read() {
       const page = cls(document, "Calendar__inner-contents") ? "calendar" : $$('a[class*="contents-user"]').length || cls(document, "BookingListView__root") ? "list" : "";
       const total = (document.body.innerText.match(/(\d+)\s*건\s*내려받기/) || [])[1];
@@ -250,6 +297,7 @@ function installNaverDriver() {
         slots: page === "calendar" ? readSlots() : [],
         cards: cards().map(readCard),
         cap: (() => { const p = capPanel(); return p ? capInfo(p) : null; })(), // 예약가능 설정 창
+        refund: refundInfo(), // 결제한 예약의 '예약 취소' 화면 { full, agreed, sure } (전액환불 · 동의된 환불기준이 켜졌는지)
         listTotal: total ? +total : null, // 예약 목록 위의 "124건"
         loading: $$('[class*="Loading__load_area"], .spinner').some(vis),
       };
@@ -351,7 +399,7 @@ function installNaverDriver() {
     cancel(no, paidOk) {
       const card = cards().find((c) => field(c, "예약번호") === String(no));
       if (!card) return { ok: false, why: `예약번호 ${no} 카드를 못 찾음` };
-      // paidOk = BC 3아웃 [전액 취소] 버튼에서만 (사장님 10/26 · 근무자가 확인한 뒤) — 그 밖에는 결제한 예약을 안 누름
+      // paidOk = BC 3아웃 자동 전액 취소에서만 (사장님 10/26 · 뒤이어 '예약 취소' 화면에서 전액환불) — 그 밖에는 결제한 예약을 안 누름
       if (!paidOk && clickables(card).some((e) => textOf(e) === "이용완료")) return { ok: false, paid: true, why: "결제한 예약([이용완료] 있음) — 취소 안 함" };
       const b = clickables(card).find((e) => textOf(e) === "예약취소");
       if (!b) return { ok: false, why: "[예약취소] 버튼이 없음" };
@@ -359,12 +407,14 @@ function installNaverDriver() {
       press(b);
       return { ok: true };
     },
-    /** 예약취소 뒤 확인 단계: 창 안의 [확인] · [예] · [예약취소] · [취소하기] (처음 누른 카드의 [예약취소]는 빼고) */
+    /** 예약취소 뒤 확인 단계: 창 안의 [확인] · [예] · [예약취소] · [취소하기] (처음 누른 카드의 [예약취소]는 빼고)
+        '예약 취소'(환불기준) 화면의 [예약 취소]는 여기서 절대 누르지 않음 — 전액환불을 확인한 뒤 submitRefund 로만 (기본 선택은 0% 환불) */
     cancelConfirm() {
       const boxSel = '[role=dialog], [role=alertdialog], [class*="odal"], [class*="ialog"], [class*="ayer"], [class*="opup"], [class*="lert"], [class*="onfirm"]';
+      const rp = refundPage();
       const ok = clickables().find((e) => {
         if (!["확인", "OK", "예", "예약취소", "취소하기", "예약취소하기"].includes(textOf(e)) || e.hasAttribute("data-astana-cancel")) return false;
-        if (cards().some((c) => c.contains(e))) return false;
+        if (cards().some((c) => c.contains(e)) || (rp && rp.contains(e))) return false;
         const box = e.closest(boxSel);
         if (box) return true;
         for (let p = e.parentElement, i = 0; p && i < 6; p = p.parentElement, i++) if (/취소하시겠습니까|취소하면|취소 사유|취소사유|취소 시/.test(p.textContent)) return true;
@@ -374,6 +424,43 @@ function installNaverDriver() {
       const label = textOf(ok);
       press(ok);
       return { ok: true, clicked: true, label };
+    },
+    /** 결제한 예약 '예약 취소' 화면: ○ 전액환불 누르기 (기본은 ● 동의된 환불기준 = 이용 당일 0% 환불) — 켜졌는지를 돌려줌 */
+    pickFullRefund() {
+      const p = refundPage();
+      if (!p) return { ok: false, why: "네이버 '예약 취소' 화면(환불기준)이 없음" };
+      const o = optionOf(p, "전액환불");
+      if (!o) return { ok: false, why: "'전액환불' 칸을 못 찾음" };
+      if (isOn(o) !== true) {
+        press(o.lab || o.el);
+        if (isOn(o) !== true && o.input) o.input.click();
+      }
+      return { ok: true, full: isOn(o) === true };
+    },
+    /** '예약 취소' 화면 맨 아래 [예약 취소] — 누르기 직전에 다시 봐서 전액환불이 켜져 있고 동의된 환불기준이 꺼져 있을 때만 */
+    submitRefund() {
+      const p = refundPage();
+      if (!p) return { ok: false, why: "네이버 '예약 취소' 화면(환불기준)이 없음" };
+      if (!refundState(p).sure) return { ok: false, why: "전액환불이 골라지지 않음 — [예약 취소]를 누르지 않음" };
+      const bs = clickables(p).filter((e) => textOf(e) === "예약취소" && !e.disabled);
+      if (!bs.length) return { ok: false, why: "'예약 취소' 화면에 [예약 취소] 버튼이 없음" };
+      press(bs[bs.length - 1]); // 맨 아래 초록 버튼
+      return { ok: true };
+    },
+    /** 누르지 않고 물러날 때: '예약 취소' 화면의 X(닫기) · ‹(뒤로) — 날짜 이동 버튼(이전 · 다음)은 건드리지 않음 */
+    closeRefund() {
+      const p = refundPage();
+      if (!p) return { ok: true, had: false };
+      const tag = (e) => `${e.getAttribute("aria-label") || ""} ${e.getAttribute("title") || ""} ${typeof e.className === "string" ? e.className : ""}`;
+      const near = (e) => !e.closest('[class*="Calendar"], [class*="DatePeriod"]');
+      let b = null;
+      for (let box = p, k = 0; !b && box && box !== document.body && k < 4; box = box.parentElement, k++) {
+        const cs = clickables(box).filter(near);
+        b = cs.find((e) => /닫기|close/i.test(tag(e))) || cs.find((e) => /뒤로|back/i.test(tag(e)));
+      }
+      if (b) press(b);
+      else document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      return { ok: true, had: true };
     },
     /** 예약정보 탭: "확정" | "완료" */
     openTab(kind) {

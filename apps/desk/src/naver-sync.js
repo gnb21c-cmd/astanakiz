@@ -85,6 +85,10 @@ class NaverSync {
       this.step("네이버에 열려 있던 판매 수량 창 닫음");
       await this.act("window.__naver.closeCap()");
     }
+    if (s && s.refund) {
+      this.step("네이버에 열려 있던 '예약 취소' 화면 닫음 (누르지 않음)");
+      await this.act("window.__naver.closeRefund()");
+    }
   }
   step(msg) {
     try {
@@ -368,7 +372,8 @@ class NaverSync {
   }
   /** 입금대기 예약 취소: 그 칸의 [확정] → 카드를 지금 다시 읽어 아직 입금대기([이용완료] 없음 · 결제완료 아님)인지 확인 → [예약취소] → 확인 창 → 칸 숫자로 확인
       b = { day, time, product, no, qty } · 결제했으면 누르지 않음 */
-  /** BC 3아웃 손님 예약 전액 취소 (사장님 10/26) — 근무자가 데스크 [전액 취소]를 누르고 확인했을 때만 · 결제한 예약도 [예약취소] → 확인 창 → 칸 숫자로 확인 */
+  /** BC 3아웃 손님 예약 전액 취소 (사장님 10/26) — 네이버를 불러올 때 데스크가 알아서 · 결제한 예약도
+      [예약취소] → '예약 취소' 화면 → ○ 전액환불 → [예약 취소] (refundFull) → 칸 숫자로 확인 */
   cancelPaid(b) {
     return this.cancel(Object.assign({}, b, { paidOk: true }));
   }
@@ -385,20 +390,26 @@ class NaverSync {
     for (let i = 0; i < 30 && !(await this.read()).cards.some((c) => c.no === b.no); i++) if (!(await this.moreCards())) break;
     const card = (await this.read()).cards.find((c) => c.no === b.no);
     if (!card) return { ok: false, why: `네이버에서 예약번호 ${b.no} 카드를 못 찾음` };
-    if (!b.paidOk && (card.canComplete || /결제완료/.test(card.pay || ""))) return { ok: false, paid: true, why: "결제한 예약 — 취소 안 함" };
+    const paid = !!(card.canComplete || /결제완료/.test(card.pay || ""));
+    if (!b.paidOk && paid) return { ok: false, paid: true, why: "결제한 예약 — 취소 안 함" };
     if (!card.canCancel) return { ok: false, why: "[예약취소] 버튼이 없음" };
     this.step(`네이버 ${b.paidOk ? "3아웃 손님" : "입금대기"} ${b.time} 예약 취소`);
     r = await this.act(`window.__naver.cancel(${JSON.stringify(b.no)}, ${b.paidOk ? "true" : "false"})`);
     if (!r.ok) return r;
     this.snap("예약취소 누른 뒤");
-    for (let i = 0; i < 20; i++) {
-      const c = await this.call("window.__naver.cancelConfirm()").catch(() => null);
-      if (c && c.clicked) {
-        this.step(`네이버 취소 확인 [${c.label}]`);
-        await this.act("({ ok: true })");
-      } else if (i > 4) break;
-      await sleep(250);
-    }
+    if (paid) {
+      // 결제한 예약 (BC 3아웃): '예약 취소' 화면에서 전액환불을 고른 뒤에만 [예약 취소]
+      const f = await this.refundFull(b);
+      if (!f.ok) return f;
+    } else
+      for (let i = 0; i < 20; i++) {
+        const c = await this.call("window.__naver.cancelConfirm()").catch(() => null);
+        if (c && c.clicked) {
+          this.step(`네이버 취소 확인 [${c.label}]`);
+          await this.act("({ ok: true })");
+        } else if (i > 4) break;
+        await sleep(250);
+      }
     // 확인: 칸의 확정 숫자가 줄었는지 — 안 보이면 예약현황을 다시 열어 그 카드가 없어졌는지
     await this.act("window.__naver.closePanel()");
     for (let i = 0; i < 20; i++) {
@@ -419,6 +430,45 @@ class NaverSync {
     }
     await this.snap("예약취소 안 됨");
     return { ok: false, why: "네이버에서 취소로 바뀌지 않음 — 바탕화면 '아스타나키즈-진단' 폴더의 사진을 보내 주세요" };
+  }
+  /** 결제한 예약 전액 취소 (현장 화면 10/26): 카드 [예약취소] 뒤 오른쪽 '예약 취소' 화면 → 환불기준 '선택항목 전체 적용'의 ○ 전액환불
+      → 맨 아래 초록 [예약 취소] → 확인 창 없이 바로 끝남. 기본 선택 ● 동의된 환불기준은 '이용 당일 0% 환불' 이라
+      전액환불이 켜지고 동의된 환불기준이 꺼진 것을 확인하지 못하면 [예약 취소]를 누르지 않고 물러남 (진단 사진만) */
+  async refundFull(b) {
+    let s = null;
+    for (let i = 0; i < 24 && !(s = (await this.read()).refund); i++) await sleep(250);
+    if (!s) return this.refundBack("네이버 '예약 취소'(환불기준) 화면이 안 열림 — 아무것도 누르지 않음", "환불 화면 안 열림");
+    this.step(`네이버 ${b.time} 3아웃 손님 — 전액환불 고르는 중`);
+    for (let k = 0; k < 2 && !s.sure; k++) {
+      const p = await this.call("window.__naver.pickFullRefund()").catch(() => null);
+      if (!p || p.ok === false) break;
+      for (let i = 0; i < 8; i++) {
+        await sleep(250);
+        s = (await this.read()).refund || {};
+        if (s.sure) break;
+      }
+    }
+    if (!s.sure) return this.refundBack("'전액환불'이 골라지지 않음 — [예약 취소]를 누르지 않음 (0% 환불로 취소될 수 있어서)", "전액환불 안 골라짐");
+    this.snap("전액환불 고른 뒤");
+    const r = await this.call("window.__naver.submitRefund()").catch(() => null);
+    if (!r || !r.ok) return this.refundBack((r && r.why) || "[예약 취소]를 누르지 못함", "예약 취소 못 누름");
+    this.step(`네이버 ${b.time} 3아웃 손님 — 전액환불로 [예약 취소] 누름`);
+    // 바로 끝남 (현장 10/26). 혹시 확인 창이 뜨면 그 창의 [확인]만 (cancelConfirm 은 '예약 취소' 화면 단추를 누르지 않음)
+    for (let i = 0; i < 16; i++) {
+      await sleep(250);
+      const c = await this.call("window.__naver.cancelConfirm()").catch(() => null);
+      if (c && c.clicked) this.step(`네이버 취소 확인 [${c.label}]`);
+      const st = await this.call("window.__naver.read()").catch(() => null);
+      if (i >= 3 && st && !st.refund) break;
+    }
+    return { ok: true };
+  }
+  /** '예약 취소' 화면에서 누르지 않고 물러남: X · ‹ → 그래도 남으면 예약현황을 다시 엶 */
+  async refundBack(why, label) {
+    await this.snap(label);
+    await this.act("window.__naver.closeRefund()");
+    if ((await this.read()).refund && this.urls) await this.act(`window.__naver.go(${JSON.stringify(this.urls.calendar)})`);
+    return { ok: false, why };
   }
   async snap(label) {
     try {

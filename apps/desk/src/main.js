@@ -417,7 +417,7 @@ ipcMain.handle("naver:load", nwrap((day, only) => naver.loadDay(day, { only }), 
 ipcMain.handle("naver:complete", nwrap((b) => naver.complete(b)));
 ipcMain.handle("naver:setCap", nwrap((c) => naver.setCap(c)));
 ipcMain.handle("naver:cancel", nwrap((b) => naver.cancel(Object.assign({}, b, { paidOk: false })))); // 입금대기 예약 자동 취소 { day, time, product, no, qty } // 판매 수량 자동 조절 { day, product, time, n }
-ipcMain.handle("naver:cancelPaid", nwrap((b) => naver.cancelPaid(b))); // BC 3아웃 [전액 취소] (근무자가 확인한 뒤만 · 사장님 10/26)
+ipcMain.handle("naver:cancelPaid", nwrap((b) => naver.cancelPaid(b))); // BC 3아웃 자동 전액 취소 (전액환불을 고른 뒤 [예약 취소] · 사장님 10/26)
 ipcMain.handle("naver:show", () => {
   if (naverWin) {
     naverWin.show();
