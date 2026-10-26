@@ -14,7 +14,7 @@ try {
 const DESK = "file://" + path.join(__dirname, "..", "..", "..", "prototype", "desk.html");
 const launch = () => chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
 
-test("BC ①②③ (체험판): 쌓임 · 다시 누르면 한 단계 내림 · ③ 은 사유 창에 쓰고 [확인]해야 · 1아웃 테두리 빨강 · 2아웃 마일리지 미적용(사은권 · 입장권 누계 없음) · 3아웃 알림 + [전액 취소] · 스위치를 끄면 그 대응만 빠짐 · 다시 켜도 그대로", async () => {
+test("BC ①②③ (체험판): 쌓임 · 다시 누르면 한 단계 내림 · ③ 은 사유 창에 쓰고 [확인]해야 · 1아웃 테두리 빨강 · 2아웃 마일리지 미적용(사은권 · 입장권 누계 없음) · 3아웃 '자동 전액 취소' 안내 · 스위치를 끄면 그 대응만 빠짐 · 다시 켜도 그대로", async () => {
   const browser = await launch();
   try {
     const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
@@ -57,10 +57,9 @@ test("BC ①②③ (체험판): 쌓임 · 다시 누르면 한 단계 내림 · 
     assert.strictEqual(await dots(), "111");
     assert.match(await page.textContent("#toast"), /3아웃 — .*예약 불가 · 사유를 남겼어요/);
     assert.match(await page.textContent("#sheet .facts"), /3아웃 사유\s*직원에게 폭언 \(시험\)/, "고객 카드에 사유");
-    assert.match(await page.textContent("#sheet .bc3"), /3아웃 · 예약 불가 — 전액 취소/);
-    assert.match(await card.locator(".bc3").textContent(), /전액 취소/);
-    await page.click("#sheet .bc3 [data-act=bcCancel]");
-    assert.match(await page.textContent("#toast"), /체험판/, "체험판에서는 취소하지 않음");
+    assert.match(await page.textContent("#sheet .bc3"), /3아웃 · 예약 불가 — 설치한 앱은 네이버를 불러올 때 자동으로 전액 취소/);
+    assert.match(await card.locator(".bc3").textContent(), /자동으로 전액 취소/);
+    assert.strictEqual(await page.$("#sheet [data-act=bcCancel]"), null, "근무자가 누르는 버튼은 없음 (자동 · 실패했을 때만 [다시 취소])");
     await page.click("#sheet [data-act=close]");
     // 운영 설정 → 고객 세부 관리 → BC 관리: 스위치 · 목록
     await page.dblclick("#now"); await page.click('[data-t="cust"]');
@@ -119,21 +118,21 @@ test("마일리지 SKIP (체험판): 고객명 · 전화번호 · N번째 등록
   }
 });
 
-test("BC (앱): 목록은 앱 본체에서 · 목록에서 단계 바꾸기 · 3아웃 손님 예약이 보이면 알림 한 번 · [전액 취소] → 확인 → 네이버 취소 → 카드가 빠짐 (취소 안 누르면 그대로)", async () => {
+test("BC (앱): 3아웃 손님 예약은 네이버를 불러올 때 알아서 전액 취소 (근무자 확인 없이) → 카드가 빠짐 · 기록 · 실패하면 다음 불러오기 때 한 번 더 · 두 번 안 되면 카드에 [다시 취소] · 목록은 앱 본체에서", async () => {
   const browser = await launch();
   try {
     const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
     const page = await ctx.newPage();
     await page.clock.install({ time: new Date("2026-10-26T11:50:00") });
     await page.addInitScript(() => {
-      window.__nt = { patch: [], cancel: [] };
+      window.__nt = { patch: [], cancel: [], fail3: 0 };
       const BK = (no, time, name, phone, done) => ({ no, time, name, phone, qty: 2, qtyText: "1시간 50분 2", product: "1시간 50분", status: "확정", pay: "결제완료", doneCount: done, cancelCount: 0 });
-      const store = { "01099990001": { m: "", k3: false, bc: 3, bl: true, nm: "삼아웃", p4: "0001", bcAt: "2026-10-20", r3: "환불 요구하며 소란", r3At: "2026-10-20 10:00", at: "2026-10-20 10:00" } };
+      const store = { "01099990001": { m: "", k3: false, bc: 3, bl: true, nm: "삼아웃", p4: "0001", bcAt: "2026-10-20", r3: "환불 요구하며 소란", r3At: "2026-10-20 10:00", at: "2026-10-20 10:00" }, "01099990002": { m: "", k3: false, bc: 3, bl: true, nm: "실패손님", p4: "0002", r3: "시험", at: "" } };
       window.desk = {
         naver: {
-          load: async (day) => ({ ok: true, day, slots: day === "2026-10-26" ? [{ time: "12:00", product: "1시간 50분", cap: 10, conf: 4, done: 0 }] : [], bookings: day === "2026-10-26" ? [BK("N1", "12:00", "삼아웃", "010-9999-0001", 4), BK("N2", "12:00", "보통손님", "010-7777-0003", 5)] : [] }),
+          load: async (day) => ({ ok: true, day, slots: day === "2026-10-26" ? [{ time: "12:00", product: "1시간 50분", cap: 10, conf: 4, done: 0 }] : [], bookings: day === "2026-10-26" ? [BK("N1", "12:00", "삼아웃", "010-9999-0001", 4), BK("N2", "12:00", "보통손님", "010-7777-0003", 5), BK("N3", "12:00", "실패손님", "010-9999-0002", 1)].filter((b) => !window.__nt.cancel.some((c) => c.ok && c.no === b.no)) : [] }),
           complete: async () => ({ ok: true }),
-          cancelPaid: async (b) => { window.__nt.cancel.push(b); return { ok: true }; },
+          cancelPaid: async (b) => { const ok = b.no !== "N3" || window.__nt.fail3 >= 2; if (!ok) window.__nt.fail3++; window.__nt.cancel.push(Object.assign({ ok }, b)); return ok ? { ok: true } : { ok: false, why: "확인 창을 못 찾음" }; },
         },
         state: { load: () => null, save: () => {} },
         config: { get: async () => ({ build: "2.6" }), set: async () => ({ ok: true }) },
@@ -151,22 +150,27 @@ test("BC (앱): 목록은 앱 본체에서 · 목록에서 단계 바꾸기 · 3
     await page.goto(DESK);
     await page.waitForFunction(() => /불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 15000 });
     await page.click('.slot[data-s="720"]');
-    await page.waitForFunction(() => document.querySelector('.res:has(.bc3)'), null, { timeout: 5000 });
-    assert.match(await page.textContent("#toast"), /3아웃 고객 예약 — 삼아웃 12:00 2장/);
-    const card = page.locator('.res:has-text("삼아웃")');
-    // 확인 창에서 [취소] → 그대로
+    // 불러오자마자 근무자 확인 없이 전액 취소 — 삼아웃 성공 · 실패손님은 실패 → 다음 불러오기(12:00 칸을 눌러 다시 읽음) 때 한 번 더 → 또 실패
+    await page.waitForFunction(() => window.__nt.cancel.length >= 3, null, { timeout: 10000 });
+    assert.deepStrictEqual(await page.evaluate(() => window.__nt.cancel.map((b) => [b.no, b.time, b.qty, b.ok])), [["N1", "12:00", 2, true], ["N3", "12:00", 2, false], ["N3", "12:00", 2, false]]);
+    await page.waitForFunction(() => ![...document.querySelectorAll(".res .name")].some((e) => /삼아웃/.test(e.textContent)));
+    assert.ok(await page.locator('.res:has-text("보통손님")').count(), "보통 손님은 그대로");
+    await page.waitForFunction(() => /자동 전액 취소 실패: 확인 창을 못 찾음/.test((document.querySelector('.res .bc3') || {}).textContent || ""));
+    // 두 번 실패하면 더 불러와도 안 함
+    await page.click("[data-act=refresh]");
+    await page.waitForTimeout(800);
+    assert.strictEqual(await page.evaluate(() => window.__nt.cancel.length), 3, "두 번 실패하면 더 안 함");
+    // [다시 취소] → 확인 창 [취소]면 그대로 · [확인]이면 다시
     page.__accept = false;
-    await card.locator("[data-act=bcCancel]").click();
-    assert.deepStrictEqual(await page.evaluate(() => window.__nt.cancel), []);
-    // [확인] → 네이버 전액 취소 → 카드가 빠짐
+    await page.click('.res:has-text("실패손님") [data-act=bcCancel]');
+    assert.strictEqual(await page.evaluate(() => window.__nt.cancel.length), 3);
     page.__accept = true;
-    await card.locator("[data-act=bcCancel]").click();
-    await page.waitForFunction(() => window.__nt.cancel.length === 1);
-    assert.deepStrictEqual(await page.evaluate(() => window.__nt.cancel.map((b) => [b.no, b.time, b.qty])), [["N1", "12:00", 2]]);
-    await page.waitForFunction(() => !document.querySelector('.res .name') || ![...document.querySelectorAll(".res .name")].some((e) => /삼아웃/.test(e.textContent)));
-    assert.match(await page.textContent("#toast"), /3아웃 고객 예약 전액 취소: 삼아웃/);
-    // 설정 목록 (앱 본체) → 단계 바꾸기
+    await page.click('.res:has-text("실패손님") [data-act=bcCancel]');
+    await page.waitForFunction(() => window.__nt.cancel.length === 4 && window.__nt.cancel[3].ok);
+    await page.waitForFunction(() => ![...document.querySelectorAll(".res .name")].some((e) => /실패손님/.test(e.textContent)));
+    // 설정 목록 (앱 본체) → 단계 바꾸기 · 자동 취소 기록
     await page.dblclick("#now"); await page.click('[data-t="cust"]');
+    assert.match(await page.textContent("#sheet"), /3아웃 자동 전액 취소 기록[\s\S]*실패손님 12:00 2장 전액 취소 \(다시 취소\)[\s\S]*실패: 확인 창을 못 찾음[\s\S]*삼아웃 12:00 2장 전액 취소/);
     await page.waitForFunction(() => /삼아웃/.test(document.querySelector("#sheet .bclist").textContent));
     assert.match(await page.textContent("#sheet .bclist"), /3아웃 사유: 환불 요구하며 소란 10\/20 10:00/, "목록에 3아웃 사유 · 때");
     assert.ok(await page.isDisabled('#sheet .bclist [data-act=bcLevel][data-id="0000aaaa1111bbbb"][data-n="3"]'), "목록에서는 3아웃으로 못 올림 (고객 카드에서 사유와 함께)");

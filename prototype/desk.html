@@ -1030,6 +1030,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     if (day === TODAY) restoreState();
     if (day === TODAY) setTimeout(extScan, 0); // 이용 중 손님의 추가 예약 (사장님 10/7)
     if (day === TODAY) setTimeout(unpaidSweep, 500); // 입금대기 예약 자동 취소 (사장님 10/8)
+    bcScan++; // 3아웃 자동 전액 취소: 실패한 예약은 다음 네이버 불러오기 때 다시 (사장님 10/26)
     if (!only) { lastRefresh = now; if (day === TODAY) todayAt = now; }
     renderAll();
     if (loud) toast(only ? `${only} 예약 ${r.bookings.filter((b) => b.time === only).length}건 다시 불러옴` : `네이버 예약 ${r.bookings.length}건 불러옴`);
@@ -2475,11 +2476,13 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
         return { html: head + `
           <div class="setcard plain stack"><b>BC(블랙컨슈머) 대응</b>
             <span class="help">예약자 창 · 열쇠 창 이름 옆 <b>BC ①②③</b>을 눌러 정해요 — 야구 아웃처럼 쌓여요 (2아웃이면 1 · 2아웃 대응 모두 · 같은 단계를 다시 누르면 한 단계 내림) · <b>③은 사유를 쓰고 [확인]해야</b> 3아웃 (아래 목록에서는 내리기만)</span>
-            ${[[1, "고객 카드 테두리 빨강", "예약 카드 · 예약자 창 · 열쇠 창"], [2, "마일리지 미적용", `누계 · ${RULES.giftEvery}회 사은권을 안 띄움 (입장권에도 없음)`], [3, "예약 불가", "네이버는 예약을 못 막아요 → 3아웃 손님 예약이 보이면 알림 · 카드에 [전액 취소] (확인 한 번 · 결제 금액 환불)"]].map(([k, t, h]) => `<div class="bcrow"><span class="bcdot on">${k}</span><button type="button" class="svswitch ${RULES.bc["o" + k] ? "on" : ""}" role="switch" aria-checked="${!!RULES.bc["o" + k]}" data-act="bcToggle" data-k="${k}" aria-label="${k}아웃 대응"><span class="knob"></span><b>${RULES.bc["o" + k] ? "켜짐" : "꺼짐"}</b></button><span><b>${k}아웃 — ${t}</b> <span class="help">${h}</span></span></div>`).join("")}</div>
+            ${[[1, "고객 카드 테두리 빨강", "예약 카드 · 예약자 창 · 열쇠 창"], [2, "마일리지 미적용", `누계 · ${RULES.giftEvery}회 사은권을 안 띄움 (입장권에도 없음)`], [3, "예약 불가", "네이버는 예약을 못 막아요 → 정해진 네이버 불러오기 때 3아웃 손님 예약(입장 전)이 보이면 앱이 알아서 전액 취소 (결제 금액 환불 · 되돌릴 수 없음 · 두 번 안 되면 카드에 [다시 취소])"]].map(([k, t, h]) => `<div class="bcrow"><span class="bcdot on">${k}</span><button type="button" class="svswitch ${RULES.bc["o" + k] ? "on" : ""}" role="switch" aria-checked="${!!RULES.bc["o" + k]}" data-act="bcToggle" data-k="${k}" aria-label="${k}아웃 대응"><span class="knob"></span><b>${RULES.bc["o" + k] ? "켜짐" : "꺼짐"}</b></button><span><b>${k}아웃 — ${t}</b> <span class="help">${h}</span></span></div>`).join("")}</div>
           <div class="setcard plain stack"><b>BC 손님 <span class="help">${L.filter((x) => x.bc === 3).length ? `3아웃 ${L.filter((x) => x.bc === 3).length}명 · ` : ""}모두 ${L.filter((x) => x.bc).length}명 · 3아웃부터</span></b>
             <input id="bc-q" class="cfg" placeholder="이름 · 전화번호(뒷 4자리)로 찾기" autocomplete="off" value="${esc(sheet.bcq || "")}">
             <div class="bclist">${custList ? rows || `<span class="help">${q ? "찾는 손님이 없어요" : "BC 손님이 없어요"}</span>` : `<span class="help">읽는 중…</span>`}</div>
-            <span class="help">이름 · 전화 뒷 4자리는 BC · SKIP 손님만 이 PC 에 저장 (전체 번호 · 클라우드 없음)</span></div>` };
+            <span class="help">이름 · 전화 뒷 4자리는 BC · SKIP 손님만 이 PC 에 저장 (전체 번호 · 클라우드 없음)</span></div>
+          <div class="setcard plain stack"><b>3아웃 자동 전액 취소 기록 <span class="help">오늘 · 이 PC</span></b>
+            <div class="caplog">${bcLog.length ? bcLog.slice(0, 20).map((x) => `<div class="${x.ok ? "" : "bad"}"><span class="num">${esc(String(x.at).slice(11))}</span> ${esc(x.name)} ${x.day && x.day !== TODAY ? `${+x.day.slice(5, 7)}/${+x.day.slice(8)} ` : ""}${esc(x.time)} ${x.qty}장 ${x.ok ? `<b>전액 취소</b>${x.auto ? "" : " (다시 취소)"}` : `실패: ${esc(x.why || "")}`}</div>`).join("") : `<span class="help">없음</span>`}</div></div>` };
       }
       if (tab === "etc") {
         const c = svCounts(), st = !SV.on ? `<b>꺼짐</b> — 설문 없이 바로 입장` : !SV.from || !SV.to ? "기간을 정하면 시작해요" : svOn() ? `<b class="on">진행 중</b> — ${krDate(SV.from)} ~ ${krDate(SV.to)}` : TODAY < SV.from ? `${krDate(SV.from)}부터 시작해요` : TODAY > SV.to ? `끝났어요 (${krDate(SV.to)}까지)` : "대상을 하나 이상 골라 주세요";
@@ -3053,8 +3056,50 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   /** 이 손님에게 n번째 예약완료가 사은권 회차인가 (2아웃 마일리지 미적용 · 마일리지 SKIP 은 빼고) */
   const giftFor = (b, n) => isGift(n) && !bcHit(b, 2) && !skipOf(b).includes(n);
   const bcWhat = (k) => [[1, "카드 테두리 빨강"], [2, "마일리지 미적용"], [3, "예약 불가"]].filter(([i]) => i <= k && RULES.bc["o" + i]).map(([, t]) => t).join(" · ") || "대응 꺼짐 (운영 설정 → 고객 세부 관리)";
-  /** 3아웃 손님 예약 (입장 전): 알림 + [전액 취소] */
-  const bc3Html = (b) => (b && bcHit(b, 3) && b.status === "확정" ? `<div class="bc3">③ 3아웃 · 예약 불가 — ${b.bcBusy ? "네이버에서 취소하는 중…" : `<button class="btn btn-sm" data-act="bcCancel" data-id="${b.id}">전액 취소</button>`}</div>` : "");
+  /** 3아웃 손님 예약 (입장 전): 네이버를 불러올 때 앱이 알아서 전액 취소 (사장님 10/26) · 두 번 실패하면 [다시 취소] */
+  const bc3Html = (b) => {
+    if (!b || !bcHit(b, 3) || b.status !== "확정") return "";
+    const t = bcTried.get(b.no) || { n: 0, why: "" };
+    const st = b.bcBusy ? "네이버에서 전액 취소하는 중…" : !APP ? "설치한 앱은 네이버를 불러올 때 자동으로 전액 취소" : t.n >= BC_TRIES ? `자동 전액 취소 실패${t.why ? `: ${esc(t.why)}` : ""} — <button class="btn btn-sm" data-act="bcCancel" data-id="${b.id}">다시 취소</button> 또는 네이버에서 직접` : t.n ? `자동 전액 취소 다시 하는 중 (${t.n}번 실패${t.why ? `: ${esc(t.why)}` : ""})` : "네이버를 불러올 때 자동으로 전액 취소";
+    return `<div class="bc3">③ 3아웃 · 예약 불가 — ${st}</div>`;
+  };
+  /* 3아웃 자동 전액 취소 (사장님 10/26 — 근무자가 하지 않고 정해진 네이버 불러오기 때 알아서)
+     대상 = 3아웃 대응이 켜졌고 · 입장 전(확정 · 열쇠 없음) · 예약번호가 있는 3아웃 손님 예약 → naver:cancelPaid · 한 예약에 하루 두 번까지 (실패하면 카드에 [다시 취소])
+     기록 = 이 PC 날마다 'astanakiz-bc3-날짜' (운영 설정 → 고객 세부 관리 → BC 관리 맨 아래) */
+  const BC_TRIES = 2;
+  const bcTried = new Map(); // 예약번호 → { n: 시도 수, why, scan: 실패한 불러오기 차례 }
+  let bcScan = 0; // 네이버를 불러온 횟수 — 실패한 예약은 다음 불러오기 때 한 번 더
+  const bcLog = (() => { try { return JSON.parse(localStorage.getItem("astanakiz-bc3-" + TODAY)) || []; } catch (e) { return []; } })();
+  let bcBusy = false;
+  async function bcSweep() {
+    if (!APP || !RULES.bc.o3 || bcBusy || !window.desk.naver.cancelPaid) return;
+    const due = Object.values(bookings).flat().filter((b) => b.status === "확정" && b.no && !b.keys.length && b.enteredAt == null && bcHit(b, 3) && (() => { const t = bcTried.get(b.no); return !t || (t.n < BC_TRIES && t.scan < bcScan); })());
+    if (!due.length) return;
+    bcBusy = true;
+    try {
+      for (const b of due) await bcCancelOne(b, true);
+    } finally { bcBusy = false; renderAll(); if (sheet.mode) renderSheet(); }
+  }
+  /** 한 예약 전액 취소 → 데스크 카드에서 뺌 · 기록 (auto = 자동 · 아니면 근무자가 [다시 취소]) */
+  async function bcCancelOne(b, auto) {
+    b.bcBusy = true; renderRes(); if (sheet.mode === "enter" && sheet.id === b.id) renderSheet();
+    const r = await window.desk.naver.cancelPaid({ day: b.day, time: hm(b.naverSlot ?? b.slot), product: b.naverProduct || "", no: b.no, qty: b.qty }).catch((e) => ({ ok: false, why: String(e) }));
+    b.bcBusy = false;
+    const ok = !!(r && r.ok), why = ok ? "" : (r && r.why) || "응답 없음";
+    bcLog.unshift({ at: `${TODAY} ${hm(now)}`, day: b.day, name: b.name, time: hm(b.slot), qty: b.qty, ok, why, auto: !!auto });
+    bcLog.length = Math.min(bcLog.length, 60);
+    try { localStorage.setItem("astanakiz-bc3-" + TODAY, JSON.stringify(bcLog)); } catch (e) { /* 저장 못 해도 동작 */ }
+    if (ok) {
+      const arr = bookings[b.day] || [], i = arr.indexOf(b); if (i >= 0) arr.splice(i, 1);
+      const ns = (naverSlots[b.day] || {})[b.slot]; if (ns) ns.conf = Math.max(0, ns.conf - b.qty);
+      if (sheet.mode === "enter" && sheet.id === b.id) closeSheet();
+      toast(`3아웃 고객 예약 ${auto ? "자동 " : ""}전액 취소: ${b.name} ${b.day === TODAY ? "" : `${+b.day.slice(5, 7)}/${+b.day.slice(8)} `}${hm(b.slot)} ${b.qty}장`, 8000);
+    } else {
+      const t = bcTried.get(b.no) || { n: 0, why: "" }; t.n++; t.why = why; t.scan = bcScan; bcTried.set(b.no, t);
+      toast(`3아웃 고객 예약 전액 취소 실패: ${b.name} ${hm(b.slot)} — ${why}${t.n >= BC_TRIES ? " (카드에서 [다시 취소] 또는 네이버에서 직접)" : " (다음에 다시)"}`, 9000);
+    }
+    return ok;
+  }
   /** 처음 보인 3아웃 손님 예약은 알림 한 번 */
   const bcSeen = new Set();
   function bcWatch() {
@@ -3062,8 +3107,9 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     for (const b of (bookings[TODAY] || []).concat(viewDay !== TODAY ? bookings[viewDay] || [] : [])) {
       if (b.status !== "확정" || bcSeen.has(b.id) || !bcHit(b, 3)) continue;
       bcSeen.add(b.id);
-      toast(`③ 3아웃 고객 예약 — ${b.name} ${b.day === TODAY ? "" : `${+b.day.slice(5, 7)}/${+b.day.slice(8)} `}${hm(b.slot)} ${b.qty}장 · 카드에서 [전액 취소]`, 8000);
+      toast(`③ 3아웃 고객 예약 — ${b.name} ${b.day === TODAY ? "" : `${+b.day.slice(5, 7)}/${+b.day.slice(8)} `}${hm(b.slot)} ${b.qty}장 · ${APP ? "네이버에서 자동 전액 취소해요" : "설치한 앱은 자동 전액 취소"}`, 8000);
     }
+    if (APP) setTimeout(bcSweep, 0); // 손님 표시(메모)를 읽은 뒤 · 네이버를 불러올 때마다
   }
   const noteAtText = (at) => (!at ? "" : at.slice(0, 10) === TODAY ? at.slice(11, 16) : `${+at.slice(5, 7)}/${+at.slice(8, 10)}`);
   let notesAsking = false;
@@ -3078,7 +3124,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       if (!r || !r.ok) return; // 다음에 그릴 때 다시
       let any = false;
       for (const k of keys) if (!NOTES.has(k)) { const n = r.notes[k] || null; NOTES.set(k, n); if (n) any = true; }
-      if (any) { renderRes(); if (sheet.mode === "enter" || sheet.mode === "key") renderSheet(); }
+      if (any) { renderRes(); bcWatch(); if (sheet.mode === "enter" || sheet.mode === "key") renderSheet(); }
     }, () => { notesAsking = false; });
   }
   const noteTimers = new Map();
@@ -4496,20 +4542,12 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       toast(`${b.name}님 BC 3아웃 — ${bcWhat(3)} · 사유를 남겼어요`, 7000);
     },
     bc3No() { sheet.bcAsk = false; renderSheet(); },
-    /** 3아웃 손님 예약을 네이버에서 전액 취소 (확인 한 번 · 결제 금액 환불 · 되돌릴 수 없음) */
+    /** 자동 전액 취소가 두 번 안 됐을 때 근무자가 [다시 취소] (확인 한 번 · 결제 금액 환불 · 되돌릴 수 없음) */
     async bcCancel(btn) {
       const b = findB(btn.dataset.id); if (!b || b.bcBusy || b.status !== "확정") return;
       if (!APP) { toast("체험판: 설치한 앱에서 네이버 예약을 전액 취소해요"); return; }
-      if (!confirm(`${b.name}님 ${b.day === TODAY ? "오늘" : b.day} ${hm(b.naverSlot ?? b.slot)} · ${b.qty}장\n\n3아웃 고객 예약을 네이버에서 전액 취소할까요?\n결제한 금액이 환불되고 되돌릴 수 없어요.`)) return;
-      b.bcBusy = true; renderAll(); if (sheet.mode) renderSheet();
-      const r = await window.desk.naver.cancelPaid({ day: b.day, time: hm(b.naverSlot ?? b.slot), product: b.naverProduct || "", no: b.no, qty: b.qty }).catch((e) => ({ ok: false, why: String(e) }));
-      b.bcBusy = false;
-      if (r && r.ok) {
-        const arr = bookings[b.day] || [], i = arr.indexOf(b); if (i >= 0) arr.splice(i, 1);
-        const ns = (naverSlots[b.day] || {})[b.slot]; if (ns) ns.conf = Math.max(0, ns.conf - b.qty);
-        if (sheet.mode === "enter" && sheet.id === b.id) closeSheet();
-        toast(`3아웃 고객 예약 전액 취소: ${b.name} ${hm(b.slot)} ${b.qty}장`, 7000);
-      } else toast(`전액 취소 실패: ${b.name} — ${(r && r.why) || "응답 없음"} (네이버에서 직접 취소해 주세요)`, 9000);
+      if (!confirm(`${b.name}님 ${b.day === TODAY ? "오늘" : b.day} ${hm(b.naverSlot ?? b.slot)} · ${b.qty}장\n\n자동 전액 취소가 안 됐어요. 지금 다시 네이버에서 전액 취소할까요?\n결제한 금액이 환불되고 되돌릴 수 없어요.`)) return;
+      await bcCancelOne(b, false);
       renderAll(); if (sheet.mode) renderSheet();
     },
     /** 목록에서 BC 단계 바꾸기 */
