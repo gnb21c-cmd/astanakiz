@@ -375,7 +375,7 @@ test("공통 양식: 이벤트 기간 입장권의 나머지(안내 문구)도 �
     await openEvent(page);
     await setPeriod(page, "2026-10-05", "2026-11-30");
     const rows = await page.$$eval("#sheet .evrule", (e) => e.map((x) => x.innerText.replace(/\s+/g, " ").trim()));
-    assert.deepStrictEqual(rows.map((r) => r.split(" ")[0] === "제공상품" ? "제공상품" : r.split(" ").slice(0, 2).join(" ")), ["공통 양식", "1번 안내", "2번 성공", "제공상품"], "공통 양식 + 안내 · 성공 + 제공상품");
+    assert.deepStrictEqual(rows.map((r) => r.split(" ")[0] === "제공상품" ? "제공상품" : r.split(" ").slice(0, 2).join(" ")), ["공통 양식", "현장 입장자", "1번 안내", "2번 성공", "제공상품"], "공통 양식 + 안내 · 성공 + 제공상품");
     assert.match(await page.textContent("#ev-def"), /아직 예시 문구: 1번 안내 · 2번 성공/);
     // 양식 고치기 → 미리보기에 바로 · 양식마다 따로 남음
     await page.fill("#ev-text", "#* 11월 재방문 이벤트\n^{다음기한}(포함)까지 오면 {사은품}\n[네이버]^{열쇠}번 열쇠 손님");
@@ -571,6 +571,48 @@ test("양식 자리 (10/16): 공통 양식의 [이벤트] 줄 = 1번 · 2번 자
     assert.deepStrictEqual(t.slice(0, 4), ["위", "재방문 이벤트 성공!", "✂", "수제돈까스 쿠폰"], "2번 안의 [사은품] 자리");
     t = await pick("^위\n[이벤트]\n^아래", "#* 성공\n^다음 기한 {다음기한}");
     assert.deepStrictEqual(t, ["위", "성공", "다음 기한 10월 25일", "✂", "수제돈까스 쿠폰", "이 쿠폰을 카페에 보여 주세요", "아래"], "어디에도 없으면 2번 바로 뒤");
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("현장 입장자 양식 (사장님 10/27): 재방문 이벤트 양식에 '현장 입장자' — 이벤트 기간 현장 결제 손님 입장권만 이 양식 · 비우면(공통 양식으로) 공통 양식 그대로 · 네이버 손님은 그대로 · 이벤트를 끄면 원래 입장권", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.addInitScript(() => { if (!localStorage.getItem("astanakiz-visitevent")) localStorage.setItem("astanakiz-visitevent", JSON.stringify({ ver: 2, on: true, from: "2026-10-05", to: "2026-10-31", days: 20, gift: "수제돈까스", form: "^공통 양식 시험\n{열쇠}번" })); });
+    await page.goto(DESK); // 체험판 10/5 · 이벤트 중
+    await openEvent(page);
+    assert.match(await page.textContent("#sheet .evrules"), /공통 양식.*현장 입장자.*1번 안내.*2번 성공.*제공상품/, "공통 양식 다음에");
+    await page.click("[data-act=evTpl][data-i='8']");
+    assert.match(await page.textContent("#ev-def"), /지금은 공통 양식 그대로/);
+    assert.strictEqual(await page.inputValue("#ev-text"), "^공통 양식 시험\n{열쇠}번", "처음엔 공통 양식에서 시작");
+    await page.fill("#ev-text", "^현장 손님 안내\n{열쇠}번");
+    assert.match(await page.textContent("#ev-paper"), /현장 손님 안내/, "미리보기 (현장 예시)");
+    assert.match(await page.textContent("#ev-def"), /현장 결제 손님/);
+    assert.strictEqual((await page.evaluate(() => JSON.parse(localStorage.getItem("astanakiz-visitevent")))).walk, "^현장 손님 안내\n{열쇠}번", "저장");
+    await page.click("#sheet .x");
+    const formOf = (pick) => page.evaluate((p) => { const T = window.__deskTest, h = T.holders().find((x) => (p === "walk" ? x.walk && !x.svc && typeof x.ev !== "string" : !x.walk && !x.svc)); return T.formFor(T.keyVals(h)); }, pick);
+    assert.match(await formOf("walk"), /현장 손님 안내/, "현장 결제 손님 = 현장 입장자 양식");
+    assert.match(await formOf("naver"), /공통 양식 시험/, "네이버 손님은 공통 양식 그대로");
+    // 다시 켜도 그대로 — 저장된 설정을 다시 읽음 (다시 켜기 대신: 쓰자마자 다시 켜면 새 페이지가 방금 쓴 것을 못 읽을 때가 있음 · 시험 쪽 경쟁)
+    const reloadCfg = () => page.evaluate(() => { const T = window.__deskTest; T.EV_().walk = null; T.EV_().form = null; T.evLoadCfg(JSON.parse(localStorage.getItem("astanakiz-visitevent"))); });
+    await reloadCfg();
+    assert.match(await formOf("walk"), /현장 손님 안내/);
+    // [공통 양식으로] → 비움 → 공통 양식
+    await openEvent(page);
+    await page.click("[data-act=evTpl][data-i='8']");
+    await page.click("[data-act=evReset]");
+    assert.match(await page.textContent("#ev-def"), /지금은 공통 양식 그대로/);
+    await page.click("#sheet .x");
+    assert.match(await formOf("walk"), /공통 양식 시험/);
+    // 이벤트를 끄면 원래 입장권 양식 (현장 입장자 양식도 안 씀)
+    await page.evaluate(() => { const v = JSON.parse(localStorage.getItem("astanakiz-visitevent")); v.walk = "^현장 손님 안내"; v.on = false; localStorage.setItem("astanakiz-visitevent", JSON.stringify(v)); });
+    await reloadCfg();
+    assert.doesNotMatch(await formOf("walk"), /현장 손님 안내|공통 양식 시험/);
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();

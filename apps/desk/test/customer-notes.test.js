@@ -72,3 +72,17 @@ test("BC 원아웃 · 투아웃 · 쓰리아웃 · 마일리지 SKIP (사장님 
   const text = fs.readFileSync(path.join(dir, N.FILE), "utf8");
   assert.ok(!/01011112222|1111/.test(text), "파일에 전체 전화번호 없음");
 });
+
+test("BC 투아웃 양식 (사장님 10/27): p2 = 투아웃 뒤 1번 양식을 낸 때 — 투아웃 · 쓰리아웃 동안 남김 · 원아웃 이하로 내리면 지움 (다시 투아웃이면 1번부터)", () => {
+  const d = { v: 1, notes: {} }, a = hashKey("salt", "01011112222");
+  N.set(d, a, { m: "", bc: 2, nm: "가나다", p4: "2222" }, "2026-10-27 10:00");
+  assert.strictEqual(N.get(d, a).p2, undefined, "처음엔 없음 → 1번");
+  N.set(d, a, { m: "", bc: 2, p2: "2026-10-27 10:05" }, "2026-10-27 10:05");
+  assert.strictEqual(N.get(d, a).p2, "2026-10-27 10:05");
+  N.set(d, a, { m: "메모", bc: 3, r3: "시험" }, "2026-10-28 11:00");
+  assert.strictEqual(N.get(d, a).p2, "2026-10-27 10:05", "안 넘기면 그대로 · 쓰리아웃도 투아웃 대응이라 남김");
+  N.patch(d, a, { bc: 1 }, "2026-10-29 09:00");
+  assert.strictEqual(N.get(d, a).p2, undefined, "원아웃으로 내리면 지움");
+  N.set(d, a, { m: "", bc: 0, p2: "x" }, "2026-10-29 09:01");
+  assert.strictEqual(N.get(d, a), null, "BC 를 풀면 p2 도 없음");
+});

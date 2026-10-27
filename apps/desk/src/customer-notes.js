@@ -8,6 +8,7 @@
    - 운영 설정 → 고객 세부 관리 → BC 관리 목록 · 검색에 보이려고 BC 손님만 이름(nm) · 전화 뒷 4자리(p4) · 표시한 날(bcAt)을 같이 둠
      (전체 전화번호는 없음 · 이 PC 에만 · 클라우드로 안 보냄) — BC 를 풀면 같이 지움
    쓰리아웃 사유 (사장님 10/26): r3 = 고객 카드에서 쓰리아웃으로 올릴 때 쓴 사유 · r3At = 그때 — 투아웃 · 원아웃으로 내려도 남김 (BC 를 다 풀면 같이 지움)
+   BC 투아웃 양식 (사장님 10/27): p2 = 투아웃이 된 뒤 입장권 대신 'BC 투아웃 양식 1번'을 낸 때 → 그다음 방문부터 2번 (투아웃 · 쓰리아웃 동안만)
    마일리지 SKIP (사장님 10/26): sk = [n, …] — 그 손님의 n번째 예약완료에는 사은권을 안 띄움 (이미 드린 손님 · 목록에 보이려고 이름 · 뒷 4자리도) */
 const fs = require("fs");
 const path = require("path");
@@ -60,6 +61,9 @@ function set(d, key, note, at) {
     n.nm = String(o.nm || (prev && prev.nm) || "").trim().slice(0, 20);
     n.p4 = String(o.p4 || (prev && prev.p4) || "").replace(/\D/g, "").slice(-4);
     if (bc) n.bcAt = prev && bcOf(prev) === bc && prev.bcAt ? prev.bcAt : n.at.slice(0, 10); // 단계를 바꾼 날
+    // BC 투아웃 양식 (사장님 10/27): p2 = 투아웃 뒤 1번 양식을 낸 때 — 투아웃 · 쓰리아웃 동안만 (원아웃 이하로 내리면 지움 → 다시 투아웃이면 1번부터)
+    const p2 = bc >= 2 ? String(o.p2 !== undefined ? o.p2 || "" : (prev && prev.p2) || "").slice(0, 16) : "";
+    if (p2) n.p2 = p2;
     const why = bc ? (o.r3 !== undefined ? cleanWhy(o.r3) : (prev && prev.r3) || "") : "";
     if (why) { n.r3 = why; n.r3At = prev && prev.r3 === why && prev.r3At ? prev.r3At : String(o.r3At || n.at).slice(0, 16); }
   }
