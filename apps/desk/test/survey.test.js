@@ -330,11 +330,15 @@ test("설문조사 + 재방문 이벤트: 카드에 횟수가 안 보여도 네�
     await page.goto(DESK); // 체험판 10/5 13:50 · 이벤트 진행 중
     await page.evaluate(() => window.__deskTest.addBooking("2026-10-05", "14:00", "신규손님", "01099990000", 1, { prevDone: 0 }));
     await page.click('.slot[data-s="840"]');
-    // 신규(완료 0): 카드는 "이벤트 시작"(횟수 없음) · 예약자 창에 설문
+    // 신규(완료 0): 카드는 "첫 방문! · 도전 시작"(횟수 없음 · 설문할 손님이 바로 보이게 · 사장님 10/27) · 예약자 창에 설문
     const card = (await page.textContent('.res:has-text("신규손님")')).replace(/\s+/g, " ");
-    assert.match(card, /이벤트 시작/);
-    assert.doesNotMatch(card, /완료 \d/);
+    assert.match(card, /첫 방문!\s*·?\s*도전 시작/);
+    assert.doesNotMatch(card, /이벤트 시작|완료 \d/);
+    assert.strictEqual(await page.locator('.res:has-text("신규손님") .firstv').textContent(), "첫 방문!", "눈에 띄는 노랑 표");
+    assert.match((await page.textContent('.res:has-text("전시윤")')).replace(/\s+/g, " "), /이벤트 시작/, "기존 손님은 그대로 '이벤트 시작'");
+    assert.strictEqual(await page.$('.res:has-text("전시윤") .firstv'), null);
     await page.click('.res:has-text("신규손님")');
+    assert.match(await page.textContent("#sheet .facts"), /첫 방문!\s*·?\s*도전 시작/, "예약자 창에도");
     assert.match(await page.textContent("#sheet .svbox"), new RegExp(Q));
     await page.click("#sheet .svb[data-n='2']");
     await page.click(".kpick button:not([disabled]):not(.on) >> nth=0");
@@ -348,6 +352,29 @@ test("설문조사 + 재방문 이벤트: 카드에 횟수가 안 보여도 네�
     await page.click('.key[data-k="32"]');
     assert.ok(await page.$("#sheet .svwalk"), "현장구매자 설문");
     await close(page);
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("첫 방문! (사장님 10/27): 이벤트가 아니어도 네이버 완료 0 손님 카드 · 예약자 창에 '첫 방문!' — 설문할 손님이 바로 보이게", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK); // 체험판 10/5 13:50 · 이벤트 없음
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    await page.evaluate(() => { const T = window.__deskTest; T.addBooking("2026-10-05", "14:00", "처음손님", "01099990001", 1, { prevDone: 0 }); T.addBooking("2026-10-05", "14:00", "단골손님", "01099990002", 1, { prevDone: 3 }); });
+    await page.click('.slot[data-s="840"]');
+    const text = async (n) => (await page.textContent(`.res:has-text("${n}")`)).replace(/\s+/g, " ");
+    assert.match(await text("처음손님"), /첫 방문!\s*·?\s*완료 0 → 1번 완료 예정/);
+    assert.doesNotMatch(await text("처음손님"), /도전 시작/, "이벤트가 아니면 '도전 시작'은 없음");
+    assert.doesNotMatch(await text("단골손님"), /첫 방문/);
+    await page.click('.res:has-text("처음손님")');
+    assert.match(await page.textContent("#sheet .facts"), /첫 방문!/);
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();

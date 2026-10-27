@@ -41,6 +41,7 @@ tr:last-child td { border-bottom: 0; }
 .tag-start { font-weight: 800; white-space: nowrap; }
 .tag-coupon { display: inline-block; background: var(--ochre); color: #1b1b1b; font-weight: 800; border-radius: 4px; padding: 0 5px; white-space: nowrap; }
 .tag-plain { color: var(--sub); font-weight: 700; white-space: nowrap; }
+.tag-first { display: inline-block; background: #FFD23F; color: #2b2100; font-weight: 800; border-radius: 4px; padding: 0 5px; white-space: nowrap; }
 .say { color: var(--accent); font-weight: 600; }
 .script { border-left: 3px solid var(--accent); background: #eef3fc; border-radius: 0 8px 8px 0; padding: 7px 10px; font-size: 9.8pt; line-height: 1.55; }
 .qa { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 14px; margin-top: 6px; }
@@ -87,7 +88,7 @@ tr:last-child td { border-bottom: 0; }
     <table>
       <thead><tr><th>카드 글자</th><th>뜻 · 입장권 → <span class="say" style="display:inline">손님께 한마디</span></th></tr></thead>
       <tbody>
-        <tr><td><span class="tag-start">이벤트 시작</span><br><small>(흰 글씨)</small></td><td>이벤트 첫 방문 (또는 20일이 지나 새로 시작) · 입장권 <b>"○월 ○일(포함)까지 다시 오시면 수제돈까스 무료 증정!"</b><span class="say">→ "이 날짜까지 다시 오시면 수제돈까스 드려요"</span></td></tr>
+        <tr><td><span class="tag-start">이벤트 시작</span><br><small>(흰 글씨) · 처음 온 손님은 <span class="tag-first">첫 방문!</span> 도전 시작 = 설문부터</small></td><td>이벤트 첫 방문 (또는 20일이 지나 새로 시작) · 입장권 <b>"○월 ○일(포함)까지 다시 오시면 수제돈까스 무료 증정!"</b><span class="say">→ "이 날짜까지 다시 오시면 수제돈까스 드려요"</span></td></tr>
         <tr><td><span class="tag-coupon">수제돈까스 쿠폰 지급하세요</span></td><td>기한 안에 다시 옴 = <b>성공</b> · 입장권 <b>"재방문 이벤트 성공!"</b> + 쿠폰 + 다음 기한<span class="say">→ "축하드려요, 쿠폰 드릴게요. ○월 ○일까지 또 오시면 또 드려요"</span></td></tr>
         <tr><td><span class="tag-plain">오늘 이미 방문</span></td><td>같은 날 두 번째 예약 · 기한 그대로, 쿠폰 없음<span class="say">→ "쿠폰은 하루 한 번이에요"</span></td></tr>
         <tr><td><span class="tag-plain">이벤트 켜기 전 입장</span></td><td>이벤트를 켜기 전에 이미 처리된 손님 → 할 일 없음</td></tr>
