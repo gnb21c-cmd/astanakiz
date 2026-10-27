@@ -3317,6 +3317,15 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     p.last = Math.max(p.last, r.n); if (r.name) p.name = r.name;
     p.visits.push({ at: r.at, day: r.day || String(r.at || "").slice(0, 10), n: r.n, no: r.no, st: r.st || "", due: r.due || "" });
   }
+  /** 재방문 성공 수 → 보고 앱 (사장님 10/27): 지금 이벤트 장부의 '성공' 줄 = 돈까스 쿠폰이 나간 수 (같은 날 두 번째는 안내라 안 셈)
+      { from: 시작일, today: 오늘, total: 시작일부터 누적, days: { 날짜: 그날 } } · 이벤트가 없으면 null */
+  function evOkStats() {
+    if (!isDay(EV.from)) return null;
+    const days = {};
+    let total = 0;
+    for (const p of evLog(EV.from).people.values()) for (const v of p.visits) if (v.st === "성공" && isDay(v.day)) { days[v.day] = (days[v.day] || 0) + 1; total++; }
+    return { from: EV.from, today: days[TODAY] || 0, total, days: Object.fromEntries(Object.keys(days).sort().map((d) => [d, days[d]])) };
+  }
   /** 마일리지에서 뺄 장부들: 지난 이벤트 + 지금 이벤트 (시작일이 오늘이거나 지난 것만) */
   const evFroms = () => [...new Set([...EV.past.map((p) => p.from), EV.from])].filter((f) => f && f <= TODAY);
   /** 그 손님이 이 예약까지 이벤트 기간에 이용완료한 수 (지난 이벤트까지 더함) — skip: 그 장부는 빼고
@@ -3552,6 +3561,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       naver: { done: sum("done"), conf: sum("conf"), left: sum("left"), test: testQty(TODAY), slots: st.map((x) => ({ t: hm(x.s), done: x.done, conf: x.conf, left: x.left, cap: x.cap })), products: [...prod].filter(([, n]) => n > 0).map(([name, done]) => ({ name, done })) },
       people: livePeople(),
       walk: { tickets: walkQ((w) => !w.extra && !isEv(w)), extra: walkQ((w) => w.extra), service: svcKeys.length, event: walkQ(isEv) }, // event = 이벤트 입장 (결제 없음 · 판매 아님 · 사장님 10/21)
+      revisit: evOkStats(), // 재방문 성공 (돈까스 쿠폰) 오늘 · 누적 · 날마다 (사장님 10/27)
       over: { paid: paid.reduce((a, h) => a + h.overPaid.amount, 0), count: paid.length, due: holders().reduce((a, h) => a + (h.overPaid ? 0 : overInfo(h).due), 0) },
       keys: { total: RULES.keys, used: hs.reduce((a, h) => a + h.keys.length, 0), free: freeKeys().length, walkable: pj.base, flex: Math.max(0, pj.all - pj.base), map, holders: list },
     };
@@ -3666,9 +3676,10 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   function evsPayload() {
     const by = new Map();
     for (const w of walkins) if (isEv(w)) by.set(w.ev, (by.get(w.ev) || 0) + walkQty(w));
-    return { type: "astanakiz-event", v: 1, day: TODAY, sentAt: `${TODAY} ${hm(now)}`, count: evTickets(TODAY), names: [...by].map(([name, n]) => ({ name: name || "이벤트", n })) };
+    // revisit = 재방문 성공 오늘 · 누적 · 날마다 (사장님 10/27 — 보고 앱 지난 날 '입장권 판매 총 수량' 카드에 '재방문 N장 (現누적 NN장)')
+    return { type: "astanakiz-event", v: 1, day: TODAY, sentAt: `${TODAY} ${hm(now)}`, count: evTickets(TODAY), names: [...by].map(([name, n]) => ({ name: name || "이벤트", n })), revisit: evOkStats() };
   }
-  const evsSig = (p) => JSON.stringify([p.count, p.names]);
+  const evsSig = (p) => JSON.stringify([p.count, p.names, p.revisit]);
   let evsBusy = false;
   async function evsSend(why) {
     if (evsBusy || !EVS_APP()) return;
@@ -4975,6 +4986,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
   window.__deskTest = { projection, capWalkOut, notes: () => Object.fromEntries(NOTES), evLoadCfg, today: () => TODAY, useDueText, printSecs, PRINT_: () => PRINT, sealOf, withSeal, SEAL, evSample: (i) => evSample(i), sealClear: () => sealCache.clear(), EV_: () => EV, liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, bk: (id) => (bookings[TODAY] || []).find((b) => b.id === id), useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capRanges, capPlan, capRun, capApply, capTick, capTeamExtra, capState: () => JSON.parse(JSON.stringify(capState)), capLock: (ts) => { capState.locks = ts.slice(); saveCapState(); }, capKeysAt, returnKeys: (id, ks) => { const h = holders().find((x) => x.id === id); if (h) { returnKeys(h, ks); renderAll(); } }, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: () => enterText(), formFor: (v) => ticketText(v), lastPrint: () => LASTPRINT, BC2_: () => BC2, holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, sheet, evOf: (b) => evOf(b),
     evLog: (from) => { const L = evLog(from); return { from: L.from, count: L.count, people: Object.fromEntries([...L.people].map(([k, p]) => [k, JSON.parse(JSON.stringify(p))])) }; },
     // 장부에 지난 방문 한 줄 넣기: o = { day, n(네이버 순번, 기본 = 지금 완료 수), base, st("안내" | "성공"), due, from(장부 · 기본 지금 이벤트), no }
+    evsPayload: () => evsPayload(),
     evInject: (name, o = {}) => {
       const b = bookings[TODAY].find((x) => x.name === name);
       const nn = o.n ?? b.prevDone, d = o.day || EV.from, st = o.st === undefined ? "안내" : o.st;

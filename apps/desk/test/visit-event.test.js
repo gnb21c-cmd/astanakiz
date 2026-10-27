@@ -618,3 +618,33 @@ test("현장 입장자 양식 (사장님 10/27): 재방문 이벤트 양식에 '
     await browser.close();
   }
 });
+
+test("재방문 성공 수 → 보고 앱 (사장님 10/27): 현황 글(astanakiz-live) · 매일 이벤트 글(astanakiz-event)에 revisit { from, today, total, days } — 장부의 '성공' 줄 (돈까스 쿠폰이 나간 수) · 같은 날 두 번째는 안 셈", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.addInitScript(() => { if (!localStorage.getItem("astanakiz-visitevent")) localStorage.setItem("astanakiz-visitevent", JSON.stringify({ ver: 2, on: true, from: "2026-09-10", to: "2026-10-31", days: 20, gift: "수제돈까스" })); });
+    await page.goto(DESK); // 체험판 10/5
+    const inject = (name, o) => page.evaluate(([n, x]) => window.__deskTest.evInject(n, x), [name, o]);
+    await inject("송다온", { day: "2026-09-12", n: 1, base: 0 }); // 안내
+    await inject("송다온", { day: "2026-09-30", n: 2, base: 0, st: "성공" }); // 9/30 성공
+    await inject("홍예준", { day: "2026-09-20" }); // 안내 → 오늘 오면 성공
+    const rv = () => page.evaluate(() => window.__deskTest.liveSnap().revisit);
+    assert.deepStrictEqual(await rv(), { from: "2026-09-10", today: 0, total: 1, days: { "2026-09-30": 1 } });
+    await enter(page, 840, "홍예준");
+    assert.deepStrictEqual(await rv(), { from: "2026-09-10", today: 1, total: 2, days: { "2026-09-30": 1, "2026-10-05": 1 } }, "오늘 성공 1 · 누적 2");
+    await enter(page, 840, "전시윤"); // 처음 → 안내 (성공 아님)
+    assert.strictEqual((await rv()).total, 2, "안내는 안 셈");
+    const p = await page.evaluate(() => window.__deskTest.evsPayload());
+    assert.deepStrictEqual(p.revisit, { from: "2026-09-10", today: 1, total: 2, days: { "2026-09-30": 1, "2026-10-05": 1 } }, "매일 이벤트 글에도 (지난 날까지 다 — 보고 앱이 지난 날 카드에)");
+    assert.strictEqual(p.type, "astanakiz-event");
+    // 이벤트가 없으면 null
+    await page.evaluate(() => { const T = window.__deskTest; T.EV_().from = ""; });
+    assert.strictEqual(await rv(), null);
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
