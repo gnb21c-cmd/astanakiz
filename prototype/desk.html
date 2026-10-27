@@ -336,7 +336,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .svopt .svdel, .svopt .svdel-sp { width: 34px; flex: none; }
 /* 방문 이벤트 (10/14) */
 .evstart { font-weight: 700; color: var(--fg); }
-.firstv { display: inline-block; font-weight: 800; color: #2b2100; background: var(--yellow); border-radius: 5px; padding: 0 7px; } /* 첫 방문! = 노랑 네모 (설문할 신규 손님 · 사장님 10/27) */ /* 이벤트 기간 카드: 처음 온 손님 (사장님 10/16 흰 글씨) */
+.firstv { display: inline-block; font-weight: 800; color: #2b2100; background: var(--yellow); border-radius: 5px; padding: 0 7px; } /* 첫 방문 = 노랑 네모 (설문할 신규 손님 · 사장님 10/27) */ /* 이벤트 기간 카드: 처음 온 손님 (사장님 10/16 흰 글씨) */
 .evcoupon { display: inline-block; font-weight: 700; color: #1b1b1b; background: var(--ochre); border-radius: 5px; padding: 0 7px; } /* 기한 안에 다시 온 손님 = 옅은 황토색 네모 · 검은 글씨 */
 .evtag { display: inline-block; font-size: 11px; font-weight: 700; color: var(--on-ink); background: var(--accent); border-radius: 5px; padding: 0 6px; margin-left: 2px; }
 .evstate { font-size: 13.5px; }
@@ -1425,19 +1425,19 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     if (b.status === "완료" ? !b.visitNo : b.prevDone == null) return `<span class="help">이용완료 횟수 확인 중</span>`;
     const c = b.cancels ? ` · 취소 ${b.cancels}` : "", done = b.status === "완료";
     if (!done) liftDone(b); // 같은 사람이 오늘 이미 따로 입장했으면 '완료 n'을 그만큼 (네이버를 다시 불러오면 같아짐)
-    // 첫 방문! (사장님 10/27): 네이버 완료 0 손님 — 설문 '신규고객'과 같은 기준 · 카드 · 예약자 창에서 설문할 손님이 바로 보이게
-    const first = done ? b.visitNo === 1 : b.prevDone === 0, firstTag = `<span class="firstv">첫 방문!</span> · `;
+    // 첫 방문 (사장님 10/27): 네이버 완료 0 손님 — 설문 '신규고객'과 같은 기준 · 카드 · 예약자 창에서 설문할 손님이 바로 보이게
+    const first = done ? b.visitNo === 1 : b.prevDone === 0, firstTag = `<span class="firstv">첫 방문</span> · `;
     /* 재방문 이벤트 기간 (사장님 10/16): 카드에는 네이버 이용완료 횟수 · 마일리지 · 사은권을 안 보임 (장부에는 이름 · 전화 · 완료 수를 계속 셈)
-       처음 오는 손님(또는 기한이 지나 다시 시작) = "이벤트 시작" · 기한 안에 다시 온 손님 = 옅은 황토색 네모 "{사은품} 쿠폰 지급하세요"
+       이름 맞춤 (사장님 10/27): 첫 방문 손님 = "첫 방문 · 이벤트 도전 시작" · 이벤트 기간에 처음 온(또는 기한이 지나 다시 시작) 손님 = "이벤트 도전 시작"
+       · 기한 안에 다시 온 손님 = 옅은 황토색 네모 "이벤트 도전 성공" (사은품은 입장 알림 · 입장권에)
        자세한 것(다음 기한 · 오늘 이미 방문)은 글자에 마우스를 올리면 */
     if (evActive() && evIn(b.day)) {
       if (evEarly(b)) return `<span class="help">이벤트 켜기 전 입장</span>`;
       const ev = evOf(b);
       if (!ev) return `<span class="help">이용완료 횟수 확인 중</span>`;
       const tip = esc(evLabel(ev));
-      if (ev.st === "성공") return `<span class="evcoupon" title="${tip}">${esc(EV.gift || "사은품")} 쿠폰 지급하세요</span>`;
-      if (first && !ev.same) return `${firstTag}<span class="evstart" title="${tip}">도전 시작</span>`; // 이벤트 중 첫 방문 = '첫 방문! · 도전 시작'
-      return `<span class="evstart" title="${tip}">${ev.same ? "오늘 이미 방문" : "이벤트 시작"}</span>`;
+      if (ev.st === "성공") return `<span class="evcoupon" title="${tip}">이벤트 도전 성공</span>`;
+      return `${first && !ev.same ? firstTag : ""}<span class="evstart" title="${tip}">${ev.same ? "오늘 이미 방문" : "이벤트 도전 시작"}</span>`;
     }
     const sub = evSub(b);
     if (done && evWas(b)) return `<b>${b.visitNo}번째 예약완료</b> · 이벤트 기간 방문 <span class="help">(마일리지 ${(b.visitEnd || b.visitNo) - sub})</span>`; // 마일리지에 안 들어간 방문
@@ -3354,8 +3354,8 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     const that = before.filter((v) => v.day === day), rc = that.filter((v) => v.st); // 그날 영수증 기록(다음 기한)
     return evRule(rc.length ? rc[rc.length - 1] : { day, due: "" }, b.day);
   }
-  /** 카드 · 알림 표시: 이벤트 성공 · 수제돈까스 / 이벤트 안내 · 11/21까지 */
-  const evLabel = (ev) => (ev.st === "성공" ? `이벤트 성공 · ${EV.gift}` : `이벤트 안내${ev.same ? " · 오늘 이미 방문" : ""}${ev.due ? ` · ${md2(ev.due)}까지` : " · 마지막 날"}`);
+  /** 카드(마우스) · 알림 표시: 이벤트 도전 성공 · 수제돈까스 / 이벤트 도전 시작 · 11/21까지 / 오늘 이미 방문 · 11/21까지 (카드 이름과 같게 · 사장님 10/27) */
+  const evLabel = (ev) => (ev.st === "성공" ? `이벤트 도전 성공 · ${EV.gift}` : `${ev.same ? "오늘 이미 방문" : "이벤트 도전 시작"}${ev.due ? ` · ${md2(ev.due)}까지` : " · 마지막 날"}`);
   const md2 = (d) => { const [, m, x] = String(d).split("-").map(Number); return `${m}/${x}`; };
   /** 오늘 이용완료한 네이버 예약을 장부에 (화면을 그릴 때마다 · 이미 적은 예약번호는 건너뜀) */
   function evSync() {
@@ -4262,7 +4262,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       if (waitVisit) b.printWaiting = true;
       // 10회 사은권 · 이벤트 성공 알림은 오래 (사장님 10/20: 바쁠 때 2.6초 알림을 놓침)
       const giftNote = !evOf(b) && giftIn(b), evOk = !!evOf(b) && evOf(b).st === "성공";
-      toast(`${b.name}님 입장 · 열쇠 ${b.keys.join(", ")}번${APP ? " · 네이버 이용완료는 뒤에서 처리 중" : " · 네이버 이용완료"}${doneNow > 1 ? ` · 네이버 ${doneNow}건 함께 이용완료` : ""}${evOf(b) ? ` · ${evOk ? `이벤트 성공 — ${EV.gift || "사은품"} 드리세요` : evLabel(evOf(b))}` : giftNote ? ` · ${giftNote}번째 예약완료, ${RULES.giftName}을 드리세요` : ""}${waitVisit ? " · 입장권은 방문 횟수를 확인한 뒤 출력" : printForm("enter", keyVals(b))}`, giftNote || evOk ? 8000 : 0);
+      toast(`${b.name}님 입장 · 열쇠 ${b.keys.join(", ")}번${APP ? " · 네이버 이용완료는 뒤에서 처리 중" : " · 네이버 이용완료"}${doneNow > 1 ? ` · 네이버 ${doneNow}건 함께 이용완료` : ""}${evOf(b) ? ` · ${evOk ? `이벤트 도전 성공 — ${EV.gift || "사은품"} 드리세요` : evLabel(evOf(b))}` : giftNote ? ` · ${giftNote}번째 예약완료, ${RULES.giftName}을 드리세요` : ""}${waitVisit ? " · 입장권은 방문 횟수를 확인한 뒤 출력" : printForm("enter", keyVals(b))}`, giftNote || evOk ? 8000 : 0);
       renderAll();
     },
     qty(btn) {

@@ -259,12 +259,25 @@ class NaverStock {
     this.onLearn = opts.onLearn || (() => {});
     this.type = opts.type || null; // 실제 키보드로 글자 치기 (앱: 네이버 창 insertText · 시험: page.keyboard.type)
     this.slow = opts.slow || 1; // 시험에서 기다림을 줄일 때
+    this.navSeq = 0; // go() 가 지금 화면에 붙이는 표시 번호
   }
   call(expr) {
     const pat = this.pat ? `window.__naverStockPat = ${JSON.stringify(this.pat)}; ` : "";
     return this.exec(`(() => { ${pat}(${NAVER_STOCK_SOURCE})(); return ${expr}; })()`);
   }
-  go(url) { return this.act(`window.__naverStock.go(${JSON.stringify(url)})`); }
+  /** 주소로 이동하고 새 화면이 실제로 뜰 때까지 기다림 (10/27) — 이동은 바로 시작되지 않아서 그 사이 옛 화면이 답함 (설치한 앱의 executeJavaScript)
+      → 옛 화면을 읽고 옛 화면에서 상품을 누르면, 늦게 끝난 이동이 그 누름을 지워 '설정 화면이 안 열림' (전체 시험을 함께 돌릴 때 가끔)
+      지금 화면에 표시를 붙이고 이동 → 표시가 없는 화면이 답할 때까지 (15초까지 · 못 바뀌면 다음 단계가 알아서 실패를 알림) */
+  async go(url) {
+    const mark = `nav${++this.navSeq}`;
+    await this.exec(`window.__stockNav = ${JSON.stringify(mark)}`).catch(() => null);
+    const r = await this.act(`window.__naverStock.go(${JSON.stringify(url)})`);
+    for (const t0 = Date.now(); Date.now() - t0 < 15000 * this.slow; ) {
+      if ((await this.exec("window.__stockNav || ''").catch(() => mark)) !== mark) break;
+      await sleep(100);
+    }
+    return r;
+  }
   schedUrl(id) { return id && this.urls && this.urls.schedule ? this.urls.schedule.replace("{id}", encodeURIComponent(id)) : ""; }
   step(msg) { try { this.onStep(msg); } catch (e) { /* 무시 */ } }
   async read(name) {

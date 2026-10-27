@@ -1,7 +1,7 @@
 /* 재방문 이벤트가 끝난 뒤 마일리지 — 사장님 10/19 시나리오 그대로 하루씩 (이벤트 2026-10-26 ~ 2027-02-28)
    - 홍길동: 이벤트 전(10/25까지) 완료 5 → 기간에 6번 더 와서 네이버 완료 11 → 3월에 오면 '완료 5 → 6번 완료 예정' (네이버 11 · 12번째가 아님)
    - 김철수: 이벤트 전 완료 3 · 기간에 한 번도 안 옴 → 3월에 오면 '완료 3 → 4번 완료 예정' (그대로)
-   - 기간 중 카드: '이벤트 시작' / '{사은품} 쿠폰 지급하세요' 둘 중 하나만 (횟수 · 마일리지 · 사은권 안 보임) · 끝나면(3/1~) 원래 모양
+   - 기간 중 카드: '이벤트 도전 시작' / '이벤트 도전 성공' 둘 중 하나만 (사장님 10/27 이름 맞춤) (횟수 · 마일리지 · 사은권 안 보임) · 끝나면(3/1~) 원래 모양
    - 같은 날 두 건(나눠 예약)이면 네이버도 2번 → 장부도 2번 → 끝나면 2를 뺌 (이영희)
    - 사람마다 따로 (전화번호로) · 10회 사은권도 마일리지 기준 · 입장권 {누계}도 마일리지
    - 체험판 '오늘'을 바꾸는 시험용 window.__today (설치한 앱은 PC 날짜) · 장부 · 설정은 브라우저 저장소로 날마다 이어짐 */
@@ -73,7 +73,7 @@ test("사장님 시나리오: 홍길동 이벤트 전 5 + 기간 6번(네이버 
       await onDay(ctx, day, async (page) => {
         await add(page, day, HONG, prev);
         const c = await card(page, HONG);
-        assert.match(c, want === "쿠폰" ? /수제돈까스 쿠폰 지급하세요/ : /이벤트 시작/, `${day} 홍길동 카드 = ${want}: ${c}`);
+        assert.match(c, want === "쿠폰" ? /이벤트 도전 성공/ : /이벤트 도전 시작/, `${day} 홍길동 카드 = ${want}: ${c}`);
         assert.doesNotMatch(c, NO_COUNT, `${day} 기간 중에는 횟수 안 보임: ${c}`);
         await enter(page, HONG);
         const t = await ticket(page, HONG);
@@ -82,7 +82,7 @@ test("사장님 시나리오: 홍길동 이벤트 전 5 + 기간 6번(네이버 
         if (day === "2026-11-03") {
           // 이영희: 같은 날 같은 시간에 나눠 예약 두 건 → 한 번에 입장 → 네이버 7 → 9 (2번)
           await add(page, day, LEE, 7, 2);
-          assert.match(await card(page, LEE), /이벤트 시작/);
+          assert.match(await card(page, LEE), /이벤트 도전 시작/);
           await enter(page, LEE);
           assert.deepStrictEqual(await ledger(page, LEE), { base: 7, last: 9, n: [8, 9], st: ["안내", ""] }, "두 건 모두 장부에 (영수증 기록은 대표 한 건)");
         }
@@ -104,7 +104,7 @@ test("사장님 시나리오: 홍길동 이벤트 전 5 + 기간 6번(네이버 
       await add(page, "2027-03-05", HONG, 11); await add(page, "2027-03-05", KIM, 3); await add(page, "2027-03-05", LEE, 9);
       const h = await card(page, HONG), k = await card(page, KIM), l = await card(page, LEE);
       assert.match(h, /완료 5 → 6번 완료 예정 \(네이버 완료 11 − 이벤트 6\)/, "홍길동: 12번째가 아니라 6번째 — " + h);
-      assert.doesNotMatch(h, /12번|이벤트 시작|쿠폰 지급/);
+      assert.doesNotMatch(h, /12번|이벤트 도전|쿠폰 지급/);
       assert.match(k, /완료 3 → 4번 완료 예정/, "김철수: 그대로 — " + k);
       assert.doesNotMatch(k, /이벤트|네이버 완료/, "김철수는 뺄 것이 없음");
       assert.match(l, /완료 7 → 8번 완료 예정 \(네이버 완료 9 − 이벤트 2\)/, "이영희: 같은 날 두 건도 2를 뺌 — " + l);

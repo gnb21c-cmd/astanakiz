@@ -126,17 +126,24 @@ test("설문조사(앱): 20:00 에 보고앱으로 한 번 · 다시 켜도 누�
     const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
     const page = await ctx.newPage();
     await page.clock.install({ time: new Date("2026-10-14T19:58:30") });
-    await page.addInitScript(() => {
-      window.__sent = JSON.parse(localStorage.getItem("test-sent") || "[]");
-      const cfg = JSON.parse(localStorage.getItem("test-cfg") || "null") || { build: "1.38", survey: { from: "2026-10-14", to: "2026-10-31", send: true, naverNew: true, opts: ["네이버 검색", "인스타그램", "지인 소개", "블로그", "기타"] } };
+    // 보낸 기록 · 설정 · 그날 기록은 시험(Node) 쪽에 두고 다시 켤 때 넘겨 줌 — 예전엔 페이지 localStorage 에 두었는데
+    // 쓰자마자 다시 켜면(page.goto) 새 페이지가 방금 쓴 것을 못 읽을 때가 있었음 (10/27: 다시 켠 뒤 보낸 수 2 → 1 · 시험 쪽 경쟁 — 앱은 설정 파일)
+    const store = { sent: [], cfg: null, state: {} };
+    await page.exposeFunction("__tput", (k, v) => { if (k === "sent") store.sent.push(v); else if (k === "cfg") store.cfg = v; else store.state[k] = v; });
+    const until = async (f, why) => { for (let i = 0; i < 200 && !f(); i++) await new Promise((r) => setTimeout(r, 25)); assert.ok(f(), why); };
+    const stub = (S) => {
+      window.__sent = S.sent.slice();
+      const cfg = S.cfg || { build: "1.38", survey: { from: "2026-10-14", to: "2026-10-31", send: true, naverNew: true, opts: ["네이버 검색", "인스타그램", "지인 소개", "블로그", "기타"] } };
+      const st = Object.assign({}, S.state);
       const BK = (no, time, name, phone, done) => ({ no, time, name, phone, qty: 1, qtyText: "1시간 50분 1", product: "1시간 50분", status: "확정", pay: "결제완료", doneCount: done, cancelCount: 0 });
       window.desk = {
         naver: { load: async (day) => ({ ok: true, day, slots: day === "2026-10-14" ? [{ time: "19:30", cap: 10, conf: 2, done: 0 }] : [], bookings: day === "2026-10-14" ? [BK("S1", "19:30", "김신규", "010-7777-0001", 0), BK("S2", "19:30", "박단골", "010-7777-0002", 6)] : [] }), complete: async () => ({ ok: true }) },
-        state: { load: (day) => localStorage.getItem("test-state-" + day), save: (day, json) => localStorage.setItem("test-state-" + day, json) },
-        config: { get: async () => cfg, set: async (patch) => { Object.assign(cfg, patch); localStorage.setItem("test-cfg", JSON.stringify(cfg)); return { ok: true }; } },
-        survey: { send: async (job) => { window.__sent.push(job); localStorage.setItem("test-sent", JSON.stringify(window.__sent)); return { ok: true, file: "C:/report-outbox/survey-2026-10-14.json" }; } },
+        state: { load: (day) => (day in st ? st[day] : null), save: (day, json) => { st[day] = json; window.__tput(day, json); } },
+        config: { get: async () => cfg, set: async (patch) => { Object.assign(cfg, patch); window.__tput("cfg", JSON.parse(JSON.stringify(cfg))); return { ok: true }; } },
+        survey: { send: async (job) => { window.__sent.push(job); window.__tput("sent", job); return { ok: true, file: "C:/report-outbox/survey-2026-10-14.json" }; } },
       };
-    });
+    };
+    await page.addInitScript(stub, store);
     const errs = [];
     page.on("pageerror", (e) => errs.push(e.message));
     await page.goto(DESK);
@@ -178,14 +185,16 @@ test("설문조사(앱): 20:00 에 보고앱으로 한 번 · 다시 켜도 누�
     const p2 = JSON.parse((await page.evaluate(() => window.__sent))[1].json);
     assert.deepStrictEqual(p2.options.map((o) => [o.no, o.today, o.total]).slice(0, 3), [[1, 1, 1], [2, 0, 0], [3, 2, 2]]);
     assert.deepStrictEqual(p2.answered, { today: 3, total: 3 }, "직접 더한 수도 응답 수에");
-    const saved = JSON.parse(await page.evaluate(() => localStorage.getItem("test-state-2026-10-14")));
+    await until(() => store.sent.length === 2 && store.state["2026-10-14"], "보낸 기록 · 그날 기록이 시험 쪽에");
+    const saved = JSON.parse(store.state["2026-10-14"]);
     assert.deepStrictEqual(saved.sa, { 1: 1, 3: 1 }, "그날 저장 파일에 번호별 수만");
 
     // 다시 켜기: 오늘 기록(저장 파일)에서 누적 그대로 · 이미 보냈으니 또 안 보냄
+    await page.addInitScript(stub, JSON.parse(JSON.stringify(store))); // 앱 본체에 남은 것 그대로 (나중에 넣은 것이 이김)
     await page.goto(DESK);
     await page.waitForFunction(() => /불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 15000 });
     await page.clock.runFor(15000);
-    assert.strictEqual(await page.evaluate(() => window.__sent.length), 2, "다시 켜도 같은 숫자면 또 안 씀");
+    assert.strictEqual(store.sent.length, 2, "다시 켜도 같은 숫자면 또 안 씀");
     await openSurvey(page);
     assert.match((await page.$$eval("#sheet .svopt", (e) => e.map((x) => x.textContent.replace(/\s+/g, " "))))[2], /오늘 2 \(직접 \+1\) · 누적 2/, "다시 켜도 직접 더한 수 그대로");
     assert.match(await page.textContent("#sheet"), /마지막: 2026-10-14 20:0\d 자동 · 파일로 남김/);
@@ -330,15 +339,15 @@ test("설문조사 + 재방문 이벤트: 카드에 횟수가 안 보여도 네�
     await page.goto(DESK); // 체험판 10/5 13:50 · 이벤트 진행 중
     await page.evaluate(() => window.__deskTest.addBooking("2026-10-05", "14:00", "신규손님", "01099990000", 1, { prevDone: 0 }));
     await page.click('.slot[data-s="840"]');
-    // 신규(완료 0): 카드는 "첫 방문! · 도전 시작"(횟수 없음 · 설문할 손님이 바로 보이게 · 사장님 10/27) · 예약자 창에 설문
+    // 신규(완료 0): 카드는 "첫 방문 · 이벤트 도전 시작"(횟수 없음 · 설문할 손님이 바로 보이게 · 사장님 10/27 이름 맞춤) · 예약자 창에 설문
     const card = (await page.textContent('.res:has-text("신규손님")')).replace(/\s+/g, " ");
-    assert.match(card, /첫 방문!\s*·?\s*도전 시작/);
-    assert.doesNotMatch(card, /이벤트 시작|완료 \d/);
-    assert.strictEqual(await page.locator('.res:has-text("신규손님") .firstv').textContent(), "첫 방문!", "눈에 띄는 노랑 표");
-    assert.match((await page.textContent('.res:has-text("전시윤")')).replace(/\s+/g, " "), /이벤트 시작/, "기존 손님은 그대로 '이벤트 시작'");
+    assert.match(card, /첫 방문\s*·\s*이벤트 도전 시작/);
+    assert.doesNotMatch(card, /첫 방문!|완료 \d/);
+    assert.strictEqual(await page.locator('.res:has-text("신규손님") .firstv').textContent(), "첫 방문", "눈에 띄는 노랑 표");
+    assert.match((await page.textContent('.res:has-text("전시윤")')).replace(/\s+/g, " "), /이벤트 도전 시작/, "기존 손님 · 이벤트 기간 첫 방문 = '이벤트 도전 시작'");
     assert.strictEqual(await page.$('.res:has-text("전시윤") .firstv'), null);
     await page.click('.res:has-text("신규손님")');
-    assert.match(await page.textContent("#sheet .facts"), /첫 방문!\s*·?\s*도전 시작/, "예약자 창에도");
+    assert.match(await page.textContent("#sheet .facts"), /첫 방문\s*·\s*이벤트 도전 시작/, "예약자 창에도");
     assert.match(await page.textContent("#sheet .svbox"), new RegExp(Q));
     await page.click("#sheet .svb[data-n='2']");
     await page.click(".kpick button:not([disabled]):not(.on) >> nth=0");
@@ -358,7 +367,7 @@ test("설문조사 + 재방문 이벤트: 카드에 횟수가 안 보여도 네�
   }
 });
 
-test("첫 방문! (사장님 10/27): 이벤트가 아니어도 네이버 완료 0 손님 카드 · 예약자 창에 '첫 방문!' — 설문할 손님이 바로 보이게", async () => {
+test("첫 방문 (사장님 10/27): 이벤트가 아니어도 네이버 완료 0 손님 카드 · 예약자 창에 '첫 방문' — 설문할 손님이 바로 보이게", async () => {
   const browser = await launch();
   try {
     const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
@@ -370,11 +379,11 @@ test("첫 방문! (사장님 10/27): 이벤트가 아니어도 네이버 완료 
     await page.evaluate(() => { const T = window.__deskTest; T.addBooking("2026-10-05", "14:00", "처음손님", "01099990001", 1, { prevDone: 0 }); T.addBooking("2026-10-05", "14:00", "단골손님", "01099990002", 1, { prevDone: 3 }); });
     await page.click('.slot[data-s="840"]');
     const text = async (n) => (await page.textContent(`.res:has-text("${n}")`)).replace(/\s+/g, " ");
-    assert.match(await text("처음손님"), /첫 방문!\s*·?\s*완료 0 → 1번 완료 예정/);
-    assert.doesNotMatch(await text("처음손님"), /도전 시작/, "이벤트가 아니면 '도전 시작'은 없음");
+    assert.match(await text("처음손님"), /첫 방문\s*·\s*완료 0 → 1번 완료 예정/);
+    assert.doesNotMatch(await text("처음손님"), /도전 시작|첫 방문!/, "이벤트가 아니면 '이벤트 도전 시작'은 없음");
     assert.doesNotMatch(await text("단골손님"), /첫 방문/);
     await page.click('.res:has-text("처음손님")');
-    assert.match(await page.textContent("#sheet .facts"), /첫 방문!/);
+    assert.match(await page.textContent("#sheet .facts"), /첫 방문/);
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();

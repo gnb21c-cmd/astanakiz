@@ -195,3 +195,23 @@ test("현장 10/20 21:47 (1.54): '모든 회차'가 value 붙은 버튼이거나
     await browser.close();
   }
 });
+
+test("주소 이동은 새 화면이 뜰 때까지 기다림 (10/27: 이동이 늦게 시작되면 그 사이 옛 화면을 읽고 옛 화면에서 상품을 눌러, 늦게 끝난 이동에 지워져 '설정 화면이 안 열림' — 전체 시험을 함께 돌릴 때 가끔)", async () => {
+  const browser = await launch();
+  try {
+    const { page, saves } = await setup(browser); // 이미 예약상품 목록 화면 (카드가 보임)
+    // 네이버가 느릴 때처럼: 주소 이동이 1.5초 뒤에 시작 (그동안 옛 화면이 그대로 답함 — 설치한 앱의 executeJavaScript 처럼)
+    const late = () => { window.__lateGo = (u) => { setTimeout(() => { location.href = u; }, 1500); return { ok: true }; }; };
+    await page.addInitScript(late);
+    await page.evaluate(late);
+    const exec = (code) => page.evaluate(code.replace(/window\.__naverStock\.go\(/g, "window.__lateGo("));
+    const st = new NaverStock(exec, { urls: URLS, pat: PAT, type: (t) => page.keyboard.type(t) });
+    await st.go(URLS.items + "&moved=1");
+    assert.match(await page.evaluate(() => location.search), /moved=1/, "go() 가 끝나면 이미 새 화면");
+    const r = await st.setDay({ product: P1, day: "2026-11-19", qty: 10 });
+    assert.ok(r.ok && r.done, JSON.stringify(r));
+    assert.deepStrictEqual(await saves(), [{ id: 1, from: "2026-11-19", to: "2026-11-19", n: 10 }]);
+  } finally {
+    await browser.close();
+  }
+});
