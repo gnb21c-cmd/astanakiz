@@ -604,8 +604,10 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 .svcgiven .kchip { margin-right: 2px; }
 .wmain .banner { font-size: 14px; padding: 10px 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .banner.bad { background: var(--red); color: #fff; }
-.wn { display: inline-grid; place-items: center; min-width: 22px; height: 22px; border-radius: 50%; font-size: 13px; font-weight: 800; color: var(--muted); }
-.wn.now { background: var(--accent); color: #fff; } .wn.done { color: var(--ok); }
+/* 단계 번호 (사장님 10/28 '숫자 크게 — 잘 안 보여'): ① 글자 대신 동그라미 안 굵은 숫자 · 30px */
+.wn { display: inline-grid; place-items: center; flex: none; box-sizing: border-box; min-width: 30px; height: 30px; border-radius: 50%; border: 2px solid currentColor; font-size: 18px; font-weight: 800; line-height: 1; color: var(--muted); }
+.wn:empty { border-color: transparent; } /* 줄 맞춤용 빈칸 */
+.wn.now { background: var(--accent); border-color: var(--accent); color: #fff; } .wn.done { color: var(--ok); }
 .wmain .wpay, .wmain .wdone { min-height: 50px; font-size: 17px; font-weight: 800; }
 /* ③ [POS로 이동] (사장님 10/21): 판매 가능 = 초록 · 판매 불가 = 빨강 (눌러도 POS로 안 넘어감 → 결제 완료도 안 눌림) */
 .wmain .wpay.go, .wmain .wpay.go:hover { background: var(--naver); border-color: var(--naver); color: var(--on-naver); }
@@ -2205,7 +2207,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       const done = [okSell, paid, paid, st.phoneOk, false];
       const cur = done.indexOf(false);
       const step = (i, t) => `<li class="${done[i] ? "done" : i === cur ? "now" : ""}"><b>${"①②③④⑤"[i]}</b> ${t}</li>`;
-      const tag = (i) => `<span class="wn ${done[i] ? "done" : i === cur ? "now" : ""}">${"①②③④⑤"[i]}</span>`;
+      const tag = (i) => `<span class="wn ${done[i] ? "done" : i === cur ? "now" : ""}">${i + 1}</span>`;
       // 왼쪽 아래 [서비스 키] (사장님 10/16): 임직원 등 예약 없이 쓸 때 — 누르면 판매 단계 없이 사용자만 적는 창으로
       const svcBox = `<div class="svcwalk"><button class="btn ${sheet.svc ? "btn-ink" : ""}" data-act="svcWalk" aria-pressed="${!!sheet.svc}">${sheet.svc ? "← 판매로 돌아가기" : "서비스 키 (판매 아님)"}</button>
         <span class="help">${sheet.svc ? "판매 · 결제 · 입장권 · 설문 없이 열쇠만 등록" : "임직원 등 예약 없이 쓸 때 — 쓰는 사람만 적고 열쇠 등록 · 총 판매수 · 인원에 안 셈"}</span></div>`;
@@ -2219,7 +2221,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
         const vs = svcWalkState();
         const sdone = [sheet.keys.length > 0, vs.ok, false], scur = sdone.indexOf(false);
         const sstep = (i, t) => `<li class="${sdone[i] ? "done" : i === scur ? "now" : ""}"><b>${"①②③"[i]}</b> ${t}</li>`;
-        const stag = (i) => `<span class="wn ${sdone[i] ? "done" : i === scur ? "now" : ""}">${"①②③"[i]}</span>`;
+        const stag = (i) => `<span class="wn ${sdone[i] ? "done" : i === scur ? "now" : ""}">${i + 1}</span>`;
         el.innerHTML = `
         <h3 id="sheet-title"><span>현장입장 · 서비스 키 <span class="badge svcb">판매 아님</span></span><button class="x" data-act="close" aria-label="닫기">×</button></h3>
         <div class="walkgrid">
