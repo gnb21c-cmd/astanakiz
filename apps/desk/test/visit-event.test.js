@@ -93,7 +93,7 @@ test("재방문 이벤트: 시작일 ~ 종료일 · 켜는 순간부터 마일�
     // 조건 [이벤트] · [네이버] 는 입장권 양식에서도 (이벤트 기간엔 {누계} 빈칸 → 그 줄 빠짐)
     assert.deepStrictEqual(await ticket(page, "전시윤", "[이벤트]^이벤트 손님만\n[네이버]^누계 {누계}\n^모두"), ["이벤트 손님만", "재방문 이벤트", "10월 25일(포함)까지 다시 오시면", "수제돈까스 무료 증정!", "이벤트 기간에는 마일리지가 멈춰요", "모두"]);
     // 현장 입장권은 그대로 (네이버 예약 안내 · 이벤트 줄 없음)
-    const walk = await page.evaluate(() => { const T = window.__deskTest, w = T.holders().find((y) => y.walk); return T.receiptLines(T.form(), T.keyVals(w)).map((l) => l.t); });
+    const walk = await page.evaluate(() => { const T = window.__deskTest, v = T.keyVals(T.holders().find((y) => y.walk)); return T.receiptLines(T.form(v), v).map((l) => l.t); });
     assert.ok(walk.some((l) => /네이버 예약하고/.test(l)) && !walk.some((l) => /재방문 이벤트/.test(l)));
 
     // 같은 날 또 오면 1번 안내 (기한 그대로)
@@ -416,7 +416,7 @@ test("공통 양식: 이벤트 기간 입장권의 나머지(안내 문구)도 �
     await enter(page, 840, "전시윤");
     let t = await ticket(page, "전시윤");
     assert.ok(t.includes("11월 재방문 이벤트 기간") && !t.some((l) => /8\/18|예약 1번/.test(l)) && t.includes("재방문 이벤트"), t.join(" | "));
-    const walk = await page.evaluate(() => { const T = window.__deskTest, w = T.holders().find((x) => x.walk); return T.receiptLines(T.form(), T.keyVals(w)).map((l) => l.t.trim()); });
+    const walk = await page.evaluate(() => { const T = window.__deskTest, v = T.keyVals(T.holders().find((x) => x.walk)); return T.receiptLines(T.form(v), v).map((l) => l.t.trim()); });
     assert.ok(walk.includes("11월 재방문 이벤트 기간") && walk.some((l) => /네이버 예약하고/.test(l)), walk.join(" | "));
 
     // 끄면 원래 양식 · 다시 켜면 고친 공통 양식 그대로 (이 PC에 저장)

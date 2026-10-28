@@ -678,3 +678,23 @@ test("근무자 메뉴얼: 맨 위 버튼 → 차례 8개 · 그림이 뜸 · �
     await browser.close();
   }
 });
+
+test("근무자 이름 칸 (사장님 10/28): 글자 · 테두리 = 빈 열쇠 숫자와 같은 회색 · 관리자도", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    await page.goto(DESK);
+    const r = await page.evaluate(() => {
+      const free = [...document.querySelectorAll(".keys .key")].find((k) => !/\b(in|pink|red|walk|svc|void|bulk)\b/.test(k.className));
+      const gray = getComputedStyle(free).color;
+      // 체험판은 근무자 0명 → 근무자 칸과 같은 모양 하나를 관리자 칸 옆에 넣어 봄
+      const adm = document.querySelector(".mbox.adm"), staff = document.createElement("button");
+      staff.className = "mbox"; staff.innerHTML = '<span class="mname">근무자</span>'; adm.parentNode.insertBefore(staff, adm);
+      return { gray, boxes: [...document.querySelectorAll(".mbox")].map((b) => ({ adm: b.classList.contains("adm"), c: getComputedStyle(b).color, bd: getComputedStyle(b).borderTopColor })) };
+    });
+    assert.ok(r.boxes.some((b) => b.adm) && r.boxes.some((b) => !b.adm), "근무자 · 관리자 칸");
+    for (const b of r.boxes) assert.deepStrictEqual([b.c, b.bd], [r.gray, r.gray], `${b.adm ? "관리자" : "근무자"} 칸 색`);
+  } finally {
+    await browser.close();
+  }
+});
