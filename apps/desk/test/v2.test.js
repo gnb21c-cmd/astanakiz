@@ -698,3 +698,43 @@ test("근무자 이름 칸 (사장님 10/28): 글자 · 테두리 = 빈 열쇠 �
     await browser.close();
   }
 });
+
+test("19:30 뒤 네이버 예약 (사장님 10/29 — 이벤트 때 늦게 온 손님이 20:00 예약): 시간표에 20:00 칸이 생기고 · 명단 · 입장 · 합 · 폰 현황에 들어감", async () => {
+  const browser = await launch();
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+    const page = await ctx.newPage();
+    await page.clock.install({ time: new Date("2026-10-29T19:52:00") });
+    await page.addInitScript(() => {
+      const BK = (no, time, name, phone) => ({ no, time, name, phone, qty: 1, qtyText: "1시간 50분 1", product: "1시간 50분", status: "확정", pay: "결제완료", doneCount: 3, cancelCount: 0 });
+      window.desk = {
+        naver: {
+          load: async (day) => ({ ok: true, day, slots: day === "2026-10-29" ? [{ time: "19:00", product: "야간자유", cap: 10, conf: 0, done: 2 }, { time: "20:00", product: "야간자유", cap: 1, conf: 1, done: 0 }] : [], bookings: day === "2026-10-29" ? [BK("N20", "20:00", "늦은손님", "010-5555-2000")] : [] }),
+          complete: async () => ({ ok: true }),
+        },
+        state: { load: () => null, save: () => {} },
+        config: { get: async () => ({ build: "2.11" }), set: async () => ({ ok: true }) },
+      };
+    });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK);
+    await page.waitForFunction(() => /불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 15000 });
+    const times = await page.$$eval("#slots .slot .t", (e) => e.map((x) => x.textContent.trim()));
+    assert.deepStrictEqual(times.slice(-3), ["19:00", "19:30", "20:00"], "19:30 다음에 20:00 칸");
+    assert.deepStrictEqual(await page.$$eval('.slot[data-s="1200"] .c', (e) => e.map((x) => x.textContent.trim())), ["0", "1", "0"], "20:00 완료 0 · 확정 1 · 잔여 0");
+    assert.deepStrictEqual(await page.$$eval("#slot-sum span", (e) => e.slice(1, 3).map((x) => x.textContent.trim())), ["2", "1"], "오늘 합(완료 · 확정)에도");
+    await page.click('.slot[data-s="1200"]');
+    assert.deepStrictEqual(await page.$$eval(".res .name", (e) => e.map((x) => x.textContent.replace(/첫 방문/, "").trim())), ["늦은손님"]);
+    const live = await page.evaluate(() => window.__deskTest.liveSnap().naver.slots.slice(-1)[0]);
+    assert.deepStrictEqual(live, { t: "20:00", done: 0, conf: 1, left: 0, cap: 1 }, "폰 실시간 현황에도");
+    // 다른 날(19:30 뒤 예약 없음)은 그대로 20칸
+    await page.click('[data-act=day][data-d="1"]');
+    await page.waitForTimeout(300);
+    const t2 = await page.$$eval("#slots .slot .t", (e) => e.map((x) => x.textContent.trim()));
+    assert.deepStrictEqual([t2.length, t2[0], t2[t2.length - 1]], [20, "10:00", "19:30"]);
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});

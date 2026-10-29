@@ -271,12 +271,24 @@ test("데스크 계획 화면: 순위 · 저녁 몰림 칸 저장 (17:00 은 3�
     const marks = await page.$$eval("#sheet .captable tr td:first-child", (e) => e.map((x) => x.textContent.replace(/\s+/g, " ").trim()));
     assert.ok(marks.some((x) => /◐/.test(x)) && marks.some((x) => /저녁 몰림/.test(x)) && marks.every((x) => /[123]순위/.test(x)), marks.join(" | "));
     assert.match(await page.textContent("#sheet"), /매시 5 · 15 · 25 · 35 · 45 · 55분/);
-    await page.fill("#cap-boost", "18:00");
-    await page.press("#cap-boost", "Tab");
+    // 순위 · 저녁 몰림 = 입장 시간 버튼 (사장님 10/29): 시간마다 1 · 2 · 3순위 중 하나만 켜짐 · 저녁 몰림은 따로 켜고 끔
+    const cell = (r, t) => `#sheet .capgrid [data-act=capCell][data-r="${r}"][data-t="${+t.slice(0, 2) * 60 + +t.slice(3)}"]`;
+    const lit = (t) => page.$$eval(`#sheet .capgrid [data-act=capCell][data-t="${+t.slice(0, 2) * 60 + +t.slice(3)}"]`, (e) => e.filter((x) => x.classList.contains("on")).map((x) => x.dataset.r).join(""));
+    assert.deepStrictEqual(await page.$$eval("#sheet .capgrid .cg-t", (e) => [e.length, e[0].textContent, e[e.length - 1].textContent]), [20, "10:00", "19:30"], "입장 시간 20개");
+    assert.deepStrictEqual([await lit("10:00"), await lit("10:30"), await lit("11:30"), await lit("18:00"), await lit("18:30")], ["1", "2", "3", "1b", "2b"], "처음: 지금 순위 그대로 (18:00 은 1순위 + 저녁 몰림)");
+    await page.click(cell("b", "18:30")); // 저녁 몰림 18:30 끔
     assert.strictEqual(await page.evaluate(() => JSON.parse(localStorage.getItem("astanakiz-capauto")).boost), "18:00", "저녁 몰림 저장");
-    await page.fill("#cap-p1", "10:00, 12:00~16:00, 18:00");
-    await page.press("#cap-p1", "Tab");
+    assert.strictEqual(await lit("18:30"), "2", "순위는 그대로");
+    await page.click(cell("1", "16:00")); // 16:00 2순위 → 1순위
+    assert.strictEqual(await lit("16:00"), "1", "2순위는 꺼짐");
     assert.strictEqual(await page.evaluate(() => window.__deskTest.capPlan().rankOf(960)), 1, "16:00 → 1순위로");
+    await page.click(cell("3", "10:00")); // 1순위 10:00 → 3순위
+    assert.strictEqual(await lit("10:00"), "3");
+    await page.click(cell("2", "10:00")); // → 2순위 (3순위는 꺼짐)
+    assert.strictEqual(await lit("10:00"), "2");
+    const P = await page.evaluate(() => JSON.parse(localStorage.getItem("astanakiz-capauto")).prio);
+    assert.deepStrictEqual(P, { p1: "12:00~16:00, 18:00", p2: "10:00~11:00, 16:30, 18:30", p3: "11:30, 17:00, 17:30, 19:00, 19:30" }, "글로도 저장 (계산은 예전과 같은 글)");
+    assert.deepStrictEqual(await page.evaluate(() => [600, 960, 1020].map((t) => window.__deskTest.capPlan().rankOf(t))), [2, 1, 3]);
     assert.deepStrictEqual(errs, []);
     // 예전(ver.2.5) 기본 순위로 저장된 PC → 17:00 을 3순위로 한 번만 바꿈 · 사장님이 고친 순위는 그대로
     const ctx = await browser.newContext();

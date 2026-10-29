@@ -565,8 +565,16 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 .facts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
 /* 열쇠 창 예약자 줄 오른쪽 [입장권 다시 출력] (사장님 10/21 · 감열지가 끊겼을 때) */
 /* 운영 설정 → 네이버 설정: 손님이 고르는 순위 1 · 2 · 3 (사장님 10/24) */
-.capprio { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 8px; align-items: center; margin-top: 6px; }
-.capprio > .help:last-child { grid-column: 1 / -1; }
+/* 순위 · 저녁 몰림 = 입장 시간 버튼 (사장님 10/29): 시간마다 1 · 2 · 3순위 중 하나 · 저녁 몰림은 따로 */
+.capgrid { display: grid; grid-template-columns: 64px repeat(20, minmax(0, 1fr)); gap: 3px 2px; align-items: center; margin-top: 8px; }
+.capgrid .cg-l { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.capgrid .cg-t { font-size: 10px; color: var(--muted); text-align: center; letter-spacing: -0.3px; }
+.capgrid .cg { height: 26px; min-width: 0; padding: 0; border: 1px solid var(--line); border-radius: 5px; background: var(--surface-2); color: var(--fg); font-size: 12px; font-weight: 800; cursor: pointer; }
+.capgrid .cg.on.cg1 { background: var(--accent); border-color: var(--accent); color: #fff; }
+.capgrid .cg.on.cg2 { background: var(--todo); border-color: var(--todo); color: var(--todo-fg); opacity: .7; }
+.capgrid .cg.on.cg3 { background: var(--faint); border-color: var(--faint); color: var(--bg); }
+.capgrid .cg.on.cgb { background: var(--amber); border-color: var(--amber); color: #1C1400; }
+.capgrid + .help { display: block; margin-top: 6px; }
 .facts dd.whorow { display: flex; align-items: center; gap: 8px; }
 .facts dd.whorow > span { min-width: 0; }
 .facts .reprint { margin-left: auto; flex: none; font-weight: 700; }
@@ -1386,10 +1394,18 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 
   /** 시간 칸마다 네이버 완료 · 확정(미입장) · 잔여 — 왼쪽 표 · 폰 실시간 현황이 같이 씀
       잔여 = 기준치 − 확정 − 완료. 기준치는 네이버 칸의 판매 수량(예약가능+확정+이용완료)이라 현장 설정에 따라 10이 아닐 수 있음 */
+  /** 그날 시간표 칸 — 기본 10:00 ~ 19:30 + 그 밖 시각에 네이버 예약 · 판매 칸이 있으면 그 칸도 (사장님 10/29 — 이벤트 때 19:30 넘어 온 손님이 20:00 예약)
+      수량 자동조절 · 현장 타임 고르기 · 예약시간 변경은 기본 칸(SLOTS)만 */
+  function daySlots(day) {
+    const set = new Set(SLOTS);
+    for (const b of bookings[day] || []) if (b.slot != null) set.add(b.slot);
+    for (const [t, o] of Object.entries(naverSlots[day] || {})) if (o.cap || o.conf || o.done) set.add(Number(t));
+    return [...set].sort((a, b) => a - b);
+  }
   function slotStats(day) {
     ensureDay(day);
     const list = bookings[day];
-    return SLOTS.map((s) => {
+    return daySlots(day).map((s) => {
       const bs = list.filter((b) => b.slot === s);
       const ns = (naverSlots[day] || {})[s];
       const sum = (st) => bs.filter((b) => b.status === st).reduce((a, b) => a + b.qty, 0);
@@ -1912,6 +1928,36 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       if (b >= a) out.push([a, b]);
     }
     return out;
+  }
+  /** 시각들 → 순위 칸 글 ("10:00, 12:00~15:30, 18:00" — 30분씩 3개 넘게 이어지면 ~ 로) · capRanges 로 다시 읽으면 같은 시각 */
+  function capFmt(ts) {
+    const a = [...new Set(ts)].sort((x, y) => x - y), out = [];
+    for (let i = 0; i < a.length; ) {
+      let j = i;
+      while (j + 1 < a.length && a[j + 1] === a[j] + 30) j++;
+      if (j - i >= 2) out.push(`${hm(a[i])}~${hm(a[j])}`);
+      else for (let k = i; k <= j; k++) out.push(hm(a[k]));
+      i = j + 1;
+    }
+    return out.join(", ");
+  }
+  const inRanges = (rs, t) => rs.some(([a, b]) => t >= a && t <= b);
+  /** 입장 시간마다 순위 1 · 2 · 3 (1순위 칸 → 2순위 칸 → 그 밖 3순위 — capPlan 과 같은 차례) */
+  function capLevel(t) {
+    const P = RULES.capAuto.prio || {};
+    return inRanges(capRanges(P.p1), t) ? 1 : inRanges(capRanges(P.p2), t) ? 2 : 3;
+  }
+  /** 순위 버튼 (사장님 10/29): 그 시간을 k 순위로 — 다른 순위는 꺼짐 · 세 칸 글을 다시 씀 */
+  function capSetLevel(t, k) {
+    const lv = new Map(SLOTS.map((x) => [x, capLevel(x)]));
+    lv.set(t, k);
+    const of = (n) => capFmt(SLOTS.filter((x) => lv.get(x) === n));
+    RULES.capAuto.prio = Object.assign({}, RULES.capAuto.prio, { p1: of(1), p2: of(2), p3: of(3) });
+  }
+  /** 저녁 몰림 버튼: 그 시간을 켜고 끔 (순위와 따로) */
+  function capToggleBoost(t) {
+    const on = SLOTS.filter((x) => inRanges(capRanges(RULES.capAuto.boost), x));
+    RULES.capAuto.boost = capFmt(on.includes(t) ? on.filter((x) => x !== t) : on.concat(t));
   }
   /** 지금 나간 현장 열쇠 (사장님 10/24 · 현장 몫 계산) — 열쇠마다 반납 시각 (capPresent 와 같은 셈 · 서비스 키는 빼고 · 이벤트 입장은 넣음) */
   function capWalkOut() {
@@ -2609,8 +2655,9 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
               <label class="help" for="cap-max" title="곧 다가오는 타임이 매진일 때 여기까지 (저녁 몰림 시간은 제한 없이 네 타임 합까지)">곧 다가오는 타임 최대</label><input id="cap-max" type="number" min="5" max="20" value="${A.max}" class="cfg" style="width:76px">
               <label class="help" for="cap-vis">보이는 잔여 최대</label><input id="cap-vis" type="number" min="1" max="20" value="${A.visible}" class="cfg" style="width:76px">
               <button class="btn btn-sm btn-ink" data-act="capNow" ${capBusy ? "disabled" : ""}>${capBusy ? "조절 중…" : "지금 한 번 조절"}</button></div>
-            <div class="capprio">${[["p1", "1순위"], ["p2", "2순위"], ["p3", "3순위"], ["boost", "저녁 몰림"]].map(([k, t]) => `<label class="help" for="cap-${k}">${t}</label><input id="cap-${k}" class="cfg" value="${esc((k === "boost" ? A.boost : A.prio && A.prio[k]) || "")}" placeholder="${k === "boost" ? "18:00, 18:30" : "10:00, 12:00~15:30, 18:00"}">`).join("")}
-              <span class="help">손님이 고르는 차례 (성수기 휴일) · 쉼표로 나눔 · 12:00~15:30 = 그 사이 모두 · 적지 않은 타임은 3순위 · 순위는 '뒤 3타임이 모두 1순위인지'와 저녁 몰림 시간에서 줄일 타임(3순위)을 고를 때 씀 · 저녁 몰림 = 매진이면 미리부터 ${A.max} 넘게</span></div></div>
+            <div class="capgrid" role="group" aria-label="손님이 고르는 차례 · 저녁 몰림"><span class="cg-l"></span>${SLOTS.map((t) => `<span class="cg-t num">${hm(t)}</span>`).join("")}
+              ${[["1", "1순위"], ["2", "2순위"], ["3", "3순위"], ["b", "저녁 몰림"]].map(([r, lb]) => `<span class="cg-l">${lb}</span>${SLOTS.map((t) => { const on = r === "b" ? inRanges(capRanges(A.boost), t) : capLevel(t) === Number(r); return `<button class="cg cg${r}${on ? " on" : ""}" data-act="capCell" data-r="${r}" data-t="${t}" aria-pressed="${on}" aria-label="${hm(t)} ${lb}">${on ? (r === "b" ? "●" : r) : ""}</button>`; }).join("")}`).join("")}</div>
+            <span class="help">손님이 고르는 차례 (성수기 휴일) — 입장 시간마다 <b>1 · 2 · 3순위 중 하나</b> (누르면 그 순위 · 다른 순위는 꺼짐) · <b>저녁 몰림</b>은 따로 켜고 끔 · 순위는 '뒤 3타임이 모두 1순위인지'와 저녁 몰림 시간에서 줄일 타임(3순위)을 고를 때 씀 · 저녁 몰림 = 매진이면 미리부터 ${A.max} 넘게</span></div>
           ${p.skip ? `<div class="banner">${esc(p.skip)}</div>` : `
           <div class="help longhelp" data-q="표 읽는 법">지금 ${hm(now)} · 안에 있는 손님(열쇠) 네이버 <b class="num">${p.inside}</b> · 현장 <b class="num">${p.insideWalk}</b> · ◐ = 곧 다가오는 타임 · 네이버 예약 = 조절하는 상품 (괄호 = 다른 상품) · 계획 = 이번에 넣을 수량과 까닭 · <b>네 타임 합</b> = 그 타임과 앞 3타임 (시작한 타임은 예약 수 · 안 시작한 타임은 수량) · 묶음 = 일찍 반납한 열쇠가 생길 때까지 안 바꿈</div>
           <table class="captable"><tr><th>타임</th><th>네이버 예약</th><th>현장</th><th>지금 수량</th><th>계획</th><th>네 타임 합</th></tr>${rows}</table>`}
@@ -4376,6 +4423,8 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       updateWalkButtons();
     },
     // 예약시간 변경: ◀ ▶ 로 시간을 고르고 [변경] → 데스크 카드만 그 시간으로 (네이버 예약은 원래 시간 그대로, 이용완료도 원래 시간 칸에서)
+    // 순위 · 저녁 몰림 입장 시간 버튼 (사장님 10/29)
+    capCell(btn) { const t = Number(btn.dataset.t); if (btn.dataset.r === "b") capToggleBoost(t); else capSetLevel(t, Number(btn.dataset.r)); capMark = null; saveCapAuto(); renderSheet(); },
     mvSlot(btn) { const b = findB(sheet.id); if (!b) return; sheet.mv = Math.max(SLOTS[0], Math.min(SLOTS[SLOTS.length - 1], (sheet.mv ?? b.slot) + Number(btn.dataset.d))); renderSheet(); },
     mvDo() {
       const b = findB(sheet.id); if (!b || sheet.mv == null || sheet.mv === b.slot) return;
@@ -4963,8 +5012,6 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
       toast(t.checked ? `오늘 네이버 판매 수량 자동조절을 켰어요 — 10분마다 (목표 ${RULES.capAuto.target} · 상한 ${RULES.capAuto.ceiling})${timedDay(TODAY) ? "" : " · 손님 이용은 그대로 무제한"} · 내일은 기본으로` : "오늘 수량조절을 껐어요 (오늘만) — 이미 바꾼 네이버 수량은 그대로예요", 7000);
     }
     if (t.id === "cap-on") { RULES.capAuto.on = t.checked; capMark = null; saveCapAuto(); renderAll(); toast(t.checked ? "네이버 판매 수량 자동 조절을 켰어요 (10분마다)" : "자동 조절을 껐어요"); }
-    if (/^cap-p[123]$/.test(t.id)) { RULES.capAuto.prio = Object.assign({}, RULES.capAuto.prio, { [t.id.slice(4)]: t.value.slice(0, 120) }); saveCapAuto(); } // 손님이 고르는 순위 (사장님 10/24)
-    if (t.id === "cap-boost") { RULES.capAuto.boost = t.value.slice(0, 60); saveCapAuto(); } // 저녁 몰림 시간 (사장님 10/24 밤)
     if ((t.id === "cap-target" || t.id === "cap-max" || t.id === "cap-ceil" || t.id === "cap-vis") && t.value) { RULES.capAuto[{ "cap-target": "target", "cap-max": "max", "cap-ceil": "ceiling", "cap-vis": "visible" }[t.id]] = Math.max(1, Math.min(60, Number(t.value) || 0)); saveCapAuto(); }
     if (t.id === "com-baud") { PRINT.baud = Number(t.value); savePrint(); }
     if (t.id === "w-phone") { sheet.phone = walkPhone(t.value); t.value = walkFmt(sheet.phone); updateWalkButtons(); }

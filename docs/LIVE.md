@@ -78,7 +78,7 @@
   "golden": null,                                  // 골든벨 울린 시각 "16:40" (그때부터 모두 무제한)
   "rules": { "keys": 45, "useMinutes": 110, "pinkUntil": 120, "overFee": 5000, "overUnitMin": 10 },
   "naver": { "done": 36, "conf": 32, "left": 132, "test": 0,      // 오늘 합: 완료 · 미입장(확정) · 잔여 · 시험으로 뺀 장수
-             "slots": [ { "t": "10:00", "done": 7, "conf": 0, "left": 3, "cap": 10 }, … ],
+             "slots": [ { "t": "10:00", "done": 7, "conf": 0, "left": 3, "cap": 10 }, … ],   // 10:00 ~ 19:30 + 그날 그 밖 시각에 예약 · 판매 칸이 있으면 그 칸도 (예 "20:00" · 2.12~)
              "products": [ { "name": "4인 입장권", "done": 36 } ] },          // 상품별 이용완료 장수 (시험 기록 뺌)
   "people": { "naver": 36, "walk": 3, "total": 39 },                          // 총 판매수 (통합데스크 맨 위 숫자와 같음)
   "walk": { "tickets": 3, "extra": 0, "service": 2, "event": 1 },             // 현장 장수 · 그중 +1타임 장수 · 서비스 키 수(판매 아님) · 이벤트 입장 수(결제 없음 · 판매 아님 · tickets 에 안 들어감 · 10/21~)
