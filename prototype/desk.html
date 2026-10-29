@@ -493,6 +493,14 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 .key.red { background: var(--red); border: 2.5px solid var(--ink); color: #fff; }
 /* V2.0 (사장님 10/21): 테두리 = 누구 열쇠 — 네이버 예약 흰색(밝은 화면은 잉크) · 현장 파랑 · 서비스 흰 점선 / 바탕 = 이용 시간 */
 .key.walk { border-color: var(--walk); }
+/* 열쇠 2초 꾹 → 끌어서 맞바꿈 · 옮기기 (사장님 10/29) */
+.keys .key { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.key.holding { animation: keyhold 2s linear forwards; }
+@keyframes keyhold { from { box-shadow: inset 0 0 0 0 var(--accent); } to { box-shadow: inset 0 0 0 4px var(--accent); } }
+.key.lifted { opacity: .3; }
+.key.drop { outline: 3px dashed var(--accent); outline-offset: -3px; }
+.keyghost { position: fixed; z-index: 3000; pointer-events: none; transform: scale(1.12); box-shadow: 0 8px 24px rgba(0, 0, 0, .55); }
+body.keydrag, body.keydrag * { cursor: grabbing !important; }
 .key.void { visibility: hidden; }
 .key.bulk { aspect-ratio: auto; height: auto; min-height: 0; align-self: stretch; font-size: 14px; font-weight: 800; }
 .key.bulk:not(:disabled) { background: var(--surface); border: 1.5px solid var(--ink); color: var(--ink); } /* 선은 주차등록 칸과 같은 굵기 (10/9) */ /* 열쇠 2개 이상 나가면 지급된 열쇠처럼 */
@@ -4293,6 +4301,36 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     if (!h.keys.length) h.outAt = now;
     toast(`${ks.join(", ")}번 ${h.svc ? "서비스 키 " : ""}반납${h.keys.length ? "" : ` · ${h.svc ? svcWho(h) : h.walk ? "현장입장자" : h.name + "님"} 퇴장`}`);
   }
+  /* 열쇠 자리 맞바꿈 · 옮기기 (사장님 10/29 — 근무자가 열쇠 번호를 잘못 넣었을 때)
+     쓰는 중인 열쇠를 2초 꾹 누르면 떠오름 → 끌어서 다른 쓰는 중인 열쇠에 놓으면 두 열쇠의 손님이 맞바뀜 · 빈 열쇠에 놓으면 그 번호로 옮김
+     열쇠별 이용시간(keyUse) · 그날 쓴 열쇠 기록(keysTaken)도 새 번호로 (잘못 넣은 번호는 그 손님 기록에서 빠짐) · 입장권은 다시 안 나옴 */
+  const KEY_HOLD_MS = 2000;
+  function moveKey(from, to) {
+    const a = holderOf(from);
+    if (!a || from === to || to < 1 || to > RULES.keys) return "";
+    const b = holderOf(to);
+    const nm = (h) => (h.svc ? svcWho(h) : h.walk ? "현장" : `${h.name}님`);
+    const swap = (h, x, y) => { // h 의 열쇠 x 를 y 로 (자리 바꿈이면 b 는 거꾸로 따로 부름)
+      h.keys = h.keys.map((k) => (k === x ? y : k));
+      if (h.keysTaken) h.keysTaken = [...new Set(h.keysTaken.map((k) => (k === x ? y : k)))];
+    };
+    const ua = a.keyUse && from in a.keyUse ? { v: a.keyUse[from] } : null, ub = b && b.keyUse && to in b.keyUse ? { v: b.keyUse[to] } : null;
+    if (a.keyUse) delete a.keyUse[from];
+    if (b && b.keyUse) delete b.keyUse[to];
+    if (b === a) { // 같은 손님의 두 열쇠 — 열쇠별 이용시간만 맞바꿈
+      if (ub) a.keyUse[from] = ub.v;
+      if (ua) a.keyUse[to] = ua.v;
+    } else {
+      swap(a, from, to);
+      if (ua) a.keyUse[to] = ua.v;
+      if (b) {
+        swap(b, to, from);
+        if (ub) b.keyUse[from] = ub.v;
+      }
+    }
+    saveState();
+    return b ? `${from}번 ↔ ${to}번 자리 바꿈 (${nm(a)} → ${to}번${b !== a ? ` · ${nm(b)} → ${from}번` : ""})` : `${from}번 → ${to}번으로 옮김 (${nm(a)})`;
+  }
   // 현장입장 전화번호: 010은 고정, 뒤 8자리만 받음 (010을 지워도 다시 붙음)
   function walkPhone(v) {
     const d = digits(v);
@@ -4952,8 +4990,67 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
     close() { closeSheet(); },
   };
 
+  // 열쇠 2초 꾹 → 끌어서 놓기 (사장님 10/29 · moveKey) — 짧게 누르면 예전처럼 열쇠 창 · 2초 전에 움직이면 그만
+  let keyDropAt = 0;
+  (() => {
+    let hold = null; // { k, x0, y0, pid, el, timer, ghost, lifted }
+    const clear = () => {
+      if (!hold) return;
+      clearTimeout(hold.timer);
+      if (hold.el) hold.el.classList.remove("holding", "lifted");
+      if (hold.ghost) hold.ghost.remove();
+      document.querySelectorAll(".keys .key.drop").forEach((x) => x.classList.remove("drop"));
+      document.body.classList.remove("keydrag");
+      hold = null;
+    };
+    const target = (x, y) => { const t = document.elementFromPoint(x, y); const el = t && t.closest(".keys .key[data-k]"); return el && !el.classList.contains("bulk") ? el : null; };
+    $("keys").addEventListener("pointerdown", (e) => {
+      const el = e.target.closest(".key[data-k]");
+      if (!el || el.classList.contains("free") || !holderOf(Number(el.dataset.k)) || (e.button != null && e.button > 0)) return;
+      clear();
+      hold = { k: Number(el.dataset.k), x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, pid: e.pointerId, el };
+      el.classList.add("holding");
+      hold.timer = setTimeout(() => {
+        if (!hold) return;
+        hold.lifted = true;
+        hold.el.classList.remove("holding");
+        hold.el.classList.add("lifted");
+        const r = hold.el.getBoundingClientRect(), g = hold.el.cloneNode(true);
+        g.className = hold.el.className.replace(/\b(lifted|holding)\b/g, "") + " keyghost";
+        Object.assign(g.style, { width: `${r.width}px`, height: `${r.height}px`, left: `${hold.x - r.width / 2}px`, top: `${hold.y - r.height / 2}px` });
+        document.body.appendChild(g);
+        hold.ghost = g;
+        document.body.classList.add("keydrag");
+      }, KEY_HOLD_MS);
+    });
+    document.addEventListener("pointermove", (e) => {
+      if (!hold || e.pointerId !== hold.pid) return;
+      hold.x = e.clientX; hold.y = e.clientY;
+      if (!hold.lifted) { if (Math.hypot(e.clientX - hold.x0, e.clientY - hold.y0) > 14) clear(); return; } // 2초 전에 움직이면 그냥 누르기 아님
+      e.preventDefault();
+      const g = hold.ghost;
+      g.style.left = `${e.clientX - g.offsetWidth / 2}px`; g.style.top = `${e.clientY - g.offsetHeight / 2}px`;
+      const t = target(e.clientX, e.clientY);
+      document.querySelectorAll(".keys .key.drop").forEach((x) => x !== t && x.classList.remove("drop"));
+      if (t && Number(t.dataset.k) !== hold.k) t.classList.add("drop");
+    }, { passive: false });
+    document.addEventListener("pointerup", (e) => {
+      if (!hold || e.pointerId !== hold.pid) return;
+      if (!hold.lifted) { clear(); return; } // 짧게 누름 → 열쇠 창 (click)
+      const t = target(e.clientX, e.clientY), from = hold.k;
+      clear();
+      keyDropAt = Date.now(); // 놓은 뒤 따라오는 click 은 무시
+      const to = t ? Number(t.dataset.k) : null;
+      if (to == null || to === from) return;
+      const msg = moveKey(from, to);
+      if (msg) { renderAll(); toast(msg, 6000); }
+    });
+    document.addEventListener("pointercancel", clear);
+    $("keys").addEventListener("contextmenu", (e) => e.preventDefault()); // 터치로 꾹 누르면 뜨는 메뉴 · 오른쪽 클릭 막기
+  })();
   document.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-act]");
+    if (btn && btn.dataset.act === "key" && Date.now() - keyDropAt < 700) return; // 열쇠를 끌어 놓은 바로 뒤
     if (btn && !btn.disabled && acts[btn.dataset.act]) { acts[btn.dataset.act](btn); return; }
     if (e.target === $("overlay")) acts.close();
   });
