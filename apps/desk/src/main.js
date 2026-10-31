@@ -853,7 +853,10 @@ ipcMain.handle("history:backfill", (_e, job) => {
       if (!r || !r.ok) {
         // 그날은 두고 다음 날로 (다음에 다시) · 3일 이어 못 읽으면 멈춤 (사장님 10/31 — 한 날 때문에 저녁 읽기가 통째로 멈췄음)
         me.skipped.push(d);
-        me.why = `${d.slice(5).replace("-", "/")} 못 읽음: ${(r && r.why) || "응답 없음"}`;
+        me.lastWhy = (r && r.why) || "응답 없음";
+        me.why = `${d.slice(5).replace("-", "/")} 못 읽음: ${me.lastWhy}`;
+        // 로그인 풀림 · 주소를 모름 · 창이 없음은 날을 바꿔도 안 됨 → 바로 멈춤
+        if (/로그인|주소를 모름|창이 아직/.test(me.lastWhy)) { me.why += " — 다시 누르면 이어서"; me.stopped = true; break; }
         if (++fails >= 3) { me.why += " — 3일 이어 못 읽어 멈춤 · 다시 누르면 이어서"; me.stopped = true; break; }
         continue;
       }
@@ -865,7 +868,7 @@ ipcMain.handle("history:backfill", (_e, job) => {
       me.done++;
       me.visits += r.visits.length;
     }
-    if (me.skipped.length && !me.stopped) me.why = `${me.skipped.length}일 못 읽고 건너뜀(${me.skipped.slice(0, 3).map((d) => d.slice(5).replace("-", "/")).join(", ")}${me.skipped.length > 3 ? " …" : ""}) — 다음에 다시`;
+    if (me.skipped.length && !me.stopped) me.why = `${me.skipped.length}일 못 읽고 건너뜀(${me.skipped.slice(0, 3).map((d) => d.slice(5).replace("-", "/")).join(", ")}${me.skipped.length > 3 ? " …" : ""} · ${me.lastWhy}) — 다음에 다시`;
     // 네이버 예약현황을 오늘로 돌려놓음 (데스크 불러오기는 오늘 근처에서 하루씩 움직임)
     await serial("naver", () => timed(naver.goView("calendar").then((g) => (g.ok ? naver.goDate(localToday()) : g)), 300000, "")).catch(() => {});
     me.running = false;
