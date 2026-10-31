@@ -121,6 +121,10 @@
         <span class="btn btn-xs calendar-btn btn-trans">${P.get("compact") ? "" : `<span class="text">${ap}</span>`}<span class="time">${hm}</span></span>
         ${conf || done ? btn("잔여예약", Math.max(0, capOf(p, t) - conf - done), "remaining") : btn("예약가능", capOf(p, t), "avail")}${conf ? btn("확정", conf, "confirmed") : ""}${done ? btn("이용완료", done, "completed") : ""}</div></div>`;
     };
+    const rowsHtml = (n) => times.slice(0, n).map((t) => `<div class="d-flex Calendar__week-cell-daily-row__5WVtA">${PRODUCTS.map((_, p) => cell(p, t)).join("")}</div>`).join("");
+    // 시험: localStorage mockNaverLag = { n(앞으로 몇 번 화면을 열 때), ms(칸이 뜨기까지), keep(그동안 보이는 시간 줄 수), spin(로딩 표시 · 기본 켬) }
+    let lag = null;
+    try { const L = JSON.parse(localStorage.getItem("mockNaverLag") || "null"); if (L && L.n > 0) { L.n--; localStorage.setItem("mockNaverLag", JSON.stringify(L)); lag = L; } } catch (e) { lag = null; }
     const sel = P.get("sel") ? JSON.parse(P.get("sel")) : null; // { p, t, s: "확정"|"완료" }
     const capSel = P.get("cap") ? JSON.parse(P.get("cap")) : null; // { p, t } 예약가능 설정
     let panel = "";
@@ -167,8 +171,14 @@
     }
     document.body.innerHTML = `<div class="bar">${dateNav(label)} <a href="naver-stock.html?view=items">예약상품</a></div><div class="wrap"><div class="Calendar__inner-contents__px333">
       <div class="Calendar__inner-header__y3esS"><div class="d-flex Calendar__week-row__JWB4z">${PRODUCTS.map((x) => `<div class="Calendar__week-cell__ntFou"><span class="Calendar__day-header__6caUi">${x}</span></div>`).join("")}</div></div>
-      <div class="Calendar__row-wrap__8dvIt">${times.map((t) => `<div class="d-flex Calendar__week-cell-daily-row__5WVtA">${PRODUCTS.map((_, p) => cell(p, t)).join("")}</div>`).join("")}</div>
+      <div class="Calendar__row-wrap__8dvIt">${rowsHtml(lag ? lag.keep || 0 : times.length)}</div>
       </div><aside>${panel}</aside></div>`;
+    // 시간 칸이 늦게 뜨는 화면 (사장님 10/31 — 날짜 글자만 먼저 바뀌고 칸은 나중에): ms 뒤에 모든 칸 · 그동안 keep 줄만 + 로딩 표시
+    if (lag) {
+      const wrap = document.querySelector('[class*="Calendar__row-wrap"]');
+      if (lag.spin !== false) wrap.insertAdjacentHTML("afterend", `<div class="Loading__load_area__q1">불러오는 중</div>`); // spin: false = 로딩 표시 없이 덜 뜬 채로
+      if (lag.ms < 1e8) setTimeout(() => { wrap.innerHTML = rowsHtml(times.length); const l = document.querySelector('[class*="Loading__load_area"]'); if (l) l.remove(); }, lag.ms);
+    }
     // 오른쪽 목록: 아래로 내리면 카드 2장씩 더
     const wrapEl = document.querySelector('[class*="List__list-wrap"]');
     if (wrapEl) wrapEl.addEventListener("scroll", () => {

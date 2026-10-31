@@ -62,12 +62,16 @@ test("재방문 간격(앱): 입장 처리 때마다 그날 손님 · 20:00 일�
     await page.click("#enter-done");
     await page.clock.runFor(1500);
     const adds = (await hv()).add;
-    assert.deepStrictEqual(adds[adds.length - 1], { day: "2026-10-26", keys: ["01077770001"] }, "이용완료한 네이버 손님만 (이처음은 아직)");
+    const a1 = adds[adds.length - 1];
+    assert.deepStrictEqual([a1.day, a1.keys], ["2026-10-26", ["01077770001"]], "이용완료한 네이버 손님만 (이처음은 아직)");
+    // 손님마다 [네이버 '완료 n'(이번까지), 오늘 건수] — 신규 · 기존 나누기 (사장님 10/31)
+    assert.deepStrictEqual(Object.keys(a1.counts), ["01077770001"]);
+    assert.ok(a1.counts["01077770001"][0] >= 1 && a1.counts["01077770001"][1] === 1, JSON.stringify(a1.counts));
     assert.strictEqual((await hv()).send.length, 0, "20:00 전엔 안 보냄");
     // 20:00 → 일수 모음을 보냄 (실패 → 10분 뒤 다시)
     await page.clock.runFor(2.5 * 60 * 1000);
     let h = await hv();
-    assert.deepStrictEqual(h.stats[h.stats.length - 1], { today: "2026-10-26", past: { from: "2026-04-01", to: "2026-10-25" }, event: { from: "2026-10-26", to: "2027-02-28" } });
+    assert.deepStrictEqual(h.stats[h.stats.length - 1], { today: "2026-10-26", paid: "2026-04-01", past: { from: "2026-04-01", to: "2026-10-25" }, event: { from: "2026-10-26", to: "2027-02-28" } });
     assert.strictEqual(h.send.length, 1);
     const p = JSON.parse(h.send[0].json);
     assert.deepStrictEqual([p.type, p.v, p.day], ["astanakiz-revisit", 1, "2026-10-26"]);

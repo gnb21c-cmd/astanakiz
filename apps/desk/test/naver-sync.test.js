@@ -71,6 +71,46 @@ test("날짜 이동: 다른 날로 갔다가 돌아옴 · 두 번째 읽기는 �
   }
 });
 
+/* 네이버를 덜 읽은 채로 숫자를 지우는 문제 (사장님 10/31 — 보고 앱 키즈 실시간이 아침 칸 0 · 완료 35 처럼 일부만 보이다가 돌아옴)
+   날짜 글자만 맞으면 바로 읽어 시간 칸이 아직 안 뜬 화면을 '입장권 칸 0개'로 받아들였음 */
+test("시간 칸이 늦게 뜨는 화면: 칸이 뜰 때까지 기다렸다가 읽음 · 끝까지 0개 · 앞보다 적으면 실패 · 적은 수가 세 번 이어지면 받아들임", async () => {
+  const { browser, page } = await open();
+  const sync = new NaverSync((code) => page.evaluate(code), { urls: { list: MOCK + "?view=list", calendar: MOCK + "?view=calendar" }, today: () => "2026-10-05" });
+  const lag = async (o) => { await page.evaluate((o) => localStorage.setItem("mockNaverLag", JSON.stringify(o)), o); await page.reload(); };
+  try {
+    // ① 날짜는 맞는데 칸이 1.5초 뒤에 뜸 → 기다렸다가 다 읽음
+    await lag({ n: 1, ms: 1500, keep: 0 });
+    let r = await sync.loadDay("2026-10-05");
+    assert.ok(r.ok, r.why);
+    assert.strictEqual(r.bookings.length, 8);
+    const n0 = r.slots.length;
+    assert.ok(n0 >= 20, "칸을 다 읽음 " + n0);
+    // ② 오늘인데 칸이 끝까지 안 뜸 → 실패 (partial)
+    await lag({ n: 1, ms: 1e9, keep: 0 });
+    r = await sync.loadDay("2026-10-05");
+    assert.deepStrictEqual([r.ok, r.partial], [false, true]);
+    assert.match(r.why, /입장권 칸 0개/);
+    // ③ 앞서 읽은 것보다 칸이 적음 (아침 6줄만) → 실패
+    await lag({ n: 1, ms: 1e9, keep: 6 });
+    r = await sync.loadDay("2026-10-05");
+    assert.deepStrictEqual([r.ok, r.partial], [false, true]);
+    assert.match(r.why, /덜 뜸 \(입장권 칸 6개 < 앞서 \d+개\)/);
+    // ④ 로딩 표시 없이 같은 적은 수(4줄)가 세 번 이어지면 정말 줄어든 것으로 받아들임 (회차를 지움 등)
+    await lag({ n: 1, ms: 1e9, keep: 4, spin: false });
+    assert.strictEqual((await sync.loadDay("2026-10-05")).ok, false);
+    assert.strictEqual((await sync.loadDay("2026-10-05")).ok, false);
+    r = await sync.loadDay("2026-10-05");
+    assert.ok(r.ok, r.why);
+    assert.strictEqual(r.slots.length, 4);
+    // ⑤ 다른 날(오늘 아님 · 처음 보는 날)은 칸 0개도 그대로 (아직 안 연 날 · 쉬는 날)
+    await lag({ n: 1, ms: 1e9, keep: 0, spin: false });
+    r = await sync.loadDay("2026-10-06");
+    assert.ok(r.ok, r.why);
+  } finally {
+    await browser.close();
+  }
+});
+
 test("이용완료: 카드의 [이용완료] → 확인 → 완료로 바뀜, 완료 수 +1", async () => {
   const { browser, sync } = await open();
   try {
@@ -176,6 +216,7 @@ test("지난 방문 기록 읽기(사장님 10/19): 그날 [이용완료] 칸만
     const old = await sync.loadDone("2026-09-25");
     assert.ok(old.ok, old.why);
     assert.deepStrictEqual(old.visits.map((v) => v.no).sort(), ["9001", "9002"]);
+    assert.deepStrictEqual(old.visits.map((v) => [v.no, v.doneCount]).sort(), [["9001", 3], ["9002", 4]], "카드의 '완료 n'도 (신규 · 기존 나누기 · 사장님 10/31)");
     assert.strictEqual(old.cells, 2, "이용완료가 있는 입장권 칸만 엶");
     const back = await sync.loadDay("2026-10-05");
     assert.ok(back.ok, "지난 날 읽은 뒤 오늘로 돌아옴: " + back.why);

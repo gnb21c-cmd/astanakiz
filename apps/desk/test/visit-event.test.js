@@ -632,13 +632,18 @@ test("재방문 성공 수 → 보고 앱 (사장님 10/27): 현황 글(astanaki
     await inject("송다온", { day: "2026-09-30", n: 2, base: 0, st: "성공" }); // 9/30 성공
     await inject("홍예준", { day: "2026-09-20" }); // 안내 → 오늘 오면 성공
     const rv = () => page.evaluate(() => window.__deskTest.liveSnap().revisit);
-    assert.deepStrictEqual(await rv(), { from: "2026-09-10", today: 0, total: 1, days: { "2026-09-30": 1 } });
+    assert.deepStrictEqual(await rv(), { from: "2026-09-10", today: 0, total: 1, days: { "2026-09-30": 1 }, who: [] });
     await enter(page, 840, "홍예준");
-    assert.deepStrictEqual(await rv(), { from: "2026-09-10", today: 1, total: 2, days: { "2026-09-30": 1, "2026-10-05": 1 } }, "오늘 성공 1 · 누적 2");
+    const r1 = await rv();
+    assert.match(r1.who[0].at, /^\d\d:\d\d$/, "누른 시각");
+    // 오늘 재방문성공 손님 (사장님 10/29 · 10/31): 이름만(전화번호 없음) · 앞 방문 날 · 며칠 만에 · 누른 시각 — today 와 수가 같게
+    assert.deepStrictEqual(r1, { from: "2026-09-10", today: 1, total: 2, days: { "2026-09-30": 1, "2026-10-05": 1 }, who: [{ name: "홍예준", prev: "2026-09-20", gap: 15, at: r1.who[0].at }] }, "오늘 성공 1 · 누적 2");
+    assert.ok(!/010/.test(JSON.stringify(r1.who)), "전화번호 없음");
     await enter(page, 840, "전시윤"); // 처음 → 안내 (성공 아님)
     assert.strictEqual((await rv()).total, 2, "안내는 안 셈");
+    assert.strictEqual((await rv()).who.length, 1, "안내는 목록에도 없음");
     const p = await page.evaluate(() => window.__deskTest.evsPayload());
-    assert.deepStrictEqual(p.revisit, { from: "2026-09-10", today: 1, total: 2, days: { "2026-09-30": 1, "2026-10-05": 1 } }, "매일 이벤트 글에도 (지난 날까지 다 — 보고 앱이 지난 날 카드에)");
+    assert.deepStrictEqual(p.revisit, { from: "2026-09-10", today: 1, total: 2, days: { "2026-09-30": 1, "2026-10-05": 1 } }, "매일 이벤트 글에도 (지난 날까지 다 — 보고 앱이 지난 날 카드에) · 손님 이름은 현황 글에만");
     assert.strictEqual(p.type, "astanakiz-event");
     // 이벤트가 없으면 null
     await page.evaluate(() => { const T = window.__deskTest; T.EV_().from = ""; });

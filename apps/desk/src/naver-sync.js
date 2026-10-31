@@ -28,6 +28,8 @@ class NaverSync {
     this.urls = opts.urls || null;
     this.timeout = opts.timeout || 10000;
     this.isTicket = opts.isTicket || isKidsTicket;
+    this.today = opts.today || (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }); // 이 PC 날짜 (시험은 바꿔 넣음)
+    this.cells = new Map(); // 날짜 → { n(입장권 칸 수), low, times } — 칸이 덜 뜬 화면을 알아봄 (사장님 10/31)
     this.onStep = opts.onStep || (() => {});
     this.onSnap = opts.onSnap || null; // 진단: 네이버 화면 저장 (이용완료 누른 뒤 · 안 됐을 때) // 진행 단계를 데스크에 알림 (현장에서 어디서 막히는지 보려고)
     this.days = new Map(); // 날짜 → Map("상품|시각|확정/이용완료" → { count, cards }) — 칸 숫자가 그대로면 다시 안 엶
@@ -119,7 +121,7 @@ class NaverSync {
       if (s.needLogin) return { ok: false, why: "네이버에 로그인해 주세요 (로그인할 때 '로그인 상태 유지'를 꼭 체크)" };
       if (!s.date) return { ok: false, why: "네이버 화면에서 날짜를 못 찾음" };
       if (s.dateRange) return { ok: false, why: "네이버 예약현황이 '일간'이 아님 — 네이버 화면에서 '일간'으로 바꿔 주세요" };
-      if (s.date === day) return { ok: true, state: s };
+      if (s.date === day) return this.settle(s);
       if (i === 0) max = Math.max(60, Math.abs(Math.round((Date.parse(day) - Date.parse(s.date)) / 86400000)) + 10);
       const dir = s.date < day ? 1 : -1;
       this.step(`네이버 날짜 맞추는 중: ${s.date.slice(5)} → ${day.slice(5)}`);
@@ -130,6 +132,34 @@ class NaverSync {
       if (!r.ok) return r;
     }
     return { ok: false, why: "날짜를 맞추지 못함" };
+  }
+  /** 날짜를 맞춘 뒤 시간 칸이 다 뜰 때까지 (사장님 10/31 — 날짜 글자만 바뀌고 칸이 아직 안 뜬 화면을 읽어 '입장권 칸 0개'로 받아들였음)
+      로딩 표시가 없고 입장권 칸 수가 세 번 이어 같으면 · 6초가 넘으면 그대로 (그날 칸이 정말 없을 수 있음 — 판단은 loadDay 의 cellCheck) */
+  async settle(s) {
+    const n = (x) => x.slots.filter((c) => this.isTicket(c.product)).length;
+    let prev = -1, same = 0;
+    for (const t0 = Date.now(); Date.now() - t0 < 6000; ) {
+      const k = s.loading ? -1 : n(s);
+      same = k > 0 && k === prev ? same + 1 : 0;
+      if (same >= 2) break;
+      prev = k;
+      await sleep(250);
+      s = await this.read();
+    }
+    return { ok: true, state: s };
+  }
+  /** 하루 칸 수 검사 (사장님 10/31): 오늘인데 입장권 칸 0개 · 앞서 읽은 것보다 적으면 덜 뜬 화면 → 실패 글 (데스크는 앞 숫자 · 손님 목록 그대로 두고 잠시 뒤 다시)
+      적은 수가 세 번 이어지면 정말 줄어든 것(회차를 지움 등)으로 받아들임 · 오늘 아닌 처음 보는 날의 0개는 그대로 (아직 안 연 날 · 쉬는 날) · 오늘 0개는 늘 실패 */
+  cellCheck(day, n) {
+    const prev = this.cells.get(day);
+    const zeroToday = n === 0 && day === this.today();
+    if (!zeroToday && !(prev && n < prev.n)) { this.cells.set(day, { n }); return ""; }
+    if (!zeroToday) {
+      prev.times = prev.low === n ? prev.times + 1 : 1;
+      prev.low = n;
+      if (prev.times >= 3) { this.cells.set(day, { n }); return ""; }
+    }
+    return n ? `네이버 시간 칸이 덜 뜸 (입장권 칸 ${n}개 < 앞서 ${prev.n}개) — 앞 숫자 그대로 두고 잠시 뒤 다시 읽어요` : "네이버 시간 칸이 아직 안 뜸 (입장권 칸 0개) — 앞 숫자 그대로 두고 잠시 뒤 다시 읽어요";
   }
   /** 칸의 [확정]/[이용완료] 누르기 — 앞에 열린 목록이 있으면 먼저 닫음 (칸을 누르면 표가 새로 그려짐) */
   async openSlot(product, time, kind) {
@@ -155,8 +185,8 @@ class NaverSync {
     }
     return !!(r && r.more);
   }
-  /** 그 칸을 열어 카드를 모두 읽음 (목록을 끝까지 내려 가며) */
-  async readSlotCards(product, time, kind) {
+  /** 그 칸을 열어 카드를 모두 읽음 (목록을 끝까지 내려 가며) — want = 칸 숫자(장수): 읽은 카드 장수가 그만큼이면 더 안 내림 (끝을 확인하느라 2초씩 기다리지 않게 · 사장님 10/31) */
+  async readSlotCards(product, time, kind, want = 0) {
     this.step(`${time} ${kind} 칸 여는 중`);
     const r = await this.openSlot(product, time, kind);
     if (!r.ok) return r;
@@ -165,6 +195,7 @@ class NaverSync {
     const got = new Map();
     for (let i = 0; i < 30; i++) {
       for (const c of (await this.read()).cards) if (c.no) got.set(c.no, c);
+      if (want > 0 && [...got.values()].reduce((a, c) => a + (Number(c.qty) || 1), 0) >= want) break;
       if (!(await this.moreCards())) break;
     }
     this.step(`${time} ${kind}: 카드 ${got.size}장`);
@@ -178,6 +209,8 @@ class NaverSync {
     g = await this.goDate(day);
     if (!g.ok) return g;
     const slots = g.state.slots.filter((s) => this.isTicket(s.product));
+    const bad = this.cellCheck(day, slots.length);
+    if (bad) { this.step(bad); return { ok: false, partial: true, why: bad }; }
     if (!this.days.has(day)) this.days.set(day, new Map());
     const cache = this.days.get(day);
     const live = new Set();
@@ -192,7 +225,7 @@ class NaverSync {
         if (opts.only && s.time !== opts.only) continue; // 그 시간만
         const c = cache.get(key);
         if (c && c.count === n && !opts.only) continue; // 숫자가 그대로면 기억한 카드 그대로
-        const r = await this.readSlotCards(s.product, s.time, kind);
+        const r = await this.readSlotCards(s.product, s.time, kind, n);
         if (!r.ok) return r;
         opened = true;
         if (!r.cards.length) {
@@ -215,7 +248,7 @@ class NaverSync {
       }
     return { ok: true, day, warn: warn.length ? `카드를 못 읽은 칸: ${warn.join(", ")}` : "", slots: slots.map((s) => ({ time: s.time, product: s.product, cap: s.avail + s.conf + s.done + s.apply, conf: s.conf + s.apply, done: s.done })), bookings };
   }
-  /** 그날 이용완료한 입장권 예약만 { no, name, phone, time, qty } — 지난 방문 기록 읽기(재방문 간격 · 사장님 10/19)
+  /** 그날 이용완료한 입장권 예약만 { no, name, phone, time, qty, doneCount(카드 완료 n) } — 지난 방문 기록 읽기(재방문 간격 · 사장님 10/19)
       [이용완료] 칸만 열고(확정은 안 엶) 기억(days)에 안 남김 → 200일을 읽어도 메모리가 늘지 않음 · 못 읽은 칸이 있으면 warn */
   async loadDone(day) {
     let g = await this.goView("calendar");
@@ -226,10 +259,10 @@ class NaverSync {
     this.step(`지난 기록 ${day.slice(5)} · 이용완료 칸 ${slots.length}개`);
     const got = new Map(), warn = [];
     for (const s of slots) {
-      const r = await this.readSlotCards(s.product, s.time, "이용완료");
+      const r = await this.readSlotCards(s.product, s.time, "이용완료", s.done);
       if (!r.ok) return r;
       if (!r.cards.length) { warn.push(s.time); continue; }
-      for (const c of r.cards) if (c.no && !got.has(c.no)) got.set(c.no, { no: c.no, name: c.name, phone: c.phone, time: s.time, qty: c.qty });
+      for (const c of r.cards) if (c.no && !got.has(c.no)) got.set(c.no, { no: c.no, name: c.name, phone: c.phone, time: s.time, qty: c.qty, doneCount: c.doneCount ?? null }); // 완료 n: 신규 · 기존 나누기 (사장님 10/31)
     }
     if (slots.length) await this.act("window.__naver.closePanel()");
     return { ok: true, day, cells: slots.length, visits: [...got.values()], warn: warn.length ? `카드를 못 읽은 칸: ${warn.join(", ")}` : "" };

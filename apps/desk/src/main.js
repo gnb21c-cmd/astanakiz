@@ -797,6 +797,8 @@ ipcMain.handle("live:send", (_e, job) => liveSend(String((job && job.json) || ""
 //   ① 데스크 입장 처리 때마다 그날 손님을 더함 (history:add)
 //   ② 지난 방문 기록 읽기 (매일 20:00 보낸 뒤 데스크가 저절로 · 또는 [지난 방문 기록 읽기]): 네이버 예약현황을 어제부터 거꾸로 하루씩 [이용완료] 칸만 읽음 (history:backfill) — 네이버 일 줄에 하루씩 끼워
 //      데스크 불러오기 · 이용완료가 막히지 않게 · 이미 네이버로 읽은 날은 건너뜀(멈췄다 다시 눌러도 이어서) · 다 읽으면 네이버를 오늘로 돌려놓음
+//      손님마다 카드 '완료 n' · 그날 건수 · 읽은 날도 남김 (신규 · 기존 · 사장님 10/31) — 예전 판에서 읽어 완료 n 이 없는 날은 안 읽은 날을 다 읽은 뒤 다시
+//      하루를 못 읽으면 그날은 두고 다음 날로 (3일 이어 못 읽으면 멈춤 — 로그인 풀림 등)
 //   ③ 매일 20:00 데스크가 일수 모음(손님 정보 없음 · astanakiz-revisit)을 같은 보고 열쇠로 boards/{열쇠}/deskStats/revisit 에 덮어씀 (history:send)
 const visitHistory = require("./visit-history");
 let visitHist = null;
@@ -807,6 +809,8 @@ function histSalt() {
   return settings.visitSalt;
 }
 const histKeys = (keys) => (Array.isArray(keys) ? keys : []).map((k) => String(k || "").trim()).filter(Boolean).map((k) => visitHistory.hashKey(histSalt(), k));
+/** { 손님 키: [완료 n, 그날 건수] } → { 해시: [완료 n, 건수, 읽은 날] } */
+const histCounts = (counts, rd) => Object.fromEntries(Object.entries(counts && typeof counts === "object" ? counts : {}).filter(([k, v]) => String(k || "").trim() && Array.isArray(v) && v[0] != null && v[0] !== "" && Number(v[0]) >= 0).map(([k, v]) => [visitHistory.hashKey(histSalt(), String(k).trim()), [Number(v[0]), Math.max(1, Number(v[1]) || 1), rd]]));
 /** 네이버 카드 → 손님 키 (데스크 장부와 같게: 전화번호 숫자, 없으면 '이름:…') */
 const visitKey = (v) => { const d = String(v.phone || "").replace(/\D/g, ""); return d || (v.name ? "이름:" + v.name : ""); };
 const isDayKey = (d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d || ""));
@@ -814,7 +818,8 @@ const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${St
 ipcMain.handle("history:add", (_e, job) => {
   try {
     const h = histGet();
-    if (visitHistory.setDay(h, String((job && job.day) || ""), histKeys(job && job.keys), "desk")) visitHistory.save(histDir(), h);
+    const day = String((job && job.day) || "");
+    if (visitHistory.setDay(h, day, histKeys(job && job.keys), "desk", histCounts(job && job.counts, day))) visitHistory.save(histDir(), h);
     return { ok: true };
   } catch (e) {
     return { ok: false, why: String(e.message || e) };
@@ -826,7 +831,7 @@ ipcMain.handle("history:stats", (_e, opts) => {
 let histJob = null; // { running, from, to, day, done, total, visits, why, stop }
 const histJobView = () => {
   const h = histGet(), days = Object.keys(h.days).sort();
-  return { ok: true, job: histJob ? { running: histJob.running, from: histJob.from, to: histJob.to, day: histJob.day, done: histJob.done, total: histJob.total, visits: histJob.visits, why: histJob.why } : null,
+  return { ok: true, job: histJob ? { running: histJob.running, from: histJob.from, to: histJob.to, day: histJob.day, done: histJob.done, total: histJob.total, visits: histJob.visits, why: histJob.why, skipped: (histJob.skipped || []).length, stopped: !!histJob.stopped } : null,
     history: { from: days[0] || "", to: days[days.length - 1] || "", days: days.length, naver: days.filter((d) => h.days[d].src === "naver").length } };
 };
 ipcMain.handle("history:job", () => histJobView());
@@ -836,21 +841,31 @@ ipcMain.handle("history:backfill", (_e, job) => {
   if (histJob && histJob.running) return histJobView();
   if (!isDayKey(from) || !isDayKey(to) || from > to) return { ok: false, why: "기간이 틀림" };
   if (!naver) return { ok: false, why: "네이버 창이 아직 열리지 않음" };
-  const h = histGet(), days = [];
-  for (let d = to; d >= from; d = visitHistory.shiftDay(d, -1)) if (!(h.days[d] && h.days[d].src === "naver")) days.push(d); // 어제부터 거꾸로
-  histJob = { running: true, from, to, day: "", done: 0, total: days.length, visits: 0, why: "", stop: false };
+  const h = histGet(), days = visitHistory.backfillDays(h, from, to); // 어제부터 거꾸로 · 안 읽은 날 먼저 · 그다음 완료 n 이 없는 날
+  histJob = { running: true, from, to, day: "", done: 0, total: days.length, visits: 0, why: "", stop: false, skipped: [] };
   const me = histJob;
   (async () => {
+    let fails = 0;
     for (const d of days) {
-      if (me.stop) { me.why = "멈춤 — 다시 누르면 이어서"; break; }
+      if (me.stop) { me.why = "멈춤 — 다시 누르면 이어서"; me.stopped = true; break; }
       me.day = d;
       const r = await serial("naver", () => timed(naver.loadDone(d), 300000, "네이버 응답이 5분 넘게 없음")).catch((e) => ({ ok: false, why: String(e.message || e) }));
-      if (!r || !r.ok) { me.why = `${d.slice(5).replace("-", "/")} 못 읽음: ${(r && r.why) || "응답 없음"} — 다시 누르면 이어서`; break; }
-      visitHistory.setDay(h, d, histKeys(r.visits.map(visitKey)), r.warn ? "desk" : "naver"); // 못 읽은 칸이 있으면 다음에 다시 읽음
-      try { visitHistory.save(histDir(), h); } catch (e) { me.why = `기록 파일을 못 씀: ${e.message || e}`; break; }
+      if (!r || !r.ok) {
+        // 그날은 두고 다음 날로 (다음에 다시) · 3일 이어 못 읽으면 멈춤 (사장님 10/31 — 한 날 때문에 저녁 읽기가 통째로 멈췄음)
+        me.skipped.push(d);
+        me.why = `${d.slice(5).replace("-", "/")} 못 읽음: ${(r && r.why) || "응답 없음"}`;
+        if (++fails >= 3) { me.why += " — 3일 이어 못 읽어 멈춤 · 다시 누르면 이어서"; me.stopped = true; break; }
+        continue;
+      }
+      fails = 0;
+      const rd = localToday(), cnt = {};
+      for (const v of r.visits) { const k = visitKey(v); if (!k) continue; const o = cnt[k] || (cnt[k] = [null, 0]); o[1]++; if (v.doneCount != null && (o[0] == null || v.doneCount > o[0])) o[0] = v.doneCount; }
+      visitHistory.setDay(h, d, histKeys(r.visits.map(visitKey)), r.warn ? "desk" : "naver", histCounts(Object.fromEntries(Object.entries(cnt).filter(([, o]) => o[0] != null)), rd)); // 못 읽은 칸이 있으면 다음에 다시 읽음
+      try { visitHistory.save(histDir(), h); } catch (e) { me.why = `기록 파일을 못 씀: ${e.message || e}`; me.stopped = true; break; }
       me.done++;
       me.visits += r.visits.length;
     }
+    if (me.skipped.length && !me.stopped) me.why = `${me.skipped.length}일 못 읽고 건너뜀(${me.skipped.slice(0, 3).map((d) => d.slice(5).replace("-", "/")).join(", ")}${me.skipped.length > 3 ? " …" : ""}) — 다음에 다시`;
     // 네이버 예약현황을 오늘로 돌려놓음 (데스크 불러오기는 오늘 근처에서 하루씩 움직임)
     await serial("naver", () => timed(naver.goView("calendar").then((g) => (g.ok ? naver.goDate(localToday()) : g)), 300000, "")).catch(() => {});
     me.running = false;

@@ -1067,6 +1067,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     TALK_API.counts().then((c) => { if (c) Object.assign(TALK, c); renderTalk(); }).catch(() => {});
   }
   let naverNext = null; // 불러오는 중에 다른 날짜를 부탁받으면 끝난 뒤 이어서 (날짜를 바꿔도 따라가게)
+  const naverPartial = {}; // 날짜 → 시간 칸이 덜 떠 이어서 실패한 횟수 (20초 뒤 다시 · 3번까지)
   /** 네이버에서 불러오기. only = "14:00" 이면 그 시간 칸만 (근무자가 시간 칸을 누를 때), 없으면 하루 전체 (새로고침 · 자동) */
   async function loadNaver(day, loud, only) {
     if (!APP) return;
@@ -1077,7 +1078,14 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     // 기다리던 날짜 · 시간이 있으면 이어서 (지금 보는 날짜일 때만)
     const next = naverNext; naverNext = null;
     if (next && (next.day !== day || next.only !== only) && next.day === viewDay) setTimeout(() => loadNaver(next.day, next.loud, next.only), 0);
-    if (!r || !r.ok) { naverErr = (r && r.why) || "응답 없음"; toast(`네이버: ${naverErr}`); renderAll(); return; }
+    if (!r || !r.ok) {
+      naverErr = (r && r.why) || "응답 없음";
+      // 시간 칸이 덜 뜬 화면 (사장님 10/31): 앞 숫자 · 손님 목록은 그대로 두고 20초 뒤 다시 (한 날짜에 이어서 3번까지)
+      if (r && r.partial && (naverPartial[day] = (naverPartial[day] || 0) + 1) <= 3) { toast(`네이버: ${naverErr.replace(/ — .*/, "")} — 앞 숫자 그대로 · 20초 뒤 다시`); setTimeout(() => loadNaver(day, false, only), 20000); }
+      else toast(`네이버: ${naverErr}`);
+      renderAll(); return;
+    }
+    naverPartial[day] = 0;
     naverErr = r.warn || "";
     applyNaver(day, r, only);
     if (day === TODAY) setTimeout(naverFlush, 3000); // 네이버에 이용완료가 안 된 입장이 있으면 다시
@@ -3455,13 +3463,25 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     p.visits.push({ at: r.at, day: r.day || String(r.at || "").slice(0, 10), n: r.n, no: r.no, st: r.st || "", due: r.due || "" });
   }
   /** 재방문 성공 수 → 보고 앱 (사장님 10/27): 지금 이벤트 장부의 '성공' 줄 = 돈까스 쿠폰이 나간 수 (같은 날 두 번째는 안내라 안 셈)
-      { from: 시작일, today: 오늘, total: 시작일부터 누적, days: { 날짜: 그날 } } · 이벤트가 없으면 null */
-  function evOkStats() {
+      { from: 시작일, today: 오늘, total: 시작일부터 누적, days: { 날짜: 그날 } } · 이벤트가 없으면 null
+      withWho (폰 실시간 현황만 · 사장님 10/29 · 10/31): who = 오늘 성공 손님 [{ name(이름만 20자 · 전화번호 없음), prev(앞 방문 날), gap(며칠 만에), at(누른 시각) }] 100명까지 */
+  function evOkStats(withWho) {
     if (!isDay(EV.from)) return null;
-    const days = {};
+    const days = {}, who = [];
     let total = 0;
-    for (const p of evLog(EV.from).people.values()) for (const v of p.visits) if (v.st === "성공" && isDay(v.day)) { days[v.day] = (days[v.day] || 0) + 1; total++; }
-    return { from: EV.from, today: days[TODAY] || 0, total, days: Object.fromEntries(Object.keys(days).sort().map((d) => [d, days[d]])) };
+    for (const p of evLog(EV.from).people.values()) {
+      const vs = p.visits.slice().sort((a, b) => String(a.at).localeCompare(String(b.at)));
+      vs.forEach((v, i) => {
+        if (v.st !== "성공" || !isDay(v.day)) return;
+        days[v.day] = (days[v.day] || 0) + 1; total++;
+        if (!withWho || v.day !== TODAY) return;
+        const prev = vs.slice(0, i).reverse().find((x) => isDay(x.day) && x.day < v.day);
+        who.push({ name: String(p.name || "").slice(0, 20), prev: prev ? prev.day : "", gap: prev ? dayDiff(prev.day, v.day) : null, at: String(v.at || "").slice(11, 16) });
+      });
+    }
+    const out = { from: EV.from, today: days[TODAY] || 0, total, days: Object.fromEntries(Object.keys(days).sort().map((d) => [d, days[d]])) };
+    if (withWho) out.who = who.sort((a, b) => a.at.localeCompare(b.at)).slice(0, 100);
+    return out;
   }
   /** 마일리지에서 뺄 장부들: 지난 이벤트 + 지금 이벤트 (시작일이 오늘이거나 지난 것만) */
   const evFroms = () => [...new Set([...EV.past.map((p) => p.from), EV.from])].filter((f) => f && f <= TODAY);
@@ -3667,7 +3687,9 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
      - 열쇠: 번호마다 색(반납 조건) · 반납 시각 + 손님 이름 · 전화번호 (열쇠 미반납 때 관리자가 전화) — 문서 하나(now)만 덮어써서 지난 기록은 안 쌓임 */
   const LIVE = { on: true, last: null }; // last = { at, ok, why } 마지막으로 보낸 결과
   if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c) LIVE.on = c.liveOn !== false; }).catch(() => {});
-  const livePeople = () => { const naver = Math.max(0, slotStats(TODAY).reduce((a, x) => a + x.done, 0) - testQty(TODAY)), walk = walkTickets(TODAY); return { naver, walk, total: naver + walk }; };
+  /** 오늘 네이버를 처음 제대로 불러왔나 (사장님 10/31) — 그 전(켜자마자 · 계속 실패)에는 폰 실시간 현황에 네이버 숫자를 보내지 않음 (저장본의 입장 손님만으로 센 숫자가 나가지 않게) */
+  const liveNaverReady = () => !APP || todayAt != null;
+  const livePeople = () => { const naver = liveNaverReady() ? Math.max(0, slotStats(TODAY).reduce((a, x) => a + x.done, 0) - testQty(TODAY)) : 0, walk = walkTickets(TODAY); return { naver, walk, total: naver + walk }; };
   /** 지금 현황 (보낼 글) */
   function liveSnap() {
     const st = slotStats(TODAY);
@@ -3695,10 +3717,11 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       type: "astanakiz-live", v: 1, day: TODAY, at: `${TODAY} ${hm(now)}:${String(sec).padStart(2, "0")}`, build: (CFG && CFG.build) || "",
       dayKind: dayKind(TODAY), golden: golden ? hm(golden.at) : null,
       rules: { keys: RULES.keys, useMinutes: RULES.useMinutes, pinkUntil: RULES.pinkUntil, overFee: RULES.overFee, overUnitMin: RULES.overUnitMin },
-      naver: { done: sum("done"), conf: sum("conf"), left: sum("left"), test: testQty(TODAY), slots: st.map((x) => ({ t: hm(x.s), done: x.done, conf: x.conf, left: x.left, cap: x.cap })), products: [...prod].filter(([, n]) => n > 0).map(([name, done]) => ({ name, done })) },
+      naver: liveNaverReady() ? { ready: true, done: sum("done"), conf: sum("conf"), left: sum("left"), test: testQty(TODAY), slots: st.map((x) => ({ t: hm(x.s), done: x.done, conf: x.conf, left: x.left, cap: x.cap })), products: [...prod].filter(([, n]) => n > 0).map(([name, done]) => ({ name, done })) }
+        : { ready: false, done: 0, conf: 0, left: 0, test: 0, slots: [], products: [] }, // 오늘 네이버를 아직 제대로 못 불러옴 (사장님 10/31)
       people: livePeople(),
       walk: { tickets: walkQ((w) => !w.extra && !isEv(w)), extra: walkQ((w) => w.extra), service: svcKeys.length, event: walkQ(isEv) }, // event = 이벤트 입장 (결제 없음 · 판매 아님 · 사장님 10/21)
-      revisit: evOkStats(), // 재방문 성공 (돈까스 쿠폰) 오늘 · 누적 · 날마다 (사장님 10/27)
+      revisit: evOkStats(true), // 재방문 성공 (돈까스 쿠폰) 오늘 · 누적 · 날마다 (사장님 10/27) · 오늘 성공 손님 이름 · 며칠 만에 (10/31)
       over: { paid: paid.reduce((a, h) => a + h.overPaid.amount, 0), count: paid.length, due: holders().reduce((a, h) => a + (h.overPaid ? 0 : overInfo(h).due), 0) },
       keys: { total: RULES.keys, used: hs.reduce((a, h) => a + h.keys.length, 0), free: freeKeys().length, walkable: pj.base, flex: Math.max(0, pj.all - pj.base), map, holders: list },
     };
@@ -4124,16 +4147,21 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   if (HV_APP()) window.desk.history.job().then((r) => { if (r && r.ok) { HV.job = r.job; HV.hist = r.history; hvShow(); } }).catch(() => {});
   const hvSaveCfg = () => { if (APP && window.desk.config) window.desk.config.set({ revisit: { sentDay: HV.sentDay, fillDay: HV.fillDay, last: HV.last, retry: HV.retry } }); };
   /** 기간: 과거 4/1 ~ 이벤트 전날 · 이벤트 시작일 ~ 종료일 (이벤트를 안 정했으면 10/26 기준 과거만) */
-  const hvRanges = () => ({ today: TODAY, past: { from: HV_PAST_FROM, to: shiftDay(EV.from || HV_EVENT_FROM, -1) }, event: EV.from ? { from: EV.from, to: EV.to || "" } : null });
+  const hvRanges = () => ({ today: TODAY, paid: HV_PAST_FROM, past: { from: HV_PAST_FROM, to: shiftDay(EV.from || HV_EVENT_FROM, -1) }, event: EV.from ? { from: EV.from, to: EV.to || "" } : null }); // paid: 이날부터 유료 — 신규 · 기존 기준 (사장님 10/31)
   let hvSig = "";
   /** 화면을 그릴 때마다: 오늘 네이버 이용완료 손님(장부와 같은 키 · '기록 삭제'한 시험 예약 빼고)이 늘었으면 방문 기록에 더함 */
   function hvSync() {
     if (!HV_APP() || !stateReady) return;
-    const keys = [...new Set((bookings[TODAY] || []).filter((b) => b.status === "완료" && !testOut.has(b.no)).map(evKey).filter(Boolean))].sort();
-    const sig = keys.join(",");
+    const done = (bookings[TODAY] || []).filter((b) => b.status === "완료" && !testOut.has(b.no));
+    const keys = [...new Set(done.map(evKey).filter(Boolean))].sort();
+    // 손님마다 [네이버 '완료 n'(오늘 것까지), 오늘 건수] — 신규 · 기존 나누기 (사장님 10/31 · 모르면 뺌)
+    const counts = {};
+    for (const b of done) { const k = evKey(b); if (!k) continue; const o = counts[k] || (counts[k] = [null, 0]); o[1]++; const n = b.visitEnd || b.visitNo; if (n != null && (o[0] == null || n > o[0])) o[0] = n; }
+    for (const k of Object.keys(counts)) if (counts[k][0] == null) delete counts[k];
+    const sig = keys.join(",") + "|" + JSON.stringify(counts);
     if (!keys.length || sig === hvSig) return;
     hvSig = sig;
-    window.desk.history.add({ day: TODAY, keys }).then((r) => { if (!r || !r.ok) hvSig = ""; }, () => { hvSig = ""; });
+    window.desk.history.add({ day: TODAY, keys, counts }).then((r) => { if (!r || !r.ok) hvSig = ""; }, () => { hvSig = ""; });
   }
   let hvBusy = false, hvPolling = false, hvPollAt = 0, hvAsk = 0, hvPending = false;
   /** 일수 모음을 보고 앱으로 — why: "auto"(20:00 · 보낸 날 남김 · 실패하면 10분 뒤) · "manual"([지금 보내기]) · "backfill"(지난 기록에서 새로 읽은 날이 있을 때 다 읽은 뒤) */
@@ -4171,9 +4199,9 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     const j = r.job;
     if (!was || !was.running || !j || j.running) return;
     const auto = HV.jobAuto;
-    if (j.why) { toast(`지난 방문 기록 읽기를 멈췄어요 (${j.done} / ${j.total}일): ${j.why}${auto ? " — 내일 20:00 이어서" : ""}`); return; }
+    if (j.why && (j.stopped || !j.skipped)) { toast(`지난 방문 기록 읽기를 멈췄어요 (${j.done} / ${j.total}일): ${j.why}${auto ? " — 내일 20:00 이어서" : ""}`); return; }
     // 새로 읽은 날이 있으면 바로 한 번 더 보냄 (20:00 에 보낸 것보다 새 것) · 20:00 저절로 읽기에서 어제 하루만 다시 본 것은 알림 없이
-    if (!auto || j.total > 1) toast(`지난 방문 기록을 다 읽었어요 (${hvMd(j.from)} ~ ${hvMd(j.to)} · ${j.total}일 · 방문 ${j.visits}건)${svKey.has ? (j.done ? " · 보고 앱으로 보내요" : "") : " · 보고 열쇠를 넣으면 보고 앱으로 보내요"}`);
+    if (!auto || j.total > 1) toast(`지난 방문 기록을 다 읽었어요 (${hvMd(j.from)} ~ ${hvMd(j.to)} · ${j.done}일 · 방문 ${j.visits}건${j.skipped ? ` · ${j.skipped}일은 못 읽어 다음에 다시` : ""})${svKey.has ? (j.done ? " · 보고 앱으로 보내요" : "") : " · 보고 열쇠를 넣으면 보고 앱으로 보내요"}`);
     if (svKey.has && (j.done > 0 || !auto)) { if (hvBusy) hvPending = true; else hvSend("backfill"); }
   }
   /** 20:00 저절로 지난 방문 기록 읽기 (그날 한 번 · 4/1 ~ 어제 중 네이버로 아직 안 읽은 날 — 앱 본체가 건너뜀) */
