@@ -3476,7 +3476,8 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
         days[v.day] = (days[v.day] || 0) + 1; total++;
         if (!withWho || v.day !== TODAY) return;
         const prev = vs.slice(0, i).reverse().find((x) => isDay(x.day) && x.day < v.day);
-        who.push({ name: String(p.name || "").slice(0, 20), prev: prev ? prev.day : "", gap: prev ? dayDiff(prev.day, v.day) : null, at: String(v.at || "").slice(11, 16) });
+        // 이름: 보고 앱이 버리지 않게(1 ~ 20자 · 숫자 셋 넘게 이어지면 버림) 숫자는 빼고 · 비면 '손님' → today 와 수가 같음 (사장님 11/1)
+        who.push({ name: String(p.name || "").replace(/\d{3,}/g, "").trim().slice(0, 20) || "손님", prev: prev ? prev.day : "", gap: prev ? dayDiff(prev.day, v.day) : null, at: String(v.at || "").slice(11, 16) });
       });
     }
     const out = { from: EV.from, today: days[TODAY] || 0, total, days: Object.fromEntries(Object.keys(days).sort().map((d) => [d, days[d]])) };
@@ -5246,7 +5247,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     evInject: (name, o = {}) => {
       const b = bookings[TODAY].find((x) => x.name === name);
       const nn = o.n ?? b.prevDone, d = o.day || EV.from, st = o.st === undefined ? "안내" : o.st;
-      evAdd(Object.assign({ at: `${d} 10:00`, day: d, no: o.no || "t-" + name + nn + d, k: evKey(b), name, phone: digits(b.phone), prev: nn - 1, n: nn, base: o.base ?? nn - 1 }, st ? { st, due: o.due ?? shiftDay(d, EV.days) } : {}), o.from || EV.from);
+      evAdd(Object.assign({ at: `${d} 10:00`, day: d, no: o.no || "t-" + name + nn + d, k: evKey(b), name: o.name ?? name, phone: digits(b.phone), prev: nn - 1, n: nn, base: o.base ?? nn - 1 }, st ? { st, due: o.due ?? shiftDay(d, EV.days) } : {}), o.from || EV.from);
       renderAll();
     }, evSub: (name) => evSub(bookings[TODAY].filter((x) => x.name === name).pop()), EV, SV, svCounts, svPayload, svSend };
 

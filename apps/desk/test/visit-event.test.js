@@ -619,6 +619,29 @@ test("현장 입장자 양식 (사장님 10/27): 재방문 이벤트 양식에 '
   }
 });
 
+test("재방문성공 손님 목록 (사장님 11/1 다시 확인): 이름이 비었거나 숫자가 이어진 이름도 보고 앱이 버리지 않게 — '손님' · 숫자 뺌 · today 와 수가 같음", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.addInitScript(() => { if (!localStorage.getItem("astanakiz-visitevent")) localStorage.setItem("astanakiz-visitevent", JSON.stringify({ ver: 2, on: true, from: "2026-09-10", to: "2026-10-31", days: 20, gift: "수제돈까스" })); });
+    await page.goto(DESK); // 체험판 10/5
+    const inject = (name, o) => page.evaluate(([n, x]) => window.__deskTest.evInject(n, x), [name, o]);
+    await inject("송다온", { day: "2026-09-20", n: 1, base: 0, name: "" }); // 이름 없이 남은 장부 (가짜)
+    await inject("송다온", { day: "2026-10-05", n: 2, base: 0, st: "성공", name: "" });
+    await inject("홍예준", { day: "2026-09-25", n: 1, base: 0, name: "홍예준0101234" });
+    await inject("홍예준", { day: "2026-10-05", n: 2, base: 0, st: "성공", name: "홍예준0101234" });
+    const r = await page.evaluate(() => window.__deskTest.liveSnap().revisit);
+    assert.strictEqual(r.today, 2);
+    assert.deepStrictEqual(r.who.map((w) => [w.name, w.prev, w.gap]).sort(), [["손님", "2026-09-20", 15], ["홍예준", "2026-09-25", 10]]);
+    assert.ok(r.who.every((w) => w.name.length >= 1 && w.name.length <= 20 && !/\d{3,}/.test(w.name)), "보고 앱 이름 검사(1 ~ 20자 · 숫자 셋 넘게 이어지지 않음)를 통과");
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
 test("재방문 성공 수 → 보고 앱 (사장님 10/27): 현황 글(astanakiz-live) · 매일 이벤트 글(astanakiz-event)에 revisit { from, today, total, days } — 장부의 '성공' 줄 (돈까스 쿠폰이 나간 수) · 같은 날 두 번째는 안 셈", async () => {
   const browser = await launch();
   try {
