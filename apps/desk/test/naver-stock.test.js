@@ -1,5 +1,8 @@
 /* 네이버 재고 자동 오픈 (사장님 10/20) — 가짜 예약상품 화면(mock/naver-stock.html, 사장님 사진 · 실제 화면 저장본 본뜸)에서
    1.54 (사장님 10/20 21:1x): 큰 달력을 읽어 확인하지 않고 바로 — 상품 일정/가격 주소 → [재고수정] → 작은 달력 ▶ → 날짜 → [다음] → [모든 회차] → 키보드로 10 → [저장]
+   2.16 (사장님 11/3 — 11/30 까지 열리다 12월부터 안 열림): 작은 달력이 큰 달력에 보이는 달로 열리고 화살표가 없음 → 사람처럼 큰 달력 › 로 그 달 → 회차가 뜰 때까지 기다림 → [재고수정] → 날짜
+     달 넘기기는 화살표 모양 버튼만 (날짜 칸을 잘못 누르지 않게)
+     진짜 까닭(사장님 11/3 사진): 날짜 칸이 "2026.12.1" · 확인 창이 "12.1(화)" — 앞 0 이 없는데 "2026.12.01" · "12.01" 과 글자로 견줘 12/1 부터 멈췄음 → 숫자로 견줌
    - 두 상품 같은 날짜 · 이미 넣은 날도 10개로 · 어느 날을 열지(stockDays): 오늘 + 30일 · 이 PC 가 마지막으로 연 날 뒤부터 이어서 (7일까지)
    - 1.53 (현장 10/20 20:55): 큰 달력을 달 넘기자마자 읽어 10월 19일을 11월 19일로 알고 '이미 열려 있음' → 이제 큰 달력을 안 읽음
    - 1.52 (현장 10/20 20:24): 가게 사진 링크 → 스마트플레이스 → 리뷰 작성자 MY플레이스 새 창 → 주소로만 · 바깥 · 새 창 링크는 안 누름 */
@@ -69,7 +72,7 @@ test("하루 네 번 기회: 10:30 → 실패하면 12:00 → 16:00 → 20:20 ·
   assert.deepStrictEqual(stockDue({ minutes: at(20, 20), tried: armed }), [3], "20:20 에 처음");
 });
 
-test("재고 넣기: 두 상품 같은 날짜(11/19) · 작은 달력 ▶ 한 번 · 키보드로 10 · 이미 넣은 날도 그대로 진행 · 확인만은 '모든 회차' 창까지 가 보고 취소", async () => {
+test("재고 넣기: 두 상품 같은 날짜(11/19) · 큰 달력 › 한 번 · 키보드로 10 · 이미 넣은 날도 그대로 진행 · 확인만은 '모든 회차' 창까지 가 보고 취소", async () => {
   const browser = await launch();
   try {
     const { page, st, saves, learned, caps } = await setup(browser);
@@ -96,7 +99,7 @@ test("재고 넣기: 두 상품 같은 날짜(11/19) · 작은 달력 ▶ 한 �
   }
 });
 
-test("재고 넣기: 예약현황 화면에서 시작 · 작은 달력 ▶ 두 번(12/1) · 네이버가 느려도 · 달력 글자만 먼저 바뀌어도 · 로그인 안 됨이면 알려 줌", async () => {
+test("재고 넣기: 예약현황 화면에서 시작 · 큰 달력 › 두 번(12/1) · 네이버가 느려도 · 달력 글자만 먼저 바뀌어도 · 로그인 안 됨이면 알려 줌", async () => {
   const browser = await launch();
   try {
     const { page, st, saves } = await setup(browser, "&slow=1&stale=1");
@@ -107,6 +110,63 @@ test("재고 넣기: 예약현황 화면에서 시작 · 작은 달력 ▶ 두 �
     await page.goto(MOCK + "?login=need");
     const l = await st.setDay({ product: P0, day: "2026-11-19", qty: 10 });
     assert.match(l.why, /로그인/);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("현장 11/3 (사장님 사진): 날짜 칸 '2026.12.1' · 확인 창 '12.1(화)' (앞 0 없음) — 11/3 에 12/1 · 12/2 · 12/3 두 상품 · 큰 달력 › 로 넘긴 뒤 · 다음 날은 그 달 그대로", async () => {
+  const browser = await launch();
+  try {
+    const { page, st, saves, caps } = await setup(browser);
+    await page.evaluate(() => localStorage.setItem("mockStockToday", "2026-11-03"));
+    await page.goto(MOCK + "?view=items");
+    for (const d of ["2026-12-01", "2026-12-02", "2026-12-03"]) {
+      const r = await st.setDay({ product: P0, day: d, qty: 10 });
+      assert.ok(r.ok && r.done, `${d}: ${r.why}`);
+    }
+    const r1 = await st.setDay({ product: P1, day: "2026-12-01", qty: 10 });
+    assert.ok(r1.ok && r1.done, r1.why);
+    assert.deepStrictEqual(await saves(), ["2026-12-01", "2026-12-02", "2026-12-03"].map((d) => ({ id: 0, from: d, to: d, n: 10 })).concat([{ id: 1, from: "2026-12-01", to: "2026-12-01", n: 10 }]));
+    assert.deepStrictEqual(await caps(0, "2026-12-01"), Array(16).fill(10));
+    assert.deepStrictEqual((await caps(0, "2026-11-01")).slice(0, 1), [10], "11월은 그대로 (잘못 누른 날 없음)");
+    assert.strictEqual((await saves()).filter((x) => x.from < "2026-12-01").length, 0, "12월 앞 날짜로 저장한 것 없음");
+    // 같은 달(11/20)도: 큰 달력이 12월에 있으면 ‹ 로 돌아옴
+    const back = await st.setDay({ product: P0, day: "2026-11-20", qty: 10 });
+    assert.ok(back.ok && back.done, back.why);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("작은 달력 예전 모양(이번 달로 열리고 ◀ ▶)이어도 그대로 · 화살표가 없는데 다른 달로 열리면 날짜를 누르지 않고 실패로 알림", async () => {
+  const browser = await launch();
+  try {
+    const { page, st, saves } = await setup(browser);
+    await page.evaluate(() => localStorage.setItem("mockStockPopOld", "1"));
+    const r = await st.setDay({ product: P0, day: "2026-11-19", qty: 10 });
+    assert.ok(r.ok && r.done, r.why);
+    assert.deepStrictEqual(await saves(), [{ id: 0, from: "2026-11-19", to: "2026-11-19", n: 10 }]);
+    await page.evaluate(() => localStorage.setItem("mockStockNoArrow", "1"));
+    await page.goto(MOCK + "?view=items");
+    const bad = await st.setDay({ product: P0, day: "2026-11-20", qty: 10 });
+    assert.strictEqual(bad.ok, false);
+    assert.match(bad.why, /달 넘기는 버튼을 못 찾음/);
+    assert.strictEqual((await saves()).length, 1, "잘못된 날짜로 저장하지 않음");
+    assert.strictEqual((await st.read(P0)).pop, null, "창은 닫음");
+  } finally {
+    await browser.close();
+  }
+});
+
+test("회차를 아직 등록하지 않은 달(사장님 11/3: 1월 회차 아직 — 12/2 부터 목표가 1/1)은 그 달 회차를 먼저 등록하라고 알림 · 아무것도 저장 안 함", async () => {
+  const browser = await launch();
+  try {
+    const { st, saves } = await setup(browser, "", { slow: 0.3 });
+    const r = await st.setDay({ product: P0, day: "2027-02-03", qty: 10 }); // 가짜 화면은 10월부터 100일(1/8)까지만 회차
+    assert.strictEqual(r.ok, false);
+    assert.match(r.why, /2027\.02 회차가 안 보임 — 네이버에 그 달 회차를 등록했는지/);
+    assert.deepStrictEqual(await saves(), []);
   } finally {
     await browser.close();
   }

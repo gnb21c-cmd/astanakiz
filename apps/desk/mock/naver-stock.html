@@ -9,8 +9,10 @@
      ?view=item&id=0    상품 설정: ← 상품 이름 · [기본정보] [일정/가격] [옵션 연결] [예약자 정보 요청] (&tab=schedules = 일정/가격으로 바로 — 실제 …/biz-items/번호/schedules)
      ?view=home         스마트플레이스 첫 화면 흉내 (10/20 현장 1.52 가 간 곳): 리뷰에 상품 이름 · 작성자 사진 = 새 창 링크 (가짜 이름)
                         [일정/가격] → (네이버가 시간 · 재고를 불러오는 딜레이) → 달력 "< 2026.10 >" · 날마다 "10:00" + "n/N개" (N = 재고, 0/0개는 가운데 줄)
-                        [재고수정] → "회차 정보를 수정할 기간을 선택해주세요." 작은 달력(▶) → 날짜 → 아래 "2026.10.30" → [다음]
-                        → "10.30(금) 날짜의 모든 회차를 수정하나요?" [모든 회차] [특정회차 선택]
+                        [재고수정] → "회차 정보를 수정할 기간을 선택해주세요." 작은 달력 → 날짜 → 아래 "2026.10.30" (한 자리 날은 "2026.12.1") → [다음]
+                          작은 달력 = 큰 달력에 보이는 달로 열림 · ▶ 는 다음 달 회차가 등록돼 있을 때만 · ◀ 없음 (사장님 11/3 사진 · 12월에 1월 회차가 없어 ▶ 없음)
+                          저장소 mockStockPopOld=1: 예전 모양 — 이번 달로 열리고 ◀ ▶ (10/20 사진) · mockStockNoArrow=1: 화살표 없음 (시험)
+                        → "10.30(금) 날짜의 모든 회차를 수정하나요?" ("12.1(화)") [모든 회차] [특정회차 선택]
                         → "변경할 재고 수를 입력해주세요." 칸(0) [취소] [저장](칸에 넣어야 켜짐) → "수정되었습니다." 알림 → 달력 "0/10개"
      &today=2026-10-20  가짜 오늘 (재고는 오늘 + 29일까지 10개, 그 뒤는 0/0개 — 아직 안 엶)
      &slow=1            일정/가격 · 저장 뒤 달력이 늦게 바뀜
@@ -49,6 +51,8 @@
   if (P.get("strict") === "1") localStorage.setItem("mockStockStrict", "1");
   // &stale=1: 달을 넘기면 달 글자(2026.11)만 먼저 바뀌고 달력 · 회차는 잠깐 앞 달 그대로 (현장 10/20 20:55 — 그 사이에 읽으면 10월을 11월로 읽음)
   const STALE = P.get("stale") === "1" || localStorage.getItem("mockStockStale") === "1";
+  const POPOLD = P.get("popold") === "1" || localStorage.getItem("mockStockPopOld") === "1"; // 작은 달력 예전 모양 (이번 달 · ◀ ▶)
+  const NOARROW = P.get("noarrow") === "1" || localStorage.getItem("mockStockNoArrow") === "1";
   const OPT_DIV = P.get("opt") === "div" || localStorage.getItem("mockStockOpt") === "div";
   if (P.get("opt") === "div") localStorage.setItem("mockStockOpt", "div");
   if (P.get("stale") === "1") localStorage.setItem("mockStockStale", "1");
@@ -115,6 +119,10 @@
         <table class="cal"><tr>${DOW.map((w) => `<th>${w}</th>`).join("")}</tr>${rows}</table>${popHtml()}`;
       wire();
     }
+    // 날짜 칸 글: 실제 "2026.12.1" — 날은 앞 0 없음 (사장님 11/3 사진 · 11월까지는 19 ~ 30일이라 몰랐음)
+    const dotDay = (d) => `${d.slice(0, 4)}.${d.slice(5, 7)}.${+d.slice(8)}`;
+    /** 다음 달에 회차가 등록돼 있나 (작은 달력 ▶ 는 그때만 · 사장님 11/3) */
+    const nextHas = (m) => { const d = new Date(dayMs(m + "-01")); d.setUTCMonth(d.getUTCMonth() + 1); return !!S.stock[id][d.toISOString().slice(0, 7) + "-01"]; };
     function popHtml() {
       if (!pop) return "";
       if (pop.kind === "period") {
@@ -124,12 +132,12 @@
         for (let d = first; d.slice(0, 7) === pop.month; d = shift(d, 1)) btns.push(`<button class="dd ${pop.pick === d ? "on" : ""}" data-d="${d}" data-tst_date="${d}" ${d < TODAY ? "disabled" : ""}>${+d.slice(8)}</button>`);
         for (let k = 1; btns.length % 7; k++) btns.push(`<button class="other" disabled>${k}</button>`);
         return `<div class="layer"><p>회차 정보를 수정할 기간을 선택해주세요.</p>
-          <div>${pop.month > TODAY.slice(0, 7) ? `<button data-pm="-1">◀</button>` : ""}<b>${pop.month.slice(0, 4)}. ${+pop.month.slice(5)}.</b><button data-pm="1">▶</button></div>
+          <div>${POPOLD && !NOARROW && pop.month > TODAY.slice(0, 7) ? `<button data-pm="-1">◀</button>` : ""}<b>${pop.month.slice(0, 4)}. ${+pop.month.slice(5)}.</b>${!NOARROW && (POPOLD || nextHas(pop.month)) ? `<button data-pm="1"><span class="sr-only">다음 달</span></button>` : ""}</div>
           <div class="mini">${DOW.map((w) => `<span>${w}</span>`).join(" ")}<br>${btns.map((b, i) => b + ((i + 1) % 7 ? "" : "<br>")).join("")}</div>
-          <div class="field">${pop.pick ? pop.pick.replace(/-/g, ".") + (pop.end && pop.end !== pop.pick ? " ~ " + pop.end.replace(/-/g, ".") : "") : ""}</div>
+          <div class="field">${pop.pick ? dotDay(pop.pick) + (pop.end && pop.end !== pop.pick ? " ~ " + dotDay(pop.end) : "") : ""}</div>
           <button data-pop="cancel">취소</button><button data-pop="next" ${pop.pick ? "" : "disabled"}>다음</button></div>`;
       }
-      const md = `${pop.pick.slice(5, 7)}.${pop.pick.slice(8)}(${DOW[new Date(dayMs(pop.pick)).getUTCDay()]})`;
+      const md = `${+pop.pick.slice(5, 7)}.${+pop.pick.slice(8)}(${DOW[new Date(dayMs(pop.pick)).getUTCDay()]})`; // 실제: "12.1(화)" (앞 0 없음 · 사장님 11/3 사진)
       // 1.54 현장: [모든 회차]를 버튼 글자로 못 찾음 → 실제 모양을 몰라 두 가지 (기본: value 가 붙은 버튼 · &opt=div: 버튼이 아닌 칸)
       if (pop.kind === "scope") return OPT_DIV
         ? `<div class="layer" role="dialog"><p><b>${md} 날짜의 모든 회차를 수정하나요?</b></p><div class="opts"><div class="opt" data-pop="all"><span>모든 회차</span></div><div class="opt" data-pop="some"><span>특정회차 선택</span></div></div></div>`
@@ -147,7 +155,7 @@
         if (STALE) { gridMonth = prev; draw(); setTimeout(() => { gridMonth = null; draw(); }, SLOW ? 2500 : 1200); return; }
         loaded = false; draw(); setTimeout(() => { loaded = true; draw(); }, SLOW ? 1500 : 500);
       }));
-      const e = app.querySelector("[data-act=edit]"); if (e) e.addEventListener("click", () => { pop = { kind: "period", month: TODAY.slice(0, 7), pick: null }; draw(); });
+      const e = app.querySelector("[data-act=edit]"); if (e) e.addEventListener("click", () => { pop = { kind: "period", month: POPOLD ? TODAY.slice(0, 7) : month, pick: null }; draw(); }); // 지금(11/3): 큰 달력에 보이는 달로
       app.querySelectorAll("[data-pm]").forEach((b) => b.addEventListener("click", () => { const d = new Date(dayMs(pop.month + "-01")); d.setUTCMonth(d.getUTCMonth() + +b.dataset.pm); pop.month = d.toISOString().slice(0, 7); draw(); }));
       app.querySelectorAll(".dd").forEach((b) => b.addEventListener("click", () => { if (pop.pick && !pop.end && b.dataset.d > pop.pick) pop.end = b.dataset.d; else { pop.pick = b.dataset.d; pop.end = null; } draw(); }));
       const q = app.querySelector("#q"); if (q) q.addEventListener("input", (e) => { if (STRICT && !e.isTrusted) return; pop.val = q.value.replace(/\D/g, ""); const s = app.querySelector("[data-pop=save]"); if (s) s.disabled = !pop.val; });

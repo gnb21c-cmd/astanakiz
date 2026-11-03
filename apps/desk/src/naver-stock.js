@@ -3,6 +3,10 @@
      상품 일정/가격 주소 → [재고수정] → 작은 달력 "2026. 10." ▶ 로 그 달 → 날짜(버튼 data-tst_date="2026-11-19") → 아래 "2026.11.19" 확인
      → [다음] → "11.19(목) 날짜의 모든 회차를 수정하나요?" 확인 → [모든 회차] → "변경할 재고 수를 입력해주세요." 칸을 누르고 키보드로 10
      → [저장](켜졌는지 보고) → 창이 닫히고 다른 경고 창이 없으면 끝 ("수정되었습니다" 알림)
+   2.16 (사장님 11/3 — 11/30 까지 열리다 12월부터 안 열림): 날짜 칸이 "2026.12.1" · 확인 창이 "12.1(화)" (한 자리 날은 앞 0 없음)인데
+     "2026.12.01" · "12.01" 과 글자로 견줘 12/1 에서 멈췄음 (11월까지는 19 ~ 30일이라 몰랐음) → 숫자로 견줌
+     · 사람처럼 큰 달력 › 로 그 달을 먼저 → 회차가 다 뜰 때까지 기다림 → [재고수정] (작은 달력은 큰 달력에 보이는 달로 열리고 화살표가 없음)
+     · 달 넘기기는 화살표 모양 버튼만 (화살표가 없을 때 날짜 칸을 누르지 않게)
    지난 기록: 1.53 은 큰 달력을 먼저 읽어 0/0 인 날만 열었는데 달을 넘기자마자 읽어 10월 19일을 11월 19일로 알고 '이미 열려 있음' (현장 10/20 20:55)
              1.52 는 상품 사진을 찾다 가게 사진 링크를 눌러 스마트플레이스 → 리뷰 작성자 MY플레이스 새 창 (현장 10/20 20:24)
    안전: 주소로만 움직임(예약상품 목록 …/bizes/{업체}/biz-items · 상품 …/biz-items/{번호}/schedules — 번호는 처음에 목록에서 이름으로 찾아 이 PC 설정에만)
@@ -10,7 +14,7 @@
    installNaverStockDriver = 네이버 페이지 안에서 실행 (window.__naverStock) · NaverStock = Node 쪽 (앱: 숨은 네이버 창 · 시험: 가짜 화면) */
 
 function installNaverStockDriver() {
-  if (window.__naverStock && window.__naverStock.v === 4) return true;
+  if (window.__naverStock && window.__naverStock.v === 5) return true;
   const norm = (s) => String(s || "").replace(/\s+/g, "");
   const vis = (el) => !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== "hidden");
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -62,6 +66,12 @@ function installNaverStockDriver() {
     return null;
   }
   const ym = (txt) => { const m = norm(txt).match(/^(\d{4})\.(\d{1,2})\.?$/); return m ? `${m[1]}-${m[2].padStart(2, "0")}` : ""; };
+  /** 달 넘기는 화살표 모양 버튼만 (‹ › ◀ ▶ · 글자 없는 그림 버튼 · '이전' · '다음' 숨은 글) — 날짜 숫자 · 창 버튼([다음] 등)은 아님 */
+  const arrowish = (b) => {
+    const t = textOf(b), a = norm(`${b.getAttribute("aria-label") || ""}${b.getAttribute("title") || ""}`);
+    if (POP_BTN.test(t) || /\d/.test(t) || t.length > 6) return false;
+    return /^[‹›<>◀▶◁▷〈〉«»←→]*$/.test(t) || /이전|다음|prev|next/i.test(t + a);
+  };
 
   /** 예약상품 목록의 그 상품 카드: 이름에서 위로 올라가며 상품 링크(…/biz-items/번호)가 한 가지뿐인 칸 → { id, href } · 링크가 없으면 { el: 이름 }
       (사진은 보지 않음 — 1.52 는 사진을 찾다 가게 사진 링크를 눌렀음) */
@@ -89,8 +99,11 @@ function installNaverStockDriver() {
       const tabOn = has("일정/가격");
       // 재고수정 창이 아닌 다른 창(저장 뒤 경고 등) — 글이 있는 보이는 대화 창
       const modal = pop ? "" : ($$("[role=dialog], .modal-dialog").filter((e) => vis(e) && norm(e.textContent)).map((e) => e.textContent.replace(/\s+/g, " ").trim())[0] || "").slice(0, 80);
+      const bigLab = deep(/^\d{4}\.\d{1,2}\.?$/).filter((e) => !inPop(e))[0];
       const st = {
         needLogin: !!document.querySelector("input[type=password]") && !tabOn && !has("예약상품"),
+        bigMonth: bigLab ? ym(bigLab.textContent) : "", // 큰 달력 달 "2026.11" → "2026-11"
+        slots: deep(/^\d+\/\d+개$/).filter((e) => !inPop(e)).length, // 큰 달력의 재고 칸 수 (회차가 다 떴는지)
         url: location.href,
         itemsTab: has("예약상품"),
         onItem: !!(want && named && tabOn), // 이 상품 설정 화면
@@ -108,7 +121,8 @@ function installNaverStockDriver() {
         if (pop.kind === "period") {
           const lab = deep(/^\d{4}\.\d{1,2}\.?$/, pop.root)[0];
           p.month = lab ? ym(lab.textContent) : "";
-          const f = $$("input", pop.root).filter(vis).map((i) => i.value).concat(deep(/^\d{4}\.\d{2}\.\d{2}/, pop.root).map((e) => e.textContent)).map(norm).find((x) => /^\d{4}\.\d{2}\.\d{2}/.test(x));
+          // 날짜 칸: "2026.12.1" (한 자리 날 · 달은 앞 0 이 없을 수도) — 사장님 11/3
+          const f = $$("input", pop.root).filter(vis).map((i) => i.value).concat(deep(/^\d{4}\.\d{1,2}\.\d{1,2}/, pop.root).map((e) => e.textContent)).map(norm).find((x) => /^\d{4}\.\d{1,2}\.\d{1,2}/.test(x));
           p.field = f || "";
           const nx = btn("다음");
           p.next = !!(nx && !off(nx));
@@ -162,6 +176,13 @@ function installNaverStockDriver() {
       if (!lab) return { ok: false, why: "작은 달력의 달을 못 찾음" };
       return navNear(lab, dir);
     },
+    /** 일정/가격 큰 달력 달 넘기기 ("‹ 2026.11 ›") — 사람처럼 그 달을 먼저 (사장님 11/3) */
+    bigNav(dir) {
+      if (popup()) return { ok: false, why: "재고수정 창이 열려 있음" };
+      const lab = deep(/^\d{4}\.\d{1,2}\.?$/)[0];
+      if (!lab) return { ok: false, why: "큰 달력의 달을 못 찾음" };
+      return navNear(lab, dir);
+    },
     /** 재고수정 창의 작은 달력에서 그 날짜 누르기 — 실제 네이버 날짜 버튼에는 data-tst_date="2026-11-19" (10/20 화면 저장본) · 없으면 숫자로
         (앞뒤 달의 흐린 날짜는 빼고 · 같은 숫자가 둘이면 15일부터는 뒤의 것) */
     popPick(d, full) {
@@ -203,10 +224,10 @@ function installNaverStockDriver() {
     reload() { location.reload(); return { ok: true }; },
     go(url) { location.href = url; return { ok: true }; },
   };
-  /** 달 글자 옆 화살표: 같은 줄에서 글자 앞(이전) · 뒤(다음) 버튼 */
+  /** 달 글자 옆 화살표: 같은 줄에서 글자 앞(이전) · 뒤(다음) 화살표 모양 버튼 (날짜 칸은 안 누름 — 화살표가 없으면 못 찾음으로) */
   function navNear(lab, dir) {
     for (let p = lab.parentElement; p && p !== document.body; p = p.parentElement) {
-      const bs = clickables(p);
+      const bs = clickables(p).filter(arrowish);
       if (!bs.length) continue;
       const after = bs.filter((b) => lab.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
       const before = bs.filter((b) => lab.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_PRECEDING);
@@ -358,11 +379,43 @@ class NaverStock {
     }
     return { ok: true, state: s };
   }
+  /** 큰 달력을 그 달로 (사장님 11/3: 사람처럼 › 로 넘기고 → 날짜별 회차가 다 뜰 때까지 기다림) — 재고수정 작은 달력은 큰 달력에 보이는 달로 열림
+      큰 달력 달 글자를 못 찾으면 그대로 (예전처럼 작은 달력에서) */
+  async toMonth(product, month) {
+    let s = await this.read(product);
+    if (!s.bigMonth || s.bigMonth === month) return { ok: true, state: s };
+    for (let i = 0; i < 4 && s.bigMonth !== month; i++) {
+      const was = s.bigMonth;
+      this.step(`네이버 큰 달력 ${was.replace("-", ".")} → ${month.replace("-", ".")}`);
+      const k = await this.act(`window.__naverStock.bigNav(${was < month ? 1 : -1})`);
+      if (!k.ok) return this.fail("stock-month", `큰 달력을 ${month}로 못 넘김: ${k.why}`);
+      const r = await this.until(product, (x) => !!x.bigMonth && x.bigMonth !== was, 15000, `큰 달력이 ${was}에서 안 넘어감`);
+      if (!r.ok) return this.fail("stock-month", r.why);
+      s = r.state;
+    }
+    if (s.bigMonth !== month) return this.fail("stock-month", `큰 달력을 ${month}로 못 넘김 (지금 ${s.bigMonth})`);
+    // 날짜별 회차가 다시 뜰 때까지: 달 글자만 먼저 바뀔 수 있어 조금 기다린 뒤 · [재고수정]이 보이고 재고 칸 수가 두 번 이어 같을 때 (20초까지)
+    await sleep(1200 * this.slow);
+    let prev = -1;
+    for (const t0 = Date.now(); Date.now() - t0 < 20000 * this.slow; ) {
+      const x = await this.read(product);
+      if (x.bigMonth === month && x.stockOn && x.slots > 0 && x.slots === prev) return { ok: true, state: x };
+      prev = x.bigMonth === month && x.stockOn ? x.slots : -1;
+      await sleep(500 * this.slow);
+    }
+    return this.fail("stock-month", `${month.replace("-", ".")} 회차가 안 보임 — 네이버에 그 달 회차를 등록했는지 확인 (등록 전이면 먼저 + 회차 · 등록했으면 네이버가 느린 것)`);
+  }
   /** 그 날짜를 회차마다 재고 qty 개로 — 확인하지 않고 바로 진행 (이미 넣은 날도) → { ok, done | dry | why }
       dry = 바꾸지 않고 '모든 회차' 확인 창(그 날짜)까지 가 보고 [취소] */
   async setDay({ product, day, qty = 10, dry = false }) {
-    const month = day.slice(0, 7), d = +day.slice(8), dot = day.replace(/-/g, "."), md = `${day.slice(5, 7)}.${day.slice(8)}`;
+    const month = day.slice(0, 7), d = +day.slice(8), dot = day.replace(/-/g, ".");
+    // 날짜 글을 숫자로 견줌: 날짜 칸 "2026.12.1" · 확인 창 "12.1(화)" — 앞 0 이 없음 (사장님 11/3: "2026.12.01" 글자로 견줘 12/1 부터 멈췄음)
+    const [Y, M, D] = day.split("-").map(Number);
+    const fieldIs = (f) => { const m = String(f || "").match(/(\d{4})\.(\d{1,2})\.(\d{1,2})/); return !!m && +m[1] === Y && +m[2] === M && +m[3] === D; };
+    const titleIs = (t) => { const m = String(t || "").match(/(\d{1,2})\.(\d{1,2})\(/); return !!m && +m[1] === M && +m[2] === D && /날짜의모든회차/.test(t); };
     let r = await this.toStock(product);
+    if (!r.ok) return r;
+    r = await this.toMonth(product, month); // 큰 달력을 그 달로 (사장님 11/3)
     if (!r.ok) return r;
     const base = r.state.modal; // 원래 떠 있던 창(공지 등)은 저장 뒤 경고로 안 봄
     this.step(`네이버 [재고수정] ${product} ${day}${dry ? " (확인만)" : ` → ${qty}개`}`);
@@ -383,13 +436,13 @@ class NaverStock {
     if (s.pop.month !== month) return this.cancel(product, "stock-period", `작은 달력을 ${month}로 못 넘김`);
     k = await this.act(`window.__naverStock.popPick(${d}, ${JSON.stringify(day)})`);
     if (!k.ok) return this.cancel(product, "stock-period", k.why);
-    r = await this.until(product, (x) => x.pop && x.pop.kind === "period" && x.pop.field === dot && x.pop.next, 5000, `날짜 칸이 ${dot} 가 아님`);
+    r = await this.until(product, (x) => x.pop && x.pop.kind === "period" && fieldIs(x.pop.field) && x.pop.next, 5000, `날짜 칸이 ${dot} 가 아님`);
     if (!r.ok) return this.cancel(product, "stock-period", `${r.why} (${(r.state && r.state.pop && r.state.pop.field) || "빈칸"})`);
     k = await this.act(`window.__naverStock.click("다음")`);
     if (!k.ok) return this.cancel(product, "stock-period", k.why);
     r = await this.until(product, (x) => x.pop && x.pop.kind === "scope", 10000, "'모든 회차' 창이 안 나옴");
     if (!r.ok) return this.cancel(product, "stock-scope", r.why);
-    if (!r.state.pop.title.includes(md) || !/날짜의모든회차/.test(r.state.pop.title)) return this.cancel(product, "stock-scope", `확인 창 날짜가 다름: ${r.state.pop.title}`);
+    if (!titleIs(r.state.pop.title)) return this.cancel(product, "stock-scope", `확인 창 날짜가 다름: ${r.state.pop.title}`);
     if (dry) { await this.cancel(product, null, ""); return { ok: true, dry: true }; }
     k = await this.act(`window.__naverStock.click("모든 회차")`);
     if (!k.ok) return this.cancel(product, "stock-scope", k.why);
