@@ -139,6 +139,41 @@ test("현장 11/3 (사장님 사진): 날짜 칸 '2026.12.1' · 확인 창 '12.1
   }
 });
 
+test("같은 상품 여러 날을 이어서 (사장님 11/4: 2.16 설치 뒤 12/1 만 열리고 12/2 부터 안 열림) — 재고수정 기간 달력이 앞서 고른 날을 기억해도: 날마다 상품 화면을 새로 열어 시작 · 기간이면 한 번 더 눌러 하루로 · 기간으로는 저장 안 함", async () => {
+  const browser = await launch();
+  try {
+    const { page, st, saves } = await setup(browser);
+    await page.evaluate(() => { localStorage.setItem("mockStockToday", "2026-11-04"); localStorage.setItem("mockStockKeep", "2"); }); // 새로 열어도 앞서 고른 날을 기억하는 가장 나쁜 경우
+    await page.goto(MOCK + "?view=items");
+    for (const p of [P0, P1]) for (const d of ["2026-12-01", "2026-12-02", "2026-12-03", "2026-12-04"]) {
+      const r = await st.setDay({ product: p, day: d, qty: 10 });
+      assert.ok(r.ok && r.done, `${p} ${d}: ${r.why}`);
+    }
+    const sv = await saves();
+    assert.ok(sv.every((x) => x.from === x.to), "기간으로 저장한 것 없음 " + JSON.stringify(sv));
+    assert.deepStrictEqual(sv.map((x) => `${x.id} ${x.from}`), ["0 2026-12-01", "0 2026-12-02", "0 2026-12-03", "0 2026-12-04", "1 2026-12-01", "1 2026-12-02", "1 2026-12-03", "1 2026-12-04"]);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("사장님 11/4 (2.16 '큰 달력을 2026-12로 못 넘김: 달 넘기는 버튼을 못 찾음'): 큰 달력 › 는 그림 + 숨은 글 '다음' — 누름 · 큰 달력 화살표를 못 찾아도 멈추지 않고 10월처럼 작은 달력 ▶ 로", async () => {
+  const browser = await launch();
+  try {
+    const { page, st, saves } = await setup(browser);
+    await page.evaluate(() => localStorage.setItem("mockStockToday", "2026-11-04"));
+    await page.goto(MOCK + "?view=items");
+    const r = await st.setDay({ product: P0, day: "2026-12-02", qty: 10 });
+    assert.ok(r.ok && r.done, r.why);
+    await page.evaluate(() => localStorage.setItem("mockStockNoBigNav", "1"));
+    const r2 = await st.setDay({ product: P1, day: "2026-12-02", qty: 10 });
+    assert.ok(r2.ok && r2.done, r2.why);
+    assert.deepStrictEqual(await saves(), [{ id: 0, from: "2026-12-02", to: "2026-12-02", n: 10 }, { id: 1, from: "2026-12-02", to: "2026-12-02", n: 10 }]);
+  } finally {
+    await browser.close();
+  }
+});
+
 test("작은 달력 예전 모양(이번 달로 열리고 ◀ ▶)이어도 그대로 · 화살표가 없는데 다른 달로 열리면 날짜를 누르지 않고 실패로 알림", async () => {
   const browser = await launch();
   try {
