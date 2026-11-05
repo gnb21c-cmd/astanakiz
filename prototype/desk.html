@@ -40,6 +40,7 @@
   --walk: #2563EB;
   --err-bg: #FDE7E7;
   --amber: #B45F00;
+  --short: #6D3FD4; --short-bg: #6D3FD4; /* 숏타임 상품 (보라 · 11/05) — 글씨 · 배지 */
   --shadow: 0 1px 2px rgba(20, 26, 38, .06), 0 3px 12px rgba(20, 26, 38, .05);
   --font: "IBM Plex Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
 }
@@ -50,7 +51,7 @@
     --bg: #06080C; --surface: #10141B; --surface-2: #161B24; --fg: #FFFFFF; --muted: #B3BDCC; --faint: #545F70; --line: #252D3A;
     --ink: #FFFFFF; --on-ink: #06080C; --accent: #5B97FF; --accent-bg: #0F2347; --naver: #18E07A; --naver-bg: #0B3B24; --on-naver: #03170C;
     --pink: #FF8DB9; --pink-fg: #2A0614; --red: #FF4646; --yellow: #FFD400; --yellow-fg: #D10000; --nm-k3: #FFE14D; --ok: #46F2A0; --warn-bg: #3D0E10;
-    --todo: #2F7BFF; --todo-fg: #FFFFFF; --gift: #FFD400; --gift-fg: #1C1400; --walk: #3D8BFF; --err-bg: #3D0E10; --amber: #FF9F1A;
+    --todo: #2F7BFF; --todo-fg: #FFFFFF; --gift: #FFD400; --gift-fg: #1C1400; --walk: #3D8BFF; --err-bg: #3D0E10; --amber: #FF9F1A; --short: #B39BFF; --short-bg: #7A52EE;
     --shadow: 0 1px 2px rgba(0,0,0,.4), 0 3px 12px rgba(0,0,0,.35);
     color-scheme: dark;
   }
@@ -60,7 +61,7 @@
   --bg: #06080C; --surface: #10141B; --surface-2: #161B24; --fg: #FFFFFF; --muted: #B3BDCC; --faint: #545F70; --line: #252D3A;
   --ink: #FFFFFF; --on-ink: #06080C; --accent: #5B97FF; --accent-bg: #0F2347; --naver: #18E07A; --naver-bg: #0B3B24; --on-naver: #03170C;
   --pink: #FF8DB9; --pink-fg: #2A0614; --red: #FF4646; --yellow: #FFD400; --yellow-fg: #D10000; --nm-k3: #FFE14D; --ok: #46F2A0; --warn-bg: #3D0E10;
-  --todo: #2F7BFF; --todo-fg: #FFFFFF; --gift: #FFD400; --gift-fg: #1C1400; --walk: #3D8BFF; --err-bg: #3D0E10; --amber: #FF9F1A;
+  --todo: #2F7BFF; --todo-fg: #FFFFFF; --gift: #FFD400; --gift-fg: #1C1400; --walk: #3D8BFF; --err-bg: #3D0E10; --amber: #FF9F1A; --short: #B39BFF; --short-bg: #7A52EE;
   --shadow: 0 1px 2px rgba(0,0,0,.4), 0 3px 12px rgba(0,0,0,.35);
   color-scheme: dark;
 }
@@ -453,6 +454,9 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 .mvrow.off b { color: var(--muted); }
 .mvwhy { margin-top: 2px; font-weight: 400; }
 .badge.proxy { background: var(--surface-2); color: var(--fg); border: 1px solid var(--line); font-size: 11px; vertical-align: 2px; }
+.badge.short { background: var(--short-bg); color: #FFFFFF; } /* 숏타임 상품 (1시간 20분 · 사장님 11/05) — 1시간 50분 손님과 한눈에 구분 */
+.res .name .badge.short { font-weight: 700; }
+.shortend { color: var(--short); font-weight: 700; }
 .badge.unpaid { background: transparent; color: var(--amber); box-shadow: inset 0 0 0 1.5px var(--amber); } /* 입금대기 (결제 안 함 · 자동 취소 대상이 될 수 있음) */
 .res dd.visitor { font-weight: 700; }
 .badge.done { background: var(--naver-bg); color: var(--ok); }
@@ -795,6 +799,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     baseKeys: 40,           // 기본 운영 열쇠, 나머지 5개는 유동 (빈 좌석 보고)
     seats: 39,              // 내부 4인석(입식·좌식)
     useMinutes: 110,        // 1시간 50분
+    shortMinutes: 80,       // 숏타임 상품(10시 매진 때 사장님이 여는 '10시 매진 시 숏타임 80분') 이용시간 — 상품 이름에 'N분'이 있으면 그 값 (사장님 11/05)
     pinkUntil: 120,         // 1시간 50분 ~ 2시간 분홍, 2시간 넘으면 빨강
     giftEvery: 10,          // 10회 방문마다 사은권 (명함식 카드로 따로 줌)
     giftName: "2만원 사은권",
@@ -879,6 +884,19 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   let golden = null; // 골든벨 { at } — 오늘 이 시각부터 모든 손님 무제한 (아래 goldenCheck)
   const baseMinutes = (key, entry) => (timedDay(key) && entry < toMin(RULES.unlimitedFrom) ? RULES.useMinutes : null); // 골든벨과 상관없는 원래 이용시간
   const minutesFor = (key, entry) => (key === TODAY && golden ? null : baseMinutes(key, entry));
+  /* 숏타임 (사장님 11/05): 방학 · 추운 날 10시부터 매진이면 사장님이 네이버 상품 '10시 매진 시 숏타임 80분'을 10개 엶 (하루 10:00 하나 · 수량 자동조절 안 함)
+     → 이 상품 예약은 1시간 20분 (10:00 입장 → 11:20 퇴장 · 날 · 성수기와 상관없이 · 골든벨이면 무제한) — 11:20 에 나가 네 타임 합 40을 넘지 않게 오전을 채움
+     퇴장시간 · 입장권 · 열쇠판 색 · 초과요금 · 연속예약 · 추가 예약 · 판매 수량 계산 모두 이 시간으로 · 카드에 '숏타임' · 보고 앱 매출 1장 = 10,000원(보고 앱에서) */
+  const SHORT_RE = /[숏솟]\s*타임/;
+  const isShort = (b) => !!b && !b.walk && !b.svc && SHORT_RE.test(String(b.naverProduct || "") + " " + String(b.product || ""));
+  /** 숏타임 이용시간(분) — 상품 이름의 'N분'(30 ~ 109) · 없으면 80 */
+  const shortMin = (b) => { const m = /(\d{2,3})\s*분/.exec(String((b && b.naverProduct) || "")); const v = m ? Number(m[1]) : 0; return v >= 30 && v < RULES.useMinutes ? v : RULES.shortMinutes; };
+  /** 이 예약 한 번의 원래 이용시간(분, 무제한이어도 1시간 50분 · 연속예약 끝 계산용) */
+  const stayOf = (b) => (isShort(b) ? shortMin(b) : RULES.useMinutes);
+  /** 이 예약의 이용시간(분) — 숏타임은 날과 상관없이 짧게 (골든벨이면 무제한) · 그 밖은 minutesFor · 무제한이면 null */
+  const bookMinutes = (b) => (isShort(b) ? (b.day === TODAY && golden ? null : shortMin(b)) : minutesFor(b.day, b.slot));
+  /** 카드 · 예약자 창 · 열쇠 창 이름 옆 '숏타임' (1시간 50분 손님과 구분) */
+  const shortBadge = (b) => `<span class="badge short" title="숏타임 상품 — ${shortMin(b)}분 이용 (1시간 50분 아님)">숏타임</span>`;
   const dayKind = (key) => (peakOf(key) ? "성수기" : "비수기") + " " + (isHoliday(key) ? "휴일" : "평일") + (key === TODAY && golden ? ` · 골든벨 무제한 ${hm(golden.at)}~` : timedDay(key) ? " · 시간제" : " · 무제한");
 
   let now = APP ? _d0.getHours() * 60 + _d0.getMinutes() : toMin("13:50");
@@ -913,6 +931,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       prevDone: o.prevDone ?? (seq * 7) % 13, cancels: (seq * 3) % 4 === 0 ? 1 : 0, visitNo: null,
       proxy: !!o.proxy, visitor: o.visitor || "", unpaid: !!o.unpaid,
     };
+    if (o.naverProduct) b.naverProduct = o.naverProduct; // 시험: 네이버 상품 이름 (숏타임 등)
     if (o.unpaid) b.pay = "입금대기";
     if (b.status === "완료") b.visitNo = b.prevDone + 1;
     (bookings[day] = bookings[day] || []).push(b);
@@ -1248,7 +1267,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   function oddNext(b) {
     if (!b || !b.phone) return [];
     return samePerson(b).filter((x) => x !== b && Math.abs(x.slot - b.slot) > CHAIN_STEP && Math.abs(x.slot - b.slot) <= 240)
-      .map((x) => { const [p, n] = x.slot < b.slot ? [x, b] : [b, x]; return { other: x, gap: n.slot - (p.slot + RULES.useMinutes) }; });
+      .map((x) => { const [p, n] = x.slot < b.slot ? [x, b] : [b, x]; return { other: x, gap: n.slot - (p.slot + stayOf(p)) }; });
   }
   /** 연속예약 열쇠별 이용시간(분): 열쇠 j 번째는 앞에서부터 수량이 j 이상인 타임까지 이어짐. 무제한이 끼면 null */
   function chainKeyMinutes(chain, qty) {
@@ -1258,7 +1277,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       for (const x of chain) { if (slotQty(x) >= j) n++; else break; }
       const part = chain.slice(0, n);
       // 끝 = 이어지는 마지막 예약 시간 + 1시간 50분 (2시간보다 짧은 간격이면 그만큼 짧아짐)
-      out.push(part.some((x) => minutesFor(x.day, x.slot) == null) ? null : part[part.length - 1].slot - part[0].slot + RULES.useMinutes);
+      out.push(part.some((x) => bookMinutes(x) == null) ? null : part[part.length - 1].slot - part[0].slot + stayOf(part[part.length - 1])); // 끝 예약이 숏타임이면 1시간 20분
     }
     return out;
   }
@@ -1279,7 +1298,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     if (golden) return null; // 골든벨: 지금 안에 있는 손님도 모두 무제한
     if (h.keyUse && k != null && h.keyUse[k] !== undefined) return h.keyUse[k];
     if (h.keyUse && k == null) { const v = h.keys.map((x) => h.keyUse[x]).filter((x) => x !== undefined); if (v.length) return v.includes(null) ? null : Math.min(...v); }
-    return h.useMin !== undefined ? h.useMin : minutesFor(TODAY, h.slot);
+    return h.useMin !== undefined ? h.useMin : isShort(h) ? shortMin(h) : minutesFor(TODAY, h.slot); // 숏타임 = 1시간 20분 (11/05)
   };
 
   // ── 입금대기 예약 자동 취소 (사장님 10/8) ─────────────────────
@@ -1322,7 +1341,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     if (!h || h.svc || !h.keys.length) return null; // 서비스 키는 추가 예약을 찾지 않음 (원래 손님 열쇠에서)
     const end = extEnd(h);
     if (end == null) return null; // 무제한 손님
-    const L = end - RULES.useMinutes;
+    const L = isShort(h) && end === h.slot + shortMin(h) ? h.slot : end - RULES.useMinutes; // 마지막 예약 시간 (숏타임은 1시간 20분 뒤가 끝)
     const x = (bookings[TODAY] || []).filter((y) => y.status === "확정" && !y.chainHead && y.enteredAt == null && !extIgnored.has(y.no) && y.slot > h.slot && samePhone(y, h) && (h.walk || y.name === h.name))
       .sort((p, q) => p.slot - q.slot)[0];
     if (!x) return null;
@@ -1562,11 +1581,11 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       if (b.giftDue) act += b.giftGiven ? `<span class="help num">${RULES.giftName} ${b.giftGiven} 전달</span>` : `<span class="npend">${b.giftDue}번째 ${RULES.giftName} 전달 전 — 손님께 연락해 전달 (열쇠 창 [사은권 전달함])</span>`;
       if (b.naverPending) act += `<span class="npend">${b.naverBusy ? "네이버 이용완료 처리 중…" : `네이버 이용완료 대기${b.naverWhy ? ` — ${esc(b.naverWhy)}` : ""} (자동으로 다시)`}</span>`;
       return `<article class="res ${b.status === "완료" ? "done" : ""}${bcHit(b, 2) ? " bc2" : bcHit(b, 1) ? " bc1" : ""}" data-act="openRes" data-id="${b.id}" tabindex="0" role="button" aria-label="${esc(b.name)} 예약 열기">
-        <div class="head"><span class="name">${nameHtml(b)}${b.proxy ? ` <span class="badge proxy">대리예약</span>` : ""}${noteOf(b) && noteOf(b).m ? ` <span class="badge memo" title="${esc(noteOf(b).m)}">메모</span>` : ""}</span>${b.unpaid && b.status === "확정" ? `<span class="badge unpaid">입금대기</span>` : `<span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span>`}</div>
+        <div class="head"><span class="name">${nameHtml(b)}${isShort(b) ? ` ${shortBadge(b)}` : ""}${b.proxy ? ` <span class="badge proxy">대리예약</span>` : ""}${noteOf(b) && noteOf(b).m ? ` <span class="badge memo" title="${esc(noteOf(b).m)}">메모</span>` : ""}</span>${b.unpaid && b.status === "확정" ? `<span class="badge unpaid">입금대기</span>` : `<span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span>`}</div>
         ${partyTag}${chainTag}<div class="visits num">${visitText(b)}</div>${bc3Html(b)}
         <dl class="kv">
           <dt>전화번호</dt><dd class="phone num">${fmtPhone(b.phone)}</dd>${visitorRow(b)}
-          <dt>이용일시</dt><dd class="num">${when}${b.naverSlot != null && b.naverSlot !== b.slot ? ` <span class="moved">네이버 ${hm(b.naverSlot)}</span>` : ""}</dd>
+          <dt>이용일시</dt><dd class="num">${when}${isShort(b) && bookMinutes(b) != null ? ` <b class="shortend">~ ${hm(b.slot + bookMinutes(b))} 퇴장</b>` : ""}${b.naverSlot != null && b.naverSlot !== b.slot ? ` <span class="moved">네이버 ${hm(b.naverSlot)}</span>` : ""}</dd>
           <dt>수량</dt><dd>${b.product} ${qtyNum(b.qty)}</dd>
           <dt>결제상태</dt><dd><span class="badge paid">${b.pay}</span></dd>
         </dl>
@@ -1772,7 +1791,8 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     const to = new Map(H.map((i) => [i, capOf(i)]));
     const q = (j) => { const x = slots[j]; if (x.started) return x.used; return x.used - x.mainUsed + (to.has(j) ? to.get(j) : capOf(j)); };
     const tail = (j) => (slots[j].started ? slots[j].tail || 0 : 0); // 골든벨: 머무는 시간이 끝나도 문 닫을 때까지 있는 손님
-    const at = (k) => { let v = 0; for (let j = 0; j <= k; j++) v += inWin(j, k) ? q(j) : tail(j); return v; };
+    const gone = (j, k) => (slots[j].short && slots[j].t + (slots[j].shortStay || 80) <= slots[k].t ? slots[j].short : 0); // 숏타임 손님은 1시간 20분 뒤 나감 (11/05)
+    const at = (k) => { let v = 0; for (let j = 0; j <= k; j++) v += inWin(j, k) ? q(j) - gone(j, k) : tail(j); return v; };
     const soldOut = (i) => slots[i].mainUsed > 0 && slots[i].mainUsed >= to.get(i);
     const left = (i) => to.get(i) - slots[i].mainUsed;
     const fewest = (a, b) => (slots[a].mainUsed - slots[b].mainUsed) || (rank(b) - rank(a)) || (b - a); // 예약이 적은 타임 → 덜 인기(순위 숫자 큰) → 뒤 타임
@@ -1913,7 +1933,8 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       const walk = day === TODAY ? walkins.filter((w) => w.slot === t && !w.extra).reduce((a, w) => a + (w.qty || Math.max(1, w.keys.length)), 0) : 0; // +1타임은 연장된 열쇠로 이미 셈
       // 골든벨: 이 타임 손님 중 지금 안에 있는(열쇠) · 아직 안 온(30분 안) 네이버 손님은 머무는 시간이 끝나도 문 닫을 때까지 (서비스 키 · 현장 · 시험 손님 빼고)
       const tail = day === TODAY && golden && t <= now ? holders().filter((h) => h.slot === t && !h.walk && !h.svc && !(h.no && testOut.has(h.no))).reduce((a, h) => a + h.keys.length, 0) + list.filter((b) => b.slot === t && b.slot >= now - 30 && b.status === "확정" && !b.chainHead && !b.keys.length && b.outAt == null && !testOut.has(b.no)).reduce((a, b) => a + b.qty, 0) : 0; // 아직 안 온 예약은 30분 전 타임까지 (그보다 오래되면 노쇼 — restBooked 와 같게)
-      return { t, used, mainUsed: raw ? raw.conf + raw.done : used, cap: raw ? raw.cap : capDemo[t] ?? (ns ? ns.cap : RULES.slotCap), product: raw ? raw.product : "", walk, started: day === TODAY && t <= now, stay: RULES.useMinutes, tail };
+      const sh = list.filter((b) => b.slot === t && isShort(b) && !b.chainHead && (b.status === "확정" || b.status === "완료") && !testOut.has(b.no)); // 숏타임 (1시간 20분 뒤 나감 · 11/05)
+      return { t, used, mainUsed: raw ? raw.conf + raw.done : used, cap: raw ? raw.cap : capDemo[t] ?? (ns ? ns.cap : RULES.slotCap), product: raw ? raw.product : "", walk, started: day === TODAY && t <= now, stay: RULES.useMinutes, tail, short: sh.reduce((a, b) => a + b.qty, 0), shortStay: sh.length ? Math.min(...sh.map(shortMin)) : RULES.shortMinutes };
     });
   }
   /** 네이버에 넣을 회차당 수량 (사장님 10/9): 고객에게 보이는 잔여(회차당 수량 − 예약)는 10장을 넘지 않게 — 안내 '최대 10팀'과 맞게.
@@ -1936,7 +1957,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     for (const b of bookings[TODAY] || []) {
       if (b.slot > now || testOut.has(b.no) || b.chainHead || b.keys.length || b.outAt != null) continue;
       if (!(b.status === "확정" || (b.status === "완료" && b.enteredAt == null))) continue;
-      const m = capMinutes(b.slot);
+      const m = isShort(b) ? bookMinutes(b) : capMinutes(b.slot); // 숏타임은 1시간 20분
       out.push({ from: now, to: m == null ? Infinity : b.slot + m, n: b.qty });
     }
     return out;
@@ -2002,7 +2023,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     for (const h of holders()) for (const k of h.keys) { const m = useOf(h, k); if (m == null || h.slot + m > x || x < now + 10) used++; }
     for (const b of bookings[TODAY]) {
       if (b.status !== "확정") continue;
-      const m = baseMinutes(TODAY, b.slot); // 아직 안 온 예약은 골든벨이어도 원래 시간 안에만 올 수 있다고 (안 온 지난 예약이 계속 자리를 막지 않게)
+      const m = isShort(b) ? shortMin(b) : baseMinutes(TODAY, b.slot); // 아직 안 온 예약은 골든벨이어도 원래 시간 안에만 올 수 있다고 (안 온 지난 예약이 계속 자리를 막지 않게) · 숏타임 1시간 20분
       if (b.slot - RULES.earlyMinutes <= x && (m == null || x < b.slot + m)) used += b.qty;
     }
     for (const o of openLeft) { const m = baseMinutes(TODAY, o.s); if (o.s - RULES.earlyMinutes <= x && (m == null || x < o.s + m)) used += o.left; }
@@ -2254,7 +2275,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     if (sheet.mode === "enter") {
       const b = findB(sheet.id);
       const ch = chainOf(b), ci = ch.indexOf(b);
-      const m = ch.length > 1 ? chainMinutes(ch) : minutesFor(b.day, b.slot);
+      const m = ch.length > 1 ? chainMinutes(ch) : bookMinutes(b);
       // 예약 당일이면 언제든 입장 (5분 전은 손님 안내 기준일 뿐, 근무자가 현장 상황을 보고 더 일찍 들여보낼 수 있음)
       // 연속예약의 두 번째부터는 첫 예약에서 함께 처리
       const party = partyOpen(b), pi = party.indexOf(b), need = partyNeed(b);
@@ -2282,7 +2303,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       el.innerHTML = `
         <h3 id="sheet-title">네이버 예약자 <button class="x" data-act="close" aria-label="닫기">×</button></h3>${bcAskHtml()}
         <div class="${sv ? "svgrid" : ""}"><dl class="facts">
-          <dt>예약자</dt><dd style="font-size:18px">${nameHtml(b)} <span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span>${noteChecks(b)}</dd>
+          <dt>예약자</dt><dd style="font-size:18px">${nameHtml(b)}${isShort(b) ? ` ${shortBadge(b)}` : ""} <span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span>${noteChecks(b)}</dd>
           <dt>${evActive() && evIn(b.day) ? "이벤트" : "이용완료"}</dt><dd class="num visits big">${visitText(b)}</dd>
           <dt>전화번호</dt><dd class="num">${fmtPhone(b.phone)}</dd>${visitorRow(b)}
           <dt>이용일시</dt><dd class="num">${hm(b.slot)} ${m == null ? "· 무제한" : `~ ${hm(b.slot + m)} (${dur(m)})`}${b.naverSlot != null && b.naverSlot !== b.slot ? ` <span class="moved">네이버 ${hm(b.naverSlot)}</span>` : ""}${b.day === TODAY && b.no ? `
@@ -2476,7 +2497,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
         <h3 id="sheet-title">${h.svc ? `<span>${h.keys.join(", ")}번 서비스 키 <span class="badge svcb">판매 아님</span></span>` : `${h.keys.join(", ")}번 열쇠`} <button class="x" data-act="close" aria-label="닫기">×</button></h3>${h.svc || h.walk ? "" : bcAskHtml()}
         <div class="${e ? "extgrid" : ""}"><div>${giftDueHtml(h)}
         <dl class="facts">
-          ${h.svc ? svcFacts(h) : `<dt>${h.walk ? "고객명" : "예약자"}</dt><dd class="whorow"><span>${h.walk ? esc(h.name) : nameHtml(h)}${h.walk ? ` · ${h.posNo}` : noteChecks(h)}</span><button class="btn btn-sm reprint" data-act="reprint" title="감열지가 다 돼 중간에 끊겼을 때 — 이 손님 입장권을 다시 출력">입장권 다시 출력</button></dd>`}
+          ${h.svc ? svcFacts(h) : `<dt>${h.walk ? "고객명" : "예약자"}</dt><dd class="whorow"><span>${h.walk ? esc(h.name) : nameHtml(h)}${isShort(h) ? ` ${shortBadge(h)}` : ""}${h.walk ? ` · ${h.posNo}` : noteChecks(h)}</span><button class="btn btn-sm reprint" data-act="reprint" title="감열지가 다 돼 중간에 끊겼을 때 — 이 손님 입장권을 다시 출력">입장권 다시 출력</button></dd>`}
           <dt>전화번호</dt><dd class="num">${h.phone ? fmtPhone(h.phone) : "—"}</dd>
           <dt>입장</dt><dd class="num">${hm(h.enteredAt)}${h.walk ? "" : ` (예약 ${hm(h.slot)})`}</dd>
           <dt>이용</dt><dd class="num">${m == null ? "무제한" : `${used < 0 ? `예약 ${hm(h.slot)}부터 셈` : `${Math.floor(used / 60)}시간 ${used % 60}분째`} · ${h.keyUse && new Set(h.keys.map((k) => useOf(h, k))).size > 1 ? h.keys.map((k) => { const mk = useOf(h, k); return `${k}번 ${mk == null ? "무제한" : hm(h.slot + mk)}`; }).join(" · ") + " 반납" : `${hm(h.slot + m)} 반납`}`}${(() => {
@@ -5259,6 +5280,9 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     evLog: (from) => { const L = evLog(from); return { from: L.from, count: L.count, people: Object.fromEntries([...L.people].map(([k, p]) => [k, JSON.parse(JSON.stringify(p))])) }; },
     // 장부에 지난 방문 한 줄 넣기: o = { day, n(네이버 순번, 기본 = 지금 완료 수), base, st("안내" | "성공"), due, from(장부 · 기본 지금 이벤트), no }
     evsPayload: () => evsPayload(),
+    // 숏타임 (11/05)
+    isShort: (id) => isShort(findB(id) || holders().find((h) => h.id === id)), bookMinutes: (id) => bookMinutes(findB(id)), overDue: (id) => { const h = holders().find((x) => x.id === id); return h ? overInfo(h).due : null; },
+    chainMin: (id) => { const b = findB(id), ch = chainOf(b); return ch.length > 1 ? chainMinutes(ch) : bookMinutes(b); }, oddGaps: (id) => oddNext(findB(id)).map((o) => o.gap), capSlots: () => capSlots(TODAY), capMain,
     evInject: (name, o = {}) => {
       const b = bookings[TODAY].find((x) => x.name === name);
       const nn = o.n ?? b.prevDone, d = o.day || EV.from, st = o.st === undefined ? "안내" : o.st;
