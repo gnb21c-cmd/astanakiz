@@ -914,7 +914,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   const minutesFor = (key, entry) => (key === TODAY && golden ? null : baseMinutes(key, entry));
   /* 숏타임 (사장님 11/05): 방학 · 추운 날 10시부터 매진이면 사장님이 네이버 상품 '10시 매진 시 숏타임 80분'을 10개 엶 (하루 10:00 하나 · 수량 자동조절 안 함)
      → 이 상품 예약은 1시간 20분 (10:00 입장 → 11:20 퇴장 · 날 · 성수기와 상관없이 · 골든벨이면 무제한) — 11:20 에 나가 네 타임 합 40을 넘지 않게 오전을 채움
-     퇴장시간 · 입장권 · 열쇠판 색 · 초과요금 · 연속예약 · 추가 예약 · 판매 수량 계산 모두 이 시간으로 · 카드에 '숏타임' · 보고 앱 매출 1장 = 10,000원(보고 앱에서) */
+     퇴장시간 · 입장권 · 열쇠판 색 · 초과요금 · 연속예약 · 추가 예약 · 판매 수량 계산 모두 이 시간으로 · 카드에 '숏타임' · 보고 앱 매출 1장 = 평일 10,000원 · 휴일 11,000원(보고 앱에서) */
   const SHORT_RE = /[숏솟]\s*타임/;
   const isShort = (b) => !!b && !b.walk && !b.svc && SHORT_RE.test(String(b.naverProduct || "") + " " + String(b.product || ""));
   /** 숏타임 이용시간(분) — 상품 이름의 'N분'(30 ~ 109) · 없으면 80 */
@@ -4059,7 +4059,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   /* 맨 위 [근무자 메뉴얼] → 입장 · 퇴장 · 화면 위치별 조작 (내려 보며 읽기)
      그림 = prototype/manual/*.jpg (체험판 화면 · apps/desk/tools/manual-shots.js 로 다시 찍음 · 설치본은 desk.html 옆 manual/)
      MANUAL_MARKS = 그림 1의 번호 자리 (% · 찍을 때 나온 값) */
-  const MANUAL_MARKS = [[14.7, 0.6], [38.7, 0], [1, 5.3], [1, 12.3], [23.4, 12.3], [48.7, 9.7], [48.7, 59.5], [48.7, 66.5], [69.3, 0.5]];
+  const MANUAL_MARKS = [[13.9, 0.6], [39.4, 0], [1, 5.3], [1, 12.3], [23.4, 12.3], [48.7, 9.7], [48.7, 59.5], [48.7, 66.5], [72.8, 0.5]];
   const MANUAL_TOC = [["man1", "① 화면 한눈에"], ["man2", "② 예약 손님 입장"], ["man3", "③ 현장 손님 입장"], ["man4", "④ 퇴장 · 열쇠 반납"], ["man5", "⑤ 마감 · 일괄 반납"], ["man6", "⑥ 주차등록"], ["man7", "⑦ 메모장"], ["man8", "⑧ 이럴 땐"]];
   const manImg = (f, alt) => `<img src="manual/${f}" alt="${alt}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'help',textContent:'(그림을 못 불러옴 — ${alt})'}))">`;
   const manSteps = (rows, tip) => `<div class="mansteps">${rows.map((r, i) => `<div><span class="n">${i + 1}</span><span>${r}</span></div>`).join("")}${tip ? `<div class="tip">${tip}</div>` : ""}</div>`;
