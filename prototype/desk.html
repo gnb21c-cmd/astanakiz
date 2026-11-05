@@ -197,8 +197,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .setnav button.on { background: var(--accent-bg); color: var(--fg); box-shadow: inset 3px 0 0 var(--accent); }
 .setnav button.on small { color: var(--muted); }
 .setbody { overflow: auto; min-height: 0; display: grid; gap: 12px; align-content: start; padding: 0 4px 12px 0; }
-.setbody .evgrid { grid-template-columns: minmax(0, 1fr) 300px; }
+.setbody .evgrid { grid-template-columns: minmax(0, 1fr) 300px; grid-template-rows: auto 1fr; } /* 미리보기가 길어도 왼쪽 칸은 위로 붙음 */
 .setbody .evgrid > :nth-child(3) { grid-column: 2; grid-row: 1 / span 2; }
+.setbody .evgrid #ev-paper { max-height: calc(100vh - 210px); } /* 재방문 이벤트 미리보기도 창 끝까지 (11/05) */
 .setbody .psub { max-width: 600px; }
 .setcard { border: 1px solid var(--accent); border-radius: 12px; padding: 10px 12px; }
 .setcard.plain { border-color: var(--line); }
@@ -267,7 +268,6 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .mhit mark { background: var(--yellow); color: #000; border-radius: 3px; padding: 0 1px; }
 .evgrid { display: grid; grid-template-columns: 290px minmax(0, 1fr) 300px; gap: 14px; }
 .evgrid > .field, .evgrid > .stack { align-content: start; }
-.evtpl #ev-text { min-height: 210px; }
 .evps { display: flex; gap: 4px 6px; flex-wrap: wrap; }
 .evp { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; }
 .field .evp input.evpn { width: 52px; min-height: 30px; font-size: 14px; padding: 2px 6px; border-radius: 7px; letter-spacing: 0; text-align: right; }
@@ -282,7 +282,41 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .cfg { font-size: 15px !important; font-weight: 500 !important; min-height: 38px !important; letter-spacing: 0 !important; }
 .date-in { font-size: 14px !important; min-height: 34px; width: 150px !important; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 .peakrow { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; }
-.prn { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 14px; }
+/* 영수증 설정 (프린트물 설정 · 사장님 11/05 — OKPOS 처럼 종류 → 템플릿 · 코드 목록 · 편집 · 미리보기) */
+.tpltop { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tpltop select { min-width: 260px; max-width: 340px; height: 34px; }
+.tpltop .chk { margin-left: auto; }
+.tpltop .chk input { width: 18px; height: 18px; min-height: 0; padding: 0; }
+.tpldesc { margin-top: -4px; }
+.setbody:has(> .tplgrid) { display: flex; flex-direction: column; gap: 8px; overflow: hidden; padding-bottom: 0; } /* 영수증 설정은 네 칸이 창 아래 끝까지 (사장님 11/05 — 미리보기를 끝단까지, 오르락내리락 없이) */
+.tplgrid { display: grid; grid-template-columns: 124px 104px minmax(0, 1fr) 272px; gap: 8px; flex: 1; min-height: 360px; }
+.tplcol { display: flex; flex-direction: column; gap: 6px; min-height: 0; border: 1px solid var(--line); border-radius: 8px; padding: 6px; background: var(--surface); }
+.tplhd { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--muted); flex-wrap: wrap; }
+.tplhd .help { font-weight: 500; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tplhd .btn { margin-left: auto; }
+.tplrows { display: grid; gap: 2px; align-content: start; overflow: auto; min-height: 0; flex: 1; }
+.tplrow { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 0 4px; align-items: center; text-align: left; padding: 5px 4px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--fg); font-size: 12.5px; }
+.tplrow .no { color: var(--faint); font-size: 11px; text-align: right; }
+.tplrow .tn { overflow-wrap: anywhere; }
+.tplrow small { grid-column: 2; font-size: 10.5px; color: var(--faint); }
+.tplrow.live .tn { font-weight: 700; }
+.tplrow:hover { background: var(--surface-2); }
+.tplrow.on { background: var(--accent-bg); border-color: var(--accent); }
+.tplrow.dirty .tn::after { content: " •"; color: var(--amber); font-weight: 700; }
+.tplbtns { display: grid; gap: 4px; }
+.tplcol #tpl-name { width: 100%; box-sizing: border-box; font-size: 12.5px; padding: 4px 6px; }
+.tplcodes { display: grid; gap: 1px; align-content: start; overflow: auto; min-height: 0; flex: 1; }
+.tplch { font-size: 11px; color: var(--faint); margin: 6px 0 1px; }
+.tplch:first-child { margin-top: 0; }
+.tplcode { text-align: left; border: 0; background: transparent; color: var(--accent); font-family: ui-monospace, Consolas, "D2Coding", monospace; font-size: 12.5px; padding: 2px 4px; border-radius: 4px; }
+.tplcode:hover { background: var(--accent-bg); }
+.tpledit textarea { flex: 1; min-height: 0; width: 100%; box-sizing: border-box; resize: none; border: 1px solid var(--line); border-radius: 6px; padding: 7px; font-family: ui-monospace, Consolas, "D2Coding", monospace; font-size: 12.5px; line-height: 1.45; background: var(--surface); color: var(--fg); }
+.tpledit textarea[readonly] { background: var(--surface-2); color: var(--muted); }
+.tpldirty { color: var(--amber); font-size: 11.5px; }
+.tplhint { min-height: 16px; }
+.tplview .paper { width: 100%; box-sizing: border-box; overflow: auto; flex: 1; min-height: 0; max-height: none; font-size: 12px; justify-self: stretch; }
+.tplview .paper .big { font-size: 18px; }
+.tplview .paper .mid { font-size: 15px; }
 .plist { display: grid; gap: 4px; }
 .plist button { text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 10px; font-weight: 600; }
 .plist button.on { border: 2px solid var(--ink); }
@@ -291,12 +325,6 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .seg2 button.on { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
 .chk { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
 .field .chk input { width: 20px; height: 20px; min-height: 0; padding: 0; flex: none; }
-.prn > .field { align-content: start; }
-#form-text, #ev-text, #bc2-text { width: 100%; min-height: 150px; border: 1px solid var(--line); border-radius: 8px; padding: 8px; font-family: ui-monospace, Consolas, "D2Coding", monospace; font-size: 13px; background: var(--surface); color: var(--fg); resize: vertical; }
-#ev-text { min-height: 74px; }
-/* 입장권 양식 글 칸은 크게 (사장님 10/21 — 작게 할 필요 없음): 운영 설정 → 프린트물 설정 아래까지 */
-.prn #form-text { height: 420px; min-height: 300px; resize: vertical; box-sizing: border-box; }
-.prn #bc2-text { height: 380px; min-height: 240px; resize: vertical; box-sizing: border-box; } /* BC 투아웃 양식 (사장님 10/27) */
 /* 설문조사 (10/14) */
 .svgrid { display: grid; grid-template-columns: minmax(0, 1fr) 236px; gap: 12px; align-items: start; }
 .svbox { border: 2px solid var(--line); border-radius: 12px; padding: 10px; display: grid; gap: 8px; }
@@ -1491,6 +1519,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
        자세한 것(다음 기한 · 오늘 이미 방문)은 글자에 마우스를 올리면 */
     if (evActive() && evIn(b.day)) {
       if (evEarly(b)) return `<span class="help">이벤트 켜기 전 입장</span>`;
+      if (evOut(b)) return `<span class="help bcmile">이벤트 제외 (BC)</span>`; // 투아웃 = 마일리지 · 이벤트 모두 아님 (사장님 11/05)
       const ev = evOf(b);
       if (!ev) return `<span class="help">이용완료 횟수 확인 중</span>`;
       const tip = esc(evLabel(ev));
@@ -2520,8 +2549,8 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     }
     if (sheet.mode === "settings") {
       // V2.0 (사장님 10/21): 왼쪽 메뉴 7개 · 긴 설명은 [?] 뒤로 — 예전 탭 이름(rules · cap · event · link · survey)도 받음
-      const SETOLD = { rules: "season", cap: "naver", event: "prints", link: "api", survey: "etc" };
-      if (SETOLD[sheet.tab]) { if (sheet.tab === "event") sheet.psub = "event"; sheet.tab = SETOLD[sheet.tab]; }
+      const SETOLD = { rules: "season", cap: "naver", link: "api", survey: "etc" }; // 재방문 이벤트는 11/05 부터 왼쪽 메뉴 따로
+      if (SETOLD[sheet.tab]) sheet.tab = SETOLD[sheet.tab];
       if (!SET_MENU.some(([k]) => k === sheet.tab)) sheet.tab = "season";
       const tab = sheet.tab, pg = setPage(tab);
       el.innerHTML = `<h3 id="sheet-title">운영 설정 <span class="help">관리자 · 바꾸면 바로 저장</span><button class="x" data-act="close" aria-label="닫기">×</button></h3>
@@ -2532,12 +2561,13 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     }
   }
   // ── 운영 설정 V2.0 (사장님 10/21): 왼쪽 메뉴 · [?] 설명 · 기준 · 근무자 ─────────────
-  const SET_MENU = [["season", "비성수기 설정"], ["printer", "프린터 설정"], ["prints", "프린트물 설정"], ["staff", "근무자 등록"], ["api", "API 연결 설정"], ["naver", "네이버 설정"], ["cust", "고객 세부 관리"], ["etc", "기타"]];
+  const SET_MENU = [["season", "비성수기 설정"], ["printer", "프린터 설정"], ["prints", "프린트물 설정"], ["event", "재방문 이벤트"], ["staff", "근무자 등록"], ["api", "API 연결 설정"], ["naver", "네이버 설정"], ["cust", "고객 세부 관리"], ["etc", "기타"]];
   /** 메뉴 옆 작은 상태 (들어가 보지 않아도 켜졌는지) */
   function setBadge(k) {
     if (k === "season") return `기간 ${RULES.peaks.length}`;
     if (k === "printer") return PRINT.mode === "com" ? PRINT.port || "포트?" : PRINT.sel ? "Windows" : "프린터?";
-    if (k === "prints") return EV.on ? "이벤트 켜짐" : "입장권";
+    if (k === "prints") return `양식 ${tplKinds().length}종`;
+    if (k === "event") return EV.on ? (evActive() ? `진행 중 · ${EV.to.slice(5).replace("-", "/")}까지` : "켜짐") : "꺼짐";
     if (k === "staff") return `${MEMO.staff.length}명 + 관리자`;
     if (k === "api") return REAL ? "" : "체험판";
     if (k === "naver") { const n = (RULES.capAuto.on ? 1 : 0) + (ST.view && ST.view.cfg && ST.view.cfg.on ? 1 : 0); return n ? `켜짐 ${n}` : "꺼짐"; }
@@ -2545,10 +2575,6 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     if (k === "cust") { if (!custList) { custLoad(); return ""; } const n = custList.filter((x) => x.bc).length; return n ? `BC ${n}명` : "BC · 마일리지 SKIP"; }
     return "";
   }
-  /** 프린트물 설정 위쪽: 입장권 양식 / 재방문 이벤트 · 쿠폰 */
-  const psubHtml = () => `<div class="seg2 psub">${[["ticket", "입장권 양식"], ["event", "재방문 이벤트 · 쿠폰"], ["bc2", "BC 투아웃 양식"]].map(([k, t]) => `<button class="${(sheet.psub || "ticket") === k ? "on" : ""}" data-act="psub" data-s="${k}" aria-pressed="${(sheet.psub || "ticket") === k}">${t}</button>`).join("")}</div>`;
-  /** BC 투아웃 양식 미리보기 예시 — 투아웃이라 누계 · 사은권 줄 없음 */
-  const bc2Sample = () => Object.assign({}, SAMPLE_NAVER, { 누계: "", _네이버: false, _사은권: false, _bc2: sheet.bc2cur === 2 ? 2 : 1 });
   /** 네이버 설정 맨 위 '기준' — 재고 자동 오픈 · 판매 수량 자동조절이 같이 보는 것 (사장님 10/21 통합) */
   function naverBase() {
     const c = (ST.view && ST.view.cfg) || { qty: 10, ahead: 30, products: ["평일 무제한 / 휴일 1시간 50분 입장권", "야간자유 입장권"] };
@@ -2586,24 +2612,111 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       h.before(b);
     }
   }
+  // ── 영수증 설정 = 프린트물 설정 (사장님 11/05 — OKPOS 영수증 설정처럼: 종류 → 템플릿 · 코드 목록 · 편집 · 미리보기) ──
+  /* 종류 = 실제로 찍히는 자리 (입장권 네이버 · 현장 · 이벤트 입장 / 재방문 이벤트 공통 · 현장 입장자 · 1번 · 2번 · 제공상품 / BC 투아웃 1 · 2)
+     종류마다 1번 줄 = 실제출력물(지금 찍히는 글) · 기본 템플릿(고칠 수 없음 — [실제출력물로] · [+ 새 템플릿]으로 씀) · 내 템플릿(이 PC 에 보관)
+     편집은 [저장]을 눌러야 들어감 — 저장 안 한 글은 그 줄에 남고 '•' (다른 줄 · 종류를 봐도 안 사라짐, 앱을 끄면 사라짐)
+     코드 목록을 누르면 편집 칸 커서 자리에 들어감 (값 · 줄 앞 표시 · 조건) · 미리보기 = 편집 칸 글 그대로 (예시 값) */
+  const TPL_LS = "astanakiz-printtpls";
+  const TPLS = {}; // { 종류: [{ id, name, text }] } 내 템플릿
+  const TPLD = new Map(); // 저장 안 한 편집 글 "종류|줄" → 글
+  function tplLoad(v) {
+    if (!v || typeof v !== "object") return;
+    for (const [k, a] of Object.entries(v)) if (Array.isArray(a)) TPLS[k] = a.filter((x) => x && typeof x.text === "string" && x.id).slice(0, 30).map((x) => ({ id: String(x.id), name: String(x.name || "템플릿").slice(0, 30), text: x.text }));
+  }
+  if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c && c.printTpls) tplLoad(c.printTpls); }).catch(() => {});
+  else try { tplLoad(JSON.parse(localStorage.getItem(TPL_LS))); } catch (e) { /* 없음 */ }
+  function tplStore() {
+    const v = JSON.parse(JSON.stringify(TPLS));
+    if (APP && window.desk.config) window.desk.config.set({ printTpls: v });
+    else try { localStorage.setItem(TPL_LS, JSON.stringify(v)); } catch (e) { /* 저장 못 해도 동작 */ }
+  }
+  const tplKey = (k, id) => `${k}|${id}`;
+  /** 종류 목록 — g 묶음 · name · get/set(실제출력물) · need(비울 수 없음) · empty(비우면 무엇이 나감) · base(기본 템플릿) · view(글 → [찍을 글, 예시 값]) · desc · warn */
+  function tplKinds() {
+    const E = PRINT.forms.enter;
+    const evS = (i, d) => Object.assign(evSample(i), i === 2 ? { _제공상품: d } : { _이벤트문구: d });
+    const bcS = (n) => Object.assign({}, SAMPLE_NAVER, { 누계: "", _네이버: false, _사은권: false, _bc2: n });
+    const evOn = evActive() && EV.form != null;
+    const bcOff = RULES.bc.o2 ? "" : "고객 세부 관리 → BC 관리에서 '투아웃' 대응이 꺼져 있어 지금은 안 나와요";
+    return [
+      { k: "naver", g: "입장권", name: "네이버 예약", get: () => E.text, set: (t) => { E.text = t; savePrint(); }, need: true, base: [["기본 양식", () => ENTER_SPLIT.naver]], view: (d) => [d, SAMPLE_NAVER],
+        desc: "네이버 예약 손님 입장권 · [네이버] 줄 = 마일리지 (누계를 알 때만)", warn: evOn ? "재방문 이벤트 기간이라 지금은 '재방문 이벤트 — 공통 양식'으로 나가요 (이벤트가 끝나면 다시 이 양식)" : "" },
+      { k: "walk", g: "입장권", name: "현장 입장", get: () => E.walk, set: (t) => { E.walk = t; savePrint(); }, need: true, base: [["기본 양식", () => ENTER_SPLIT.walk]], view: (d) => [d, SAMPLE_WALK],
+        desc: `현장 결제 · 서비스 키${E.ev ? "" : ` · ${wevLabel()}`} 입장권`, warn: evOn ? "재방문 이벤트 기간이라 지금은 '재방문 이벤트 — 공통 양식'(현장 입장자)으로 나가요" : "" },
+      { k: "ev", g: "입장권", name: wevLabel(), get: () => E.ev || "", set: (t) => { E.ev = t.trim() ? t : ""; savePrint(); }, empty: evOn ? "방문 이벤트 공통 양식" : "현장 입장 양식", base: [["지금 나가는 양식", () => enterText(evwSample())]], view: (d) => [d.trim() ? d : enterText(evwSample()), evwSample()],
+        desc: `결제 없이 [${wevLabel()}]으로 들어온 손님만 · {구분} = '${walkTag({ ev: WEV.name })}' · 이름은 기타 → 현장 이벤트 입장`, warn: "" },
+      { k: "evbase", g: "재방문 이벤트", name: "공통 양식", get: () => (EV.form != null ? EV.form : ""), set: (t) => { EV.form = t.trim() ? t : null; evSaveCfg(); }, empty: "입장권 양식(네이버 · 현장) 그대로", base: [["입장권 양식 합침 (네이버 · 현장)", () => joinForms(E.text, E.walk)]], view: (d) => [d.trim() ? d : E.text, evS(0, EV.tpl[0])],
+        desc: "이벤트 기간 모든 입장권의 나머지 (열쇠 · 시간 · 안내) — [이벤트] 줄 = 1번 · 2번 자리 · [사은품] 줄 = 제공상품 자리 · 끝나면 입장권 양식", warn: "" },
+      { k: "evwalk", g: "재방문 이벤트", name: "현장 입장자", get: () => EV.walk || "", set: (t) => { EV.walk = t.trim() ? t : null; evSaveCfg(); }, empty: "공통 양식", base: [["공통 양식", () => evBaseForm()]], view: (d) => [d.trim() ? d : EV.form != null ? EV.form : E.walk, evWalkSample()],
+        desc: "이벤트 기간 현장 결제 손님 입장권만 (네이버 · 이벤트 입장 · 서비스 키는 그대로)", warn: "" },
+      ...[0, 1, 2].map((i) => ({ k: "ev" + (i + 1), g: "재방문 이벤트", name: EV_NAMES[i], get: () => EV.tpl[i], set: (t) => { EV.tpl[i] = t; evSaveCfg(); }, base: [["예시 문구", () => EV_TPL[i]]], view: (d) => [evBaseForm(), i === 2 ? Object.assign(evS(1, EV.tpl[1]), { _제공상품: d }) : evS(i, d)],
+        desc: EV_DESC[i] + " · 미리보기는 공통 양식에 넣은 모양", warn: "" })),
+      ...[1, 2].map((n) => ({ k: "bc" + n, g: "BC 투아웃", name: n === 1 ? "1번 (투아웃 뒤 첫 방문)" : "2번 (그다음 방문부터)", get: () => BC2["f" + n], set: (t) => { BC2["f" + n] = t.trim() ? t : ""; saveBc2(); }, empty: "입장권 양식 (마일리지 줄 없이)", base: [["지금 입장권 양식", () => enterText()]], view: (d) => [d.trim() ? d : enterText(), bcS(n)],
+        desc: "투아웃 손님은 마일리지 · 이벤트가 없지만 손님은 몰라요 → 입장권 대신 이 양식 (다시 출력도 그 방문 양식)", warn: bcOff })),
+    ];
+  }
+  const tplKind = () => { const K = tplKinds(); return K.find((x) => x.k === sheet.tk) || K[0]; };
+  /** 그 종류의 줄: 실제출력물 · 기본 템플릿 · 내 템플릿 */
+  const tplRows = (kd) => [{ id: "live", name: "실제출력물", text: kd.get(), live: true }]
+    .concat(kd.base.map(([n, f], j) => ({ id: "b" + j, name: n, text: f(), ro: true, base: true })))
+    .concat((TPLS[kd.k] || []).map((u) => ({ id: u.id, name: u.name, text: u.text, mine: true })));
+  /** 편집 칸 글 (저장 안 한 글이 있으면 그것) */
+  const tplText = (kd, r) => { const key = tplKey(kd.k, r.id); return TPLD.has(key) ? TPLD.get(key) : r.text; };
+  /** 코드 목록 — [코드, 설명, 넣는 법(값 · line = 줄 맨 앞 · rule = 새 줄)] */
+  const TPL_VALS = { 구분: "네이버 · 현장 · ○○ 이벤트", 고객: "손님 이름 (가운데 *)", 전화뒤4: "전화 뒷 4자리", 열쇠: "열쇠 번호들", 입장시간: "예약한 입장 시각", 퇴장시간: "반납 시각 (숏타임은 1시간 20분)", 누계: "마일리지 (네이버 예약 이용완료 수)", 기준회: `사은권 기준 회수 (${RULES.giftEvery})`, 사은권: "사은권 이름", 날짜: "출력한 날", 시각: "출력한 시각", 시작일: "재방문 이벤트 시작일", 종료일: "재방문 이벤트 종료일", 기한일수: "재방문 기한 (일)", 사은품: "재방문 사은품", 다음기한: "다음 기한 날짜", 지난방문: "지난 방문 날짜", 사용기한: "쿠폰 사용기한" };
+  const TPL_CODES = () => [
+    ["값", PRINT_KEYS.map((k) => [`{${k}}`, TPL_VALS[k] || "", "val"])],
+    ["줄 앞", [["#", "2배 크게 · 가운데", "line"], ["##", "3배 크게 · 가운데", "line"], ["+", "세로 2배 (중간)", "line"], ["^", "가운데", "line"], ["*", "굵게 (^* · #* 처럼 붙여 씀)", "line"], ["---", "점선 줄", "rule"], ["===", "두 줄", "rule"]]],
+    ["조건 · 자리", [["[네이버]", "네이버 예약 마일리지 줄 — 누계를 알 때만", "line"], ["[현장]", "현장 입장 손님만", "line"], ["[사은권]", "사은권 회차만", "line"], ["[이벤트]", "이벤트 손님만 · 한 줄만 쓰면 1번 · 2번 안내 자리", "line"], ["[기한]", "다음 기한이 있을 때만", "line"], ["[사은품]", "한 줄 = 2번 성공일 때 제공상품 자리", "rule"], ["[자르기]", "한 줄 = 그 자리에서 종이 자름 (쿠폰 떼기)", "rule"]]],
+  ];
+  /** 편집 칸 글이 바뀜 → 저장 안 한 글 · 미리보기 · 표시 (다시 그리지 않음 — 커서 그대로) */
+  function tplInput(v) {
+    const kd = tplKind(), r = tplRows(kd).find((x) => x.id === sheet.tsel); if (!r || r.ro) return;
+    const key = tplKey(kd.k, r.id);
+    if (v === r.text) TPLD.delete(key); else TPLD.set(key, v);
+    const [text, val] = kd.view(v), pp = $("tpl-paper");
+    if (pp) pp.innerHTML = paperHtml(text, val);
+    const dirty = TPLD.has(key), sv = $("tpl-save"), mk = $("tpl-dirty"), row = document.querySelector(`#sheet .tplrow[data-id="${r.id}"]`);
+    if (sv) sv.disabled = !dirty;
+    if (mk) mk.hidden = !dirty;
+    if (row) row.classList.toggle("dirty", dirty);
+    const em = $("tpl-empty"); if (em) em.hidden = !!v.trim();
+  }
+  function tplPage() {
+    const K = tplKinds(), kd = K.find((x) => x.k === sheet.tk) || K[0]; sheet.tk = kd.k;
+    const rows = tplRows(kd), r = rows.find((x) => x.id === sheet.tsel) || rows[0]; sheet.tsel = r.id;
+    const txt = tplText(kd, r), dirty = TPLD.has(tplKey(kd.k, r.id)), [vt, vv] = kd.view(txt);
+    const groups = [...new Set(K.map((x) => x.g))];
+    const opts = groups.map((g) => `<optgroup label="${esc(g)}">${K.filter((x) => x.g === g).map((x) => `<option value="${x.k}" ${x.k === kd.k ? "selected" : ""}>${esc(g)} — ${esc(x.name)}</option>`).join("")}</optgroup>`).join("");
+    const liveEmpty = !kd.get().trim() && kd.empty;
+    const rowHtml = rows.map((x, j) => `<button type="button" class="tplrow${x.id === r.id ? " on" : ""}${TPLD.has(tplKey(kd.k, x.id)) ? " dirty" : ""}${x.live ? " live" : ""}" data-act="tplRow" data-id="${esc(x.id)}" aria-pressed="${x.id === r.id}"><span class="no num">${j + 1}</span><span class="tn">${esc(x.name)}</span>${x.base ? `<small>기본</small>` : ""}${x.live && liveEmpty ? `<small>비어 있음</small>` : ""}</button>`).join("");
+    const codes = TPL_CODES().map(([h, list]) => `<div class="tplch">${h}</div>` + list.map(([c, d, w]) => `<button type="button" class="tplcode" data-act="tplCode" data-c="${esc(c)}" data-w="${w}" title="${esc(d)}">${esc(c)}</button>`).join("")).join("");
+    const html = `
+      <div class="tpltop"><label for="tpl-kind"><b>종류</b></label><select id="tpl-kind" class="cfg" aria-label="양식 종류">${opts}</select>
+        <label class="chk" title="입장권(네이버 · 현장 · 이벤트 입장)을 입장 · 등록할 때 바로 찍음"><input type="checkbox" id="form-auto" ${PRINT.forms.enter.auto ? "checked" : ""}> 입장권 자동 출력</label></div>
+      <div class="help tpldesc">${esc(kd.desc)}${kd.empty ? ` · 실제출력물을 비우면 <b>${esc(kd.empty)}</b>` : ""}</div>
+      ${kd.warn ? `<div class="help evwarn">${esc(kd.warn)}</div>` : ""}
+      <div class="tplgrid">
+        <div class="tplcol"><div class="tplhd">실제출력물 및 템플릿</div>
+          <div class="tplrows" role="listbox" aria-label="템플릿">${rowHtml}</div>
+          ${r.mine ? `<input id="tpl-name" class="cfg" maxlength="30" value="${esc(r.name)}" aria-label="템플릿 이름">` : ""}
+          <div class="tplbtns"><button class="btn btn-sm" data-act="tplNew" title="지금 편집 칸 글로 내 템플릿을 하나 만들어 보관">+ 새 템플릿</button>
+            <button class="btn btn-sm" data-act="tplUse" ${r.live ? "disabled" : ""} title="이 템플릿(편집 칸 글)을 지금 찍히는 글로">실제출력물로</button>
+            ${r.mine ? `<button class="btn btn-sm" data-act="tplDel">삭제</button>` : ""}</div></div>
+        <div class="tplcol"><div class="tplhd">코드 목록</div><div class="tplcodes">${codes}</div></div>
+        <div class="tplcol tpledit"><div class="tplhd">편집 <span class="help">${esc(r.name)}</span><b class="tpldirty" id="tpl-dirty" ${dirty ? "" : "hidden"}>저장 안 됨</b><button class="btn btn-sm btn-ink" id="tpl-save" data-act="tplSave" ${r.ro || !dirty ? "disabled" : ""}>저장</button></div>
+          <textarea id="tpl-text" spellcheck="false" aria-label="${esc(kd.name)} ${esc(r.name)}" ${r.ro ? `readonly title="기본 템플릿은 고칠 수 없어요 — [실제출력물로] 또는 [+ 새 템플릿]"` : ""}${kd.empty ? ` placeholder="비어 있으면 ${esc(kd.empty)}"` : ""}>${esc(txt)}</textarea>
+          <div class="help tplhint" id="tpl-hint">${r.ro ? "기본 템플릿은 고칠 수 없어요 — [실제출력물로] 또는 [+ 새 템플릿]" : "코드를 누르면 편집 칸 커서 자리에 들어가요 · 고친 뒤 [저장]"}</div></div>
+        <div class="tplcol tplview"><div class="tplhd">미리보기 <span class="help" id="tpl-empty" ${!txt.trim() && kd.empty ? "" : "hidden"}>(비어 있어 ${esc(kd.empty || "")})</span><button class="btn btn-sm" data-act="tplTest">시험 출력</button></div>
+          <div class="paper" id="tpl-paper">${paperHtml(vt, vv)}</div></div>
+      </div>`;
+    return { html, after: () => evScroll("tpl-paper") };
+  }
   /** 운영 설정 한 쪽 (왼쪽 메뉴에서 고른 것) → { html, after(그린 뒤 할 일) } */
   function setPage(tab) {
-      if (tab === "prints" && sheet.psub === "bc2") {
-        const n = sheet.bc2cur === 2 ? 2 : 1, txt = BC2["f" + n];
-        const html = psubHtml() + `
-        <div class="prn">
-          <div class="stack">
-            <div class="field"><span class="label">BC 투아웃 양식 <span class="help">투아웃 손님 입장권 대신 (사장님 10/27)</span></span>
-              <div class="seg2" role="group" aria-label="양식 번호">${[[1, "1번 — 투아웃이 된 뒤 첫 방문"], [2, "2번 — 그다음 방문부터"]].map(([k, t]) => `<button class="${n === k ? "on" : ""}" data-act="bc2Cur" data-n="${k}" aria-pressed="${n === k}">${t}</button>`).join("")}</div>
-              <div class="help">투아웃 손님은 마일리지 · 사은권이 없지만 손님은 몰라요 → 투아웃이 된 뒤 처음 입장할 때 <b>1번</b>, 그다음 방문부터 <b>2번</b>이 입장권 대신 나와요 (다시 출력도 그 방문 양식 그대로) · <b>비어 있으면 입장권 양식 그대로</b> (마일리지 줄은 빠진 채) · <button class="btn btn-sm" data-act="bc2Copy">입장권 양식 가져오기</button></div>
-              ${RULES.bc.o2 ? "" : `<div class="help evwarn">고객 세부 관리 → BC 관리에서 '투아웃 — 마일리지 미적용'이 꺼져 있어 지금은 안 나와요</div>`}
-              <textarea id="bc2-text" spellcheck="false" aria-label="BC 투아웃 ${n}번 양식" placeholder="비어 있으면 입장권 양식 그대로">${esc(txt)}</textarea></div>
-          </div>
-          <div class="field"><span class="label">미리보기 <span class="help">예시 값 · ${n}번<span id="bc2-note">${txt ? "" : " (비어 있어 입장권 양식)"}</span></span></span><div class="paper" id="bc2-paper">${paperHtml(txt || enterText(), bc2Sample())}</div>${formHelp()}</div>
-        </div>`;
-        return { html };
-      }
-      if (tab === "prints" && sheet.psub === "event") {
+      if (tab === "event") {
+        if (!(EV.cur >= 0 && EV.cur <= 2)) EV.cur = 0; // 미리보기 예시 (1번 안내 · 2번 성공) — 양식 고치기는 프린트물 설정
         const L = EV.from ? evLog() : null, i = EV.cur, period = isDay(EV.from) && isDay(EV.to) ? `${krDate(EV.from)} ~ ${krDate(EV.to)}` : "";
         const subs = evFroms().reduce((a, f) => a + evLog(f).count, 0);
         const st = !EV.on ? `<b>꺼짐</b> — 입장권에 마일리지(네이버 이용완료 누계)와 ${RULES.giftEvery}회 사은권${subs ? " · 지난 이벤트 기간 이용완료는 빼고 셈" : ""}`
@@ -2628,14 +2741,13 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
                 <input id="ev-q" class="cfg" placeholder="이름 또는 전화 뒷번호" value="${esc(EV.q)}" autocomplete="off" aria-label="손님 찾기 (이름 또는 전화 뒷번호)">
                 <div class="caplog evhits" id="ev-hits">${evFindHtml()}</div></div>
             </div>
-            <div class="field evtpl"><span class="label">양식 <span class="help">손님 기록으로 안내 · 성공이 자동으로 골라짐</span></span>
-              <div class="evrules">${evRow(EV_BASE)}${evRow(EV_WALK)}${EV_NAMES.map((t, j) => evRow(j)).join("")}</div>
-              <textarea id="ev-text" spellcheck="false" aria-label="${evName(i)} 문구">${esc(i === EV_BASE ? evBaseForm() : i === EV_WALK ? evWalkForm() : EV.tpl[i])}</textarea>
-              <div class="btns" style="align-items:center"><button class="btn btn-sm" data-act="evReset">${i === EV_BASE ? "원래 양식으로" : i === EV_WALK ? "공통 양식으로" : "예시 문구로"}</button><button class="btn btn-sm" data-act="evTest">${ro(evName(i))} 시험 출력</button><label class="chk" title="제공상품(쿠폰)을 매장만 찍을 수 있는 무늬 그림으로 — 프린터가 그림을 못 찍으면 끄세요"><input type="checkbox" id="ev-seal" ${EV.seal ? "checked" : ""}> 쿠폰 보안 무늬</label></div>
+            <div class="field evtpl"><span class="label">입장권 문구 <span class="help">손님 기록으로 1번 안내 · 2번 성공이 자동으로 골라짐</span></span>
+              <div class="btns" style="align-items:center"><button class="btn btn-sm btn-ink" data-act="tplGo" data-k="ev1">문구 고치기 (프린트물 설정) ›</button><button class="btn btn-sm" data-act="evTest">${ro(evName(i))} 시험 출력</button><label class="chk" title="제공상품(쿠폰)을 매장만 찍을 수 있는 무늬 그림으로 — 프린터가 그림을 못 찍으면 끄세요"><input type="checkbox" id="ev-seal" ${EV.seal ? "checked" : ""}> 쿠폰 보안 무늬</label></div>
+              <span class="help">공통 양식 · 현장 입장자 · 1번 안내 · 2번 성공 · 제공상품은 <b>프린트물 설정 → 종류 '재방문 이벤트 …'</b>에서 고쳐요</span>
               <span class="help" id="ev-def">${evDefText()}</span></div>
-            <div class="field"><span class="label">미리보기 <span class="help">${i === EV_BASE ? "공통 양식 + 1번 안내" : i === EV_WALK ? "현장 결제 손님" : EV_NAMES[i]} · 예시 값 · 칠한 줄이 이벤트 안내</span></span><div class="paper" id="ev-paper">${evPrev()}</div>${formHelp()}</div>
+            <div class="field"><span class="label">미리보기 ${[0, 1, 2].map((j) => `<button class="btn btn-sm ${i === j ? "btn-ink" : ""}" data-act="evTpl" data-i="${j}" aria-pressed="${i === j}">${EV_NAMES[j]}</button>`).join("")}</span><span class="help">예시 값 · 칠한 줄이 이벤트 안내</span><div class="paper" id="ev-paper">${evPrev()}</div></div>
           </div>`;
-        return { html: psubHtml() + html, after: () => { if (i !== EV_BASE && i !== EV_WALK) evScroll("ev-paper"); } };
+        return { html, after: () => evScroll("ev-paper") };
       }
       if (tab === "cust") {
         const sub = sheet.csub === "skip" ? "skip" : "bc";
@@ -2660,7 +2772,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
         return { html: head + `
           <div class="setcard plain stack"><b>BC(블랙컨슈머) 대응</b>
             <span class="help">예약자 창 · 열쇠 창 이름 옆 <b>BC ①②③</b>을 눌러 정해요 — 야구 아웃처럼 쌓여요 (투아웃이면 원아웃 · 투아웃 대응 모두 · 같은 단계를 다시 누르면 한 단계 내림) · <b>③은 사유를 쓰고 [확인]해야</b> 쓰리아웃 (아래 목록에서는 내리기만)</span>
-            ${[[1, "고객 카드 테두리 빨강", "예약 카드 · 예약자 창 · 열쇠 창"], [2, "마일리지 미적용", `누계 · ${RULES.giftEvery}회 사은권을 안 띄움 (입장권에도 없음)`], [3, "예약 불가", "네이버는 예약을 못 막아요 → 정해진 네이버 불러오기 때 쓰리아웃 손님 예약(입장 전)이 보이면 앱이 알아서 취소 — 네이버 '예약 취소' 화면에서 ○ 전액환불을 고른 것을 확인한 뒤에만 [예약 취소] (기본 '동의된 환불기준'은 0% 환불 · 되돌릴 수 없음 · 두 번 안 되면 카드에 [다시 취소])"]].map(([k, t, h]) => `<div class="bcrow"><span class="bcdot on">${k}</span><button type="button" class="svswitch ${RULES.bc["o" + k] ? "on" : ""}" role="switch" aria-checked="${!!RULES.bc["o" + k]}" data-act="bcToggle" data-k="${k}" aria-label="${OUTN[k]} 대응"><span class="knob"></span><b>${RULES.bc["o" + k] ? "켜짐" : "꺼짐"}</b></button><span><b>${OUTN[k]} — ${t}</b> <span class="help">${h}</span></span></div>`).join("")}</div>
+            ${[[1, "고객 카드 테두리 빨강", "예약 카드 · 예약자 창 · 열쇠 창"], [2, "마일리지 · 이벤트 미적용", `누계 · ${RULES.giftEvery}회 사은권을 안 띄움 (입장권에도 없음) · 재방문 이벤트 등 모든 이벤트에서 빠짐 (도전 · 성공 · 쿠폰 없음 · 사장님 11/05)`], [3, "예약 불가", "네이버는 예약을 못 막아요 → 정해진 네이버 불러오기 때 쓰리아웃 손님 예약(입장 전)이 보이면 앱이 알아서 취소 — 네이버 '예약 취소' 화면에서 ○ 전액환불을 고른 것을 확인한 뒤에만 [예약 취소] (기본 '동의된 환불기준'은 0% 환불 · 되돌릴 수 없음 · 두 번 안 되면 카드에 [다시 취소])"]].map(([k, t, h]) => `<div class="bcrow"><span class="bcdot on">${k}</span><button type="button" class="svswitch ${RULES.bc["o" + k] ? "on" : ""}" role="switch" aria-checked="${!!RULES.bc["o" + k]}" data-act="bcToggle" data-k="${k}" aria-label="${OUTN[k]} 대응"><span class="knob"></span><b>${RULES.bc["o" + k] ? "켜짐" : "꺼짐"}</b></button><span><b>${OUTN[k]} — ${t}</b> <span class="help">${h}</span></span></div>`).join("")}</div>
           <div class="setcard plain stack"><div class="bcfind"><b>BC 손님</b><span class="dots" role="group" aria-label="아웃 단계로 거르기">${[1, 2, 3].map((k) => `<button type="button" class="bcdot ${bcf.includes(k) ? "on" : ""}" role="checkbox" aria-checked="${bcf.includes(k)}" data-act="bcFilter" data-n="${k}" aria-label="${OUTN[k]} 고객만">${k}</button>`).join("")}</span><b>아웃 고객 검색</b>
               <span class="help">${bcf.length ? `${bcf.map((k) => `${OUTN[k]} ${nOf(k)}명`).join(" · ")} · 모두 ${L.filter((x) => x.bc).length}명` : `동그라미를 누르면 그 단계만 · 모두 ${L.filter((x) => x.bc).length}명 · 쓰리아웃부터`}</span></div>
             <input id="bc-q" class="cfg" placeholder="${bcf.length ? `${fName} 고객 중에서 ` : ""}이름 · 전화번호(뒷 4자리)로 찾기" autocomplete="off" value="${esc(sheet.bcq || "")}">
@@ -2676,7 +2788,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
           <div class="setcard plain stack"><b>현장 이벤트 입장</b>
             <div class="field"><label for="wev-name">현장 이벤트 이름 <span class="help">현장입장 창 아래 왼쪽 버튼 — 결제 없이 들어오는 이벤트 · 쿠폰 손님 (열쇠 · 입장권 · 인원은 현장과 같고 총 판매수에는 안 셈)</span></label>
               <div class="btns" style="align-items:center"><input id="wev-name" class="cfg" maxlength="10" value="${esc(WEV.name)}" placeholder="예: 한가위" style="max-width:200px" aria-label="현장 이벤트 이름"><span class="help">버튼: <b id="wev-preview">[${esc(wevLabel())}]</b> · 비우면 [이벤트 입장]</span></div>
-              <span class="help">입장권: 프린트물 설정 → 입장권 양식 → <b id="wev-form">[${esc(wevLabel())}]</b> 칸에 따로 쓸 수 있어요 (${PRINT.forms.enter.ev ? "<b>쓰는 중</b>" : "비어 있어 현장 입장 양식"})</span></div></div>
+              <span class="help">입장권: 프린트물 설정 → 종류 <b id="wev-form">'입장권 — ${esc(wevLabel())}'</b>에서 따로 쓸 수 있어요 (${PRINT.forms.enter.ev ? "<b>쓰는 중</b>" : "비어 있어 현장 입장 양식"}) <button class="btn btn-sm" data-act="tplGo" data-k="ev">양식 고치기 ›</button></span></div></div>
           <div class="setcard plain stack"><b>설문조사</b>
           <div class="field"><span class="label">설문 기간 <span class="help">신규 손님에게 '아스타나키즈를 어떻게 알게 되었는지' — 현장 안내문의 번호를 근무자가 누름 (번호를 눌러야 열쇠 등록)</span></span>
             <div class="btns" style="align-items:center"><input type="date" id="sv-from" class="date-in" value="${esc(SV.from)}"> <span>~</span> <input type="date" id="sv-to" class="date-in" value="${esc(SV.to)}"> <span class="evstate">${st}</span>
@@ -2797,29 +2909,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
 `;
         return { html };
       }
-      // 프린트물 설정 — 입장권 양식 (재방문 이벤트 · 쿠폰은 위 [재방문 이벤트] 쪽) · 네이버 예약 · 현장 입장 따로 (사장님 10/28 — 이벤트 양식처럼 골라서)
-      // + 현장 이벤트 입장(한가위 등 · 결제 없이 [○○ 이벤트 입장]) 손님만 따로 — 비어 있으면 현장 입장 양식 그대로 (사장님 11/05)
-      const f = PRINT.forms[PRINT.cur], ek = PRINT.ecur === "walk" || PRINT.ecur === "ev" ? PRINT.ecur : "naver", wk = ek === "walk", evw = ek === "ev";
-      const txt = evw ? f.ev || "" : wk ? f.walk : f.text, kname = evw ? wevLabel() : wk ? "현장 입장" : "네이버 예약";
-      if (evw) SAMPLE = evwSample(); // 이름을 바꿨을 수도 있어 그릴 때마다
-      const erow = (k, t, d) => `<div class="evrule${ek === k ? " on" : ""}"><button class="evno" data-act="ecur" data-k="${k}" aria-pressed="${ek === k}">${esc(t)}</button><span class="evdesc">${d}</span></div>`;
-      const evwOn = !!f.ev; // 이벤트 입장 양식을 씀
-      const warn = evw ? "" : evActive() && EV.form != null ? `<div class="help evwarn">방문 이벤트 중이라 지금은 '방문 이벤트 → 공통 양식'으로 출력돼요 (이 양식은 이벤트를 끄면 다시)</div>` : "";
-      const html = psubHtml() + `
-        <div class="prn">
-          <div class="stack">
-            <div class="field"><span class="label">출력 양식 <span class="help">손님 따라 자동으로 골라짐</span></span>
-              <div class="help">초과요금은 POS에서 결제하고 POS 영수증을 드려요</div>
-              <label class="chk"><input type="checkbox" id="form-auto" ${f.auto ? "checked" : ""}> ${f.when}에 자동 출력</label>
-              ${warn}
-              <div class="evrules">${erow("naver", "네이버 예약", "네이버 예약 손님 · [네이버] 줄 = 마일리지 (누계를 알 때만)")}${erow("walk", "현장 입장", `현장 결제 · ${evwOn ? "" : "이벤트 입장 · "}서비스 키 입장권`)}${erow("ev", wevLabel(), `결제 없이 <b>[${esc(wevLabel())}]</b>으로 들어온 손님만 · ${evwOn ? "<b>이 양식으로 나가요</b>" : "비어 있으면 현장 입장 양식"} <span class="help">(이름: 기타 → 현장 이벤트 입장)</span>`)}</div>
-              ${evw ? `<div class="help">한가위처럼 결제 없이 들어오는 현장 이벤트 손님 입장권만 따로 — 이벤트 이름 · 기간 · 안내를 적어 두세요 ({구분} = <b>${esc(walkTag({ ev: WEV.name }))}</b>) · <b>비우면 현장 입장 양식 그대로</b>${evActive() && EV.form != null ? " (지금은 방문 이벤트 공통 양식)" : ""} · <button class="btn btn-sm" data-act="evwCopy">지금 나가는 양식 가져오기</button> <button class="btn btn-sm" data-act="resetForm" ${txt ? "" : "disabled"}>비우기</button></div>` : ""}
-              <textarea id="form-text" spellcheck="false" aria-label="${esc(kname)} 입장권 양식"${evw ? ` placeholder="비어 있으면 현장 입장 양식 그대로 — 위 [지금 나가는 양식 가져오기]로 시작하면 쉬워요"` : ""}>${esc(txt)}</textarea>
-              ${evw ? "" : `<div class="btns"><button class="btn btn-sm" data-act="resetForm">${kname} 기본 양식으로</button></div>`}</div>
-          </div>
-          <div class="field"><span class="label">미리보기 <span class="help">예시 값 · ${esc(kname)}</span>${evw ? `<span class="help" id="evw-note">${txt ? "" : evwEmpty()}</span>` : ""}${wk || evw ? "" : ` <button class="btn btn-sm ${SAMPLE._이벤트 ? "" : "btn-ink"}" data-act="previewKind" data-k="naver">보통</button><button class="btn btn-sm ${SAMPLE._이벤트 ? "btn-ink" : ""}" data-act="previewKind" data-k="event" title="방문 이벤트 ${EV_NAMES[EV.cur]} 안내로">이벤트</button>`}</span><div class="paper" id="paper">${paperHtml(evw ? ticketText(SAMPLE) : txt, SAMPLE)}</div>${formHelp()}</div>
-        </div>`;
-        return { html, after: () => { if (SAMPLE._이벤트) evScroll("paper"); } };
+      return tplPage(); // 프린트물 설정 = 영수증 설정 (종류 · 템플릿 · 코드 목록 · 편집 · 미리보기 — 사장님 11/05)
   }
 
   // ── 영수증 프린터 (80mm 감열지) ─────────────────────
@@ -2833,8 +2923,6 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   const SAMPLE_NAVER = { 구분: "네이버", 고객: "송*온", 전화뒤4: "5489", 열쇠: "3, 13", 입장시간: "오후 2시 00분", 퇴장시간: "오후 3시 50분", 누계: "8", 기준회: "10", 사은권: "2만원 사은권", 날짜: "2026-10-06", 시각: "13:55", _네이버: true, _현장: false, _사은권: false };
   const SAMPLE_WALK = { 구분: "현장", 고객: "   ", 전화뒤4: "9013", 열쇠: "30", 입장시간: "오후 12시 30분", 퇴장시간: "오후 2시 20분", 누계: "", 기준회: "10", 사은권: "2만원 사은권", 날짜: "2026-10-06", 시각: "12:40", _네이버: false, _현장: true, _사은권: false };
   let SAMPLE = SAMPLE_NAVER; // 미리보기 · 테스트 출력 예시 (네이버 / 현장 / 이벤트 입장)
-  /** 이벤트 입장 양식이 비었을 때 미리보기 설명 — 지금 나가는 양식 */
-  const evwEmpty = () => (evActive() && EV.form != null ? " (비어 있어 방문 이벤트 공통 양식)" : " (비어 있어 현장 입장 양식)");
   /** 이벤트 입장 예시 — 현장 예시에 {구분} = '한가위 이벤트' (현장 이벤트 이름) */
   const evwSample = () => Object.assign({}, SAMPLE_WALK, { 구분: walkTag({ ev: WEV.name }), _walkev: true });
   // OK-50 한 줄 = 42칸 (한글 21자 · 2배 글씨는 한글 10자). 선 아래는 원래 쓰던 OKPOS 입장권 내용 (현장 사진 10/6)
@@ -2915,7 +3003,6 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     // 입장권 양식: text = 네이버 예약 · walk = 현장 입장 (현장 결제 · 이벤트 입장 · 서비스 키) — 사장님 10/28
     // ev = 현장 이벤트 입장(한가위 등 · 결제 없이 [○○ 이벤트 입장]) 손님만 — 비어 있으면 현장 입장 양식 그대로 (사장님 11/05)
     forms: { enter: { name: "입장권", when: "등록 완료", auto: true, text: ENTER_SPLIT.naver, walk: ENTER_SPLIT.walk, ev: "" } },
-    ecur: "naver", // 설정 화면에서 고치는 입장권 양식 (naver · walk · ev)
   };
   // 설치한 앱: 고른 프린터 · 양식은 이 PC 설정에 저장 (껐다 켜도 그대로)
   if (APP && window.desk.config) window.desk.config.get().then((c) => {
@@ -3214,7 +3301,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   };
 
   // ── 방문 이벤트 (사장님 10/14 · 10/15 단순하게) ─────────────
-  /* 재방문 이벤트 — 운영 설정 → 프린트물 설정 → 재방문 이벤트 · 쿠폰에서 시작일 ~ 종료일
+  /* 재방문 이벤트 — 운영 설정 → 재방문 이벤트(11/05 왼쪽 메뉴 따로 · 문구는 프린트물 설정)에서 시작일 ~ 종료일
      - 기간 동안 네이버 예약 손님 입장권: 마일리지(네이버 이용완료 누계 · 10회 사은권) 대신 이벤트 안내 → 마일리지는 멈춤
      - 방문한 날(D) + 기한(기본 20일, 그날 포함) 안에 다시 오면 성공 → 사은품(기본 수제돈까스) · 그 방문일부터 다시 기한 → 계속 반복
        처음 · 기한 넘김 = 1번 안내 (다음 기한) · 기한 안 = 2번 성공 · 같은 날 또 오면 1번 안내(기한 그대로) · 기한은 종료일을 넘지 않음
@@ -3313,7 +3400,10 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   const skipOf = (b) => { const n = noteOf(b); return n && Array.isArray(n.sk) ? n.sk : []; };
   /** 이 손님에게 n번째 예약완료가 사은권 회차인가 (투아웃 마일리지 미적용 · 마일리지 SKIP 은 빼고) */
   const giftFor = (b, n) => isGift(n) && !bcHit(b, 2) && !skipOf(b).includes(n);
-  const bcWhat = (k) => [[1, "카드 테두리 빨강"], [2, "마일리지 미적용"], [3, "예약 불가"]].filter(([i]) => i <= k && RULES.bc["o" + i]).map(([, t]) => t).join(" · ") || "대응 꺼짐 (운영 설정 → 고객 세부 관리)";
+  /** 이벤트 대상이 아닌 손님 (사장님 11/05: 투아웃 손님은 마일리지 · 지금 · 앞으로의 모든 이벤트 대상 아님 — 새 이벤트도 이 함수를 거침)
+      투아웃 · 쓰리아웃 (고객 세부 관리 → BC 관리 '투아웃 — 마일리지 · 이벤트 미적용' 스위치) · 원아웃 이하로 내리거나 풀면 다음 방문부터 다시 대상 */
+  const evOut = (b) => bcHit(b, 2);
+  const bcWhat = (k) => [[1, "카드 테두리 빨강"], [2, "마일리지 · 이벤트 미적용"], [3, "예약 불가"]].filter(([i]) => i <= k && RULES.bc["o" + i]).map(([, t]) => t).join(" · ") || "대응 꺼짐 (운영 설정 → 고객 세부 관리)";
   /** 쓰리아웃 손님 예약 (입장 전): 네이버를 불러올 때 앱이 알아서 전액 취소 (사장님 10/26) · 두 번 실패하면 [다시 취소] */
   const bc3Html = (b) => {
     if (!b || !bcHit(b, 3) || b.status !== "확정") return "";
@@ -3584,7 +3674,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       이벤트는 **방문한 날** 기준 (사장님 10/15): 그날 몇 장 · 몇 건(나눠 한 예약 · 연속예약 · 입장 뒤 추가 예약 · 다시 등록)이든 그날 방문은 한 번
       → 오늘 이미 기록이 있으면 '오늘 이미 방문'(기한 그대로 · 사은품 없음) · 성공은 오늘 뒤 날짜에 다시 올 때만 (네이버 완료 순번은 안 봄) */
   function evOf(b) {
-    if (!evFrozen(b)) return null;
+    if (!evFrozen(b) || evOut(b)) return null; // BC 투아웃 이상은 이벤트 대상 아님 (사장님 11/05)
     const n = b.status === "완료" ? b.visitNo : b.prevDone == null ? null : b.prevDone + 1;
     if (!n) return null;
     // 함께 이용완료한 예약은 대표 예약의 기록으로 봄 · 이미 적힌 예약이면 그 줄보다 앞에 적힌 기록만
@@ -3683,7 +3773,6 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   /** 예시 날짜 (시작일에 오면) — 영수증엔 날짜로 (방문일 + 기한 일수, 그날 포함) */
   const evSampleDay = () => (isDay(EV.from) && EV.from > TODAY ? EV.from : TODAY);
   const evDatesText = () => { const d = evSampleDay(), due = EV.days ? evDue(d) : ""; return `${krDate(d)}에 오면 → ${due ? `${krDate(due)}(포함)까지 다시 오면 ${EV.gift || "사은품"} · 그날부터 다시 ${EV.days}일` : "다음 기한 없음 (종료일)"}`; };
-  const evRow = (j) => `<div class="evrule${EV.cur === j ? " on" : ""}"><button class="evno" data-act="evTpl" data-i="${j}" aria-pressed="${EV.cur === j}">${evName(j)}</button><span class="evdesc">${j === EV_WALK ? "현장 결제 손님 입장권 — 이벤트 기간에만 (비우면 공통 양식)" : j === EV_BASE ? "입장권 나머지 (열쇠 · 시간 · 안내 문구) — 이벤트 기간에만" : EV_DESC[j]}</span></div>`;
   /** 설정 화면 미리보기 · 시험 출력용 예시 (0 = 안내 · 1 = 성공 · 2 = 제공상품 → 성공 예시로) */
   const evSample = (i) => {
     const ok = i >= 1, d = evSampleDay(), ev = { st: ok ? "성공" : "안내", due: EV.days ? evDue(d) : "", last: ok ? shiftDay(d, -Math.min(EV.days || 7, 7)) : "" };
@@ -4826,9 +4915,70 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       toast(was && was !== from ? `새 이벤트 ${p} — 그날부터 새로 기록해요 (전 기록은 남아요)` : evActive() ? `재방문 이벤트 ${p} — 지금부터 입장권에 이벤트 안내 · 마일리지는 멈춰요` : `재방문 이벤트 ${p} — 그 전에는 원래대로`);
     },
     evOff() { EV.on = false; evSaveCfg(); renderAll(); renderSheet(); toast("재방문 이벤트를 껐어요 — 입장권은 마일리지로 (이벤트 기간 이용완료는 빼고 셈)"); },
-    evTpl(btn) { EV.cur = Number(btn.dataset.i); renderSheet(); },
+    evTpl(btn) { EV.cur = Number(btn.dataset.i); renderSheet(); }, // 재방문 이벤트 미리보기 예시 (1번 안내 · 2번 성공 · 제공상품)
+    // ── 영수증 설정 (프린트물 설정 · 사장님 11/05) ──
+    /** 다른 화면에서 그 종류로 바로 (재방문 이벤트 → 문구 고치기) */
+    tplGo(btn) { sheet.tab = "prints"; sheet.tk = btn.dataset.k; sheet.tsel = "live"; renderSheet(); },
+    /** 템플릿 줄 고르기 (저장 안 한 글은 그 줄에 남음) */
+    tplRow(btn) { sheet.tsel = btn.dataset.id; renderSheet(); },
+    /** [저장] — 편집 칸 글을 고른 줄에 (실제출력물 = 바로 찍히는 글 · 내 템플릿) */
+    tplSave() {
+      const kd = tplKind(), r = tplRows(kd).find((x) => x.id === sheet.tsel); if (!r || r.ro) return;
+      const key = tplKey(kd.k, r.id); if (!TPLD.has(key)) return;
+      const t = TPLD.get(key);
+      if (r.live) { if (kd.need && !t.trim()) { toast(`${kd.name} 양식은 비울 수 없어요 — 기본 템플릿을 [실제출력물로] 쓰세요`); return; } kd.set(t); }
+      else { const u = (TPLS[kd.k] || []).find((x) => x.id === r.id); if (u) u.text = t; tplStore(); }
+      TPLD.delete(key); renderSheet(); renderAll();
+      toast(r.live ? `저장했어요 — ${kd.g} ${kd.name} 실제출력물${kd.empty && !t.trim() ? ` (비움 → ${kd.empty})` : ""}` : `'${r.name}' 템플릿을 저장했어요`);
+    },
+    /** [실제출력물로] — 고른 템플릿(편집 칸 글)을 지금 찍히는 글로 */
+    tplUse() {
+      const kd = tplKind(), r = tplRows(kd).find((x) => x.id === sheet.tsel); if (!r || r.live) return;
+      const t = tplText(kd, r);
+      if (kd.need && !t.trim()) { toast("빈 글은 실제출력물로 쓸 수 없어요"); return; }
+      kd.set(t); TPLD.delete(tplKey(kd.k, "live")); sheet.tsel = "live"; renderSheet(); renderAll();
+      toast(`'${r.name}'을 ${kd.name} 실제출력물로 썼어요 — 다음 출력부터`);
+    },
+    /** [+ 새 템플릿] — 지금 편집 칸 글로 내 템플릿 하나 (이름은 아래 칸에서) */
+    tplNew() {
+      const kd = tplKind(), r = tplRows(kd).find((x) => x.id === sheet.tsel), a = (TPLS[kd.k] = TPLS[kd.k] || []);
+      if (a.length >= 30) { toast("템플릿은 종류마다 30개까지예요"); return; }
+      let n = a.length + 1; while (a.some((x) => x.name === `템플릿 ${n}`)) n++;
+      const u = { id: "t" + Date.now().toString(36) + a.length, name: `템플릿 ${n}`, text: r ? tplText(kd, r) : kd.get() };
+      a.push(u); tplStore(); sheet.tsel = u.id; renderSheet();
+      setTimeout(() => { const i = $("tpl-name"); if (i) { i.focus(); i.select(); } }, 30);
+      toast(`'${u.name}' 템플릿을 만들었어요 — 이름을 바꾸고 고쳐 쓴 뒤 [저장]`);
+    },
+    /** [삭제] — 내 템플릿만 (확인 한 번) */
+    tplDel() {
+      const kd = tplKind(), a = TPLS[kd.k] || [], u = a.find((x) => x.id === sheet.tsel); if (!u) return;
+      if (!confirm(`'${u.name}' 템플릿을 지울까요? (실제출력물은 그대로)`)) return;
+      a.splice(a.indexOf(u), 1); TPLD.delete(tplKey(kd.k, u.id)); tplStore(); sheet.tsel = "live"; renderSheet();
+    },
+    /** 코드 목록 → 편집 칸 커서 자리에 (줄 앞 표시 · 조건은 그 줄 맨 앞, 선은 새 줄) */
+    tplCode(btn) {
+      const ta = $("tpl-text"), c = btn.dataset.c, kind = btn.dataset.w;
+      const hint = $("tpl-hint"); if (hint) hint.innerHTML = `<b>${esc(c)}</b> — ${esc(btn.title)}`;
+      if (!ta || ta.readOnly) return;
+      const v = ta.value, used = ta.dataset.f === "1", at = used ? ta.selectionStart ?? v.length : v.length, end = used ? ta.selectionEnd ?? at : at; // 편집 칸을 누른 적이 없으면 글 끝에
+      let nv, pos;
+      if (kind === "line") { const ls = v.lastIndexOf("\n", at - 1) + 1; nv = v.slice(0, ls) + c + v.slice(ls); pos = at + c.length; }
+      else if (kind === "rule") { const pre = at > 0 && v[at - 1] !== "\n" ? "\n" : "", post = v[end] !== undefined && v[end] !== "\n" ? "\n" : ""; nv = v.slice(0, at) + pre + c + post + v.slice(end); pos = at + pre.length + c.length + post.length; }
+      else { nv = v.slice(0, at) + c + v.slice(end); pos = at + c.length; }
+      ta.value = nv; ta.focus(); ta.setSelectionRange(pos, pos); tplInput(nv);
+    },
+    /** [시험 출력] — 미리보기 그대로 (예시 값) */
+    async tplTest() {
+      if (!printerReady()) { toast("운영 설정 → 프린터 설정에서 영수증 프린터를 먼저 정해 주세요"); return; }
+      const kd = tplKind(), r = tplRows(kd).find((x) => x.id === sheet.tsel) || tplRows(kd)[0], [text, v] = kd.view(tplText(kd, r));
+      if (!APP || !window.desk.print) { toast(`${kd.name} 시험 출력 (${printerName()}, 체험)`); return; }
+      if (PRINT.busy) { toast("앞 출력을 아직 보내는 중이에요 — 끝나면 다시 눌러 주세요"); return; }
+      PRINT.busy = true; toast(`${kd.name} 시험 출력 보내는 중…`);
+      let res;
+      try { res = await sendPrint(text, v); } catch (e) { res = { ok: false, why: String(e) }; } finally { PRINT.busy = false; }
+      toast(res && res.ok ? `${kd.name} 시험 출력을 보냈어요` : `출력 실패: ${(res && res.why) || "응답 없음"}`);
+    },
     async evOpen() { const r = await window.desk.ledger.open().catch((e) => ({ ok: false, why: String(e) })); if (!r || !r.ok) toast(`폴더를 못 열었어요: ${(r && r.why) || ""}`); },
-    evReset() { if (EV.cur === EV_BASE) EV.form = null; else if (EV.cur === EV_WALK) EV.walk = null; else EV.tpl[EV.cur] = EV_TPL[EV.cur]; evSaveCfg(); renderSheet(); },
     async evTest() {
       if (!printerReady()) { toast("운영 설정 → 프린터 설정에서 영수증 프린터를 먼저 정해 주세요"); return; }
       const walk = EV.cur === EV_WALK, text = walk ? evWalkForm() : evBaseForm(), v = walk ? evWalkSample() : evSample(evSampleIdx()), secs = printSecs(text, v);
@@ -4845,11 +4995,6 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     settings() { openSheet({ mode: "settings", tab: "season" }); },
     // 운영 설정 V2.0: [?] 설명 펼치기 · 프린트물 (입장권 양식 / 재방문 이벤트)
     qhelp(btn) { const t = btn.nextElementSibling; if (!t || !t.classList.contains("qtext")) return; t.hidden = !t.hidden; btn.setAttribute("aria-expanded", String(!t.hidden)); },
-    psub(btn) { sheet.psub = ["event", "bc2"].includes(btn.dataset.s) ? btn.dataset.s : "ticket"; renderSheet(); },
-    /** BC 투아웃 양식: 1번(투아웃 뒤 첫 방문) · 2번(그다음 방문부터) 고르기 */
-    bc2Cur(btn) { sheet.bc2cur = btn.dataset.n === "2" ? 2 : 1; renderSheet(); },
-    /** 지금 입장권 양식을 가져와 고치기 시작 */
-    bc2Copy() { const k = "f" + (sheet.bc2cur === 2 ? 2 : 1); BC2[k] = enterText(); saveBc2(); renderSheet(); toast(`입장권 양식을 BC 투아웃 ${sheet.bc2cur === 2 ? 2 : 1}번으로 가져왔어요 — 고쳐 쓰세요`); },
     // ── 고객 세부 관리 (사장님 10/26) ──
     csub(btn) { sheet.csub = btn.dataset.s === "skip" ? "skip" : "bc"; renderSheet(); },
     /** BC 손님 목록 거르기 ①②③ — 누르면 켬 · 다시 누르면 끔 (여러 개 · 아무것도 안 고르면 모두) */
@@ -5028,17 +5173,12 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       if (!APP || !window.desk.print) { toast(`${printerName()}로 테스트 출력 보냄 (체험)`); return; }
       PRINT.busy = true; PRINT.msg = "출력 보내는 중…"; renderSheet();
       const dlg = !!(btn && btn.dataset.act === "testPrintDlg");
-      const r = await sendPrint(PRINT.ecur === "ev" ? ticketText(SAMPLE) : enterFor(SAMPLE), SAMPLE, { dialog: dlg }); // 이벤트 입장 = 그 손님에게 실제로 나가는 양식
+      const r = await sendPrint(enterFor(SAMPLE), SAMPLE, { dialog: dlg }); // 네이버 예약 입장권 예시 (양식별 시험 출력은 프린트물 설정 미리보기 [시험 출력])
       PRINT.busy = false;
       PRINT.msg = r && r.ok ? `${printerName()}로 보냈어요 — 종이가 나오고 ${PRINT.cut && !dlg ? "잘렸는지" : "나왔는지"} 확인해 주세요. 글자가 깨져 나오면 속도를 바꿔 보세요${r.cutWhy ? ` (자르기 실패: ${r.cutWhy})` : ""}` : `출력 실패: ${(r && r.why) || "응답 없음"}`;
       renderSheet();
     },
     testPrintDlg(btn) { return acts.testPrint(btn); },
-    previewKind(btn) { SAMPLE = btn.dataset.k === "walk" ? SAMPLE_WALK : btn.dataset.k === "event" ? evSample(evSampleIdx()) : SAMPLE_NAVER; PRINT.ecur = btn.dataset.k === "walk" ? "walk" : "naver"; renderSheet(); },
-    ecur(btn) { const k = btn.dataset.k; PRINT.ecur = k === "walk" || k === "ev" ? k : "naver"; SAMPLE = k === "ev" ? evwSample() : k === "walk" ? SAMPLE_WALK : SAMPLE_NAVER; renderSheet(); }, // 입장권 양식 고르기 (사장님 10/28 · 이벤트 입장 11/05)
-    resetForm() { const k = PRINT.ecur; if (k === "ev") PRINT.forms.enter.ev = ""; else PRINT.forms.enter[k === "walk" ? "walk" : "text"] = ENTER_SPLIT[k === "walk" ? "walk" : "naver"]; savePrint(); renderSheet(); }, // 이벤트 입장 = 비우기 (현장 입장 양식 그대로)
-    /** 이벤트 입장 양식 ← 지금 이벤트 입장 손님에게 나가는 양식(현장 입장 · 방문 이벤트 중이면 공통 양식)을 가져와 고쳐 씀 */
-    evwCopy() { PRINT.forms.enter.ev = enterText(evwSample()); savePrint(); renderSheet(); toast(`지금 나가는 양식을 ${wevLabel()} 양식으로 가져왔어요 — 고쳐 쓰세요`); },
     car(btn) {
       park.sel = btn.dataset.id;
       const c = park.state.rows.find((x) => x.id === park.sel);
@@ -5176,7 +5316,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     const t = e.target;
     // 메모장 (V2.0): 쓰던 글은 다시 그려도 남게 · 찾기는 아래만 다시
     if (sheet.mode === "memo" && (t.id === "memo-new" || t.id === "memo-msg")) sheet.draft[t.id] = t.value;
-    if (t.id === "wev-name") { WEV.name = t.value.trim().slice(0, 10); wevSave(); $("wev-preview").textContent = `[${wevLabel()}]`; if ($("wev-form")) $("wev-form").textContent = `[${wevLabel()}]`; }
+    if (t.id === "wev-name") { WEV.name = t.value.trim().slice(0, 10); wevSave(); $("wev-preview").textContent = `[${wevLabel()}]`; if ($("wev-form")) $("wev-form").textContent = `'입장권 — ${wevLabel()}'`; }
     if (t.id === "bc-q") { sheet.bcq = t.value; renderSheet(); } // BC 손님 찾기 (사장님 10/26)
     if (t.id === "memo-admin") { MEMO.admin = t.value.trim().slice(0, 12) || "관리자"; memoSaveSoon(); }
     if (t.id === "memo-q") { sheet.q = t.value; $("memo-body").innerHTML = memoBodyHtml(); }
@@ -5187,8 +5327,6 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       const b = noteTarget();
       if (b) { const f = t.id === "note-k3" ? "k3" : "bl"; noteChange(b, { [f]: t.checked }, true); renderRes(); renderSheet(); toast(`${b.name}님 ${f === "k3" ? "3자녀" : "BC"} ${t.checked ? "표시 — 이름이 " + (f === "k3" ? "노랑" : "빨강") + "으로 보여요" : "표시를 뺐어요"}`); }
     }
-    if (t.id === "bc2-text") { const k = "f" + (sheet.bc2cur === 2 ? 2 : 1); BC2[k] = t.value; $("bc2-paper").innerHTML = paperHtml(t.value || enterText(), bc2Sample()); $("bc2-note").textContent = t.value ? "" : " (비어 있어 입장권 양식)"; saveBc2(); } // BC 투아웃 양식 (사장님 10/27)
-    if (t.id === "form-text") { const ev = PRINT.ecur === "ev"; PRINT.forms.enter[ev ? "ev" : PRINT.ecur === "walk" ? "walk" : "text"] = ev ? (t.value.trim() ? t.value : "") : t.value; $("paper").innerHTML = paperHtml(ev ? ticketText(SAMPLE) : t.value, SAMPLE); if (ev && $("evw-note")) $("evw-note").textContent = PRINT.forms.enter.ev ? "" : evwEmpty(); savePrint(); }
     if (t.id === "ev-days" && t.value !== "") { EV.days = evDays(t.value) || EV.days; evSaveCfg(); $("ev-paper").innerHTML = evPrev(); evScroll("ev-paper"); $("ev-dates").textContent = evDatesText(); renderAll(); }
     if (t.id === "ev-seal") { EV.seal = t.checked; evSaveCfg(); $("ev-paper").innerHTML = evPrev(); evScroll("ev-paper"); toast(t.checked ? "쿠폰을 보안 무늬 그림으로 찍어요 — [시험 출력]으로 확인해 보세요" : "쿠폰을 예전처럼 글자로 찍어요"); }
     if (t.id === "ev-use" || t.id === "ev-useu") { EV.useUnit = $("ev-useu").value === "일" ? "일" : "개월"; EV.useN = useClamp($("ev-use").value, EV.useUnit); evSaveCfg(); $("ev-paper").innerHTML = evPrev(); evScroll("ev-paper"); $("ev-usehelp").textContent = useHelp(); }
@@ -5198,8 +5336,10 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     if (t.id === "sv-new" || t.id === "sv-walk" || t.id === "sv-all") { SV[{ "sv-new": "naverNew", "sv-walk": "walkin", "sv-all": "all" }[t.id]] = t.checked; svSaveCfg(); renderSheet(); }
     if (t.classList.contains("svlabel")) { SV.opts[+t.dataset.i] = t.value; svSaveCfg(); }
     if (t.id === "ev-q") { EV.q = t.value; $("ev-hits").innerHTML = evFindHtml(); }
-    if (t.id === "ev-text") { if (EV.cur === EV_BASE) EV.form = t.value; else if (EV.cur === EV_WALK) EV.walk = t.value; else EV.tpl[EV.cur] = t.value; $("ev-paper").innerHTML = evPrev(); if (EV.cur !== EV_BASE && EV.cur !== EV_WALK) evScroll("ev-paper"); $("ev-def").innerHTML = evDefText(); evSaveCfg(); }
     if (t.id === "form-auto") { PRINT.forms[PRINT.cur].auto = t.checked; savePrint(); }
+    if (t.id === "tpl-kind") { sheet.tk = t.value; sheet.tsel = "live"; renderSheet(); } // 영수증 설정: 종류 고르기
+    if (t.id === "tpl-text") tplInput(t.value);
+    if (t.id === "tpl-name") { const u = (TPLS[tplKind().k] || []).find((x) => x.id === sheet.tsel); if (u) { u.name = t.value.trim().slice(0, 30) || u.name; tplStore(); const c = document.querySelector(`#sheet .tplrow[data-id="${u.id}"] .tn`); if (c) c.textContent = u.name; } }
     if (t.id === "print-cut") { PRINT.cut = t.checked; savePrint(); }
     if (t.id === "print-feed" && t.value !== "") { PRINT.feed = Math.max(1, Math.min(8, Math.round(Number(t.value)) || 4)); savePrint(); $("print-feed-mm").textContent = feedHelp(); }
     if (t.id === "cap-t-day" && t.value) capTry.day = t.value;
@@ -5275,6 +5415,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   }
 
   // 시험용: 입장권을 만드는 함수들 (자동 시험이 실제 입장 손님으로 출력 내용을 확인)
+  document.addEventListener("focusin", (e) => { if (e.target && e.target.id === "tpl-text") e.target.dataset.f = "1"; }); // 영수증 설정: 편집 칸에 커서를 둔 적이 있음 → 코드는 커서 자리에
   document.addEventListener("change", (e) => { if (/^cap-(target|max|ceil|p1|p2|p3|boost)$/.test(e.target.id)) renderSheet(); if (e.target.id === "note-m") noteFlush(); }); // 숫자를 다 넣으면 계획 다시
   window.__deskTest = { projection, capWalkOut, notes: () => Object.fromEntries(NOTES), evLoadCfg, today: () => TODAY, useDueText, printSecs, PRINT_: () => PRINT, sealOf, withSeal, SEAL, evSample: (i) => evSample(i), sealClear: () => sealCache.clear(), EV_: () => EV, liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, bk: (id) => (bookings[TODAY] || []).find((b) => b.id === id), useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capRanges, capPlan, capRun, capApply, capTick, capMoving: () => capMoveN > 0, capTeamExtra, capState: () => JSON.parse(JSON.stringify(capState)), capLock: (ts) => { capState.locks = ts.slice(); saveCapState(); }, capKeysAt, returnKeys: (id, ks) => { const h = holders().find((x) => x.id === id); if (h) { returnKeys(h, ks); renderAll(); } }, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: (v) => enterText(v), formFor: (v) => ticketText(v), splitForm, joinForms, lastPrint: () => LASTPRINT, BC2_: () => BC2, holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, sheet, evOf: (b) => evOf(b),
     evLog: (from) => { const L = evLog(from); return { from: L.from, count: L.count, people: Object.fromEntries([...L.people].map(([k, p]) => [k, JSON.parse(JSON.stringify(p))])) }; },

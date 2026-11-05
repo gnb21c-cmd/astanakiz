@@ -41,7 +41,7 @@ test("쿠폰 사용기한: 처음 1개월 · 일로 바꾸면 그날 + n일 · �
 
     // 설정 화면: 방문 이벤트 → 쿠폰 사용기한 30 일 → 미리보기 · 저장
     await page.dblclick("#now");
-    await page.click('[data-t=\"prints\"]'); await page.click('[data-s=\"event\"]');
+    await page.click('[data-t="event"]'); // 운영 설정 → 재방문 이벤트 (11/05 따로)
     await page.click("[data-act=evTpl][data-i='2']");
     assert.strictEqual(await page.inputValue("#ev-use"), "1");
     assert.strictEqual(await page.inputValue("#ev-useu"), "개월");
@@ -53,7 +53,9 @@ test("쿠폰 사용기한: 처음 1개월 · 일로 바꾸면 그날 + n일 · �
     assert.match(await page.textContent("#ev-usehelp"), /11월 4일까지/);
     const saved = JSON.parse(await page.evaluate(() => localStorage.getItem("astanakiz-visitevent")));
     assert.deepStrictEqual([saved.useN, saved.useUnit], [30, "일"], "설정에 저장");
-    assert.match(await page.textContent(".formhelp"), /\{사용기한\}/, "넣을 수 있는 값에 {사용기한}");
+    await page.click('[data-t="prints"]');
+    assert.match(await page.textContent("#sheet .tplcodes"), /\{사용기한\}/, "코드 목록에 {사용기한}");
+    await page.click('[data-t="event"]');
     // 비우면 그 줄은 안 나옴
     await page.fill("#ev-use", "");
     assert.doesNotMatch(await page.textContent("#ev-paper"), /사용기한/, "비우면 사용기한 줄 없음");

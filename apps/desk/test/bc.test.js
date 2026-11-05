@@ -33,7 +33,7 @@ test("BC ①②③ (체험판): 쌓임 · 다시 누르면 한 단계 내림 · 
     const dots = () => page.$$eval("#sheet .bcdot", (e) => e.map((x) => (x.classList.contains("on") ? 1 : 0)).join(""));
     await page.click('#sheet [data-act=bcSet][data-n="2"]');
     assert.strictEqual(await dots(), "110", "투아웃 → ① ② 채움");
-    assert.match(await page.textContent("#toast"), /BC 투아웃 — 카드 테두리 빨강 · 마일리지 미적용/);
+    assert.match(await page.textContent("#toast"), /BC 투아웃 — 카드 테두리 빨강 · 마일리지 · 이벤트 미적용/);
     assert.ok(await page.evaluate(() => document.getElementById("sheet").classList.contains("bcred")), "예약자 창 테두리 빨강");
     assert.match(await card.getAttribute("class"), /\bbc2\b/, "예약 카드 테두리 빨강 (투아웃 = 점선 · 사장님 10/27)");
     assert.ok(await card.locator(".name .nm-bl").count(), "이름 빨강");
@@ -223,19 +223,22 @@ test("BC 투아웃 양식 (사장님 10/27): 프린트물 설정 → [BC 투아�
     await page.goto(DESK); // 체험판 10/5 13:50
     await page.evaluate(() => localStorage.clear());
     await page.reload();
-    // 프린트물 설정 → [BC 투아웃 양식]: 1번 · 2번 (쓰는 법은 입장권 양식과 같음)
+    // 프린트물 설정(영수증 설정 · 11/05) → 종류 'BC 투아웃 — 1번' · '2번' (코드는 입장권 양식과 같음)
     await page.dblclick("#now"); await page.click('[data-t="prints"]');
-    assert.match(await page.textContent("#sheet .psub"), /입장권 양식\s*재방문 이벤트 · 쿠폰\s*BC 투아웃 양식/);
-    await page.click('[data-act=psub][data-s="bc2"]');
-    assert.match(await page.textContent("#sheet"), /비어 있으면 입장권 양식 그대로/);
-    assert.match(await page.textContent("#sheet .formhelp"), /\{열쇠\}/, "입장권 양식과 같은 쓰는 법");
-    await page.fill("#bc2-text", "^투아웃 첫 안내\n{열쇠}번");
-    assert.match(await page.textContent("#bc2-paper"), /투아웃 첫 안내/, "미리보기");
-    await page.click('[data-act=bc2Cur][data-n="2"]');
-    assert.strictEqual(await page.inputValue("#bc2-text"), "", "2번은 아직 비어 있음");
-    await page.click("[data-act=bc2Copy]"); // 입장권 양식 가져오기
-    assert.match(await page.inputValue("#bc2-text"), /\{열쇠\}/);
-    await page.fill("#bc2-text", "^투아웃 다음 안내\n{열쇠}번");
+    assert.deepStrictEqual((await page.$$eval("#tpl-kind option", (e) => e.map((x) => x.textContent))).slice(-2), ["BC 투아웃 — 1번 (투아웃 뒤 첫 방문)", "BC 투아웃 — 2번 (그다음 방문부터)"]);
+    await page.selectOption("#tpl-kind", "bc1");
+    assert.match(await page.textContent("#sheet .tpldesc"), /비우면 입장권 양식 \(마일리지 줄 없이\)/);
+    assert.match(await page.textContent("#sheet .tplcodes"), /\{열쇠\}/, "입장권 양식과 같은 코드");
+    await page.fill("#tpl-text", "^투아웃 첫 안내\n{열쇠}번");
+    assert.match(await page.textContent("#tpl-paper"), /투아웃 첫 안내/, "미리보기");
+    await page.click("#tpl-save");
+    await page.selectOption("#tpl-kind", "bc2");
+    assert.strictEqual(await page.inputValue("#tpl-text"), "", "2번은 아직 비어 있음");
+    await page.click("#sheet .tplrow[data-id=b0]"); // 기본 템플릿 '지금 입장권 양식'
+    assert.match(await page.inputValue("#tpl-text"), /\{열쇠\}/);
+    await page.click("[data-act=tplUse]");
+    await page.fill("#tpl-text", "^투아웃 다음 안내\n{열쇠}번");
+    await page.click("#tpl-save");
     assert.deepStrictEqual(await page.evaluate(() => JSON.parse(localStorage.getItem("astanakiz-bc2forms"))), { f1: "^투아웃 첫 안내\n{열쇠}번", f2: "^투아웃 다음 안내\n{열쇠}번" }, "저장");
     await page.click("#sheet .x");
     // 손님: 원아웃 = 실선 · 투아웃 = 점선
@@ -264,10 +267,9 @@ test("BC 투아웃 양식 (사장님 10/27): 프린트물 설정 → [BC 투아�
     assert.deepStrictEqual(await formOf(b), [2, "^투아웃 다음 안내\n{열쇠}번"], "1번을 낸 뒤 방문은 2번");
     assert.match(JSON.stringify(await page.evaluate(() => window.__deskTest.notes())), /"p2":"2026-10-05 13:50"/, "1번을 낸 때를 손님 기록에");
     // 2번을 비우면 입장권 양식 그대로 (마일리지 줄은 빠진 채)
-    await page.evaluate(() => { localStorage.setItem("astanakiz-bc2forms", JSON.stringify({ f1: "^투아웃 첫 안내", f2: "" })); });
-    await page.dblclick("#now"); await page.click('[data-t="prints"]'); await page.click('[data-act=psub][data-s="bc2"]');
-    await page.click('[data-act=bc2Cur][data-n="2"]');
-    await page.fill("#bc2-text", "");
+    await page.dblclick("#now"); await page.click('[data-t="prints"]'); await page.selectOption("#tpl-kind", "bc2");
+    await page.fill("#tpl-text", ""); await page.click("#tpl-save");
+    assert.strictEqual(JSON.parse(await page.evaluate(() => localStorage.getItem("astanakiz-bc2forms"))).f2, "");
     await page.click("#sheet .x");
     assert.doesNotMatch((await formOf(b))[1], /투아웃/, "비우면 입장권 양식");
     assert.deepStrictEqual(errs, []);

@@ -70,7 +70,7 @@ test("메모 파일(2번 모양): 모르는 칸 · 틀린 값은 버림 · 길�
   assert.deepStrictEqual(M.load(dir).staff, [{ id: "a1", name: "민지" }], "1번 모양 파일도 읽음");
 });
 
-test("시계를 1.5초 안에 두 번 → 운영 설정 (버튼 없음) · 왼쪽 메뉴 8개 · 긴 설명은 [?] · 예전 탭 이름도 받음", async () => {
+test("시계를 1.5초 안에 두 번 → 운영 설정 (버튼 없음) · 왼쪽 메뉴 9개 · 긴 설명은 [?] · 예전 탭 이름도 받음", async () => {
   const browser = await launch();
   try {
     const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
@@ -91,7 +91,7 @@ test("시계를 1.5초 안에 두 번 → 운영 설정 (버튼 없음) · 왼�
     await page.clock.runFor(700);
     await page.click("#now");
     assert.ok(await page.isVisible("#sheet .setnav"), "1.5초 안 두 번 → 운영 설정");
-    assert.deepStrictEqual(await page.$$eval("#sheet .setnav button span", (e) => e.map((x) => x.textContent)), ["비성수기 설정", "프린터 설정", "프린트물 설정", "근무자 등록", "API 연결 설정", "네이버 설정", "고객 세부 관리", "기타"]); // 고객 세부 관리 (사장님 10/26)
+    assert.deepStrictEqual(await page.$$eval("#sheet .setnav button span", (e) => e.map((x) => x.textContent)), ["비성수기 설정", "프린터 설정", "프린트물 설정", "재방문 이벤트", "근무자 등록", "API 연결 설정", "네이버 설정", "고객 세부 관리", "기타"]); // 고객 세부 관리 (사장님 10/26) · 재방문 이벤트 따로 (11/05)
     // 긴 설명은 숨김 → [?] 를 누르면 보임
     const q = page.locator("#setbody .qhelp").first();
     const t = page.locator("#setbody .qtext").first();
@@ -104,10 +104,10 @@ test("시계를 1.5초 안에 두 번 → 운영 설정 (버튼 없음) · 왼�
     const nv = (await page.textContent("#setbody")).replace(/\s+/g, " ");
     assert.match(nv, /기준.*대상 상품.*평일 무제한.*야간자유.*회차당 기본 재고.*열어 둘 기간.*네이버 재고 자동 오픈.*매시 5 · 15 · 25 · 35 · 45 · 55분에 네이버 판매 수량 자동 조절.*입금대기 예약 자동 취소/);
     // 예전 탭 이름 (rules · cap · event · link · survey) → 새 메뉴
-    for (const [old, now, psub] of [["cap", "naver"], ["survey", "etc"], ["link", "api"], ["rules", "season"], ["event", "prints", "event"]]) {
+    for (const [old, now, psub] of [["cap", "naver"], ["survey", "etc"], ["link", "api"], ["rules", "season"], ["event", "event", "event"]]) {
       await page.evaluate((o) => { window.__deskTest.sheet.tab = o; window.__deskTest.renderSheet(); }, old);
       assert.strictEqual(await page.getAttribute("#sheet .setnav [aria-current=page]", "data-t"), now, old);
-      if (psub) assert.ok(await page.isVisible("#ev-text"), "event → 프린트물 설정 · 재방문 이벤트");
+      if (psub) assert.ok(await page.isVisible("#ev-from"), "event → 재방문 이벤트 (11/05 왼쪽 메뉴 따로)");
     }
     assert.deepStrictEqual(errs, []);
   } finally {
