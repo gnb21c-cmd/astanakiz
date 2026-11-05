@@ -2654,7 +2654,8 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
         const html = `
           <div class="setcard plain stack"><b>현장 이벤트 입장</b>
             <div class="field"><label for="wev-name">현장 이벤트 이름 <span class="help">현장입장 창 아래 왼쪽 버튼 — 결제 없이 들어오는 이벤트 · 쿠폰 손님 (열쇠 · 입장권 · 인원은 현장과 같고 총 판매수에는 안 셈)</span></label>
-              <div class="btns" style="align-items:center"><input id="wev-name" class="cfg" maxlength="10" value="${esc(WEV.name)}" placeholder="예: 한가위" style="max-width:200px" aria-label="현장 이벤트 이름"><span class="help">버튼: <b id="wev-preview">[${esc(wevLabel())}]</b> · 비우면 [이벤트 입장]</span></div></div></div>
+              <div class="btns" style="align-items:center"><input id="wev-name" class="cfg" maxlength="10" value="${esc(WEV.name)}" placeholder="예: 한가위" style="max-width:200px" aria-label="현장 이벤트 이름"><span class="help">버튼: <b id="wev-preview">[${esc(wevLabel())}]</b> · 비우면 [이벤트 입장]</span></div>
+              <span class="help">입장권: 프린트물 설정 → 입장권 양식 → <b id="wev-form">[${esc(wevLabel())}]</b> 칸에 따로 쓸 수 있어요 (${PRINT.forms.enter.ev ? "<b>쓰는 중</b>" : "비어 있어 현장 입장 양식"})</span></div></div>
           <div class="setcard plain stack"><b>설문조사</b>
           <div class="field"><span class="label">설문 기간 <span class="help">신규 손님에게 '아스타나키즈를 어떻게 알게 되었는지' — 현장 안내문의 번호를 근무자가 누름 (번호를 눌러야 열쇠 등록)</span></span>
             <div class="btns" style="align-items:center"><input type="date" id="sv-from" class="date-in" value="${esc(SV.from)}"> <span>~</span> <input type="date" id="sv-to" class="date-in" value="${esc(SV.to)}"> <span class="evstate">${st}</span>
@@ -2776,20 +2777,26 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
         return { html };
       }
       // 프린트물 설정 — 입장권 양식 (재방문 이벤트 · 쿠폰은 위 [재방문 이벤트] 쪽) · 네이버 예약 · 현장 입장 따로 (사장님 10/28 — 이벤트 양식처럼 골라서)
-      const f = PRINT.forms[PRINT.cur], wk = PRINT.ecur === "walk", txt = wk ? f.walk : f.text;
-      const erow = (k, t, d) => `<div class="evrule${(wk ? "walk" : "naver") === k ? " on" : ""}"><button class="evno" data-act="ecur" data-k="${k}" aria-pressed="${(wk ? "walk" : "naver") === k}">${t}</button><span class="evdesc">${d}</span></div>`;
+      // + 현장 이벤트 입장(한가위 등 · 결제 없이 [○○ 이벤트 입장]) 손님만 따로 — 비어 있으면 현장 입장 양식 그대로 (사장님 11/05)
+      const f = PRINT.forms[PRINT.cur], ek = PRINT.ecur === "walk" || PRINT.ecur === "ev" ? PRINT.ecur : "naver", wk = ek === "walk", evw = ek === "ev";
+      const txt = evw ? f.ev || "" : wk ? f.walk : f.text, kname = evw ? wevLabel() : wk ? "현장 입장" : "네이버 예약";
+      if (evw) SAMPLE = evwSample(); // 이름을 바꿨을 수도 있어 그릴 때마다
+      const erow = (k, t, d) => `<div class="evrule${ek === k ? " on" : ""}"><button class="evno" data-act="ecur" data-k="${k}" aria-pressed="${ek === k}">${esc(t)}</button><span class="evdesc">${d}</span></div>`;
+      const evwOn = !!f.ev; // 이벤트 입장 양식을 씀
+      const warn = evw ? "" : evActive() && EV.form != null ? `<div class="help evwarn">방문 이벤트 중이라 지금은 '방문 이벤트 → 공통 양식'으로 출력돼요 (이 양식은 이벤트를 끄면 다시)</div>` : "";
       const html = psubHtml() + `
         <div class="prn">
           <div class="stack">
             <div class="field"><span class="label">출력 양식 <span class="help">손님 따라 자동으로 골라짐</span></span>
               <div class="help">초과요금은 POS에서 결제하고 POS 영수증을 드려요</div>
               <label class="chk"><input type="checkbox" id="form-auto" ${f.auto ? "checked" : ""}> ${f.when}에 자동 출력</label>
-              ${evActive() && EV.form != null ? `<div class="help evwarn">방문 이벤트 중이라 지금은 '방문 이벤트 → 공통 양식'으로 출력돼요 (이 양식은 이벤트를 끄면 다시)</div>` : ""}
-              <div class="evrules">${erow("naver", "네이버 예약", "네이버 예약 손님 · [네이버] 줄 = 마일리지 (누계를 알 때만)")}${erow("walk", "현장 입장", "현장 결제 · 이벤트 입장 · 서비스 키 입장권")}</div>
-              <textarea id="form-text" spellcheck="false" aria-label="${wk ? "현장 입장" : "네이버 예약"} 입장권 양식">${esc(txt)}</textarea>
-              <div class="btns"><button class="btn btn-sm" data-act="resetForm">${wk ? "현장 입장" : "네이버 예약"} 기본 양식으로</button></div></div>
+              ${warn}
+              <div class="evrules">${erow("naver", "네이버 예약", "네이버 예약 손님 · [네이버] 줄 = 마일리지 (누계를 알 때만)")}${erow("walk", "현장 입장", `현장 결제 · ${evwOn ? "" : "이벤트 입장 · "}서비스 키 입장권`)}${erow("ev", wevLabel(), `결제 없이 <b>[${esc(wevLabel())}]</b>으로 들어온 손님만 · ${evwOn ? "<b>이 양식으로 나가요</b>" : "비어 있으면 현장 입장 양식"} <span class="help">(이름: 기타 → 현장 이벤트 입장)</span>`)}</div>
+              ${evw ? `<div class="help">한가위처럼 결제 없이 들어오는 현장 이벤트 손님 입장권만 따로 — 이벤트 이름 · 기간 · 안내를 적어 두세요 ({구분} = <b>${esc(walkTag({ ev: WEV.name }))}</b>) · <b>비우면 현장 입장 양식 그대로</b>${evActive() && EV.form != null ? " (지금은 방문 이벤트 공통 양식)" : ""} · <button class="btn btn-sm" data-act="evwCopy">지금 나가는 양식 가져오기</button> <button class="btn btn-sm" data-act="resetForm" ${txt ? "" : "disabled"}>비우기</button></div>` : ""}
+              <textarea id="form-text" spellcheck="false" aria-label="${esc(kname)} 입장권 양식"${evw ? ` placeholder="비어 있으면 현장 입장 양식 그대로 — 위 [지금 나가는 양식 가져오기]로 시작하면 쉬워요"` : ""}>${esc(txt)}</textarea>
+              ${evw ? "" : `<div class="btns"><button class="btn btn-sm" data-act="resetForm">${kname} 기본 양식으로</button></div>`}</div>
           </div>
-          <div class="field"><span class="label">미리보기 <span class="help">예시 값 · ${wk ? "현장 입장" : "네이버 예약"}</span>${wk ? "" : ` <button class="btn btn-sm ${SAMPLE._이벤트 ? "" : "btn-ink"}" data-act="previewKind" data-k="naver">보통</button><button class="btn btn-sm ${SAMPLE._이벤트 ? "btn-ink" : ""}" data-act="previewKind" data-k="event" title="방문 이벤트 ${EV_NAMES[EV.cur]} 안내로">이벤트</button>`}</span><div class="paper" id="paper">${paperHtml(txt, SAMPLE)}</div>${formHelp()}</div>
+          <div class="field"><span class="label">미리보기 <span class="help">예시 값 · ${esc(kname)}</span>${evw ? `<span class="help" id="evw-note">${txt ? "" : evwEmpty()}</span>` : ""}${wk || evw ? "" : ` <button class="btn btn-sm ${SAMPLE._이벤트 ? "" : "btn-ink"}" data-act="previewKind" data-k="naver">보통</button><button class="btn btn-sm ${SAMPLE._이벤트 ? "btn-ink" : ""}" data-act="previewKind" data-k="event" title="방문 이벤트 ${EV_NAMES[EV.cur]} 안내로">이벤트</button>`}</span><div class="paper" id="paper">${paperHtml(evw ? ticketText(SAMPLE) : txt, SAMPLE)}</div>${formHelp()}</div>
         </div>`;
         return { html, after: () => { if (SAMPLE._이벤트) evScroll("paper"); } };
   }
@@ -2804,7 +2811,11 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   const formHelp = () => `<span class="help formhelp">넣을 수 있는 값: ${PRINT_KEYS.map((k) => `{${k}}`).join(" ")}<br>줄 앞: <b>#</b> 2배 · <b>##</b> 3배 (가운데) · <b>+</b> 세로 2배(중간) · <b>^</b> 가운데 · <b>*</b> 굵게 (붙여 씀 <b>^+*</b>) · <b>---</b> <b>===</b> 줄<br>조건(줄 맨 앞): <b>[네이버]</b> 네이버 예약 마일리지 줄 (누계를 알 때만) · <b>[현장]</b> 현장입장만 (입장권 양식은 네이버 · 현장이 따로라 안 써도 됨) · <b>[사은권]</b> 사은권 회차만 · <b>[이벤트]</b> 이벤트 손님만 · <b>[기한]</b> 다음 기한이 있을 때만<br><b>[자르기]</b> 한 줄 = 그 자리에서 종이 자름 (쿠폰 떼기 · 예 <b>[이벤트][자르기]</b>)<br><b>[이벤트]</b> 한 줄 = 이벤트 안내(1번 · 2번) 자리 (없으면 <b>[네이버] · [사은권]</b> 줄 자리) · <b>[사은품]</b> 한 줄 = 2번 성공일 때 제공상품 자리</span>`;
   const SAMPLE_NAVER = { 구분: "네이버", 고객: "송*온", 전화뒤4: "5489", 열쇠: "3, 13", 입장시간: "오후 2시 00분", 퇴장시간: "오후 3시 50분", 누계: "8", 기준회: "10", 사은권: "2만원 사은권", 날짜: "2026-10-06", 시각: "13:55", _네이버: true, _현장: false, _사은권: false };
   const SAMPLE_WALK = { 구분: "현장", 고객: "   ", 전화뒤4: "9013", 열쇠: "30", 입장시간: "오후 12시 30분", 퇴장시간: "오후 2시 20분", 누계: "", 기준회: "10", 사은권: "2만원 사은권", 날짜: "2026-10-06", 시각: "12:40", _네이버: false, _현장: true, _사은권: false };
-  let SAMPLE = SAMPLE_NAVER; // 미리보기 · 테스트 출력 예시 (네이버 / 현장)
+  let SAMPLE = SAMPLE_NAVER; // 미리보기 · 테스트 출력 예시 (네이버 / 현장 / 이벤트 입장)
+  /** 이벤트 입장 양식이 비었을 때 미리보기 설명 — 지금 나가는 양식 */
+  const evwEmpty = () => (evActive() && EV.form != null ? " (비어 있어 방문 이벤트 공통 양식)" : " (비어 있어 현장 입장 양식)");
+  /** 이벤트 입장 예시 — 현장 예시에 {구분} = '한가위 이벤트' (현장 이벤트 이름) */
+  const evwSample = () => Object.assign({}, SAMPLE_WALK, { 구분: walkTag({ ev: WEV.name }), _walkev: true });
   // OK-50 한 줄 = 42칸 (한글 21자 · 2배 글씨는 한글 10자). 선 아래는 원래 쓰던 OKPOS 입장권 내용 (현장 사진 10/6)
   const ENTER_FORM_VER = 4; // 기본 양식을 바꾸면 올림 → 예전 기본 양식으로 저장된 PC 도 새 기본 양식으로 (4: 사장님 양식 10/7 — '방문' 대신 '네이버 예약 N번 이용완료')
   // 사장님이 정한 기본 양식 (10/6)
@@ -2881,8 +2892,9 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     drawerPin: "auto", // 현금통 단자: auto = 2번 → 5번 차례로 · "2" · "5" (열리는 쪽 하나만 고르면 더 빠름 · 10/9)
     list: APP ? [] : [{ name: "POS-80C (USB001)", isDefault: false }, { name: "EPSON TM-T82 Receipt", isDefault: false }, { name: "Microsoft Print to PDF", isDefault: true }],
     // 입장권 양식: text = 네이버 예약 · walk = 현장 입장 (현장 결제 · 이벤트 입장 · 서비스 키) — 사장님 10/28
-    forms: { enter: { name: "입장권", when: "등록 완료", auto: true, text: ENTER_SPLIT.naver, walk: ENTER_SPLIT.walk } },
-    ecur: "naver", // 설정 화면에서 고치는 입장권 양식 (naver · walk)
+    // ev = 현장 이벤트 입장(한가위 등 · 결제 없이 [○○ 이벤트 입장]) 손님만 — 비어 있으면 현장 입장 양식 그대로 (사장님 11/05)
+    forms: { enter: { name: "입장권", when: "등록 완료", auto: true, text: ENTER_SPLIT.naver, walk: ENTER_SPLIT.walk, ev: "" } },
+    ecur: "naver", // 설정 화면에서 고치는 입장권 양식 (naver · walk · ev)
   };
   // 설치한 앱: 고른 프린터 · 양식은 이 PC 설정에 저장 (껐다 켜도 그대로)
   if (APP && window.desk.config) window.desk.config.get().then((c) => {
@@ -2890,6 +2902,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     let split = false;
     if (c && c.printForm) {
       Object.assign(PRINT.forms.enter, c.printForm);
+      if (typeof PRINT.forms.enter.ev !== "string") PRINT.forms.enter.ev = ""; // 이벤트 입장 양식 (2.18 전 설정엔 없음)
       if (c.printForm.ver !== ENTER_FORM_VER) Object.assign(PRINT.forms.enter, { text: ENTER_SPLIT.naver, walk: ENTER_SPLIT.walk });
       else if (typeof c.printForm.walk !== "string") { const sp = splitForm(PRINT.forms.enter.text); Object.assign(PRINT.forms.enter, { text: sp.naver, walk: sp.walk }); split = true; } // 2.10 까지 한 칸 양식 → 네이버 · 현장 둘로 (사장님이 고친 줄 그대로 · 10/28)
     }
@@ -2933,7 +2946,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   const saveBc2 = () => { const v = { f1: BC2.f1, f2: BC2.f2 }; if (APP && window.desk.config) window.desk.config.set({ bc2Forms: v }); else try { localStorage.setItem("astanakiz-bc2forms", JSON.stringify(v)); } catch (e) { /* 저장 못 해도 동작 */ } };
   const saveBc = () => { if (APP && window.desk.config) window.desk.config.set({ bc: Object.assign({}, RULES.bc) }); else try { localStorage.setItem("astanakiz-bc", JSON.stringify(RULES.bc)); } catch (e) { /* 저장 못 해도 동작 */ } };
   const feedHelp = () => `약 ${Math.round(PRINT.feed * 4.2)}mm${PRINT.feed === 4 ? " (처음)" : ""}`; // 자르기 전 여백 (1줄 ≈ 4.2mm)
-  const savePrint = () => { if (APP && window.desk.config) window.desk.config.set({ printer: PRINT.sel, printCut: PRINT.cut, printFeed: PRINT.feed, printMode: PRINT.mode, comPort: PRINT.port, comBaud: PRINT.baud, drawerPin: PRINT.drawerPin, printForm: { text: PRINT.forms.enter.text, walk: PRINT.forms.enter.walk, auto: PRINT.forms.enter.auto, ver: ENTER_FORM_VER } }); };
+  const savePrint = () => { if (APP && window.desk.config) window.desk.config.set({ printer: PRINT.sel, printCut: PRINT.cut, printFeed: PRINT.feed, printMode: PRINT.mode, comPort: PRINT.port, comBaud: PRINT.baud, drawerPin: PRINT.drawerPin, printForm: { text: PRINT.forms.enter.text, walk: PRINT.forms.enter.walk, ev: PRINT.forms.enter.ev || "", auto: PRINT.forms.enter.auto, ver: ENTER_FORM_VER } }); };
   // 영수증 프린터처럼 보이는 이름 (처음 찾을 때 자동으로 고름)
   const RECEIPT_RE = /pos|receipt|영수증|감열|thermal|80|srp|bixolon|빅솔론|sewoo|세우|lk-|tm-|epson|rongta|xprinter|hwasung|화성|hmk|star|citizen|okpos/i;
 
@@ -3133,8 +3146,8 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     return (n * 10) / (Number(PRINT.baud) || 115200) + w / 1000;
   }
   const printerName = () => (PRINT.mode === "com" ? `${PRINT.port} · ${PRINT.baud}` : PRINT.sel || "");
-  /** 입장권으로 낼 양식 — BC 투아웃 손님은 투아웃 양식 1 · 2 (비어 있으면 입장권 양식) · 이벤트 기간 현장 결제 손님은 현장 입장자 양식(비어 있으면 공통 양식) · 그 밖에는 입장권 양식 (이벤트 기간엔 공통 양식) */
-  const ticketText = (v) => (v && v._bc2 && BC2["f" + v._bc2]) || (v && v._walkpay && evActive() && EV.walk) || enterText(v); // 이벤트 기간 현장 결제 손님 = 현장 입장자 양식 (사장님 10/27)
+  /** 입장권으로 낼 양식 — BC 투아웃 손님은 투아웃 양식 1 · 2 (비어 있으면 입장권 양식) · 현장 이벤트 입장(한가위 등) 손님은 이벤트 입장 양식(비어 있으면 아래대로) · 이벤트 기간 현장 결제 손님은 현장 입장자 양식(비어 있으면 공통 양식) · 그 밖에는 입장권 양식 (이벤트 기간엔 공통 양식) */
+  const ticketText = (v) => (v && v._bc2 && BC2["f" + v._bc2]) || (v && v._walkev && PRINT.forms.enter.ev) || (v && v._walkpay && evActive() && EV.walk) || enterText(v); // 이벤트 기간 현장 결제 손님 = 현장 입장자 양식 (사장님 10/27) · 현장 이벤트 입장(한가위 등) = 이벤트 입장 양식 (11/05)
   let LASTPRINT = null; // 마지막에 낸 출력물 (시험 · 확인용)
   /** force = [입장권 다시 출력]처럼 직접 누른 것 — 자동 출력을 꺼 둬도 출력 */
   function printForm(kind, v, force) {
@@ -3174,7 +3187,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       입장시간: krTime(h.slot), 퇴장시간: out, 누계: h.visitNo && !frozen && !noMile ? String((h.visitEnd || h.visitNo) - sub) : "", 기준회: String(RULES.giftEvery), 사은권: RULES.giftName,
       날짜: TODAY, 시각: hm(now), _현장: !naver,
       // 방문 이벤트 기간(10/15): 입장권 양식의 [네이버] 누계 · [사은권] 줄(마일리지)은 빼고 그 자리에 이벤트 안내 (evText) — 안내 안에서는 조건을 똑같이 씀
-      _네이버: naver && !!h.visitNo && !noMile, _사은권: naver && !!giftIn(h), _bc2: bc2, _bc2id: bc2 ? h.id : "", _walkpay: !!h.walk && !h.svc && !isEv(h),
+      _네이버: naver && !!h.visitNo && !noMile, _사은권: naver && !!giftIn(h), _bc2: bc2, _bc2id: bc2 ? h.id : "", _walkpay: !!h.walk && !h.svc && !isEv(h), _walkev: !!h.walk && !h.svc && isEv(h),
       ...evVals(ev, frozen),
     };
   };
@@ -4994,15 +5007,17 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       if (!APP || !window.desk.print) { toast(`${printerName()}로 테스트 출력 보냄 (체험)`); return; }
       PRINT.busy = true; PRINT.msg = "출력 보내는 중…"; renderSheet();
       const dlg = !!(btn && btn.dataset.act === "testPrintDlg");
-      const r = await sendPrint(enterFor(SAMPLE), SAMPLE, { dialog: dlg });
+      const r = await sendPrint(PRINT.ecur === "ev" ? ticketText(SAMPLE) : enterFor(SAMPLE), SAMPLE, { dialog: dlg }); // 이벤트 입장 = 그 손님에게 실제로 나가는 양식
       PRINT.busy = false;
       PRINT.msg = r && r.ok ? `${printerName()}로 보냈어요 — 종이가 나오고 ${PRINT.cut && !dlg ? "잘렸는지" : "나왔는지"} 확인해 주세요. 글자가 깨져 나오면 속도를 바꿔 보세요${r.cutWhy ? ` (자르기 실패: ${r.cutWhy})` : ""}` : `출력 실패: ${(r && r.why) || "응답 없음"}`;
       renderSheet();
     },
     testPrintDlg(btn) { return acts.testPrint(btn); },
     previewKind(btn) { SAMPLE = btn.dataset.k === "walk" ? SAMPLE_WALK : btn.dataset.k === "event" ? evSample(evSampleIdx()) : SAMPLE_NAVER; PRINT.ecur = btn.dataset.k === "walk" ? "walk" : "naver"; renderSheet(); },
-    ecur(btn) { PRINT.ecur = btn.dataset.k === "walk" ? "walk" : "naver"; SAMPLE = PRINT.ecur === "walk" ? SAMPLE_WALK : SAMPLE_NAVER; renderSheet(); }, // 입장권 양식 고르기 (사장님 10/28)
-    resetForm() { const wk = PRINT.ecur === "walk"; PRINT.forms.enter[wk ? "walk" : "text"] = ENTER_SPLIT[wk ? "walk" : "naver"]; savePrint(); renderSheet(); },
+    ecur(btn) { const k = btn.dataset.k; PRINT.ecur = k === "walk" || k === "ev" ? k : "naver"; SAMPLE = k === "ev" ? evwSample() : k === "walk" ? SAMPLE_WALK : SAMPLE_NAVER; renderSheet(); }, // 입장권 양식 고르기 (사장님 10/28 · 이벤트 입장 11/05)
+    resetForm() { const k = PRINT.ecur; if (k === "ev") PRINT.forms.enter.ev = ""; else PRINT.forms.enter[k === "walk" ? "walk" : "text"] = ENTER_SPLIT[k === "walk" ? "walk" : "naver"]; savePrint(); renderSheet(); }, // 이벤트 입장 = 비우기 (현장 입장 양식 그대로)
+    /** 이벤트 입장 양식 ← 지금 이벤트 입장 손님에게 나가는 양식(현장 입장 · 방문 이벤트 중이면 공통 양식)을 가져와 고쳐 씀 */
+    evwCopy() { PRINT.forms.enter.ev = enterText(evwSample()); savePrint(); renderSheet(); toast(`지금 나가는 양식을 ${wevLabel()} 양식으로 가져왔어요 — 고쳐 쓰세요`); },
     car(btn) {
       park.sel = btn.dataset.id;
       const c = park.state.rows.find((x) => x.id === park.sel);
@@ -5140,7 +5155,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     const t = e.target;
     // 메모장 (V2.0): 쓰던 글은 다시 그려도 남게 · 찾기는 아래만 다시
     if (sheet.mode === "memo" && (t.id === "memo-new" || t.id === "memo-msg")) sheet.draft[t.id] = t.value;
-    if (t.id === "wev-name") { WEV.name = t.value.trim().slice(0, 10); wevSave(); $("wev-preview").textContent = `[${wevLabel()}]`; }
+    if (t.id === "wev-name") { WEV.name = t.value.trim().slice(0, 10); wevSave(); $("wev-preview").textContent = `[${wevLabel()}]`; if ($("wev-form")) $("wev-form").textContent = `[${wevLabel()}]`; }
     if (t.id === "bc-q") { sheet.bcq = t.value; renderSheet(); } // BC 손님 찾기 (사장님 10/26)
     if (t.id === "memo-admin") { MEMO.admin = t.value.trim().slice(0, 12) || "관리자"; memoSaveSoon(); }
     if (t.id === "memo-q") { sheet.q = t.value; $("memo-body").innerHTML = memoBodyHtml(); }
@@ -5152,7 +5167,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       if (b) { const f = t.id === "note-k3" ? "k3" : "bl"; noteChange(b, { [f]: t.checked }, true); renderRes(); renderSheet(); toast(`${b.name}님 ${f === "k3" ? "3자녀" : "BC"} ${t.checked ? "표시 — 이름이 " + (f === "k3" ? "노랑" : "빨강") + "으로 보여요" : "표시를 뺐어요"}`); }
     }
     if (t.id === "bc2-text") { const k = "f" + (sheet.bc2cur === 2 ? 2 : 1); BC2[k] = t.value; $("bc2-paper").innerHTML = paperHtml(t.value || enterText(), bc2Sample()); $("bc2-note").textContent = t.value ? "" : " (비어 있어 입장권 양식)"; saveBc2(); } // BC 투아웃 양식 (사장님 10/27)
-    if (t.id === "form-text") { PRINT.forms.enter[PRINT.ecur === "walk" ? "walk" : "text"] = t.value; $("paper").innerHTML = paperHtml(t.value, SAMPLE); savePrint(); }
+    if (t.id === "form-text") { const ev = PRINT.ecur === "ev"; PRINT.forms.enter[ev ? "ev" : PRINT.ecur === "walk" ? "walk" : "text"] = ev ? (t.value.trim() ? t.value : "") : t.value; $("paper").innerHTML = paperHtml(ev ? ticketText(SAMPLE) : t.value, SAMPLE); if (ev && $("evw-note")) $("evw-note").textContent = PRINT.forms.enter.ev ? "" : evwEmpty(); savePrint(); }
     if (t.id === "ev-days" && t.value !== "") { EV.days = evDays(t.value) || EV.days; evSaveCfg(); $("ev-paper").innerHTML = evPrev(); evScroll("ev-paper"); $("ev-dates").textContent = evDatesText(); renderAll(); }
     if (t.id === "ev-seal") { EV.seal = t.checked; evSaveCfg(); $("ev-paper").innerHTML = evPrev(); evScroll("ev-paper"); toast(t.checked ? "쿠폰을 보안 무늬 그림으로 찍어요 — [시험 출력]으로 확인해 보세요" : "쿠폰을 예전처럼 글자로 찍어요"); }
     if (t.id === "ev-use" || t.id === "ev-useu") { EV.useUnit = $("ev-useu").value === "일" ? "일" : "개월"; EV.useN = useClamp($("ev-use").value, EV.useUnit); evSaveCfg(); $("ev-paper").innerHTML = evPrev(); evScroll("ev-paper"); $("ev-usehelp").textContent = useHelp(); }

@@ -235,7 +235,7 @@ test("입장권 양식 네이버 · 현장 따로 (사장님 10/28): 예전 한 
     await p2.goto(DESK);
     await p2.dblclick("#now");
     await p2.click('[data-t="prints"]'); await p2.click('[data-s="ticket"]');
-    assert.deepStrictEqual(await p2.$$eval("#sheet .evrules .evno", (e) => e.map((x) => x.textContent.trim())), ["네이버 예약", "현장 입장"]);
+    assert.deepStrictEqual(await p2.$$eval("#sheet .evrules .evno", (e) => e.map((x) => x.textContent.trim())), ["네이버 예약", "현장 입장", "이벤트 입장"], "현장 이벤트 입장 칸 (11/05 · 이름이 없으면 '이벤트 입장')");
     const nText = await p2.inputValue("#form-text");
     assert.ok(!/\[현장\]/.test(nText) && /\{누계\}/.test(nText), "네이버 양식엔 [현장] 줄 없음");
     await p2.click("#sheet .evno[data-k=walk]");
