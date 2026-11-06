@@ -286,6 +286,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .tplapply { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; border: 1px solid var(--accent); border-radius: 8px; background: var(--accent-bg); padding: 7px 10px; }
 .tplapply select { min-width: 150px; height: 32px; font-weight: 700; }
 .tplapply .chk input { width: 18px; height: 18px; min-height: 0; padding: 0; }
+.tplapply .tplall { margin-left: auto; } /* 모든 양식 샘플 출력 (11/06) */
 .tplkindhd { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .tplkindhd > b { font-size: 14px; }
 .setbody:has(> .tplgrid) { display: flex; flex-direction: column; gap: 7px; overflow: hidden; padding-bottom: 0; } /* 네 칸이 창 아래 끝까지 (사장님 11/05) */
@@ -2724,6 +2725,27 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     while (taken.has(c)) c = `${base}${n++}`;
     return c;
   }
+  /* 모든 양식 샘플 출력 (사장님 11/06 — "모든 양식을 설정 끝난 뒤 출력해볼 수 있도록"): 저장된 양식을 손님마다 한 장씩 차례로
+     기본 입장권(네이버 예약 · 현장 입장) · 이벤트((재)공통양식 — 도전 · 성공(쿠폰) · 이벤트 입장 · 현장 결제) · BC(1아웃용 · 2아웃용 — 써 둔 것만)
+     장마다 맨 위에 '[샘플] 무엇' 한 줄 · 예시 값 · 적용 중이 아닌 묶음도 찍어 봄 (제목에 표시) */
+  let SAMPLEPRINT = []; // 마지막 샘플 출력 제목들 (시험 · 확인용)
+  function sampleJobs() {
+    const E = PRINT.forms.enter, ev = EV.form != null && EV.form.trim() ? EV.form : null, ap = applyOf();
+    const tag = (g) => (ap === g ? "" : " (지금 적용 안 함)");
+    const common = (v) => ev || enterFor(v);
+    const bcS = (n) => Object.assign({}, SAMPLE_NAVER, n >= 2 ? { 누계: "", _네이버: false, _사은권: false } : {}, { _bc: n });
+    const J = [
+      { title: `기본 입장권 · ${pname("naver")}${tag("base")}`, text: E.text, v: SAMPLE_NAVER },
+      { title: `기본 입장권 · ${pname("walk")}${tag("base")}`, text: E.walk, v: SAMPLE_WALK },
+      { title: `이벤트 · 도전 손님${tag("event")}`, text: common(evSample(0)), v: evSample(0) },
+      { title: `이벤트 · 성공 손님${tag("event")}`, text: common(evSample(1)), v: evSample(1) },
+      { title: `이벤트 · ${walkTag({ ev: WEV.name })} 입장 손님${tag("event")}`, text: common(evwSample()), v: evwSample() },
+      { title: `이벤트 · 현장 결제 손님${tag("event")}`, text: EV.walk || common(evWalkSample()), v: evWalkSample() },
+    ];
+    for (const n of [1, 2]) if (String(BC2["f" + n] || "").trim()) J.push({ title: `BC · ${pname("bc" + n)}${PSET.bcOn ? "" : " (BC 별도 출력 꺼짐)"}`, text: BC2["f" + n], v: bcS(n) });
+    return J;
+  }
+  const sampleText = (j) => `^* [샘플] ${j.title}\n---\n${j.text}`;
   function tplPage() {
     const K = tplKinds(), kd = K.find((x) => x.k === sheet.tk) || K.find((x) => x.g === (sheet.tg || "base")) || K[0];
     sheet.tk = kd.k; sheet.tg = kd.g;
@@ -2739,7 +2761,8 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     const html = `
       <div class="tplapply"><label for="tpl-apply"><b>현재 기본 적용 템플릿 :</b></label><select id="tpl-apply" class="cfg" aria-label="현재 기본 적용 템플릿">${[["base", "기본 입장권"], ["event", "이벤트"]].map(([k, t]) => `<option value="${k}" ${ap === k ? "selected" : ""}>${t}</option>`).join("")}</select>
         <label class="chk" title="BC 원아웃 · 투아웃 손님에게 BC 묶음의 1아웃용 · 2아웃용 양식 (비어 있으면 보통 입장권)"><input type="checkbox" id="tpl-bc" ${PSET.bcOn ? "checked" : ""}> BC 고객 별도 영수증 출력</label>
-        <label class="chk" title="입장 · 등록할 때 입장권을 바로 찍음"><input type="checkbox" id="form-auto" ${PRINT.forms.enter.auto ? "checked" : ""}> 입장권 자동 출력</label></div>
+        <label class="chk" title="입장 · 등록할 때 입장권을 바로 찍음"><input type="checkbox" id="form-auto" ${PRINT.forms.enter.auto ? "checked" : ""}> 입장권 자동 출력</label>
+        <button class="btn btn-sm btn-ink tplall" data-act="tplSampleAll" title="저장된 모든 양식을 손님마다 한 장씩 차례로 (기본 입장권 · 이벤트 · BC — 장마다 맨 위에 [샘플] 이름)">모든 양식 샘플 출력</button></div>
       ${applyWarn ? `<div class="help evwarn">${esc(applyWarn)}</div>` : ""}
       <div class="tplkindhd"><b>종류</b><span class="help tpldesc">${esc(kd.desc)}${kd.empty ? ` · 비어 있으면 <b>${esc(kd.empty)}</b>` : ""}</span></div>
       ${kd.warn || lostWarn ? `<div class="help evwarn">${esc(kd.warn || lostWarn)}</div>` : ""}
@@ -2757,7 +2780,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
         <div class="tplcol tpledit"><div class="tplhd">편집 <span class="help">${esc(kd.name)}</span><b class="tpldirty" id="tpl-dirty" ${dirty ? "" : "hidden"}>저장 안 됨</b><button class="btn btn-sm btn-ink" id="tpl-save" data-act="tplSave" ${dirty ? "" : "disabled"}>저장</button></div>
           <div class="tpledbox"><div class="tplgut" id="tpl-gut" aria-hidden="true">${tplGutter(txt, vv)}</div><textarea id="tpl-text" wrap="off" spellcheck="false" aria-label="${esc(kd.name)}"${kd.empty ? ` placeholder="비어 있으면 ${esc(kd.empty)}"` : ""}>${esc(txt)}</textarea></div>
           <div class="help tplhint" id="tpl-hint">왼쪽 숫자 = 그 줄이 종이에서 찍히는 줄 수 (42칸 넘으면 '2줄') · 코드를 누르면 커서 자리에 · 고친 뒤 [저장]</div></div>
-        <div class="tplcol tplview"><div class="tplhd">미리보기 <span class="help">42칸 그대로</span><span class="help" id="tpl-empty" ${!txt.trim() && kd.empty ? "" : "hidden"}>(비어 있어 ${esc(kd.empty || "")})</span><button class="btn btn-sm" data-act="tplTest">시험 출력</button></div>
+        <div class="tplcol tplview"><div class="tplhd">미리보기 <span class="help">42칸 그대로</span><span class="help" id="tpl-empty" ${!txt.trim() && kd.empty ? "" : "hidden"}>(비어 있어 ${esc(kd.empty || "")})</span><button class="btn btn-sm" data-act="tplTest" title="이 양식 — 미리보기 그대로 (저장 안 한 글도)">샘플 출력</button></div>
           ${kd.samp ? `<div class="tplsamp">${TPL_SAMPS.map(([k, t]) => `<button class="btn btn-sm ${(sheet.tsamp || "start") === k ? "btn-ink" : ""}" data-act="tplSamp" data-s="${k}">${t}</button>`).join("")}</div>` : ""}
           <div class="paper" id="tpl-paper">${paperHtml(vt, vv)}</div></div>
       </div>`;
@@ -5092,16 +5115,35 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       else { nv = v.slice(0, at) + c + v.slice(end); pos = at + c.length; }
       ta.value = nv; ta.focus(); ta.setSelectionRange(pos, pos); tplInput(nv);
     },
-    /** [시험 출력] — 미리보기 그대로 (예시 값) */
+    /** [모든 양식 샘플 출력] — 저장된 양식을 손님마다 한 장씩 차례로 (확인 한 번) */
+    async tplSampleAll() {
+      if (!printerReady()) { toast("운영 설정 → 프린터 설정에서 영수증 프린터를 먼저 정해 주세요"); return; }
+      if (PRINT.busy) { toast("앞 출력을 아직 보내는 중이에요 — 끝나면 다시 눌러 주세요"); return; }
+      const J = sampleJobs(), unsaved = TPLD.size ? ` · 저장 안 한 글 ${TPLD.size}개는 빼고 저장된 글로` : "";
+      if (!confirm(`모든 양식 샘플 ${J.length}장을 차례로 출력할까요?${unsaved}\n\n${J.map((j, i) => `${i + 1}. ${j.title}`).join("\n")}`)) return;
+      SAMPLEPRINT = J.map((j) => j.title);
+      if (!APP || !window.desk.print) { toast(`모든 양식 샘플 ${J.length}장 출력 (${printerName()}, 체험)`); return; }
+      PRINT.busy = true;
+      try {
+        for (let i = 0; i < J.length; i++) {
+          toast(`샘플 출력 ${i + 1}/${J.length} — ${J[i].title}`, 8000);
+          let r;
+          try { r = await sendPrint(sampleText(J[i]), J[i].v); } catch (e) { r = { ok: false, why: String(e) }; }
+          if (!r || !r.ok) { toast(`샘플 ${i + 1}/${J.length} 출력 실패: ${(r && r.why) || "응답 없음"} — 거기서 멈췄어요`, 9000); return; }
+        }
+        toast(`모든 양식 샘플 ${J.length}장을 보냈어요 — 장마다 맨 위 [샘플] 이름을 보고 확인하세요`, 8000);
+      } finally { PRINT.busy = false; }
+    },
+    /** [샘플 출력] — 이 양식 미리보기 그대로 (예시 값 · 저장 안 한 글도) */
     async tplTest() {
       if (!printerReady()) { toast("운영 설정 → 프린터 설정에서 영수증 프린터를 먼저 정해 주세요"); return; }
       const kd = tplKind(), [text, v] = kd.view(tplText(kd));
-      if (!APP || !window.desk.print) { toast(`${kd.name} 시험 출력 (${printerName()}, 체험)`); return; }
+      if (!APP || !window.desk.print) { toast(`${kd.name} 샘플 출력 (${printerName()}, 체험)`); return; }
       if (PRINT.busy) { toast("앞 출력을 아직 보내는 중이에요 — 끝나면 다시 눌러 주세요"); return; }
-      PRINT.busy = true; toast(`${kd.name} 시험 출력 보내는 중…`);
+      PRINT.busy = true; toast(`${kd.name} 샘플 출력 보내는 중…`);
       let res;
       try { res = await sendPrint(text, v); } catch (e) { res = { ok: false, why: String(e) }; } finally { PRINT.busy = false; }
-      toast(res && res.ok ? `${kd.name} 시험 출력을 보냈어요` : `출력 실패: ${(res && res.why) || "응답 없음"}`);
+      toast(res && res.ok ? `${kd.name} 샘플 출력을 보냈어요` : `출력 실패: ${(res && res.why) || "응답 없음"}`);
     },
     async evOpen() { const r = await window.desk.ledger.open().catch((e) => ({ ok: false, why: String(e) })); if (!r || !r.ok) toast(`폴더를 못 열었어요: ${(r && r.why) || ""}`); },
     async evTest() {
@@ -5562,6 +5604,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     evLog: (from) => { const L = evLog(from); return { from: L.from, count: L.count, people: Object.fromEntries([...L.people].map(([k, p]) => [k, JSON.parse(JSON.stringify(p))])) }; },
     // 장부에 지난 방문 한 줄 넣기: o = { day, n(네이버 순번, 기본 = 지금 완료 수), base, st("안내" | "성공"), due, from(장부 · 기본 지금 이벤트), no }
     evsPayload: () => evsPayload(),
+    sampleJobs: () => sampleJobs().map((j) => ({ title: j.title, lines: receiptLines(sampleText(j), j.v).map((l) => l.t.trim()).filter(Boolean) })), lastSamples: () => SAMPLEPRINT.slice(),
     // 숏타임 (11/05)
     isShort: (id) => isShort(findB(id) || holders().find((h) => h.id === id)), bookMinutes: (id) => bookMinutes(findB(id)), overDue: (id) => { const h = holders().find((x) => x.id === id); return h ? overInfo(h).due : null; },
     chainMin: (id) => { const b = findB(id), ch = chainOf(b); return ch.length > 1 ? chainMinutes(ch) : bookMinutes(b); }, oddGaps: (id) => oddNext(findB(id)).map((o) => o.gap), capSlots: () => capSlots(TODAY), capMain,

@@ -144,3 +144,40 @@ test("재방문 이벤트(돈까스) 중 [이벤트 입장]으로 등록한 손�
     await browser.close();
   }
 });
+
+test("모든 양식 샘플 출력 (사장님 11/06): 맨 위 [모든 양식 샘플 출력] → 확인 한 번 → 저장된 양식을 손님마다 한 장씩 (기본 입장권 · 이벤트 도전 · 성공 · 이벤트 입장 · 현장 결제 · 써 둔 BC) · 장마다 맨 위 [샘플] 이름 · 양식마다 [샘플 출력]", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [], dialogs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    page.on("dialog", (d) => { dialogs.push(d.message()); d.accept(); });
+    const BASE = "#* 아스타나키즈 공통\n^* {구분} 입장권\n#*{열쇠}번\n[이벤트]\n{한가위양식}";
+    await page.addInitScript((form) => { if (!sessionStorage.getItem("once")) { sessionStorage.setItem("once", "1"); localStorage.clear(); localStorage.setItem("astanakiz-visitevent", JSON.stringify({ ver: 2, on: true, from: "2026-09-10", to: "2026-10-31", days: 20, gift: "수제돈까스", form })); localStorage.setItem("astanakiz-walkevent", "한가위"); localStorage.setItem("astanakiz-bc2forms", JSON.stringify({ v: 2, f1: "", f2: "^투아웃 안내\n{열쇠}번" })); } }, BASE);
+    await page.goto(DESK);
+    await page.evaluate((f) => { window.__deskTest.PRINT_().forms.enter.ev = f; }, FRAG);
+    // 프린터를 안 정했으면 안내만
+    await openPrints(page);
+    await page.click("[data-act=tplSampleAll]");
+    assert.match(await page.textContent("#toast"), /영수증 프린터를 먼저 정해 주세요/);
+    assert.deepStrictEqual(dialogs, []);
+    await page.evaluate(() => { const P = window.__deskTest.PRINT_(); P.mode = "win"; P.sel = "POS-80C (USB001)"; });
+    await page.click("[data-act=tplSampleAll]");
+    assert.match(dialogs[0], /^모든 양식 샘플 7장을 차례로 출력할까요\?/);
+    const titles = ["기본 입장권 · 네이버 예약용 (지금 적용 안 함)", "기본 입장권 · 현장입장자용 (지금 적용 안 함)", "이벤트 · 도전 손님", "이벤트 · 성공 손님", "이벤트 · 한가위 이벤트 입장 손님", "이벤트 · 현장 결제 손님", "BC · 2아웃용"];
+    assert.deepStrictEqual(await page.evaluate(() => window.__deskTest.lastSamples()), titles, "1아웃용은 비어 있어 빠짐");
+    assert.match(await page.textContent("#toast"), /모든 양식 샘플 7장 출력 \(POS-80C \(USB001\), 체험\)/);
+    const jobs = await page.evaluate(() => window.__deskTest.sampleJobs());
+    assert.deepStrictEqual(jobs.map((j) => j.lines[0]), titles.map((t) => `[샘플] ${t}`), "장마다 맨 위 [샘플] 이름");
+    assert.ok(jobs[4].lines.includes("한가위 이벤트") && !jobs[2].lines.includes("한가위 이벤트"), "이벤트 입장 손님 장에만 한가위 조각");
+    assert.ok(jobs[3].lines.some((l) => /재방문 이벤트 성공!/.test(l)), "성공 손님 장 = 성공 양식 (쿠폰)");
+    assert.ok(jobs[6].lines.includes("투아웃 안내"), "BC 2아웃용");
+    // 양식마다 [샘플 출력] = 그 양식 미리보기 그대로
+    assert.strictEqual((await page.textContent("#sheet [data-act=tplTest]")).trim(), "샘플 출력");
+    await page.click("#sheet [data-act=tplTest]");
+    assert.match(await page.textContent("#toast"), /샘플 출력 \(POS-80C \(USB001\), 체험\)/);
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
