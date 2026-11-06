@@ -5586,8 +5586,10 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
         if (p0.skip) return done(true, p0.skip);
         if (capBusy) return done(false, "다른 수량 조절이 진행 중이에요 — 잠시 뒤 다시");
         const top = capLog[0];
-        await capRun(true);
-        return done(true, say(fresh(top)) || "바꿀 것 없음");
+        const r = await capRun(true);
+        if (r === "wait") return done(false, "현장 POS 가 네이버를 불러오는 중이에요 — 잠시 뒤 다시");
+        const f = fresh(top);
+        return done(!f.some((x) => x.ok === false), say(f) || "바꿀 것 없음");
       }
       if (c.act === "capTry") {
         const a = c.args || {};

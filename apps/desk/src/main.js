@@ -1177,7 +1177,7 @@ function syncStart() {
   };
   const on = {
     snap: (snap, at) => toDesk("sync:snap", { snap, at }),
-    cmd: (c) => { if (deskWin && !deskWin.isDestroyed()) deskWin.webContents.send("sync:cmd", c); else syncEngine.ack(c.id, false, "현장 POS 화면이 아직 안 켜짐"); },
+    cmd: (c) => { if (deskWin && !deskWin.isDestroyed() && !deskWin.webContents.isLoading()) deskWin.webContents.send("sync:cmd", c); else syncEngine.ack(c.id, false, "현장 POS 화면이 켜지는 중이에요 — 잠시 뒤 다시 눌러 주세요"); },
     ack: (a) => toDesk("sync:ack", a),
     status: (st) => toDesk("sync:status", st),
   };

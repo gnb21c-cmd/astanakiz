@@ -91,7 +91,7 @@ test("시계를 1.5초 안에 두 번 → 운영 설정 (버튼 없음) · 왼�
     await page.clock.runFor(700);
     await page.click("#now");
     assert.ok(await page.isVisible("#sheet .setnav"), "1.5초 안 두 번 → 운영 설정");
-    assert.deepStrictEqual(await page.$$eval("#sheet .setnav button span", (e) => e.map((x) => x.textContent)), ["비성수기 설정", "프린터 설정", "프린트물 설정", "재방문 이벤트", "근무자 등록", "API 연결 설정", "네이버 설정", "고객 세부 관리", "기타"]); // 고객 세부 관리 (사장님 10/26) · 재방문 이벤트 따로 (11/05)
+    assert.deepStrictEqual(await page.$$eval("#sheet .setnav button span", (e) => e.map((x) => x.textContent)), ["비성수기 설정", "프린터 설정", "프린트물 설정", "재방문 이벤트", "근무자 등록", "API 연결 설정", "네이버 설정", "고객 세부 관리", "기타", "두 PC 연결"]); // 고객 세부 관리 (사장님 10/26) · 재방문 이벤트 따로 (11/05) · 두 PC 연결 (11/06)
     // 긴 설명은 숨김 → [?] 를 누르면 보임
     const q = page.locator("#setbody .qhelp").first();
     const t = page.locator("#setbody .qtext").first();
