@@ -214,64 +214,72 @@ test("BC (앱): 쓰리아웃 손님 예약은 네이버를 불러올 때 알아�
   }
 });
 
-test("BC 투아웃 양식 (사장님 10/27): 프린트물 설정 → [BC 투아웃 양식] 1 · 2 → 투아웃 뒤 첫 방문은 1번, 그다음부터 2번 · 다시 출력은 같은 양식 · 비우면 입장권 양식 · 투아웃 카드 테두리는 빨강 점선", async () => {
+test("BC 양식 (사장님 11/06): 프린트물 설정 → BC 묶음 '1아웃용' · '2아웃용' → 원아웃 손님은 1아웃용 · 투아웃 손님은 2아웃용 · 다시 출력도 · 맨 위 'BC 고객 별도 영수증 출력'을 끄면 보통 입장권 · 비우면 보통 · 예전 투아웃 1번 · 2번은 2아웃용으로", async () => {
   const browser = await launch();
   try {
     const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
     const errs = [];
     page.on("pageerror", (e) => errs.push(e.message));
+    // 예전(2.17 ~ 2.18) 설정: 투아웃 1번(첫 방문) · 2번(그다음) → 2아웃용 = 예전 2번 글 · 1아웃용은 새로 (비어 있음)
+    await page.addInitScript(() => { if (!sessionStorage.getItem("once")) { sessionStorage.setItem("once", "1"); localStorage.clear(); localStorage.setItem("astanakiz-bc2forms", JSON.stringify({ f1: "^예전 첫 안내", f2: "^예전 다음 안내" })); } });
     await page.goto(DESK); // 체험판 10/5 13:50
-    await page.evaluate(() => localStorage.clear());
-    await page.reload();
-    // 프린트물 설정(영수증 설정 · 11/05) → 종류 'BC 투아웃 — 1번' · '2번' (코드는 입장권 양식과 같음)
+    assert.deepStrictEqual(await page.evaluate(() => window.__deskTest.BC2_()), { f1: "", f2: "^예전 다음 안내" }, "예전 투아웃 양식 → 2아웃용");
+    assert.strictEqual(JSON.parse(await page.evaluate(() => localStorage.getItem("astanakiz-bc2forms"))).v, 2, "새 모양으로 저장");
+    // 프린트물 설정 → 묶음 BC: 1아웃용 · 2아웃용 (코드는 입장권 양식과 같음)
     await page.dblclick("#now"); await page.click('[data-t="prints"]');
-    assert.deepStrictEqual((await page.$$eval("#tpl-kind option", (e) => e.map((x) => x.textContent))).slice(-2), ["BC 투아웃 — 1번 (투아웃 뒤 첫 방문)", "BC 투아웃 — 2번 (그다음 방문부터)"]);
-    await page.selectOption("#tpl-kind", "bc1");
-    assert.match(await page.textContent("#sheet .tpldesc"), /비우면 입장권 양식 \(마일리지 줄 없이\)/);
+    await page.selectOption("#tpl-group", "bc");
+    assert.deepStrictEqual(await page.$$eval("#sheet .tplrow .tn", (e) => e.map((x) => x.textContent)), ["1아웃용", "2아웃용"]);
+    assert.match(await page.textContent("#sheet .tpldesc"), /BC 원아웃 손님 입장권 대신.*비어 있으면 보통 입장권/);
     assert.match(await page.textContent("#sheet .tplcodes"), /\{열쇠\}/, "입장권 양식과 같은 코드");
-    await page.fill("#tpl-text", "^투아웃 첫 안내\n{열쇠}번");
-    assert.match(await page.textContent("#tpl-paper"), /투아웃 첫 안내/, "미리보기");
+    await page.fill("#tpl-text", "^원아웃 안내\n{열쇠}번");
+    assert.match(await page.textContent("#tpl-paper"), /원아웃 안내/, "미리보기");
     await page.click("#tpl-save");
-    await page.selectOption("#tpl-kind", "bc2");
-    assert.strictEqual(await page.inputValue("#tpl-text"), "", "2번은 아직 비어 있음");
-    await page.click("#sheet .tplrow[data-id=b0]"); // 기본 템플릿 '지금 입장권 양식'
-    assert.match(await page.inputValue("#tpl-text"), /\{열쇠\}/);
-    await page.click("[data-act=tplUse]");
-    await page.fill("#tpl-text", "^투아웃 다음 안내\n{열쇠}번");
+    await page.click('#sheet .tplrow[data-k="bc2"]');
+    assert.strictEqual(await page.inputValue("#tpl-text"), "^예전 다음 안내");
+    await page.fill("#tpl-text", "^투아웃 안내\n{열쇠}번");
     await page.click("#tpl-save");
-    assert.deepStrictEqual(await page.evaluate(() => JSON.parse(localStorage.getItem("astanakiz-bc2forms"))), { f1: "^투아웃 첫 안내\n{열쇠}번", f2: "^투아웃 다음 안내\n{열쇠}번" }, "저장");
+    assert.deepStrictEqual(await page.evaluate(() => JSON.parse(localStorage.getItem("astanakiz-bc2forms"))), { v: 2, f1: "^원아웃 안내\n{열쇠}번", f2: "^투아웃 안내\n{열쇠}번" }, "저장");
     await page.click("#sheet .x");
     // 손님: 원아웃 = 실선 · 투아웃 = 점선
-    const [a, b] = await page.evaluate(() => { const T = window.__deskTest; const P = T.PRINT_(); P.sel = "시험 프린터"; P.port = "COM3"; T.setNow(830); return [T.addBooking(T.today(), "14:30", "투아웃손님", "01055550002", 1, { prevDone: 3 }), T.addBooking(T.today(), "18:00", "투아웃손님", "01055550002", 1, { prevDone: 3 })]; });
+    const [a, b] = await page.evaluate(() => { const T = window.__deskTest; const P = T.PRINT_(); P.sel = "시험 프린터"; P.port = "COM3"; T.setNow(830); return [T.addBooking(T.today(), "14:30", "비씨손님", "01055550002", 1, { prevDone: 3 }), T.addBooking(T.today(), "18:00", "비씨손님", "01055550002", 1, { prevDone: 3 })]; });
     await page.click('.slot[data-s="870"]');
     const card = page.locator(`.res[data-id="${a}"]`);
     await card.click();
     await page.click('#sheet [data-act=bcSet][data-n="1"]');
     const style = () => card.evaluate((e) => getComputedStyle(e).borderTopStyle);
     assert.strictEqual(await style(), "solid", "원아웃 = 빨강 실선");
+    const formOf = (id) => page.evaluate((x) => { const T = window.__deskTest; const v = T.keyVals(T.bk(x)); return [v._bc, T.formFor(v)]; }, id);
+    assert.deepStrictEqual(await formOf(a), [1, "^원아웃 안내\n{열쇠}번"], "원아웃 = 1아웃용");
     await page.click('#sheet [data-act=bcSet][data-n="2"]');
     assert.strictEqual(await style(), "dashed", "투아웃 = 빨강 점선");
     assert.strictEqual(await page.evaluate(() => getComputedStyle(document.getElementById("sheet")).outlineStyle), "dashed", "예약자 창 테두리도 점선");
-    // 투아웃 뒤 첫 입장 → 1번 · 다시 출력도 1번
+    // 투아웃 입장 → 2아웃용 · 다시 출력도
     await page.click(".kpick button:not([disabled]) >> nth=0");
     await page.click("#enter-done");
+    assert.match(await page.textContent("#toast"), /\(BC 2아웃용\) 출력/);
     const last = () => page.evaluate(() => (window.__deskTest.lastPrint() || {}).text || "");
-    assert.match(await last(), /투아웃 첫 안내/);
+    assert.match(await last(), /투아웃 안내/);
     const k = await page.evaluate((id) => window.__deskTest.bk(id).keys[0], a);
     await page.click(`.key[data-k='${k}']`);
     await page.click("#sheet [data-act=reprint]");
-    assert.match(await last(), /투아웃 첫 안내/, "다시 출력은 그때 양식 그대로");
+    assert.match(await last(), /투아웃 안내/, "다시 출력도 2아웃용");
     await page.click("#sheet [data-act=close]");
-    // 그다음 방문 (따로 온 18:00 예약) → 2번
-    const formOf = (id) => page.evaluate((x) => { const T = window.__deskTest; const v = T.keyVals(T.bk(x)); return [v._bc2, T.formFor(v)]; }, id);
-    assert.deepStrictEqual(await formOf(b), [2, "^투아웃 다음 안내\n{열쇠}번"], "1번을 낸 뒤 방문은 2번");
-    assert.match(JSON.stringify(await page.evaluate(() => window.__deskTest.notes())), /"p2":"2026-10-05 13:50"/, "1번을 낸 때를 손님 기록에");
-    // 2번을 비우면 입장권 양식 그대로 (마일리지 줄은 빠진 채)
-    await page.dblclick("#now"); await page.click('[data-t="prints"]'); await page.selectOption("#tpl-kind", "bc2");
+    assert.deepStrictEqual(await formOf(b), [2, "^투아웃 안내\n{열쇠}번"], "그다음 방문도 2아웃용 (첫 방문 · 그다음 구분 없음)");
+    // 맨 위 'BC 고객 별도 영수증 출력' 끄면 보통 입장권 (투아웃은 마일리지 줄 없이) · 이 PC 에 저장
+    await page.dblclick("#now"); await page.click('[data-t="prints"]');
+    await page.uncheck("#tpl-bc");
+    assert.strictEqual(JSON.parse(await page.evaluate(() => localStorage.getItem("astanakiz-printset"))).bcOn, false);
+    await page.selectOption("#tpl-group", "bc");
+    assert.match(await page.textContent("#sheet .evwarn"), /'BC 고객 별도 영수증 출력'이 꺼져 있어 지금은 보통 입장권/);
+    await page.click("#sheet .x");
+    assert.doesNotMatch((await formOf(b))[1], /투아웃 안내/, "끄면 보통 입장권");
+    await page.dblclick("#now"); await page.click('[data-t="prints"]'); await page.check("#tpl-bc");
+    // 2아웃용을 비우면 보통 입장권
+    await page.selectOption("#tpl-group", "bc"); await page.click('#sheet .tplrow[data-k="bc2"]');
     await page.fill("#tpl-text", ""); await page.click("#tpl-save");
     assert.strictEqual(JSON.parse(await page.evaluate(() => localStorage.getItem("astanakiz-bc2forms"))).f2, "");
     await page.click("#sheet .x");
-    assert.doesNotMatch((await formOf(b))[1], /투아웃/, "비우면 입장권 양식");
+    assert.doesNotMatch((await formOf(b))[1], /투아웃/, "비우면 보통 입장권");
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();

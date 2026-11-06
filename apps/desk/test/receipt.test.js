@@ -177,7 +177,7 @@ test("+ = 세로 2배 (기본과 2배 사이 중간 크기 · 폭 그대로 42�
     await page.fill("#tpl-text", "^+* 중간 크기\n^보통");
     const hgt = await page.$$eval("#tpl-paper .pl", (e) => e.map((x) => x.getBoundingClientRect().height));
     assert.ok(hgt[0] > hgt[1] * 1.6, `미리보기도 세로로 커짐 ${hgt}`);
-    assert.strictEqual(await page.getAttribute('#sheet .tplcode[data-c="+"]', "title"), "세로 2배 (중간)");
+    assert.strictEqual(await page.getAttribute('#sheet .tplcode[data-c="+"]', "title"), "세로 2배 (중간 · 폭은 그대로)");
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();
@@ -228,30 +228,34 @@ test("입장권 양식 네이버 · 현장 따로 (사장님 10/28): 예전 한 
     assert.deepStrictEqual(errs, []);
     await ctx.close();
 
-    // ② 체험판 설정: 프린트물 설정 = 영수증 설정 (사장님 11/05 — OKPOS 처럼) — 종류 · 실제출력물 및 템플릿 · 코드 목록 · 편집 · 미리보기
+    // ② 체험판 설정: 프린트물 설정 = 영수증 설정 (사장님 11/06 그림판 배치) — 맨 위 파란 상자 · 종류(묶음 → 양식) · 코드 목록 · 편집 · 미리보기
     const p2 = await browser.newPage({ viewport: { width: 1024, height: 768 } });
     const errs2 = [];
     p2.on("pageerror", (e) => errs2.push(e.message));
     p2.on("dialog", (d) => d.accept());
     await p2.goto(DESK);
-    await p2.evaluate(() => localStorage.removeItem("astanakiz-printtpls"));
+    await p2.evaluate(() => localStorage.clear());
+    await p2.reload();
     await p2.dblclick("#now");
     await p2.click('[data-t="prints"]');
-    assert.deepStrictEqual((await p2.$$eval("#tpl-kind option", (e) => e.map((x) => x.textContent))).slice(0, 3), ["입장권 — 네이버 예약", "입장권 — 현장 입장", "입장권 — 이벤트 입장"], "입장권 종류 셋 (현장 이벤트 이름이 없으면 '이벤트 입장')");
-    assert.deepStrictEqual(await p2.$$eval("#sheet .tplrow .tn", (e) => e.map((x) => x.textContent)), ["실제출력물", "기본 양식"]);
+    assert.deepStrictEqual(await p2.$$eval("#tpl-apply option", (e) => e.map((x) => x.textContent)), ["기본 입장권", "이벤트"], "현재 기본 적용 템플릿");
+    assert.ok(await p2.isChecked("#tpl-bc") && await p2.isChecked("#form-auto"), "BC 고객 별도 영수증 · 입장권 자동 출력");
+    assert.deepStrictEqual(await p2.$$eval("#tpl-group option", (e) => e.map((x) => x.textContent)), ["기본 입장권", "이벤트", "BC"]);
+    assert.deepStrictEqual(await p2.$$eval("#sheet .tplrow .tn", (e) => e.map((x) => x.textContent)), ["네이버 예약용", "현장입장자용"]);
     const nText = await p2.inputValue("#tpl-text");
     assert.ok(!/\[현장\]/.test(nText) && /\{누계\}/.test(nText), "네이버 양식엔 [현장] 줄 없음");
-    await p2.selectOption("#tpl-kind", "walk");
+    assert.strictEqual(await p2.getAttribute("#tpl-text", "wrap"), "off", "편집 칸은 스스로 줄을 바꾸지 않음");
+    await p2.click('#sheet .tplrow[data-k="walk"]');
     const wText = await p2.inputValue("#tpl-text");
     assert.ok(!/\[현장\]|\[네이버\]/.test(wText) && /네이버 예약하고/.test(wText), "현장 양식엔 표시 없이 현장 줄만");
     assert.match(await p2.textContent("#tpl-paper"), /네이버 예약하고/, "미리보기 = 현장 예시");
-    // 편집 → 미리보기 바로 · [저장]해야 들어감 · 저장 안 한 글은 그 줄에 남음 (다른 종류를 봐도)
+    // 편집 → 미리보기 바로 · [저장]해야 들어감 · 저장 안 한 글은 그 양식에 남음 (다른 양식을 봐도)
     await p2.fill("#tpl-text", "^* 현장 전용\n#{열쇠}번");
     assert.match(await p2.textContent("#tpl-paper"), /현장 전용/);
     assert.strictEqual(await p2.evaluate(() => window.__deskTest.PRINT_().forms.enter.walk), wText, "저장 전엔 그대로");
-    assert.match(await p2.getAttribute("#sheet .tplrow.live", "class"), /dirty/, "줄에 • 표시");
-    await p2.selectOption("#tpl-kind", "naver");
-    await p2.selectOption("#tpl-kind", "walk");
+    assert.match(await p2.getAttribute('#sheet .tplrow[data-k="walk"]', "class"), /dirty/, "줄에 • 표시");
+    await p2.click('#sheet .tplrow[data-k="naver"]');
+    await p2.click('#sheet .tplrow[data-k="walk"]');
     assert.strictEqual(await p2.inputValue("#tpl-text"), "^* 현장 전용\n#{열쇠}번", "저장 안 한 글 그대로");
     await p2.click("#tpl-save");
     const after = await p2.evaluate(() => { const P = window.__deskTest.PRINT_().forms.enter; return { walk: P.walk, naver: P.text }; });
@@ -269,31 +273,24 @@ test("입장권 양식 네이버 · 현장 따로 (사장님 10/28): 예전 한 
     await p2.evaluate(() => { const t = document.getElementById("tpl-text"); t.setSelectionRange(t.value.length, t.value.length); });
     await p2.click('#sheet .tplcode[data-c="---"]');
     assert.strictEqual(await p2.inputValue("#tpl-text"), "^* 현장 전용\n[현장]#{퇴장시간}{열쇠}번\n---", "선은 새 줄");
-    // 기본 템플릿(기본 양식)은 고칠 수 없음 → [실제출력물로] = 기본 양식으로
-    await p2.click("#sheet .tplrow[data-id=b0]");
-    assert.ok(await p2.$eval("#tpl-text", (t) => t.readOnly));
+    // 42칸 그대로: 편집 칸 왼쪽 = 그 줄이 종이에서 몇 줄 · 미리보기 줄 = 실제 출력 줄 (11/06)
+    const LONG = "가나다라마바사아자차카타파하 가나다라마바사아자차카타파하 끝"; // 한글 28자(56칸) + 띄어쓰기 2 + 끝 = 60칸 → 2줄
+    await p2.fill("#tpl-text", `^* 현장 전용\n${LONG}\n#가나다라마바사아자차카타`); // 2배 한글 12자 = 48칸 → 2줄
+    assert.deepStrictEqual(await p2.$$eval("#tpl-gut > div", (e) => e.map((x) => (x.querySelector("b") || {}).textContent || "")), ["", "2줄", "2줄"]);
+    const prevRows = await p2.$$eval("#tpl-paper .pl", (e) => e.map((x) => x.textContent));
+    assert.deepStrictEqual(prevRows.slice(1), ["가나다라마바사아자차카타파하 가나다라마바", "사아자차카타파하 끝", "가나다라마바사아자차", "카타"], "미리보기 = 42칸에서 나눈 줄 (한글 20자 + 띄어쓰기 = 41칸 · 2배는 한글 10자)");
+    const sent = await p2.evaluate((t) => { const T = window.__deskTest; return T.escposParts(t, Object.assign({}, T.PRINT_ ? {} : {}, { 구분: "현장", _현장: true }), false).filter((x) => x.t != null).map((x) => x.t); }, `^* 현장 전용\n${LONG}\n#가나다라마바사아자차카타`);
+    assert.deepStrictEqual(sent, ["현장 전용\n", "가나다라마바사아자차카타파하 가나다라마바\n사아자차카타파하 끝\n", "가나다라마바사아자차\n카타\n"], "프린터에도 같은 자리에서 줄을 나눠 보냄 (프린터가 스스로 바꾸지 않게)");
+    // [기본 양식으로] → 편집 칸에 · [저장]
+    await p2.click("[data-act=tplDef]");
     assert.strictEqual(await p2.inputValue("#tpl-text"), wText);
-    await p2.click("[data-act=tplUse]");
+    await p2.click("#tpl-save");
     assert.strictEqual(await p2.evaluate(() => window.__deskTest.PRINT_().forms.enter.walk), wText, "기본 양식으로 = 현장 양식만");
     assert.strictEqual(await p2.evaluate(() => window.__deskTest.PRINT_().forms.enter.text), nText);
-    // 내 템플릿: [+ 새 템플릿] → 이름 · 고쳐 [저장] → 보관 (다시 열어도) · [실제출력물로] · [삭제]
-    await p2.click("[data-act=tplNew]");
-    await p2.fill("#tpl-name", "겨울 안내");
-    await p2.fill("#tpl-text", "^* 겨울 현장\n#{열쇠}번");
-    await p2.click("#tpl-save");
-    assert.deepStrictEqual(await p2.$$eval("#sheet .tplrow .tn", (e) => e.map((x) => x.textContent)), ["실제출력물", "기본 양식", "겨울 안내"]);
-    const kept = JSON.parse(await p2.evaluate(() => localStorage.getItem("astanakiz-printtpls")));
-    assert.deepStrictEqual(kept.walk.map((x) => [x.name, x.text]), [["겨울 안내", "^* 겨울 현장\n#{열쇠}번"]], "이 PC 에 보관");
-    assert.strictEqual(await p2.evaluate(() => window.__deskTest.PRINT_().forms.enter.walk), wText, "템플릿을 저장해도 실제출력물은 그대로");
-    await p2.click("[data-act=tplUse]");
-    assert.strictEqual(await p2.evaluate(() => window.__deskTest.PRINT_().forms.enter.walk), "^* 겨울 현장\n#{열쇠}번", "[실제출력물로]");
-    await p2.click("#sheet .x");
-    await p2.reload();
-    await p2.dblclick("#now"); await p2.click('[data-t="prints"]'); await p2.selectOption("#tpl-kind", "walk");
-    assert.deepStrictEqual(await p2.$$eval("#sheet .tplrow .tn", (e) => e.map((x) => x.textContent)), ["실제출력물", "기본 양식", "겨울 안내"], "다시 열어도 보관");
-    await p2.click("#sheet .tplrow >> nth=2");
-    await p2.click("[data-act=tplDel]");
-    assert.deepStrictEqual(await p2.$$eval("#sheet .tplrow .tn", (e) => e.map((x) => x.textContent)), ["실제출력물", "기본 양식"]);
+    // 이름은 고칠 수 있음 (이 PC 에 저장)
+    await p2.fill("#tpl-name", "현장 손님용"); await p2.press("#tpl-name", "Enter");
+    assert.deepStrictEqual(await p2.$$eval("#sheet .tplrow .tn", (e) => e.map((x) => x.textContent)), ["네이버 예약용", "현장 손님용"]);
+    assert.strictEqual(JSON.parse(await p2.evaluate(() => localStorage.getItem("astanakiz-printset"))).names.walk, "현장 손님용");
     // 네이버 · 현장 입장권은 비울 수 없음
     await p2.fill("#tpl-text", "  ");
     await p2.click("#tpl-save");
