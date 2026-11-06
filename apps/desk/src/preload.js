@@ -94,15 +94,13 @@ contextBridge.exposeInMainWorld("desk", {
     get: () => ipcRenderer.invoke("config:get"),
     set: (patch) => ipcRenderer.invoke("config:set", patch),
   },
-  // 두 PC 연결 (사장님 11/06): 현장 POS ↔ 사무실 PC — 역할 · 연결 코드 · 상태 · 현장 화면 · 명령 (desk-sync.js)
+  // 두 PC 연결 (사장님 11/06): 현장 POS ↔ 사무실 PC — 역할 · 연결 코드 · 상태 · 키 현황 (desk-sync.js)
   sync: {
     role: () => ipcRenderer.sendSync("sync:role"), // 켤 때 역할 "pos" · "office" · ""
     get: () => ipcRenderer.invoke("sync:get"),
     set: (job) => ipcRenderer.invoke("sync:set", job), // { role } · { code } · { newCode: true }
     relaunch: () => ipcRenderer.invoke("sync:relaunch"),
-    snap: (s) => ipcRenderer.send("sync:snap", s), // 현장 POS: 지금 화면
-    cmd: (act, args) => ipcRenderer.invoke("sync:cmd", { act, args }), // 사무실: 명령 → { ok, id }
-    ack: (id, ok, msg) => ipcRenderer.send("sync:ack", id, ok, msg), // 현장 POS: 명령 결과
-    on: (ch, cb) => { if (["settings", "memo", "snap", "cmd", "ack", "status"].includes(ch)) ipcRenderer.on("sync:" + ch, (_e, v) => cb(v)); },
+    snap: (s) => ipcRenderer.send("sync:snap", s), // 현장 POS: 키 현황
+    on: (ch, cb) => { if (["settings", "memo", "snap", "status"].includes(ch)) ipcRenderer.on("sync:" + ch, (_e, v) => cb(v)); },
   },
 });

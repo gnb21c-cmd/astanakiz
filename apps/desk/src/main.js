@@ -417,10 +417,12 @@ const nwrap = (fn, limit = 120000) => async (_e, ...args) => {
   }
 };
 ipcMain.handle("naver:load", nwrap((day, only) => naver.loadDay(day, { only }), 300000)); // 처음엔 칸을 다 열어 오래 걸릴 수 있음
-ipcMain.handle("naver:complete", nwrap((b) => naver.complete(b)));
-ipcMain.handle("naver:setCap", nwrap((c) => naver.setCap(c)));
-ipcMain.handle("naver:cancel", nwrap((b) => naver.cancel(Object.assign({}, b, { paidOk: false })))); // 입금대기 예약 자동 취소 { day, time, product, no, qty } // 판매 수량 자동 조절 { day, product, time, n }
-ipcMain.handle("naver:cancelPaid", nwrap((b) => naver.cancelPaid(b))); // BC 쓰리아웃 자동 전액 취소 (전액환불을 고른 뒤 [예약 취소] · 사장님 10/26)
+// 두 PC 연결 (11/06): 사무실 PC 는 네이버를 읽기만 — 이용완료 · 판매 수량 · 취소는 현장 POS 만
+const posOnly = (h) => (e, ...a) => (RUN_ROLE === "office" ? { ok: false, why: "사무실 PC 는 네이버를 읽기만 해요 (현장 POS 에서)" } : h(e, ...a));
+ipcMain.handle("naver:complete", posOnly(nwrap((b) => naver.complete(b))));
+ipcMain.handle("naver:setCap", posOnly(nwrap((c) => naver.setCap(c))));
+ipcMain.handle("naver:cancel", posOnly(nwrap((b) => naver.cancel(Object.assign({}, b, { paidOk: false }))))); // 입금대기 예약 자동 취소 { day, time, product, no, qty } // 판매 수량 자동 조절 { day, product, time, n }
+ipcMain.handle("naver:cancelPaid", posOnly(nwrap((b) => naver.cancelPaid(b)))); // BC 쓰리아웃 자동 전액 취소 (전액환불을 고른 뒤 [예약 취소] · 사장님 10/26)
 ipcMain.handle("naver:show", () => {
   if (naverWin) {
     naverWin.show();
@@ -840,6 +842,7 @@ const histJobView = () => {
 ipcMain.handle("history:job", () => histJobView());
 ipcMain.handle("history:stop", () => { if (histJob && histJob.running) histJob.stop = true; return histJobView(); });
 ipcMain.handle("history:backfill", (_e, job) => {
+  if (RUN_ROLE === "office") return { ok: false, why: "지난 방문 기록은 현장 POS 가 읽어요" };
   const from = String((job && job.from) || ""), to = String((job && job.to) || "");
   if (histJob && histJob.running) return histJobView();
   if (!isDayKey(from) || !isDayKey(to) || from > to) return { ok: false, why: "기간이 틀림" };
@@ -1049,7 +1052,7 @@ function stockArm() {
 function stockTick() {
   try {
     const c = stockCfg();
-    if (!c.on || !naver || (stockJob && stockJob.running)) return;
+    if (!c.on || !naver || RUN_ROLE === "office" || (stockJob && stockJob.running)) return; // 사무실 PC 는 재고를 안 엶 (현장 POS 가)
     const today = localToday();
     if (settings.stockDoneDay === today) return;
     if (!settings.stockTried) { stockArm(); saveSettings(); return; } // 설치한 날: 켜자마자 돌지 않고 그날 남은 다음 때부터 (19시에 설치 → 20:20)
@@ -1066,7 +1069,7 @@ function stockTick() {
 }
 setInterval(stockTick, 30000);
 ipcMain.handle("stock:job", () => stockView());
-ipcMain.handle("stock:run", (_e, opts) => stockRun({ dry: !!(opts && opts.dry) }));
+ipcMain.handle("stock:run", (_e, opts) => (RUN_ROLE === "office" ? { ok: false, why: "재고는 현장 POS 가 열어요" } : stockRun({ dry: !!(opts && opts.dry) })));
 
 /** 보고 시스템 클라우드 boards/{보고 열쇠}/{문서} 에 { json, at } 덮어쓰기 — 200 = 보냄 / 403 = 열쇠나 모양이 틀림(규칙이 아직 없을 때도) */
 async function boardPatch(doc, json, at, rule) {
@@ -1089,7 +1092,8 @@ async function boardPatch(doc, json, at, rule) {
 // ── 두 PC 연결 (사장님 11/06): 현장 POS ↔ 사무실 PC · 같은 버전끼리 같은 설정 · 같은 화면 (desk-sync.js · docs/SYNC.md) ──
 //   우편함 = 보고 시스템 클라우드 boards/{보고 열쇠}/deskSync/pos · office (보고 시스템 규칙에 deskSync 가 있어야 함)
 //   역할(settings.syncRole): "pos" 현장 POS · "office" 사무실 PC · "" 안 씀 — 켤 때 정해짐 (바꾸면 다시 켜기)
-//   사무실 PC 는 아마노 · 네이버 · 톡톡 · POS · 현금통 창을 열지 않고 · 네이버 일(불러오기 · 이용완료 · 수량 · 재고)은 현장 POS 에 명령으로
+//   주고받는 것 (사장님 11/06 다시): 운영 설정 일체 · 메모장(관리자 메시지) · 자동 수량조절 켜고 끄기(설정) · 키 현황(현장 → 사무실)
+//   사무실 PC 는 아마노 · 톡톡 · POS · 현금통 창을 열지 않고 · 네이버는 직접 읽기만 (이용완료 · 판매 수량 · 취소 · 재고 · 지난 방문 기록은 현장 POS 만)으로
 //   연결 코드는 Windows 암호화로 이 PC 에만 (settings.syncCodeEnc) · 설정 바꾼 때 · 메모장 바꾼 때 · 처리한 명령은 앱 폴더 desk-sync.json
 const deskSync = require("./desk-sync");
 let RUN_ROLE = ""; // 켤 때 역할
@@ -1177,7 +1181,7 @@ function syncStart() {
   };
   const on = {
     snap: (snap, at) => toDesk("sync:snap", { snap, at }),
-    cmd: (c) => { if (deskWin && !deskWin.isDestroyed() && !deskWin.webContents.isLoading()) deskWin.webContents.send("sync:cmd", c); else syncEngine.ack(c.id, false, "현장 POS 화면이 켜지는 중이에요 — 잠시 뒤 다시 눌러 주세요"); },
+    cmd: (c) => syncEngine.ack(c.id, false, "이 버전은 사무실 명령을 받지 않아요 (설정 · 메모장 · 키 현황만)"),
     ack: (a) => toDesk("sync:ack", a),
     status: (st) => toDesk("sync:status", st),
   };
@@ -1213,12 +1217,6 @@ ipcMain.handle("sync:set", (_e, job) => {
 });
 ipcMain.handle("sync:relaunch", () => { app.relaunch(); app.exit(0); });
 ipcMain.on("sync:snap", (_e, snap) => { if (syncEngine && RUN_ROLE === "pos") syncEngine.setSnap(snap); });
-ipcMain.handle("sync:cmd", (_e, job) => {
-  if (!syncEngine || RUN_ROLE !== "office") return { ok: false, why: "사무실 PC 로 연결돼 있지 않아요" };
-  if (!syncEngine.status().peer.active) return { ok: false, why: "현장 POS 소식이 없어요 (꺼짐 · 인터넷 확인) — 켜지면 다시 눌러 주세요" };
-  return { ok: true, id: syncEngine.cmd(job && job.act, job && job.args) };
-});
-ipcMain.on("sync:ack", (_e, id, ok, msg) => { if (syncEngine && RUN_ROLE === "pos") syncEngine.ack(String(id || ""), ok, msg); });
 
 // ── 영수증 프린터 (80mm 감열지) ──
 // Windows 에 설치된 프린터 목록 (POS 프린터도 Windows 에 드라이버가 깔려 있어야 보임 — '설정 → 프린터 및 스캐너' 에 있는 것)
@@ -1556,10 +1554,10 @@ app.whenReady().then(() => {
   if (!gotLock) return;
   setInterval(memWatch, 5 * 60 * 1000);
   loadSettings();
-  RUN_ROLE = syncRole(); // 두 PC 연결 역할 (11/06) — 사무실 PC 는 화면만 (아마노 · 네이버 · 톡톡 · POS · 현금통은 현장 POS 에서)
+  RUN_ROLE = syncRole(); // 두 PC 연결 역할 (11/06) — 사무실 PC 는 아마노 · 톡톡 · POS · 현금통을 안 켜고 네이버는 읽기만
   const pos = RUN_ROLE !== "office";
   if (pos) openAmano(); // 맨 뒤 아마노
-  if (pos) openNaver(); // 맨 뒤 네이버 예약관리
+  openNaver(); // 맨 뒤 네이버 예약관리 (사무실 PC 는 읽기만 — 처음 한 번 사무실에서 네이버 로그인)
   createDesk(); // 맨 앞 데스크 (POS 는 원래대로 따로 켜져 있음)
   if (pos) startPosAgent(); // POS로 넘어가는 도우미를 미리 켜 둠
   if (pos) setTimeout(startPrnAgent, 3000); // 현금통 · 프린터 도우미도 (환전 오픈을 바로)

@@ -1,6 +1,7 @@
-/* 두 PC 연결 — 화면 쪽 (사장님 11/06): 현장 POS 화면 → 사무실 PC 화면 · 사무실 버튼 · 현장 POS 가 명령을 대신 함 · 반대편 설정 받기
+/* 두 PC 연결 — 화면 쪽 (사장님 11/06): 우편함으로는 운영 설정 · 메모장 · 자동 수량조절 켜고 끄기 · 키 현황만
+   네이버 예약 · 고객 카드는 사무실 PC 가 네이버에서 직접 읽음(읽기만) · 주차는 사무실에 없음
    앱 본체(우편함 · 잠금)는 desk-sync.test.js · 실제 앱 두 대 끝에서 끝까지는 빌드 때 Electron 점검
-   여기서는 체험판 두 창: A = 현장 POS · B = 사무실 PC ('사무실 PC 화면 미리 보기' + A 의 화면을 넣음) */
+   여기서는 체험판 두 창: A = 현장 POS · B = 사무실 PC ('사무실 PC 화면 미리 보기' + A 의 키 현황을 넣음) */
 const test = require("node:test");
 const assert = require("node:assert");
 const path = require("path");
@@ -21,39 +22,76 @@ async function open(ctx) {
   return page;
 }
 const keyBoard = (page) => page.$$eval("#keys .key[data-k]", (els) => els.map((e) => `${e.dataset.k}:${e.className.replace(/\s*(holding|sel)\b/g, "")}:${e.textContent.replace(/\s+/g, " ").trim()}`));
+async function enter(page, id, slot) {
+  await page.click(`.slot[data-s="${slot}"]`);
+  await page.click(`.res[data-id="${id}"]`);
+  for (let i = 0; i < 6 && !(await page.$("#enter-done:not([disabled])")); i++) await page.click(".kpick button:not([disabled]):not(.on) >> nth=0");
+  await page.click("#enter-done");
+}
+const snapOf = (page) => page.evaluate(() => JSON.stringify(window.__deskTest.sync.snap()));
+const applyTo = (page, snap, at) => page.evaluate(([s, t]) => { window.__deskTest.sync.apply(JSON.parse(s), window.__deskTest.today() + " " + t); window.__deskTest.setNow(830); }, [snap, at]);
 
-test("사무실 PC 화면: 현장 화면 그대로 (열쇠판 · 예약 · 판매 수량) · 근무자 일은 막힘 · 메모장 · 설정은 됨 · 손님 메모는 안 감", async () => {
+test("사무실 PC 키 현황: 현장 열쇠판 그대로 · 이름 · 전화 · 손님 메모는 안 감 · 사무실 네이버에 없는 입장은 '예약 손님' → 네이버에 나오면 그 카드로", async () => {
   const browser = await launch();
   try {
     const ctx = await browser.newContext();
     const A = await open(ctx);
     await A.evaluate(() => localStorage.clear());
     await A.reload();
-    // 현장: 예약 하나 더 · 손님 메모
-    await A.evaluate(() => { const T = window.__deskTest; T.addBooking(T.today(), "14:00", "사무실확인", "01077770000", 2, { prevDone: 2 }); T.setNow(830); });
+    await A.evaluate(() => window.__deskTest.setNow(830));
+    // 현장: 사무실 PC 네이버에는 아직 없는 예약이 입장 · 손님 메모
+    const id = await A.evaluate(() => { const T = window.__deskTest; return T.addBooking(T.today(), "14:00", "사무실확인", "01077770000", 2, { prevDone: 2 }); });
+    await enter(A, id, 840);
+    const ent = await A.evaluate((i) => { const b = window.__deskTest.bk(i); return { keys: b.keys.slice(), no: b.no }; }, id);
+    assert.strictEqual(ent.keys.length, 2, "현장에서 열쇠 2개 입장");
     const k = await A.evaluate(() => window.__deskTest.holders()[0].keys[0]);
     await A.click(`.key[data-k='${k}']`);
-    assert.ok(await A.$("#note-m"), "현장 열쇠 창에는 손님 메모 칸");
     await A.fill("#note-m", "손님메모비밀글"); await A.dispatchEvent("#note-m", "change");
-    assert.ok(JSON.stringify(await A.evaluate(() => window.__deskTest.notes())).includes("손님메모비밀글"), "현장에는 메모가 남음");
     await A.click("#sheet [data-act=close] >> nth=0");
-    const snap = await A.evaluate(() => JSON.stringify(window.__deskTest.sync.snap()));
-    assert.ok(!snap.includes("손님메모비밀글"), "손님 메모는 사무실로 안 감");
-    assert.ok(snap.includes("사무실확인"));
+    const snap = await snapOf(A);
+    for (const s of ["손님메모비밀글", "사무실확인", "01077770000", "찟재명", "01020039595"]) assert.ok(!snap.includes(s), `키 현황에 '${s}' 없음 (이름 · 전화 · 메모는 안 보냄)`);
+    assert.deepStrictEqual(Object.keys(JSON.parse(snap)).sort(), ["at", "b", "day", "g", "ig", "mv", "s", "v", "w", "x"].sort(), "네이버 칸 · 고객 카드 · 수량 기록은 안 보냄");
 
+    // 사무실 PC (체험판 미리 보기) — 네이버 예약은 이 PC 가 읽은 것 (체험 예시 = 현장과 같은 예약, '사무실확인'은 아직 없음)
     const B = await open(ctx);
     await B.evaluate(() => window.__deskTest.sync.demo(true));
     assert.strictEqual(await B.evaluate(() => window.__deskTest.sync.office()), true);
-    await B.evaluate((s) => { window.__deskTest.sync.apply(JSON.parse(s), window.__deskTest.today() + " 13:50:00"); window.__deskTest.setNow(830); }, snap);
-    // 같은 화면
-    assert.deepStrictEqual(await keyBoard(B), await keyBoard(A), "열쇠판이 같음");
-    assert.deepStrictEqual(await B.evaluate(() => window.__deskTest.holders2()), await A.evaluate(() => window.__deskTest.holders2()));
-    for (const p of [A, B]) await p.click('.slot[data-s="840"]');
-    const names = (p) => p.$$eval(".res .name", (e) => e.map((x) => x.textContent.replace(/\s+/g, " ").trim()));
-    assert.deepStrictEqual(await names(B), await names(A), "14:00 예약 목록이 같음");
-    assert.ok((await names(B)).some((n) => n.includes("사무실확인")));
+    await applyTo(B, snap, "13:50:00");
+    const boardA = await keyBoard(A), boardB = await keyBoard(B);
+    for (const kk of ent.keys) {
+      assert.match(boardB.find((x) => x.startsWith(kk + ":")), /예약 손님/, `${kk}번: 사무실 네이버에 아직 없는 입장은 '예약 손님'`);
+      assert.match(boardA.find((x) => x.startsWith(kk + ":")), /사무실확인/);
+    }
+    const strip = (b) => b.filter((x) => !ent.keys.some((kk) => x.startsWith(kk + ":")));
+    assert.deepStrictEqual(strip(boardB), strip(boardA), "다른 열쇠는 이름까지 같음 (이름은 사무실 네이버 카드에서)");
     assert.strictEqual((await B.textContent("#syncchip")).trim(), "사무실 PC 미리 보기 · 누르면 끝");
-    // 근무자 일은 막힘: 열쇠 창의 버튼 · 포스 전환
+    // 사무실 네이버를 다시 읽어 그 예약이 나옴 → 그 카드에 붙음 ('예약 손님' 카드는 없어짐)
+    await B.evaluate((no) => { const T = window.__deskTest; const i = T.addBooking(T.today(), "14:00", "사무실확인", "01077770000", 2, {}); T.bk(i).no = no; }, ent.no);
+    await applyTo(B, snap, "13:50:10");
+    const after = await keyBoard(B);
+    for (const kk of ent.keys) assert.match(after.find((x) => x.startsWith(kk + ":")), /사무실확인/);
+    assert.strictEqual(await B.evaluate(() => window.__deskTest.holders().filter((h) => h.name === "예약 손님").length), 0);
+    assert.strictEqual(await B.evaluate((no) => window.__deskTest.holders().filter((h) => h.no === no).length, ent.no), 1, "한 손님은 한 카드");
+    // 현장에서 반납 → 사무실 열쇠판도
+    await A.evaluate((key) => { const T = window.__deskTest, h = T.holders().find((x) => x.keys.includes(key)); T.returnKeys(h.id, [key]); }, k);
+    await applyTo(B, await snapOf(A), "13:51:00");
+    assert.ok((await keyBoard(B)).find((x) => x.startsWith(k + ":")).includes("free"), "반납한 열쇠는 빈 열쇠");
+    assert.deepStrictEqual(await B.evaluate(() => window.__deskTest.holders2().map((h) => h.keys.join("+")).sort()), await A.evaluate(() => window.__deskTest.holders2().map((h) => h.keys.join("+")).sort()));
+    assert.deepStrictEqual(A.errs.concat(B.errs), []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("사무실 PC 버튼: 근무자 일 · 네이버에 넣는 일 · 출력은 막힘 · 설정 · 메모장 · 네이버 보기(새로고침 · 날짜)는 됨 · 주차 · 톡톡 없음", async () => {
+  const browser = await launch();
+  try {
+    const ctx = await browser.newContext();
+    const B = await open(ctx);
+    await B.evaluate(() => localStorage.clear());
+    await B.reload();
+    await B.evaluate(() => window.__deskTest.sync.demo(true));
+    const k = await B.evaluate(() => window.__deskTest.holders()[0].keys[0]);
     await B.click(`.key[data-k='${k}']`);
     assert.strictEqual(await B.$("#note-m"), null, "사무실 PC 에는 손님 메모 칸 없음");
     const blocked = await B.$$eval("#sheet [data-act]:not([disabled])", (e) => e.map((x) => x.dataset.act).find((a) => /^(payOver|svcPick|plusSlot|endSlot|reprint|returnKey|returnAll)$/.test(a)));
@@ -63,56 +101,27 @@ test("사무실 PC 화면: 현장 화면 그대로 (열쇠판 · 예약 · 판�
     assert.match(await B.textContent("#toast"), /현장 POS 에서/);
     assert.strictEqual(await B.evaluate(() => JSON.stringify(window.__deskTest.holders2())), before, "아무것도 안 바뀜");
     await B.click("#sheet [data-act=close] >> nth=0");
-    assert.strictEqual(await B.evaluate(() => window.__deskTest.sync.gate("day")), false);
-    assert.match(await B.textContent("#toast"), /오늘 현장 화면만/);
-    assert.strictEqual(await B.evaluate(() => window.__deskTest.sync.gate("tplTest")), false);
-    assert.match(await B.textContent("#toast"), /출력은 현장 POS 에서/);
-    // 되는 것: 메모장 · 운영 설정 · 새로고침 = 현장에 명령
-    for (const a of ["memoSend", "memoAdd", "settings", "tplSave", "capCell", "stToggle"]) assert.strictEqual(await B.evaluate((x) => window.__deskTest.sync.gate(x), a), true, a);
+    for (const a of ["capNow", "capTry", "stNow", "stDry"]) {
+      assert.strictEqual(await B.evaluate((x) => window.__deskTest.sync.gate(x), a), false, a);
+      assert.match(await B.textContent("#toast"), /현장 POS 가 넣어요 — 사무실은 자동 수량조절 켜고 끄기/);
+    }
+    for (const a of ["tplTest", "tplSampleAll", "testPrint"]) { assert.strictEqual(await B.evaluate((x) => window.__deskTest.sync.gate(x), a), false, a); assert.match(await B.textContent("#toast"), /출력은 현장 POS 에서/); }
+    for (const a of ["car", "discount", "talkOpen", "posGo", "bcSet", "walkDone", "svSendNow", "hvBackfill"]) assert.strictEqual(await B.evaluate((x) => window.__deskTest.sync.gate(x), a), false, a);
+    for (const a of ["refresh", "day", "slot", "openRes", "memoSend", "memoAdd", "settings", "tplSave", "capCell", "stToggle", "naverShow"]) assert.strictEqual(await B.evaluate((x) => window.__deskTest.sync.gate(x), a), true, a);
     await B.click("[data-act=refresh]");
-    assert.match(await B.textContent("#toast"), /현장 POS 로 보냄: 네이버 새로고침/);
-    // 현장에서 바뀌면 다시: 열쇠 하나 반납 → 사무실 열쇠판도
-    await A.evaluate((key) => { const T = window.__deskTest, h = T.holders().find((x) => x.keys.includes(key)); T.returnKeys(h.id, [key]); }, k);
-    await B.evaluate((s) => window.__deskTest.sync.apply(JSON.parse(s), window.__deskTest.today() + " 13:51:00"), await A.evaluate(() => JSON.stringify(window.__deskTest.sync.snap())));
-    assert.deepStrictEqual(await keyBoard(B), await keyBoard(A), "반납도 같게");
-    // 미리 보기 끝 (맨 위 표시를 누름)
+    assert.match(await B.textContent("#toast"), /새로고침/, "네이버 보기는 이 PC 가 직접");
+    await B.click('[data-act=day][data-d="1"]');
+    assert.doesNotMatch(await B.textContent("#toast"), /현장 POS 에서/, "다른 날짜도 네이버에서 직접");
+    for (const sel of [".park", "#talk-kids", "#bulk-btn", "[data-act=posGo]"]) assert.strictEqual(await B.isVisible(sel), false, `${sel} 안 보임`);
+    // 맨 위 [오늘 수량조절] (자동 수량조절 켜고 끄기) 는 사무실에서도
+    const was = await B.isChecked("#capforce-on");
+    await B.click("#capforce");
+    assert.strictEqual(await B.isChecked("#capforce-on"), !was);
+    // 미리 보기 끝
     await B.click("#syncchip");
     assert.strictEqual(await B.evaluate(() => window.__deskTest.sync.office()), false);
-    assert.strictEqual(await B.isHidden("#syncchip"), true);
-    assert.deepStrictEqual(A.errs.concat(B.errs), []);
-  } finally {
-    await browser.close();
-  }
-});
-
-test("현장 POS: 사무실이 보낸 명령을 대신 하고 결과를 돌려줌 · 사무실은 결과를 알림 · 모르는 명령은 안 함", async () => {
-  const browser = await launch();
-  try {
-    const ctx = await browser.newContext();
-    const A = await open(ctx);
-    await A.evaluate(() => localStorage.clear());
-    await A.reload();
-    await A.evaluate(() => window.__deskTest.setNow(600)); // 체험판 10/5 (대체공휴일 · 시간제) 10:00
-    await A.evaluate(() => window.__deskTest.sync.run({ id: "aaaaaaaaaaaa", act: "capNow", args: {} }));
-    await A.waitForFunction(() => window.__deskTest.sync.acks().length === 1);
-    const a1 = await A.evaluate(() => window.__deskTest.sync.acks()[0]);
-    assert.strictEqual(a1.ok, true);
-    assert.ok(a1.msg.length > 0, `결과 글: ${a1.msg}`);
-    assert.match(await A.textContent("#toast"), /사무실 PC 에서 보낸 일|판매 수량/);
-    await A.evaluate(() => window.__deskTest.sync.run({ id: "bbbbbbbbbbbb", act: "capTry", args: { day: "2026-10-12", time: "10:00", n: 12 } }));
-    await A.evaluate(() => window.__deskTest.sync.run({ id: "cccccccccccc", act: "rmrf", args: {} }));
-    await A.evaluate(() => window.__deskTest.sync.run({ id: "dddddddddddd", act: "capTry", args: { day: "어제", time: "10:00", n: 12 } }));
-    const acks = await A.evaluate(() => window.__deskTest.sync.acks().slice(1));
-    assert.deepStrictEqual(acks.map((x) => [x.id, x.ok]), [["bbbbbbbbbbbb", false], ["cccccccccccc", false], ["dddddddddddd", false]]);
-    assert.match(acks[0].msg, /체험판/);
-    assert.match(acks[1].msg, /모르는 명령/);
-    assert.match(acks[2].msg, /틀려요/);
-    // 사무실 쪽 알림
-    const B = await open(ctx);
-    await B.evaluate(() => window.__deskTest.sync.demo(true));
-    await B.evaluate((a) => window.__deskTest.sync.ack({ id: a.id, act: "capNow", ok: a.ok, msg: a.msg }), a1);
-    assert.match(await B.textContent("#toast"), /^현장 POS: 수량 지금 조절 됨/);
-    assert.deepStrictEqual(A.errs.concat(B.errs), []);
+    assert.strictEqual(await B.isVisible(".park"), true, "현장 POS 로 돌아오면 주차");
+    assert.deepStrictEqual(B.errs, []);
   } finally {
     await browser.close();
   }
@@ -125,23 +134,21 @@ test("반대편 PC 에서 바꾼 설정이 화면에 바로: 프린트물 설정
     const A = await open(ctx);
     await A.evaluate(() => localStorage.clear());
     await A.reload();
-    // 프린트물 설정을 열고 편집 칸에 쓰는 중
     await A.dblclick("#now");
     await A.click('[data-t="prints"]');
     await A.click("#tpl-text");
     await A.keyboard.type("쓰는중");
     const typed = await A.inputValue("#tpl-text");
-    await A.evaluate(() => window.__deskTest.sync.settings(["printSet", "peaks", "capAuto"], { printSet: { apply: "event", bcOn: false, names: { evw: "(추)추석양식" }, frags: [] }, peaks: [], capAuto: Object.assign({}, window.__deskTest.RULES.capAuto, { target: 37 }) }));
+    await A.evaluate(() => window.__deskTest.sync.settings(["printSet", "peaks", "capAuto"], { printSet: { apply: "event", bcOn: false, names: { evw: "(추)추석양식" }, frags: [] }, peaks: [], capAuto: Object.assign({}, window.__deskTest.RULES.capAuto, { on: false, target: 37 }) }));
     assert.match(await A.textContent("#toast"), /사무실 PC에서 바꾼 설정을 받았어요/);
-    assert.strictEqual(await A.evaluate(() => window.__deskTest.RULES.capAuto.target), 37);
+    assert.deepStrictEqual(await A.evaluate(() => [window.__deskTest.RULES.capAuto.on, window.__deskTest.RULES.capAuto.target]), [false, 37], "자동 수량조절 끔 · 목표");
     assert.deepStrictEqual(await A.evaluate(() => window.__deskTest.RULES.peaks), []);
     assert.strictEqual(await A.inputValue("#tpl-text"), typed, "쓰는 중인 글은 그대로");
-    await A.click("#sheet h3"); // 칸 밖을 누름 → 다시 그림
+    await A.click("#sheet h3");
     await A.waitForFunction(() => document.getElementById("tpl-apply") && document.getElementById("tpl-apply").value === "event");
     assert.strictEqual(await A.isChecked("#tpl-bc"), false);
     await A.selectOption("#tpl-group", "event");
     assert.ok((await A.$$eval("#sheet .tplrow", (e) => e.map((x) => x.textContent))).some((t) => t.includes("(추)추석양식")));
-    // 두 PC 연결 메뉴 (체험판)
     await A.click('[data-t="sync"]');
     assert.match(await A.textContent("#setbody"), /체험판 — 설치한 앱에서 이어져요/);
     assert.match(await A.textContent('[data-t="sync"]'), /두 PC 연결\s*체험판/);
