@@ -106,6 +106,16 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .top .capforce.on { border-color: var(--ok); color: var(--fg); }
 .top .capforce.on .cfknob { background: var(--ok); }
 .top .capforce.on .cfknob::after { left: 12px; }
+/* 두 PC 연결 (11/06): 맨 위 작은 표시 · 사무실 PC 는 근무자 일 버튼을 흐리게 */
+.top .synchip { flex: none; border: 1.5px solid var(--line); border-radius: 8px; padding: 3px 7px; font-size: 11px; font-weight: 700; line-height: 1.2; background: var(--surface); color: var(--muted); cursor: pointer; white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.top .synchip.ok { border-color: var(--ok); color: var(--fg); }
+.top .synchip.warn { border-color: var(--amber); color: var(--amber); }
+.top .synchip.bad { border-color: var(--red); color: var(--red); }
+body.office .top .posgo { display: none; }
+body.office #sheet .btn-ink:not([data-act^="sync"]):not([data-act^="memo"]):not([data-act^="tpl"]):not([data-act^="ev"]) { opacity: .45; }
+.synccode { font-size: 20px; letter-spacing: 1px; padding: 4px 10px; border: 1.5px dashed var(--line); border-radius: 8px; user-select: all; }
+.seg3 button { min-width: 0; }
+.syncst b.on { color: var(--ok); } .syncst b.bad { color: var(--red); }
 .top .capforce:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; }
 .top .spacer { flex: 1; }
 .top .now { font-size: 22px; font-weight: 700; border: 0; background: transparent; padding: 0; color: var(--fg); cursor: default; } /* 시계 = 관리자 숨은 입구 (두 번 누르기) */
@@ -741,6 +751,8 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     <button class="btn btn-sm posgo" data-act="drawer" title="POS와 연결된 현금통을 엶 (POS가 꺼져 있어도)">환전 오픈</button>
     <!-- 사장님 10/21: 사람이 몰리는 비수기 평일 — 근무자가 체크하면 그날만 네이버 판매 수량 자동조절 (다음 날은 다시 꺼짐 · 시간제인 날은 저절로 켜져 있음) -->
     <label class="capforce" id="capforce"><input type="checkbox" id="capforce-on" role="switch" aria-label="오늘 수량조절"><span class="cfknob" aria-hidden="true"></span><span>오늘<br>수량조절</span></label>
+    <!-- 두 PC 연결 (사장님 11/06): 사무실 PC = 현장 화면 몇 시 기준 · 현장 POS = 사무실이 보고 있으면 -->
+    <button class="synchip" id="syncchip" data-act="syncOpen" hidden></button>
     <span class="spacer"></span>
     <button class="btn btn-sm" data-act="time" data-min="5">+5분</button>
     <button class="btn btn-sm" data-act="time" data-min="30">+30분</button>
@@ -876,6 +888,13 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   const SLOTS = []; for (let h = 10; h <= 19; h++) SLOTS.push(h * 60, h * 60 + 30);
   // 설치한 앱 안에서 열리면 실제 네이버·아마노·POS 와 연결 (window.desk), 아니면 체험판(예시 자료 · 가짜 시계)
   const APP = !!(window.desk && window.desk.naver);
+  /* 두 PC 연결 (사장님 11/06) — 현장 POS ↔ 사무실 PC · 같은 버전끼리 같은 설정 · 같은 화면 (앱 본체 desk-sync.js · docs/SYNC.md)
+     SYNC_ROLE (켤 때 정해짐): "pos" 현장 POS · "office" 사무실 PC · "" 안 씀
+     사무실 PC(OFFICE): 네이버 · 아마노 · 프린터 · 보고 · 장부 · 저장 파일을 건드리지 않고 현장 POS 가 보낸 화면을 그대로 그림 (아래 syncApply) */
+  const SYNC = APP && window.desk.sync ? window.desk.sync : null;
+  const SYNC_ROLE = (() => { try { return (SYNC && SYNC.role()) || ""; } catch (e) { return ""; } })();
+  let OFFICE = SYNC_ROLE === "office"; // 체험판 '사무실 PC 화면 미리 보기'에서도 켬
+  const SYNCV = { st: null, info: null, snapAt: 0, snapText: "", dayOff: "", ev: {}, wait: new Map(), acks: [], demo: false, stale: false, sentAt: 0, lastSnap: "" };
   /* 글 칸 커서 되살리기 (사장님 10/26: 메모 칸을 눌러도 커서가 어쩌다 생기고 어쩌다 안 생겨 글이 안 써짐)
      설치한 앱(Electron · Windows)은 확인 창(confirm)을 닫은 뒤나 숨은 창(네이버 · 아마노 · 톡톡)이 잠깐 앞에 왔다 간 뒤
      창은 앞인데 키보드 포커스가 없어 글 칸에 커서가 안 생기는 일이 있음 →
@@ -1136,7 +1155,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   const naverPartial = {}; // 날짜 → 시간 칸이 덜 떠 이어서 실패한 횟수 (20초 뒤 다시 · 3번까지)
   /** 네이버에서 불러오기. only = "14:00" 이면 그 시간 칸만 (근무자가 시간 칸을 누를 때), 없으면 하루 전체 (새로고침 · 자동) */
   async function loadNaver(day, loud, only) {
-    if (!APP) return;
+    if (!APP || OFFICE) return; // 사무실 PC 는 네이버를 직접 안 읽음 (현장 POS 에 [새로고침] 명령)
     if (naverBusy) { naverNext = { day, loud, only }; if (loud) toast(`지금 불러오기가 끝나면 ${dateLabel(day)}${only ? ` ${only}` : ""}를 이어서 불러와요`); return; }
     naverBusy = true; naverStep = ""; renderAll();
     const r = await window.desk.naver.load(day, only).catch((e) => ({ ok: false, why: String(e) }));
@@ -1198,7 +1217,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   /* 입장 처리는 열쇠를 바로 등록하고, 네이버 이용완료는 여기서 뒤에서 차례로 (근무자가 기다리지 않게 · 현장 10/6)
      실패하면 카드에 '네이버 이용완료 대기'로 남고 2분마다 다시. 불러오기에서 네이버가 완료로 보이면 대기 표시도 지움 */
   async function naverFlush() {
-    if (!APP || flushing) return;
+    if (!APP || OFFICE || flushing) return;
     flushing = true;
     const tried = new Set();
     try {
@@ -1223,7 +1242,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       }
     } finally { flushing = false; }
   }
-  if (APP) setInterval(naverFlush, 2 * 60 * 1000);
+  if (APP) setInterval(() => { if (!OFFICE) naverFlush(); }, 2 * 60 * 1000);
 
   /* 오늘의 열쇠 · 입장 기록은 이 PC에 저장 → 프로그램을 껐다 켜도 · 컴퓨터를 다시 켜도 · 재설치해도 그대로 (현장 10/6)
      - 입장한 예약은 예약 정보까지 통째로 저장 → 다시 켜면 네이버를 불러오기 전에도 열쇠판 · 명단에 바로 나옴
@@ -1238,6 +1257,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
      일괄 반납으로 돌려받은 열쇠는 bulkOut (하나씩 확인하지 않은 열쇠) */
   const noteKeys = (h) => { if (h.keys && h.keys.length) h.keysTaken = [...new Set([...(h.keysTaken || []), ...h.keys])]; };
   function saveState() {
+    if (OFFICE) return; // 사무실 PC: 현장 화면을 보여 주기만
     for (const h of (bookings[TODAY] || []).concat(walkins, svcKeys)) noteKeys(h);
     if (!APP || !stateReady) return;
     const b = (bookings[TODAY] || []).filter((x) => x.enteredAt != null).map((x) => Object.fromEntries(SAVE_FIELDS.filter((k) => x[k] !== undefined).map((k) => [k, x[k]])));
@@ -1252,8 +1272,8 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     if (!st) try { st = parse(localStorage.getItem(STATE_KEY)); } catch (e) { st = null; }
     return st;
   }
-  // 켜자마자: 저장본으로 오늘 입장 기록 · 현장입장 · 열쇠를 되살림
-  if (APP) {
+  // 켜자마자: 저장본으로 오늘 입장 기록 · 현장입장 · 열쇠를 되살림 (사무실 PC 는 저장본 없이 현장 화면을 받음)
+  if (APP && !OFFICE) {
     const st = loadSaved();
     if (st) {
       seq = Math.max(seq, st.seq || 0); posSeq = Math.max(posSeq, st.posSeq || 0);
@@ -2273,7 +2293,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     $("golden").hidden = false;
     renderAll();
   }
-  function renderAll() { saveState(); evSync(); hvSync(); notesSync(); bcWatch(); $("now").textContent = hm(now); $("refresh-at").textContent = refreshText(); $("refresh-at").style.color = (naverErr || (bookings[TODAY] || []).some((b) => b.naverPending && b.naverWhy)) && !naverBusy ? "var(--red)" : ""; renderSlots(); renderRes(); renderKeys(); renderCars(); goldenCheck(); renderMemoBoxes(); renderCapForce(); }
+  function renderAll() { if (!OFFICE) { saveState(); evSync(); hvSync(); notesSync(); bcWatch(); } $("now").textContent = hm(now); $("refresh-at").textContent = refreshText(); $("refresh-at").style.color = (naverErr || (bookings[TODAY] || []).some((b) => b.naverPending && b.naverWhy)) && !naverBusy ? "var(--red)" : ""; renderSlots(); renderRes(); renderKeys(); renderCars(); if (!OFFICE) goldenCheck(); renderMemoBoxes(); renderCapForce(); renderSyncChip(); }
   /** 맨 위 [오늘 수량조절] 스위치 (사장님 10/21): 설정과 상관없이 근무자가 그날만 켜고 끔 · 다음 날은 기본(시간제인 날 = 설정 · 평일 = 꺼짐) */
   function renderCapForce() {
     const el = $("capforce"), cb = $("capforce-on");
@@ -2580,7 +2600,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     }
   }
   // ── 운영 설정 V2.0 (사장님 10/21): 왼쪽 메뉴 · [?] 설명 · 기준 · 근무자 ─────────────
-  const SET_MENU = [["season", "비성수기 설정"], ["printer", "프린터 설정"], ["prints", "프린트물 설정"], ["event", "재방문 이벤트"], ["staff", "근무자 등록"], ["api", "API 연결 설정"], ["naver", "네이버 설정"], ["cust", "고객 세부 관리"], ["etc", "기타"]];
+  const SET_MENU = [["season", "비성수기 설정"], ["printer", "프린터 설정"], ["prints", "프린트물 설정"], ["event", "재방문 이벤트"], ["staff", "근무자 등록"], ["api", "API 연결 설정"], ["naver", "네이버 설정"], ["cust", "고객 세부 관리"], ["etc", "기타"], ["sync", "두 PC 연결"]];
   /** 메뉴 옆 작은 상태 (들어가 보지 않아도 켜졌는지) */
   function setBadge(k) {
     if (k === "season") return `기간 ${RULES.peaks.length}`;
@@ -2591,6 +2611,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     if (k === "api") return REAL ? "" : "체험판";
     if (k === "naver") { const n = (RULES.capAuto.on ? 1 : 0) + (ST.view && ST.view.cfg && ST.view.cfg.on ? 1 : 0); return n ? `켜짐 ${n}` : "꺼짐"; }
     if (k === "etc") return [WEV.name ? `${WEV.name} 이벤트` : "", SV.on ? "설문 켜짐" : ""].filter(Boolean).join(" · ");
+    if (k === "sync") return syncBadge();
     if (k === "cust") { if (!custList) { custLoad(); return ""; } const n = custList.filter((x) => x.bc).length; return n ? `BC ${n}명` : "BC · 마일리지 SKIP"; }
     return "";
   }
@@ -2788,6 +2809,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   }
   /** 운영 설정 한 쪽 (왼쪽 메뉴에서 고른 것) → { html, after(그린 뒤 할 일) } */
   function setPage(tab) {
+      if (tab === "sync") return syncPage(); // 두 PC 연결 (11/06)
       if (tab === "event") {
         if (!(EV.cur >= 0 && EV.cur <= 2)) EV.cur = 0; // 미리보기 예시 (1번 안내 · 2번 성공) — 양식 고치기는 프린트물 설정
         const L = EV.from ? evLog() : null, i = EV.cur, period = isDay(EV.from) && isDay(EV.to) ? `${krDate(EV.from)} ~ ${krDate(EV.to)}` : "";
@@ -3514,7 +3536,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   const NOTE_APP = () => APP && !!(window.desk && window.desk.notes);
   if (!APP) try { for (const [k, n] of Object.entries(JSON.parse(localStorage.getItem(NOTE_LS)) || {})) NOTES.set(k, n); } catch (e) { /* 없음 */ }
   const noteKey = (b) => (b && !b.walk && !b.svc ? evKey(b) : "");
-  const noteOf = (b) => { const k = noteKey(b); return (k && NOTES.get(k)) || null; };
+  const noteOf = (b) => { if (OFFICE) return null; const k = noteKey(b); return (k && NOTES.get(k)) || null; }; // 손님 메모는 현장 POS 에만 (클라우드로 안 보냄)
   /** 이름 색 (블랙컨슈머가 먼저) */
   const nameCls = (b) => { const n = noteOf(b); return !n ? "" : n.bl || Number(n.bc) > 0 ? "nm-bl" : n.k3 ? "nm-k3" : ""; };
   const nameHtml = (b) => { const c = nameCls(b); return c ? `<span class="${c}" title="${c === "nm-bl" ? "BC" : "3자녀"}">${esc(b.name)}</span>` : esc(b.name); };
@@ -3662,7 +3684,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   const bcWhyText = (n) => (n && n.r3 ? `${esc(n.r3)} <span class="help">${n.r3At ? `${+n.r3At.slice(5, 7)}/${+n.r3At.slice(8, 10)} ${n.r3At.slice(11, 16)}` : ""}</span>` : "");
   /** 쓰리아웃 사유 창 (고객 카드에서 ③ 누르는 순간) — 쓰고 [확인]해야 쓰리아웃 */
   const bcAskHtml = () => (!sheet.bcAsk ? "" : `<div class="bcask" role="dialog" aria-modal="true" aria-labelledby="bc-ask-t"><div><b id="bc-ask-t" class="bcwhy">③ 쓰리아웃 사유</b><span class="help">사유를 남겨야 쓰리아웃이 돼요 — 그때부터 예약 불가 대응 (나중에도 이유를 볼 수 있어요)</span><textarea id="bc-why" maxlength="200" placeholder="예: 직원에게 폭언 · 규칙 위반 반복 …"></textarea><div class="btns" style="justify-content:flex-end"><button class="btn" data-act="bc3No">취소</button><button class="btn btn-ink" data-act="bc3Ok">확인 — 쓰리아웃</button></div></div></div>`);
-  const noteRow = (b) => { if (!noteKey(b)) return ""; const n = noteOf(b) || {}; return `${n.r3 && bcOf(b) >= 1 ? `<dt>${bcOf(b) >= 3 ? "쓰리아웃 사유" : "지난 쓰리아웃 사유"}</dt><dd class="bcwhy">${bcWhyText(n)}</dd>` : ""}<dt>메모</dt><dd class="notecell"><textarea id="note-m" class="notein" rows="2" maxlength="${NOTE_MAX}" spellcheck="false" aria-label="고객 메모" placeholder="고객 메모 (2줄) — 이 PC에 저장 · 다음 방문에도 보여요">${esc(n.m || "")}</textarea><span class="help" id="note-at">${n.at ? `${noteAtText(n.at)} 저장` : ""}</span></dd>`; };
+  const noteRow = (b) => { if (OFFICE || !noteKey(b)) return ""; const n = noteOf(b) || {}; return `${n.r3 && bcOf(b) >= 1 ? `<dt>${bcOf(b) >= 3 ? "쓰리아웃 사유" : "지난 쓰리아웃 사유"}</dt><dd class="bcwhy">${bcWhyText(n)}</dd>` : ""}<dt>메모</dt><dd class="notecell"><textarea id="note-m" class="notein" rows="2" maxlength="${NOTE_MAX}" spellcheck="false" aria-label="고객 메모" placeholder="고객 메모 (2줄) — 이 PC에 저장 · 다음 방문에도 보여요">${esc(n.m || "")}</textarea><span class="help" id="note-at">${n.at ? `${noteAtText(n.at)} 저장` : ""}</span></dd>`; };
   /** 2줄 칸에 맞춤: 줄바꿈은 한 번까지 · 칸을 넘는 글자는 뒤에서 뺌 (스크롤 없음) */
   function noteFit(t) {
     const p = t.value.split("\n");
@@ -3801,6 +3823,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       이벤트는 **방문한 날** 기준 (사장님 10/15): 그날 몇 장 · 몇 건(나눠 한 예약 · 연속예약 · 입장 뒤 추가 예약 · 다시 등록)이든 그날 방문은 한 번
       → 오늘 이미 기록이 있으면 '오늘 이미 방문'(기한 그대로 · 사은품 없음) · 성공은 오늘 뒤 날짜에 다시 올 때만 (네이버 완료 순번은 안 봄) */
   function evOf(b) {
+    if (OFFICE) return (b && b.day === TODAY && SYNCV.ev[b.id]) || null; // 사무실 PC: 현장 POS 가 셈한 것 (장부는 현장에만)
     if (!evFrozen(b) || evOut(b)) return null; // BC 투아웃 이상은 이벤트 대상 아님 (사장님 11/05)
     const n = b.status === "완료" ? b.visitNo : b.prevDone == null ? null : b.prevDone + 1;
     if (!n) return null;
@@ -4605,6 +4628,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       sec++;
       if (sec >= 60) { sec = 0; now++; renderAll(); }
     }
+    if (!OFFICE) { // 사무실 PC 는 자동 일 없음 (현장 POS 가 함)
     autoLoad();
     svTick(); // 설문 누적 20:00 보고
     evsTick(); // 이벤트 입장 수 20:00 보고 (설문과 같이 · 설문이 없어도)
@@ -4612,6 +4636,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     hvTick(); // 재방문 간격 20:00 보고 · 지난 기록 읽기 진행
     stTick(); // 네이버 재고 자동 오픈 진행
     capTick();
+    }
     if (sheet.mode === "key" && $("pos").hidden) { const h = holderById(sheet.hid); const mt = $("meter"); if (h && mt) { const before = !!overInfo(h).due; mt.innerHTML = meterHtml(h); if (sec === 0 || (!!overInfo(h).due !== before)) renderSheet(); } }
   }, 1000);
 
@@ -5420,6 +5445,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     };
     const target = (x, y) => { const t = document.elementFromPoint(x, y); const el = t && t.closest(".keys .key[data-k]"); return el && !el.classList.contains("bulk") ? el : null; };
     $("keys").addEventListener("pointerdown", (e) => {
+      if (OFFICE) return; // 사무실 PC: 열쇠 옮기기는 현장에서
       const el = e.target.closest(".key[data-k]");
       if (!el || el.classList.contains("free") || !holderOf(Number(el.dataset.k)) || (e.button != null && e.button > 0)) return;
       clear();
@@ -5463,10 +5489,303 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     document.addEventListener("pointercancel", clear);
     $("keys").addEventListener("contextmenu", (e) => e.preventDefault()); // 터치로 꾹 누르면 뜨는 메뉴 · 오른쪽 클릭 막기
   })();
+  // ── 두 PC 연결 (사장님 11/06): 현장 POS ↔ 사무실 PC · 같은 버전끼리 같은 설정 · 같은 화면 (앱 본체 desk-sync.js · docs/SYNC.md) ──
+  //   현장 POS: 사무실 PC 가 열려 있으면 지금 화면(snap)을 2초마다 앱 본체로 → 우편함 · 사무실이 보낸 명령(수량 조절 등)을 대신 하고 결과를 돌려줌
+  //   사무실 PC: 받은 화면을 그대로 그림 · 근무자 일(입장 · 반납 · 결제 · 출력 · 주차)은 막음 · 설정 · 메모장은 그대로 쓰고 · 수량 조절 · 재고 오픈 · 네이버 새로고침은 명령
+  //   손님 메모 · BC · 마일리지 SKIP(손님 정보)은 화면에 안 실음 — 현장 POS 에만
+  /** 현장 화면 (사무실로 보낼 것) — 오늘만 */
+  function syncSnap() {
+    const ev = {};
+    for (const b of bookings[TODAY] || []) { const e = evOf(b); if (e) ev[b.id] = e; }
+    return {
+      v: 1, day: TODAY, at: hm(now),
+      b: bookings[TODAY] || [], w: walkins, s: svcKeys, x: [...testOut], ig: [...extIgnored], mv: [...moved], g: golden, sa: svExtra,
+      ns: naverSlots[TODAY] || null, nr: naverRaw[TODAY] || null, cd: capDemo, ne: naverErr, nb: naverBusy, np: naverStep, lr: lastRefresh, ta: todayAt,
+      cs: capState, cl: capLog, cb: capBusy, st: ST.view, ul: unpaidLog, ev,
+    };
+  }
+  /** 사무실: 받은 화면으로 바꿈 (오늘 것만) */
+  function syncApply(s, at) {
+    if (!s || s.v !== 1) return;
+    SYNCV.snapAt = Date.now(); SYNCV.snapText = String(at || "");
+    if (s.day !== TODAY) { SYNCV.dayOff = s.day; renderSyncChip(); return; }
+    SYNCV.dayOff = "";
+    const J = (v) => JSON.parse(JSON.stringify(v == null ? null : v));
+    bookings[TODAY] = J(s.b) || [];
+    walkins.splice(0, walkins.length, ...(J(s.w) || []));
+    svcKeys.splice(0, svcKeys.length, ...(J(s.s) || []));
+    testOut.clear(); for (const no of s.x || []) testOut.add(no);
+    extIgnored.clear(); for (const no of s.ig || []) extIgnored.add(no);
+    moved.clear(); for (const [no, v] of s.mv || []) moved.set(no, v);
+    golden = J(s.g); svExtra = J(s.sa) || {};
+    if (s.ns) naverSlots[TODAY] = J(s.ns); else delete naverSlots[TODAY];
+    if (s.nr) naverRaw[TODAY] = J(s.nr); else delete naverRaw[TODAY];
+    for (const k of Object.keys(capDemo)) delete capDemo[k];
+    Object.assign(capDemo, J(s.cd) || {});
+    naverErr = String(s.ne || ""); naverBusy = !!s.nb; naverStep = String(s.np || ""); lastRefresh = s.lr ?? null; todayAt = s.ta ?? null; capBusy = !!s.cb;
+    for (const k of Object.keys(capState)) delete capState[k];
+    Object.assign(capState, { loans: [], bonus: {}, locks: [] }, J(s.cs) || {});
+    capLog.splice(0, capLog.length, ...(J(s.cl) || []));
+    unpaidLog.splice(0, unpaidLog.length, ...(J(s.ul) || []));
+    if (s.st) ST.view = J(s.st);
+    SYNCV.ev = J(s.ev) || {};
+    viewDay = TODAY;
+    renderAll();
+    if (sheet.mode && sheet.mode !== "settings" && sheet.mode !== "memo") syncSheetSoon();
+    else if (sheet.mode === "settings" && sheet.tab === "naver") syncSheetSoon();
+  }
+  /** 글을 쓰는 중이면 그리기를 미룸 (사무실 · 현장 둘 다) */
+  function syncSheetSoon() {
+    const a = document.activeElement;
+    if (a && $("sheet").contains(a) && typable(a)) { SYNCV.stale = true; return; }
+    SYNCV.stale = false; renderSheet();
+  }
+  /** 현장 POS: 2초마다 — 사무실이 보고 있을 때만 화면을 앱 본체로 (같으면 안 보냄) */
+  function syncTick() {
+    if (SYNC_ROLE !== "pos" || !SYNC || OFFICE) return;
+    const st = SYNCV.st;
+    if (!(st && st.peer && st.peer.active) || Date.now() - SYNCV.sentAt < 2000) return;
+    SYNCV.sentAt = Date.now();
+    let j = "";
+    try { j = JSON.stringify(syncSnap()); } catch (e) { return; }
+    if (j === SYNCV.lastSnap) return;
+    SYNCV.lastSnap = j;
+    SYNC.snap(JSON.parse(j));
+  }
+  /** 반대편 PC 에서 바뀐 설정을 이 화면에 (앱 본체가 settings.json 은 이미 고침) */
+  function syncSettings(keys, c) {
+    for (const k of keys || []) {
+      const v = c && c[k];
+      if (k === "peaks" && Array.isArray(v)) RULES.peaks = v;
+      if (k === "capAuto" && v) capAutoLoad(v);
+      if (k === "unpaidCancel" && v) Object.assign(RULES.unpaidCancel, v);
+      if (k === "stockAuto") stLoad();
+      if (k === "printForm" && v && v.ver === ENTER_FORM_VER) { for (const f of ["text", "walk", "ev"]) if (typeof v[f] === "string") PRINT.forms.enter[f] = v[f]; if (typeof v.auto === "boolean") PRINT.forms.enter.auto = v.auto; }
+      if (k === "printSet" && v) { Object.assign(PSET, { apply: "", bcOn: true, names: {}, frags: [] }); psetLoad(v); }
+      if (k === "bc2Forms" && v) bc2Load(v);
+      if (k === "bc" && v) Object.assign(RULES.bc, v);
+      if (k === "visitEvent" && v) evLoadCfg(v);
+      if (k === "walkEvent" && v) WEV.name = String(v.name || "").slice(0, 10);
+      if (k === "survey" && v) svLoadCfg(v);
+      if (k === "liveOn") LIVE.on = v !== false;
+    }
+    renderAll();
+    if (sheet.mode === "settings") syncSheetSoon();
+    toast(`${OFFICE ? "현장 POS" : "사무실 PC"}에서 바꾼 설정을 받았어요`);
+  }
+  /** 현장 POS: 사무실이 보낸 명령 → 대신 하고 결과를 돌려줌 */
+  async function syncRun(c) {
+    const done = (ok, msg) => { if (SYNC) SYNC.ack(c.id, ok, msg); else SYNCV.acks.push({ id: c.id, ok, msg }); };
+    const label = SYNC_ACTS[c.act] || c.act;
+    try {
+      toast(`사무실 PC 에서 보낸 일: ${label}`, 4000);
+      const fresh = (top) => { const out = []; for (const x of capLog) { if (x === top) break; out.push(x); } return out.reverse(); };
+      const say = (xs) => xs.map((x) => (x.t ? `${x.t} ${x.from}→${x.to}${x.ok ? "" : ` 실패(${x.why || "?"})`}` : x.msg || x.why || "")).filter(Boolean).join(" · ");
+      if (c.act === "capNow") {
+        const p0 = capPlan();
+        if (p0.skip) return done(true, p0.skip);
+        if (capBusy) return done(false, "다른 수량 조절이 진행 중이에요 — 잠시 뒤 다시");
+        const top = capLog[0];
+        await capRun(true);
+        return done(true, say(fresh(top)) || "바꿀 것 없음");
+      }
+      if (c.act === "capTry") {
+        const a = c.args || {};
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(a.day || "") || !/^\d{2}:\d{2}$/.test(a.time || "") || !(a.n >= 0 && a.n <= 99)) return done(false, "날짜 · 타임 · 수량이 틀려요");
+        if (!APP) return done(false, "체험판: 설치한 앱에서 네이버 수량을 바꿔요");
+        if (capBusy) return done(false, "다른 수량 조절이 진행 중이에요 — 잠시 뒤 다시");
+        Object.assign(capTry, { day: a.day, time: a.time, n: Math.round(a.n) });
+        const top = capLog[0];
+        await acts.capTry();
+        const f = fresh(top);
+        return done(f.length ? f.every((x) => x.ok) : false, say(f) || "네이버를 먼저 불러와야 해요");
+      }
+      if (c.act === "stNow" || c.act === "stDry") {
+        if (!ST_APP()) return done(false, "체험판: 설치한 앱에서 네이버 재고를 열어요");
+        const v = await window.desk.stock.run(c.act === "stDry" ? { dry: true } : {});
+        if (v && v.ok) { ST.view = v; stPollAt = Date.now(); stShow(); return done(true, c.act === "stDry" ? "재고 확인을 시작했어요 (결과는 네이버 설정 화면)" : "재고 열기를 시작했어요 (몇 분 · 결과는 네이버 설정 화면)"); }
+        return done(false, (v && v.why) || "응답 없음");
+      }
+      if (c.act === "naverLoad") {
+        if (!APP) return done(true, "체험판: 새로고침");
+        await loadNaver(TODAY, false);
+        return done(!naverErr, naverErr ? `실패: ${naverErr}` : `${hm(now)} 네이버 불러옴`);
+      }
+      done(false, "모르는 명령이에요 (버전 확인)");
+    } catch (e) { done(false, String((e && e.message) || e)); }
+  }
+  const SYNC_ACTS = { capNow: "수량 지금 조절", capTry: "한 칸 판매 수량 바꾸기", stNow: "네이버 재고 지금 열기", stDry: "네이버 재고 확인만", naverLoad: "네이버 새로고침" };
+  /** 사무실: 명령 보내기 */
+  async function syncSend(act, args, label) {
+    if (SYNCV.demo) { toast(`(체험) 현장 POS 로 보냄: ${label} — 설치한 앱에서는 현장 POS 가 네이버에 넣고 결과가 여기로 와요`, 5000); return; }
+    if (!SYNC) return;
+    const r = await SYNC.cmd(act, args).catch((e) => ({ ok: false, why: String(e) }));
+    if (!r || !r.ok) { toast((r && r.why) || "못 보냈어요", 6000); return; }
+    SYNCV.wait.set(r.id, label); renderSyncChip();
+    toast(`현장 POS 로 보냄: ${label} — 결과를 기다려요 (보통 10초 안)`, 5000);
+  }
+  function syncAck(a) {
+    const label = SYNCV.wait.get(a.id) || SYNC_ACTS[a.act] || "보낸 일";
+    SYNCV.wait.delete(a.id); renderSyncChip();
+    toast(`현장 POS: ${label} ${a.ok ? "됨" : "못 함"}${a.msg ? ` — ${a.msg}` : ""}`, 8000);
+  }
+  /** 사무실 PC 에서 누른 버튼: 되는 것 · 현장에 명령으로 보내는 것 · 막는 것 */
+  const OFFICE_OK = new Set(["time", "slot", "openRes", "key", "minimize", "soldList", "soldDay", "soldOpen", "settings", "setTab", "qhelp", "csub", "manual", "manGo", "close", "clock",
+    "memoOpen", "memoTab", "memoTo", "memoSend", "memoAck", "memoFin", "memoUnfin", "memoRecall", "memoAdd", "memoDone", "memoUndo", "memoDel",
+    "capCell", "addPeak", "delPeak", "evApply", "evOff", "evTpl", "evOpen", "tplGo", "tplRow", "tplSamp", "tplSave", "tplDef", "tplNew", "tplDel", "tplCode",
+    "staffAdd", "staffDel", "svPick", "svAdd", "svDel", "svToggle", "liveToggle", "svKeySave", "svKeyDel", "stToggle", "printMode", "drawerPin", "findPorts", "pickPort", "findPrinters", "pickPrinter", "bcFilter",
+    "syncRole", "syncCodeNew", "syncCodeSave", "syncRelaunch", "syncOpen", "syncDemo"]);
+  const OFFICE_CMD = {
+    capNow: () => syncSend("capNow", {}, SYNC_ACTS.capNow),
+    capTry: () => syncSend("capTry", { day: capTry.day, time: capTry.time, n: capTry.n }, `${capTry.day.slice(5)} ${capTry.time} 판매 수량 ${capTry.n}`),
+    stDry: () => syncSend("stDry", {}, SYNC_ACTS.stDry),
+    stNow: () => { if (confirm("현장 POS 가 네이버 예약상품 재고를 열어요 (그동안 몇 분 현장 네이버 불러오기 · 이용완료가 잠시 멈춤).\n보낼까요?")) syncSend("stNow", {}, SYNC_ACTS.stNow); },
+    refresh: () => syncSend("naverLoad", {}, SYNC_ACTS.naverLoad),
+  };
+  function officeGate(btn) {
+    const a = btn.dataset.act;
+    if (OFFICE_OK.has(a)) return true;
+    if (OFFICE_CMD[a]) { OFFICE_CMD[a](btn); return false; }
+    toast(a === "day" ? "사무실 PC 는 오늘 현장 화면만 보여요 (다른 날은 현장 POS 에서)" : /print|Test|Sample/i.test(a) ? "출력은 현장 POS 에서 해요" : "사무실 PC — 이 일은 현장 POS 에서 해요 (사무실은 보기 · 운영 설정 · 메모장 · 수량 조절)", 4000);
+    return false;
+  }
+  /** 맨 위 작은 표시 */
+  function syncChip() {
+    const st = SYNCV.st, w = SYNCV.wait.size ? ` · 보낸 일 ${SYNCV.wait.size}` : "";
+    if (SYNCV.demo) return { text: "사무실 PC 미리 보기 · 누르면 끝", cls: "ok", title: "체험판: 사무실 PC 에서 보이는 화면 — 근무자 일은 막히고 수량 조절은 현장 POS 로 보내요" };
+    if (!SYNC_ROLE) return null;
+    const bad = st && (st.why || st.getWhy || st.putWhy);
+    if (SYNC_ROLE === "pos") {
+      if (bad) return { text: "두 PC 연결 확인", cls: "bad", title: bad };
+      return st && st.peer && st.peer.active ? { text: "사무실 PC 연결됨", cls: "ok", title: `사무실 PC 가 이 화면을 보고 있어요 (ver.${st.peer.build})` } : null;
+    }
+    if (st && st.why) return { text: st.same === false ? "버전이 달라요" : "연결 코드 확인", cls: "bad", title: st.why };
+    if (bad) return { text: "현장 POS 연결 안 됨", cls: "bad", title: bad };
+    if (SYNCV.dayOff) return { text: `현장 POS 날짜가 달라요 (${SYNCV.dayOff})`, cls: "bad", title: "두 PC 의 날짜 · 시계를 확인해 주세요" };
+    if (!SYNCV.snapAt) return { text: `사무실 PC · 현장 화면 기다리는 중${w}`, cls: "warn", title: "현장 POS 가 켜져 있으면 15초 안에 와요" };
+    const ago = Math.floor((Date.now() - SYNCV.snapAt) / 60000);
+    const t = SYNCV.snapText.slice(11, 16) || "";
+    return ago >= 3 ? { text: `사무실 PC · 현장 소식 ${ago}분째 없음${w}`, cls: "warn", title: `마지막 현장 화면 ${SYNCV.snapText} (현장 POS 꺼짐 · 인터넷 확인)` } : { text: `사무실 PC · 현장 ${t} 기준${w}`, cls: "ok", title: `현장 POS 화면 ${SYNCV.snapText} 기준 — 근무자 일은 현장에서 · 설정 · 메모장 · 수량 조절은 여기서` };
+  }
+  function renderSyncChip() {
+    const el = $("syncchip"); if (!el) return;
+    const c = syncChip();
+    el.hidden = !c;
+    document.body.classList.toggle("office", OFFICE);
+    if (!c) return;
+    el.textContent = c.text; el.className = `synchip ${c.cls}`; el.title = c.title || "";
+  }
+  const syncAgo = (ms) => { if (!ms) return ""; const s = Math.max(0, Math.round((Date.now() - ms) / 1000)); return s < 60 ? `${s}초 전` : `${Math.floor(s / 60)}분 전`; };
+  /** 운영 설정 → 두 PC 연결: 지금 상태 한 줄 */
+  function syncStatusHtml() {
+    if (!SYNC) return SYNCV.demo ? `<b class="on">미리 보기 중</b> — 맨 위 '사무실 PC 미리 보기'를 누르면 끝` : "체험판 — 설치한 앱에서 이어져요";
+    const I = SYNCV.info || {}, st = SYNCV.st || I.status;
+    if (!I.runRole) return I.role ? `<b>다시 켜면 시작해요</b> — 아래 [지금 다시 켜기]` : "<b>꺼짐</b> — 이 PC 역할을 고르면 시작해요";
+    if (I.role !== I.runRole) return `<b>다시 켜면 바뀐 역할로</b> — 아래 [지금 다시 켜기]`;
+    if (!I.hasKey) return `<b class="bad">보고 열쇠가 없어요</b> — 기타 → 보고 앱 '보고 열쇠'를 넣어 주세요 (두 PC 모두 같은 열쇠)`;
+    if (!st || !st.ready) return `<b class="bad">연결 코드를 넣어 주세요</b>`;
+    if (st.why) return `<b class="bad">${esc(st.why)}</b>`;
+    if (st.getWhy || st.putWhy) return `<b class="bad">우편함: ${esc(st.getWhy || st.putWhy)}</b>`;
+    const who = I.runRole === "pos" ? "사무실 PC" : "현장 POS", p = st.peer || {};
+    if (p.active) return `<b class="on">연결됨</b> — ${who} ver.${esc(p.build)} · 마지막 소식 ${esc(String(p.at).slice(11))} (${syncAgo(p.seen)} 확인)${st.waiting ? ` · 결과 기다리는 일 ${st.waiting}` : ""}`;
+    return `<b>${who} 꺼짐</b>${p.at ? ` — 마지막 소식 ${esc(p.at)}` : " — 아직 소식 없음"}${I.runRole === "pos" ? " (사무실 PC 를 켜면 15초 안에 이어져요)" : " (현장 POS 가 켜져 있는지 · 인터넷 확인)"}`;
+  }
+  function syncPage() {
+    const I = SYNCV.info || {}, role = SYNC ? I.role || "" : "", dis = SYNC ? "" : "disabled";
+    const seg = [["", "안 씀"], ["pos", "현장 POS (본 PC)"], ["office", "사무실 PC"]].map(([k, t]) => `<button class="${role === k ? "on" : ""}" data-act="syncRole" data-r="${k}" aria-pressed="${role === k}" ${dis}>${t}</button>`).join("");
+    const restart = SYNC && I.role !== undefined && I.role !== I.runRole;
+    const codeHtml = !SYNC ? "" : role === "pos"
+      ? `<div class="field"><span class="label">연결 코드 <span class="help">사무실 PC 의 이 칸에 그대로 넣어요 · 남에게 알려 주지 마세요</span></span>
+          <div class="btns" style="align-items:center"><b class="num synccode" id="sync-code-show">${esc(I.code || "—")}</b><button class="btn btn-sm" data-act="syncCodeNew">새 코드 만들기</button></div></div>`
+      : role === "office"
+        ? `<div class="field"><label class="label" for="sync-code">연결 코드 <span class="help">현장 POS 의 운영 설정 → 두 PC 연결에 보이는 16자리${I.codeTail ? ` · 지금 넣은 코드 끝 ${esc(I.codeTail)}` : ""}</span></label>
+          <div class="btns" style="align-items:center"><input id="sync-code" class="cfg num" style="width:230px" placeholder="ABCD-EFGH-JKLM-NPQR" autocomplete="off" spellcheck="false"><button class="btn btn-sm" data-act="syncCodeSave">저장</button></div></div>`
+        : "";
+    const html = `
+      <div class="setcard plain stack"><b>두 PC 연결 <span class="help">현장 POS ↔ 사무실 PC · 같은 버전끼리</span></b>
+        <span class="help">사무실 PC 에 같은 버전을 설치해 이어 두면 — 사무실에서 바꾼 <b>운영 설정</b> · <b>메모장 전달</b> · <b>수량 조절</b>이 현장 POS 에 그대로, 현장 POS 의 <b>지금 화면</b>(예약 · 열쇠 · 판매 수량)이 사무실에 그대로 보여요. 고정 IP 없이 보고 앱 '보고 열쇠' 클라우드를 우편함으로 쓰고, 내용은 연결 코드로 잠가요.</span>
+        <div class="field"><span class="label">이 PC 역할 <span class="help">바꾸면 프로그램을 다시 켜야 해요</span></span><div class="seg2 seg3">${seg}</div></div>
+        ${codeHtml}
+        <div class="field"><span class="label">상태</span><span id="sync-status" class="syncst">${syncStatusHtml()}</span></div>
+        ${restart ? `<div class="btns"><button class="btn btn-ink" data-act="syncRelaunch">지금 다시 켜기</button></div>` : ""}
+        ${SYNC ? "" : `<div class="btns"><button class="btn" data-act="syncDemo">${SYNCV.demo ? "미리 보기 끝" : "사무실 PC 화면 미리 보기 (체험)"}</button></div>`}
+      </div>
+      <div class="setcard plain stack"><b>함께 쓰는 것 · 각 PC 에만 있는 것</b>
+        <span class="help"><b>함께</b>: 성수기 기간 · 판매 수량 자동조절 · 입금대기 자동 취소 · 재고 자동 오픈 · 입장권 양식 · 프린트물 설정 · BC 양식 · 재방문 이벤트 · 현장 이벤트 · 설문 · 폰 실시간 현황 · 메모장(근무자 · 메모 · 전달) — 두 PC 중 늦게 바꾼 쪽</span>
+        <span class="help"><b>각 PC 에만</b>: 프린터 · API(아마노 · 네이버 · 톡톡 로그인) · 보고 열쇠 · 고객 세부 관리(손님 메모 · BC · 마일리지 SKIP — 손님 정보라 클라우드로 안 보냄)</span>
+        <span class="help"><b>사무실 PC 에서</b>: 현장 화면 보기 · 운영 설정 · 메모장 · 맨 위 [오늘 수량조절] · 네이버 설정의 [지금 조절] · [한 칸 시험] · 재고 [확인만] · [지금 한 번] · [새로고침] → 현장 POS 가 네이버에 넣고 결과가 와요. 입장 · 반납 · 결제 · 출력 · 주차는 현장 POS 에서만.</span>
+      </div>`;
+    return { html, after: syncInfo };
+  }
+  /** 앱 본체에서 역할 · 코드 · 상태를 다시 읽음 (두 PC 연결 화면을 열 때) */
+  function syncInfo() {
+    if (!SYNC) return;
+    SYNC.get().then((v) => {
+      const was = JSON.stringify(Object.assign({}, SYNCV.info, { status: 0 }));
+      SYNCV.info = v; if (v && v.status) SYNCV.st = v.status;
+      if (JSON.stringify(Object.assign({}, v, { status: 0 })) !== was && sheet.mode === "settings" && sheet.tab === "sync") renderSheet();
+      else syncStatusRefresh();
+    }, () => {});
+  }
+  function syncStatusRefresh() { const el = $("sync-status"); if (el) el.innerHTML = syncStatusHtml(); }
+  const syncBadge = () => (SYNCV.demo ? "미리 보기" : !SYNC_ROLE ? (SYNC ? "안 씀" : "체험판") : SYNC_ROLE === "pos" ? (SYNCV.st && SYNCV.st.peer && SYNCV.st.peer.active ? "현장 · 사무실 연결됨" : "현장 POS") : "사무실 PC");
+  /** 체험판: 이 화면을 사무실 PC 처럼 (같은 화면 · 근무자 일 막힘 · 명령은 보낸 척) */
+  function syncDemo(on) {
+    if (SYNC) return;
+    if (on) { const s = JSON.parse(JSON.stringify(syncSnap())); OFFICE = true; SYNCV.demo = true; syncApply(s, `${TODAY} ${hm(now)}:00`); }
+    else { OFFICE = false; SYNCV.demo = false; SYNCV.snapAt = 0; }
+    renderAll(); renderSyncChip();
+    if (sheet.mode === "settings") renderSheet();
+  }
+  Object.assign(acts, {
+    async syncRole(btn) {
+      const r = btn.dataset.r || "";
+      if (r === "office" && SYNC_ROLE !== "office" && !confirm("이 PC 를 '사무실 PC'로 바꿀까요?\n다시 켜면 네이버 · 아마노 · 프린터 · POS 를 쓰지 않고, 현장 POS 화면을 받아 보여 줘요.\n(현장에 있는 POS 는 '현장 POS (본 PC)'로 두세요)")) return;
+      if (r === "" && SYNC_ROLE && !confirm("두 PC 연결을 끌까요? (다시 켜면 이 PC 만 따로)")) return;
+      const v = await SYNC.set({ role: r }).catch((e) => ({ ok: false, why: String(e) }));
+      if (!v || !v.ok) { toast((v && v.why) || "못 바꿨어요"); return; }
+      SYNCV.info = null; syncInfo();
+      toast(v.restart ? "바꿨어요 — [지금 다시 켜기]를 눌러야 적용돼요" : "바꿨어요");
+      renderSheet();
+    },
+    async syncCodeNew() {
+      if (SYNCV.info && SYNCV.info.code && !confirm("새 연결 코드를 만들까요?\n사무실 PC 에도 새 코드를 다시 넣어야 이어져요.")) return;
+      const v = await SYNC.set({ newCode: true }).catch((e) => ({ ok: false, why: String(e) }));
+      if (!v || !v.ok) { toast((v && v.why) || "못 만들었어요"); return; }
+      SYNCV.info = null; syncInfo(); toast("새 연결 코드를 만들었어요 — 사무실 PC 에 넣어 주세요");
+    },
+    async syncCodeSave() {
+      const el = $("sync-code"), c = el ? el.value.trim() : "";
+      if (!c) { toast("연결 코드를 넣어 주세요"); return; }
+      const v = await SYNC.set({ code: c }).catch((e) => ({ ok: false, why: String(e) }));
+      if (!v || !v.ok) { toast((v && v.why) || "못 넣었어요"); return; }
+      SYNCV.info = null; syncInfo(); toast("연결 코드를 넣었어요 — 15초 안에 현장 POS 와 이어져요");
+    },
+    syncRelaunch() { if (SYNC) SYNC.relaunch(); },
+    syncOpen() { if (SYNCV.demo) { syncDemo(false); return; } acts.settings(); sheet.tab = "sync"; renderSheet(); },
+    syncDemo() { syncDemo(!SYNCV.demo); },
+  });
+  if (SYNC) {
+    if (OFFICE) document.body.classList.add("office");
+    SYNC.on("settings", (v) => syncSettings(v && v.keys, v && v.cfg));
+    SYNC.on("memo", (m) => { memoLoad(m); renderMemoBoxes(); if (sheet.mode === "memo" || (sheet.mode === "settings" && sheet.tab === "staff")) syncSheetSoon(); });
+    SYNC.on("status", (st) => {
+      const was = !!(SYNCV.st && SYNCV.st.peer && SYNCV.st.peer.active);
+      SYNCV.st = st; renderSyncChip(); syncStatusRefresh();
+      if (SYNC_ROLE === "pos" && st && st.peer && st.peer.active && !was) { SYNCV.lastSnap = ""; SYNCV.sentAt = 0; } // 사무실이 막 켜짐 → 바로 화면
+    });
+    if (SYNC_ROLE === "pos") SYNC.on("cmd", (c) => syncRun(c));
+    if (OFFICE) { SYNC.on("snap", (v) => syncApply(v && v.snap, v && v.at)); SYNC.on("ack", syncAck); }
+    syncInfo();
+  }
+  document.addEventListener("focusout", () => setTimeout(() => { if (SYNCV.stale && !(document.activeElement && $("sheet").contains(document.activeElement) && typable(document.activeElement))) { SYNCV.stale = false; if (sheet.mode) renderSheet(); } }, 0));
+  setInterval(() => { renderSyncChip(); syncTick(); }, 1000);
+  const SYNC_T = { snap: syncSnap, apply: syncApply, run: syncRun, ack: syncAck, gate: (act) => officeGate({ dataset: { act } }), demo: syncDemo, office: () => OFFICE, acks: () => SYNCV.acks, chip: () => syncChip(), settings: syncSettings };
+
   document.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-act]");
     if (btn && btn.dataset.act === "key" && Date.now() - keyDropAt < 700) return; // 열쇠를 끌어 놓은 바로 뒤
-    if (btn && !btn.disabled && acts[btn.dataset.act]) { acts[btn.dataset.act](btn); return; }
+    if (btn && !btn.disabled && acts[btn.dataset.act]) { if (OFFICE && !officeGate(btn)) return; acts[btn.dataset.act](btn); return; }
     if (e.target === $("overlay")) acts.close();
   });
   document.addEventListener("keydown", (e) => {
@@ -5600,7 +5919,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   // 편집 칸을 내리면 왼쪽 줄 수 칸도 같이
   document.addEventListener("scroll", (e) => { if (e.target && e.target.id === "tpl-text") { const g = $("tpl-gut"); if (g) g.scrollTop = e.target.scrollTop; } }, true); // 영수증 설정: 편집 칸에 커서를 둔 적이 있음 → 코드는 커서 자리에
   document.addEventListener("change", (e) => { if (/^cap-(target|max|ceil|p1|p2|p3|boost)$/.test(e.target.id)) renderSheet(); if (e.target.id === "note-m") noteFlush(); }); // 숫자를 다 넣으면 계획 다시
-  window.__deskTest = { projection, capWalkOut, notes: () => Object.fromEntries(NOTES), evLoadCfg, today: () => TODAY, useDueText, printSecs, PRINT_: () => PRINT, sealOf, withSeal, SEAL, evSample: (i) => evSample(i), sealClear: () => sealCache.clear(), EV_: () => EV, liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, bk: (id) => (bookings[TODAY] || []).find((b) => b.id === id), useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capRanges, capPlan, capRun, capApply, capTick, capMoving: () => capMoveN > 0, capTeamExtra, capState: () => JSON.parse(JSON.stringify(capState)), capLock: (ts) => { capState.locks = ts.slice(); saveCapState(); }, capKeysAt, returnKeys: (id, ks) => { const h = holders().find((x) => x.id === id); if (h) { returnKeys(h, ks); renderAll(); } }, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: (v) => enterText(v), formFor: (v) => ticketText(v), splitForm, joinForms, lastPrint: () => LASTPRINT, BC2_: () => BC2, holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, sheet, evOf: (b) => evOf(b),
+  window.__deskTest = { sync: SYNC_T, projection, capWalkOut, notes: () => Object.fromEntries(NOTES), evLoadCfg, today: () => TODAY, useDueText, printSecs, PRINT_: () => PRINT, sealOf, withSeal, SEAL, evSample: (i) => evSample(i), sealClear: () => sealCache.clear(), EV_: () => EV, liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, bk: (id) => (bookings[TODAY] || []).find((b) => b.id === id), useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capRanges, capPlan, capRun, capApply, capTick, capMoving: () => capMoveN > 0, capTeamExtra, capState: () => JSON.parse(JSON.stringify(capState)), capLock: (ts) => { capState.locks = ts.slice(); saveCapState(); }, capKeysAt, returnKeys: (id, ks) => { const h = holders().find((x) => x.id === id); if (h) { returnKeys(h, ks); renderAll(); } }, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: (v) => enterText(v), formFor: (v) => ticketText(v), splitForm, joinForms, lastPrint: () => LASTPRINT, BC2_: () => BC2, holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, sheet, evOf: (b) => evOf(b),
     evLog: (from) => { const L = evLog(from); return { from: L.from, count: L.count, people: Object.fromEntries([...L.people].map(([k, p]) => [k, JSON.parse(JSON.stringify(p))])) }; },
     // 장부에 지난 방문 한 줄 넣기: o = { day, n(네이버 순번, 기본 = 지금 완료 수), base, st("안내" | "성공"), due, from(장부 · 기본 지금 이벤트), no }
     evsPayload: () => evsPayload(),

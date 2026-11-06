@@ -636,7 +636,7 @@ function surveyKey() {
   try { return settings.surveyKeyEnc ? safeStorage.decryptString(Buffer.from(settings.surveyKeyEnc, "base64")) : ""; } catch (e) { return ""; }
 }
 ipcMain.handle("config:get", () => {
-  const { amanoPwEnc, surveyKeyEnc, visitSalt, ...rest } = settings; // visitSalt(방문 기록 해시 비밀값)는 화면에 안 줌
+  const { amanoPwEnc, surveyKeyEnc, visitSalt, syncCodeEnc, ...rest } = settings; // visitSalt(방문 기록 해시 비밀값) · 두 PC 연결 코드는 화면에 안 줌
   const k = surveyKey();
   return { ...rest, hasAmanoPw: !!amanoPwEnc, hasSurveyKey: !!k, surveyKeyTail: k ? k.slice(-4) : "", build: BUILD };
 });
@@ -660,10 +660,13 @@ ipcMain.handle("config:set", (_e, patch) => {
   delete patch.surveyKey;
   delete patch.surveyKeyEnc;
   delete patch.visitSalt; // 바꾸면 지난 방문 기록과 이어지지 않음
-  if (patch.stockAuto && patch.stockAuto.on && !stockCfg().on) stockArm();
+  delete patch.syncRole; delete patch.syncCodeEnc; // 두 PC 연결은 sync:set 으로만
+  if (patch.stockAuto && patch.stockAuto.on && !stockCfg().on && RUN_ROLE !== "office") stockArm();
+  const prev = settings;
   settings = { ...settings, ...patch };
   saveSettings();
-  if (urlChanged) openAmano();
+  syncNoteSettings(prev); // 두 PC 연결: 함께 쓰는 설정이면 반대편 PC 로 (11/06)
+  if (urlChanged && RUN_ROLE !== "office") openAmano();
   return { ok: true };
 });
 ipcMain.handle("pos:show", () => showPos());
@@ -958,7 +961,12 @@ ipcMain.handle("memo:get", () => {
   try { return { ok: true, memo: staffMemo.load(histDir()) }; } catch (e) { return { ok: false, why: String(e.message || e) }; }
 });
 ipcMain.handle("memo:set", (_e, d) => {
-  try { const m = staffMemo.clean(d); staffMemo.save(histDir(), m); return { ok: true, memo: m }; } catch (e) { return { ok: false, why: String(e.message || e) }; }
+  try {
+    const prev = syncOn() ? staffMemo.load(histDir()) : null;
+    const m = staffMemo.clean(d); staffMemo.save(histDir(), m);
+    if (prev) syncNoteMemo(prev, m); // 두 PC 연결: 사무실에서 남긴 전달 → 현장 POS · 현장 접수 → 사무실 (11/06)
+    return { ok: true, memo: m };
+  } catch (e) { return { ok: false, why: String(e.message || e) }; }
 });
 
 // ── 네이버 재고 자동 오픈 (사장님 10/20): 매일 오늘 + 30일 날짜를 두 상품 모두 회차마다 재고 10개로 ──
@@ -1077,6 +1085,140 @@ async function boardPatch(doc, json, at, rule) {
     return { ok: false, code: 0, why: `인터넷 오류: ${err && err.name === "AbortError" ? "응답 없음" : err && err.message ? err.message : err}` };
   }
 }
+
+// ── 두 PC 연결 (사장님 11/06): 현장 POS ↔ 사무실 PC · 같은 버전끼리 같은 설정 · 같은 화면 (desk-sync.js · docs/SYNC.md) ──
+//   우편함 = 보고 시스템 클라우드 boards/{보고 열쇠}/deskSync/pos · office (보고 시스템 규칙에 deskSync 가 있어야 함)
+//   역할(settings.syncRole): "pos" 현장 POS · "office" 사무실 PC · "" 안 씀 — 켤 때 정해짐 (바꾸면 다시 켜기)
+//   사무실 PC 는 아마노 · 네이버 · 톡톡 · POS · 현금통 창을 열지 않고 · 네이버 일(불러오기 · 이용완료 · 수량 · 재고)은 현장 POS 에 명령으로
+//   연결 코드는 Windows 암호화로 이 PC 에만 (settings.syncCodeEnc) · 설정 바꾼 때 · 메모장 바꾼 때 · 처리한 명령은 앱 폴더 desk-sync.json
+const deskSync = require("./desk-sync");
+let RUN_ROLE = ""; // 켤 때 역할
+let syncEngine = null;
+let syncSt = null; // { meta, mm, done }
+const SYNC_FILE = () => path.join(app.getPath("userData"), "desk-sync.json");
+const syncRole = () => (deskSync.ROLES.includes(settings.syncRole) ? settings.syncRole : "");
+const syncOn = () => !!syncEngine;
+function syncCode() {
+  try { return settings.syncCodeEnc ? safeStorage.decryptString(Buffer.from(settings.syncCodeEnc, "base64")) : ""; } catch (e) { return ""; }
+}
+function syncLoad() {
+  let d = null;
+  try { d = JSON.parse(fs.readFileSync(SYNC_FILE(), "utf8")); } catch (e) { d = null; }
+  const ok = (v) => v && typeof v === "object" && !Array.isArray(v);
+  syncSt = { meta: ok(d && d.meta) ? d.meta : {}, mm: ok(d && d.mm) ? Object.assign({ su: 0, u: {}, gone: {} }, d.mm) : { su: 0, u: {}, gone: {} }, done: Array.isArray(d && d.done) ? d.done.slice(-300) : [] };
+}
+function syncSave() {
+  try {
+    const f = SYNC_FILE();
+    fs.writeFileSync(f + ".tmp", JSON.stringify(syncSt), "utf8");
+    fs.renameSync(f + ".tmp", f);
+  } catch (e) { /* 다음에 다시 */ }
+}
+/** 현장 POS 로 처음 켤 때: 지금 설정을 '바꾼 때 1'로 (사무실 PC 는 0 이라 처음 연결하면 현장 설정을 받음) */
+function syncSeed(role) {
+  if (role === "office") { syncSt.meta = {}; syncSt.mm = { su: 0, u: {}, gone: {} }; }
+  else for (const k of deskSync.SHARED) if (settings[k] !== undefined && syncSt.meta[k] == null) syncSt.meta[k] = 1;
+  syncSave();
+}
+const sharedOf = () => Object.fromEntries(deskSync.SHARED.filter((k) => settings[k] !== undefined).map((k) => [k, settings[k]]));
+function syncNoteSettings(prev) {
+  if (!syncSt) return;
+  const meta = deskSync.stampSettings(prev, settings, syncSt.meta, Date.now());
+  if (JSON.stringify(meta) === JSON.stringify(syncSt.meta)) return;
+  syncSt.meta = meta; syncSave();
+  if (syncEngine) syncEngine.touch();
+}
+function syncNoteMemo(prev, next) {
+  if (!syncSt) return;
+  syncSt.mm = deskSync.stampMemo(prev, next, syncSt.mm, Date.now()); syncSave();
+  if (syncEngine) syncEngine.touch();
+}
+const toDesk = (ch, v) => { if (deskWin && !deskWin.isDestroyed()) deskWin.webContents.send(ch, v); };
+async function syncGetDoc(doc) {
+  const key = surveyKey();
+  if (!key) return { ok: false, code: 0, why: "보고 열쇠 없음 — 운영 설정 → 기타 → 보고 앱 '보고 열쇠'" };
+  try {
+    const { net } = require("electron");
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(), 15000);
+    const r = await net.fetch(`${INBOX_BASE}/boards/${encodeURIComponent(key)}/deskSync/${doc}`, { signal: ac.signal });
+    clearTimeout(t);
+    if (r.status === 404) return { ok: true, code: 404, json: null }; // 반대편이 아직 한 번도 안 씀
+    if (r.status !== 200) return { ok: false, code: r.status, why: r.status === 403 ? "열쇠나 모양이 틀림 (403) — 보고 시스템 규칙에 deskSync 가 있는지" : `응답 ${r.status}` };
+    const b = await r.json();
+    return { ok: true, code: 200, json: (b && b.fields && b.fields.json && b.fields.json.stringValue) || null };
+  } catch (err) {
+    return { ok: false, code: 0, why: `인터넷 오류: ${err && err.name === "AbortError" ? "응답 없음" : err && err.message ? err.message : err}` };
+  }
+}
+function syncStart() {
+  if (!RUN_ROLE || syncEngine) return;
+  syncLoad();
+  syncSeed(RUN_ROLE);
+  const io = {
+    get: (doc) => syncGetDoc(doc),
+    put: (doc, json, at) => (json.length >= 900000 ? Promise.resolve({ ok: false, code: 0, why: "보낼 글이 너무 길어요" }) : boardPatch(`deskSync/${doc}`, json, at, "deskSync")),
+  };
+  const local = {
+    settings: sharedOf,
+    meta: () => syncSt.meta,
+    applySettings: (ch) => {
+      const before = stockCfg().on;
+      for (const [k, [t, v]] of Object.entries(ch)) { settings[k] = v; syncSt.meta[k] = t; }
+      if (ch.stockAuto && RUN_ROLE === "pos" && stockCfg().on && !before) stockArm(); // 사무실에서 재고 자동 오픈을 켬 → 현장은 다음 때부터
+      saveSettings(); syncSave();
+      const { amanoPwEnc, surveyKeyEnc, visitSalt, syncCodeEnc, ...rest } = settings;
+      toDesk("sync:settings", { keys: Object.keys(ch), cfg: rest });
+    },
+    memo: () => ({ memo: staffMemo.load(histDir()), mm: syncSt.mm }),
+    applyMemo: (m) => { const c = staffMemo.clean(m.memo); staffMemo.save(histDir(), c); syncSt.mm = m.mm; syncSave(); toDesk("sync:memo", c); },
+    done: () => syncSt.done,
+    markDone: (id) => { syncSt.done = syncSt.done.concat([id]).slice(-300); syncSave(); },
+  };
+  const on = {
+    snap: (snap, at) => toDesk("sync:snap", { snap, at }),
+    cmd: (c) => { if (deskWin && !deskWin.isDestroyed()) deskWin.webContents.send("sync:cmd", c); else syncEngine.ack(c.id, false, "현장 POS 화면이 아직 안 켜짐"); },
+    ack: (a) => toDesk("sync:ack", a),
+    status: (st) => toDesk("sync:status", st),
+  };
+  syncEngine = new deskSync.DeskSync({ role: RUN_ROLE, build: BUILD, board: surveyKey, code: syncCode }, io, local, on);
+  setInterval(() => { syncEngine.tick().catch(() => {}); }, 1000);
+}
+ipcMain.on("sync:role", (e) => { e.returnValue = RUN_ROLE; });
+ipcMain.handle("sync:get", () => {
+  const code = syncCode();
+  return { role: syncRole(), runRole: RUN_ROLE, build: BUILD, hasKey: !!surveyKey(), code: RUN_ROLE === "pos" || syncRole() === "pos" ? code : "", codeTail: code ? code.slice(-4) : "", status: syncEngine ? syncEngine.status() : null };
+});
+/** { role } · { code } · { newCode: true } (현장 POS 가 만듦) → { ok, why, restart } */
+ipcMain.handle("sync:set", (_e, job) => {
+  job = job || {};
+  if (job.newCode || job.code !== undefined) {
+    const c = job.newCode ? deskSync.newCode() : String(job.code || "").trim();
+    if (c && !deskSync.normCode(c)) return { ok: false, why: "연결 코드는 16자리예요 (예: ABCD-EFGH-JKLM-NPQR)" };
+    if (c && !safeStorage.isEncryptionAvailable()) return { ok: false, why: "이 PC에서 암호화를 쓸 수 없음" };
+    settings.syncCodeEnc = c ? safeStorage.encryptString(deskSync.fmtCode(deskSync.normCode(c))).toString("base64") : "";
+  }
+  if (job.role !== undefined) {
+    const r = deskSync.ROLES.includes(job.role) ? job.role : "";
+    if (r !== syncRole()) {
+      settings.syncRole = r;
+      if (!syncSt) syncLoad();
+      if (r) syncSeed(r);
+      if (r === "pos" && !settings.syncCodeEnc && safeStorage.isEncryptionAvailable()) settings.syncCodeEnc = safeStorage.encryptString(deskSync.newCode()).toString("base64");
+    }
+  }
+  saveSettings();
+  if (syncEngine) syncEngine.touch();
+  return { ok: true, restart: syncRole() !== RUN_ROLE };
+});
+ipcMain.handle("sync:relaunch", () => { app.relaunch(); app.exit(0); });
+ipcMain.on("sync:snap", (_e, snap) => { if (syncEngine && RUN_ROLE === "pos") syncEngine.setSnap(snap); });
+ipcMain.handle("sync:cmd", (_e, job) => {
+  if (!syncEngine || RUN_ROLE !== "office") return { ok: false, why: "사무실 PC 로 연결돼 있지 않아요" };
+  if (!syncEngine.status().peer.active) return { ok: false, why: "현장 POS 소식이 없어요 (꺼짐 · 인터넷 확인) — 켜지면 다시 눌러 주세요" };
+  return { ok: true, id: syncEngine.cmd(job && job.act, job && job.args) };
+});
+ipcMain.on("sync:ack", (_e, id, ok, msg) => { if (syncEngine && RUN_ROLE === "pos") syncEngine.ack(String(id || ""), ok, msg); });
 
 // ── 영수증 프린터 (80mm 감열지) ──
 // Windows 에 설치된 프린터 목록 (POS 프린터도 Windows 에 드라이버가 깔려 있어야 보임 — '설정 → 프린터 및 스캐너' 에 있는 것)
@@ -1414,13 +1556,16 @@ app.whenReady().then(() => {
   if (!gotLock) return;
   setInterval(memWatch, 5 * 60 * 1000);
   loadSettings();
-  openAmano(); // 맨 뒤 아마노
-  openNaver(); // 맨 뒤 네이버 예약관리
+  RUN_ROLE = syncRole(); // 두 PC 연결 역할 (11/06) — 사무실 PC 는 화면만 (아마노 · 네이버 · 톡톡 · POS · 현금통은 현장 POS 에서)
+  const pos = RUN_ROLE !== "office";
+  if (pos) openAmano(); // 맨 뒤 아마노
+  if (pos) openNaver(); // 맨 뒤 네이버 예약관리
   createDesk(); // 맨 앞 데스크 (POS 는 원래대로 따로 켜져 있음)
-  startPosAgent(); // POS로 넘어가는 도우미를 미리 켜 둠
-  setTimeout(startPrnAgent, 3000); // 현금통 · 프린터 도우미도 (환전 오픈을 바로)
-  setTimeout(talkTick, 8000); // 톡톡 상담 목록 (네이버 예약 창이 먼저 뜬 뒤)
-  setInterval(talkTick, 20 * 1000);
+  if (pos) startPosAgent(); // POS로 넘어가는 도우미를 미리 켜 둠
+  if (pos) setTimeout(startPrnAgent, 3000); // 현금통 · 프린터 도우미도 (환전 오픈을 바로)
+  if (pos) setTimeout(talkTick, 8000); // 톡톡 상담 목록 (네이버 예약 창이 먼저 뜬 뒤)
+  if (pos) setInterval(talkTick, 20 * 1000);
+  syncStart();
 });
 app.on("before-quit", () => {
   app.isQuitting = true;
