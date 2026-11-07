@@ -975,7 +975,8 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   const bookMinutes = (b) => (isShort(b) ? (b.day === TODAY && golden ? null : shortMin(b)) : minutesFor(b.day, b.slot));
   /** 카드 · 예약자 창 · 열쇠 창 이름 옆 '숏타임' (1시간 50분 손님과 구분) */
   const shortBadge = (b) => `<span class="badge short" title="숏타임 상품 — ${shortMin(b)}분 이용 (1시간 50분 아님)">숏타임</span>`;
-  const dayKind = (key) => (peakOf(key) ? "성수기" : "비수기") + " " + (isHoliday(key) ? "휴일" : "평일") + (key === TODAY && golden ? ` · 골든벨 무제한 ${hm(golden.at)}~` : timedDay(key) ? " · 시간제" : " · 무제한");
+  const dayKind = (key) => (peakOf(key) ? "성수기" : "비수기") + " " + (isHoliday(key) ? "휴일" : "평일") + (key === TODAY && golden ? ` · 골든벨 무제한 ${hm(golden.at)}~` : timedDay(key) ? ` · 시간제${key === TODAY && goldenHold ? ` · 골든벨 대기 (연속구매 ${goldenHold.join(", ")}번 퇴장 뒤)` : ""}` : " · 무제한");
+  let goldenHold = null; // 골든벨 조건은 됐는데 연속구매 손님이 안에 있어 기다리는 중 — 그 손님 열쇠 번호 (사장님 11/07)
 
   let now = APP ? _d0.getHours() * 60 + _d0.getMinutes() : toMin("13:50");
   let lastRefresh = APP ? null : toMin("13:50");
@@ -1266,7 +1267,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
      - 앱: 저장 폴더(%APPDATA%\아스타나키즈 입장 데스크\desk-state\날짜.json)에 바로 씀 (갑자기 꺼져도 남게) + 브라우저 저장소에도 한 벌
      - 켜자마자 빈 화면으로 저장본을 덮어쓰지 않게: 저장본을 먼저 읽어 들인 뒤부터 저장 */
   const STATE_KEY = "astanakiz-desk-" + TODAY;
-  const SAVE_FIELDS = ["id", "day", "no", "slot", "name", "phone", "qty", "product", "naverProduct", "pay", "cancels", "prevDone", "visitNo", "visitEnd", "proxy", "visitor", "status", "keys", "enteredAt", "outAt", "overPaid", "naverPending", "naverWhy", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut", "naverSlot", "sv", "giftDue", "giftGiven"];
+  const SAVE_FIELDS = ["id", "day", "no", "slot", "name", "phone", "qty", "product", "naverProduct", "pay", "cancels", "prevDone", "visitNo", "visitEnd", "proxy", "visitor", "status", "keys", "enteredAt", "outAt", "overPaid", "naverPending", "naverWhy", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut", "naverSlot", "sv", "giftDue", "giftGiven", "plusT"];
   let stateReady = !APP; // 저장본을 읽기 전에는 저장하지 않음
   let svExtra = {}; // 설문: 오늘 근무자가 [+]로 직접 더한 수 { 번호: 건수 } — 예약 없이 이벤트로 들어온 손님 등 (사장님 10/15 · 따로 기록은 없음)
   let pendingSaved = []; // 예전 형식(예약번호만 있는) 저장본 — 네이버에서 그 예약을 불러오면 합침
@@ -2333,13 +2334,22 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   const restBooked = () => (bookings[TODAY] || []).filter((b) => b.status === "확정" && b.enteredAt == null && !testOut.has(b.no) && b.slot >= now - 30).reduce((a, b) => a + b.qty, 0);
   /* 골든벨 (사장님 10/9): 1시간 50분 제한이 있는 날, 16:00 이후 ① 안에 있는 열쇠 20개 이하 ② 남은 예약 5장 이하 — 둘 다 되면 한 번
      → 근무자 알림창 + 그때부터 모든 손님 무제한 (지금 열쇠 · 새로 들어오는 손님 — 시간 색 · 초과요금 · 반납 알림 없음) · 다시 켜도 그대로 */
+  /* 연속구매 손님 (사장님 11/07): 시간을 더 사서 들어와 있는 손님 — 연속예약을 입장 때 함께 이용완료 · 이용 중 추가 예약으로 연장(뒤 시간 예약이 그 손님에게 묶임) · [+1타임]
+     이런 손님이 열쇠를 가지고 안에 있으면 골든벨(무제한 · 방송)을 하지 않고 기다림 → 그 손님이 퇴장(열쇠 반납)한 뒤 조건이 맞으면 그때 */
+  const longBuy = (h) => !h.svc && ((h.plusT || 0) > 0 || (!h.walk && (bookings[TODAY] || []).some((x) => x.chainHead === h.id && x.slot > h.slot)));
+  const goldenBlockers = () => holders().filter((h) => h.keys.length && longBuy(h));
   function goldenCheck() {
     const G = RULES.golden;
-    if (golden || !G.on || !timedDay(TODAY) || now < toMin(G.from)) return;
+    const was = goldenHold ? goldenHold.join(",") : "";
+    goldenHold = null;
+    const done = () => { if ((goldenHold ? goldenHold.join(",") : "") !== was) $("date").innerHTML = `${dateLabel(viewDay)}<small>${dayKind(viewDay)}</small>`; };
+    if (golden || !G.on || !timedDay(TODAY) || now < toMin(G.from)) return done();
     const n = holders().reduce((a, h) => a + h.keys.length, 0);
-    if (n > G.keys) return;
+    if (n > G.keys) return done();
     const rest = restBooked();
-    if (rest > G.rest) return;
+    if (rest > G.rest) return done();
+    const hold = goldenBlockers();
+    if (hold.length) { goldenHold = hold.flatMap((h) => h.keys).sort((a, b) => a - b); return done(); }
     golden = { at: now, keys: n, rest };
     $("golden-sub").textContent = `${hm(now)} · 안에 있는 열쇠 ${n}개 · 남은 예약 ${rest}장 → 지금 열쇠와 앞으로 들어오는 손님 모두 무제한으로 바꿨어요`;
     $("golden").hidden = false;
@@ -4932,6 +4942,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       const h = holderById(sheet.hid); const cur = h && holderEnd(h); if (cur == null) return;
       const to = cur + RULES.useMinutes, n = h.keys.length;
       setEnd(h, to); sheet.end = null;
+      h.plusT = (h.plusT || 0) + 1; // 연속구매 — 이 손님이 안에 있는 동안 골든벨을 기다림 (사장님 11/07)
       // 입장권 n장 더 산 것: 판매수 · 시간표 인원에 (열쇠는 그대로 · 안에 있는 손님은 연장된 열쇠로 셈)
       walkins.push({ id: "w" + seq++, name: "추가 1타임", extra: true, of: `${h.walk ? walkTag(h) : h.name} ${h.keys.join(", ")}번`, phone: h.phone, keys: [], qty: n, enteredAt: now, slot: cur + 10, posNo: "POS-" + String(posSeq++).padStart(4, "0"), outAt: now, walk: true });
       saveState(); renderAll(); renderSheet();
@@ -5767,7 +5778,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   //   우편함으로 주고받는 것 (사장님 11/06 다시): 운영 설정 일체 · 관리자 메시지(메모장) · 자동 수량조절 켜고 끄기(설정) · 키 현황
   //   네이버 예약 · 고객 카드는 우편함으로 안 보냄 → 사무실 PC 가 네이버에서 직접 읽기만 (이용완료 · 수량 · 취소 · 재고는 현장 POS 만) · 주차는 사무실에 없음
   //   키 현황 = 입장한 예약의 열쇠 · 입장 · 반납 시각 (예약번호로 사무실 네이버 카드에 붙임) · 현장 · 서비스 키 — 이름 · 전화번호는 빼고 보냄
-  const KEY_FIELDS = ["id", "no", "slot", "naverSlot", "qty", "product", "naverProduct", "status", "keys", "enteredAt", "outAt", "overPaid", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut", "visitEnd", "naverPending", "naverWhy"];
+  const KEY_FIELDS = ["id", "no", "slot", "naverSlot", "qty", "product", "naverProduct", "status", "keys", "enteredAt", "outAt", "overPaid", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut", "visitEnd", "naverPending", "naverWhy", "plusT"];
   /** 현장 POS: 키 현황 (사무실로 보낼 것) — 오늘만 */
   function syncSnap() {
     const pick = (x, fs) => Object.fromEntries(fs.filter((k) => x[k] !== undefined).map((k) => [k, x[k]]));
@@ -6138,7 +6149,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   // 편집 칸을 내리면 왼쪽 줄 수 칸도 같이
   window.addEventListener("resize", () => { if (sheet.mode === "settings" && sheet.tab === "prints") tplFit(); }); // 편집 칸 글씨 크기 다시 (창 크기)
   document.addEventListener("change", (e) => { if (/^cap-(target|max|ceil|p1|p2|p3|boost)$/.test(e.target.id)) renderSheet(); if (e.target.id === "note-m") noteFlush(); }); // 숫자를 다 넣으면 계획 다시
-  window.__deskTest = { ann: { pink: () => annPink(), text: (ks) => annExitText(ks), state: () => ANNS, ANN, stop: () => annStop(), due: () => annAutoDue(), tick: () => annAutoTick() }, sync: SYNC_T, projection, capWalkOut, notes: () => Object.fromEntries(NOTES), evLoadCfg, today: () => TODAY, useDueText, printSecs, PRINT_: () => PRINT, sealOf, withSeal, SEAL, evSample: (i) => evSample(i), sealClear: () => sealCache.clear(), EV_: () => EV, liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, bk: (id) => (bookings[TODAY] || []).find((b) => b.id === id), useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capRanges, capPlan, capRun, capApply, capTick, capMoving: () => capMoveN > 0, capTeamExtra, capState: () => JSON.parse(JSON.stringify(capState)), capLock: (ts) => { capState.locks = ts.slice(); saveCapState(); }, capKeysAt, returnKeys: (id, ks) => { const h = holders().find((x) => x.id === id); if (h) { returnKeys(h, ks); renderAll(); } }, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: (v) => enterText(v), formFor: (v) => ticketText(v), splitForm, joinForms, lastPrint: () => LASTPRINT, BC2_: () => BC2, holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, sheet, evOf: (b) => evOf(b),
+  window.__deskTest = { golden: () => golden, goldenHold: () => goldenHold, longBuy: (id) => { const h = holders().find((x) => x.id === id); return h ? longBuy(h) : null; }, ann: { pink: () => annPink(), text: (ks) => annExitText(ks), state: () => ANNS, ANN, stop: () => annStop(), due: () => annAutoDue(), tick: () => annAutoTick() }, sync: SYNC_T, projection, capWalkOut, notes: () => Object.fromEntries(NOTES), evLoadCfg, today: () => TODAY, useDueText, printSecs, PRINT_: () => PRINT, sealOf, withSeal, SEAL, evSample: (i) => evSample(i), sealClear: () => sealCache.clear(), EV_: () => EV, liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, bk: (id) => (bookings[TODAY] || []).find((b) => b.id === id), useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capRanges, capPlan, capRun, capApply, capTick, capMoving: () => capMoveN > 0, capTeamExtra, capState: () => JSON.parse(JSON.stringify(capState)), capLock: (ts) => { capState.locks = ts.slice(); saveCapState(); }, capKeysAt, returnKeys: (id, ks) => { const h = holders().find((x) => x.id === id); if (h) { returnKeys(h, ks); renderAll(); } }, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: (v) => enterText(v), formFor: (v) => ticketText(v), splitForm, joinForms, lastPrint: () => LASTPRINT, BC2_: () => BC2, holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, sheet, evOf: (b) => evOf(b),
     evLog: (from) => { const L = evLog(from); return { from: L.from, count: L.count, people: Object.fromEntries([...L.people].map(([k, p]) => [k, JSON.parse(JSON.stringify(p))])) }; },
     // 장부에 지난 방문 한 줄 넣기: o = { day, n(네이버 순번, 기본 = 지금 완료 수), base, st("안내" | "성공"), due, from(장부 · 기본 지금 이벤트), no }
     evsPayload: () => evsPayload(),

@@ -76,3 +76,65 @@ test("골든벨: 열쇠가 20개보다 많으면 기다렸다가 반납으로 20
     await browser.close();
   }
 });
+
+/* 사장님 11/07: 연속구매 손님(연속예약을 입장 때 함께 이용완료 · 이용 중 추가 예약 · [+1타임])이 열쇠를 가지고 안에 있으면 골든벨(무제한 · 방송)을 하지 않고
+   그 손님이 퇴장(열쇠 반납)한 뒤 조건이 맞으면 그때 — 날짜 밑에 '골든벨 대기 (연속구매 n번 퇴장 뒤)' */
+test("골든벨 대기: [+1타임] 산 손님이 안에 있으면 안 울림 → 그 열쇠 반납 뒤 울림", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK);
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    await page.evaluate(() => window.__deskTest.setNow(900)); // 15:00 — 8번(권이준 13:30 입장) 반납 15:20
+    await page.click('.key[data-k="8"]');
+    await page.$eval("#sheet [data-act=plusSlot]", (e) => e.click()); // +1타임 → 17:10
+    await page.click("#sheet [data-act=close] >> nth=0");
+    assert.strictEqual(await page.evaluate(() => window.__deskTest.longBuy(window.__deskTest.holders().find((h) => h.keys.includes(8)).id)), true, "연속구매 손님");
+    await page.evaluate(() => window.__deskTest.setNow(1050)); // 17:30 — 열쇠 19개 · 남은 예약 2장 (조건은 됨)
+    assert.ok(await page.isHidden("#golden"), "연속구매 손님이 안에 있어 안 울림");
+    assert.strictEqual(await page.evaluate(() => window.__deskTest.golden()), null);
+    assert.ok(await page.$("#keys .key.red"), "아직 시간제 (분홍 · 빨강 그대로)");
+    assert.match(await page.textContent("#date"), /골든벨 대기 \(연속구매 8번 퇴장 뒤\)/);
+    // 그 손님이 반납 · 퇴장 → 다음에 조건을 볼 때 울림
+    await page.evaluate(() => window.__deskTest.returnKeys(window.__deskTest.holders().find((h) => h.keys.includes(8)).id, [8])); // 초과요금 결제 뒤 반납
+    assert.ok(await page.isVisible("#golden"), "연속구매 손님이 나간 뒤 골든벨");
+    assert.doesNotMatch(await page.textContent("#date"), /골든벨 대기/);
+    assert.match(await page.textContent("#date"), /골든벨 무제한 17:30~/);
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("골든벨 대기: 연속예약(15:00 · 17:00)을 입장 때 함께 이용완료한 손님이 안에 있으면 안 울림 → 반납 뒤 울림", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK);
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    const id = await page.evaluate(() => { const T = window.__deskTest, d = T.today(); const a = T.addBooking(d, "15:00", "연속손님", "01088887777", 1, { prevDone: 2 }); T.addBooking(d, "17:00", "연속손님", "01088887777", 1, { prevDone: 2 }); T.setNow(895); return a; });
+    await page.click('.slot[data-s="900"]');
+    await page.click(`.res[data-id="${id}"]`);
+    for (let i = 0; i < 4 && !(await page.$("#enter-done:not([disabled])")); i++) await page.click(".kpick button:not([disabled]):not(.on) >> nth=0");
+    await page.click("#enter-done");
+    const k = await page.evaluate((i) => window.__deskTest.bk(i).keys[0], id);
+    assert.strictEqual(await page.evaluate((i) => window.__deskTest.longBuy(i), id), true, "17:00 예약이 함께 이용완료됨 = 연속구매");
+    await page.evaluate(() => window.__deskTest.setNow(1050)); // 17:30 — 열쇠 20개 · 남은 예약 2장
+    assert.ok(await page.isHidden("#golden"), "연속예약 손님이 안에 있어 안 울림");
+    assert.match(await page.textContent("#date"), new RegExp(`골든벨 대기 \\(연속구매 ${k}번 퇴장 뒤\\)`));
+    await page.evaluate(() => window.__deskTest.setNow(1060));
+    assert.ok(await page.isHidden("#golden"), "계속 기다림");
+    await page.evaluate((i) => window.__deskTest.returnKeys(i, window.__deskTest.bk(i).keys.slice()), id);
+    await page.evaluate(() => window.__deskTest.setNow(1061));
+    assert.ok(await page.isVisible("#golden"), "반납 뒤 골든벨");
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
