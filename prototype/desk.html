@@ -323,14 +323,10 @@ body.office #sheet .btn-ink:not([data-act^="sync"]):not([data-act^="memo"]):not(
 .tplch:first-child { margin-top: 0; }
 .tplcode { text-align: left; border: 0; background: transparent; color: var(--accent); font-family: "GulimChe", "굴림체", "D2Coding", ui-monospace, monospace; font-size: 12.5px; padding: 2px 4px; border-radius: 4px; overflow-wrap: anywhere; }
 .tplcode:hover { background: var(--accent-bg); }
-/* 편집 칸: 스스로 줄을 바꾸지 않음 (줄 = 양식 한 줄) · 왼쪽 = 그 줄이 종이에서 몇 줄인지 · 42칸 자리에 옅은 세로줄 */
-.tpledbox { display: flex; flex: 1; min-height: 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--surface); }
-.tplgut { flex: none; width: 40px; overflow: hidden; padding: 7px 0; background: var(--surface-2); font-size: 10.5px; text-align: right; color: var(--faint); }
-.tplgut > div { height: 17px; line-height: 17px; padding-right: 4px; white-space: nowrap; display: flex; justify-content: flex-end; gap: 3px; }
-.tplgut .gn { min-width: 14px; }
-.tplgut b { font-weight: 700; }
-.tplgut .g2 { color: var(--amber); } .tplgut .gf { color: var(--accent); } .tplgut .g0 { color: var(--faint); }
-.tpledit textarea { flex: 1; min-height: 0; width: 100%; box-sizing: border-box; resize: none; border: 0; padding: 7px; white-space: pre; overflow: auto; font-family: "GulimChe", "굴림체", "D2Coding", ui-monospace, Consolas, monospace; font-size: 11px; line-height: 17px; background: var(--surface); color: var(--fg); background-image: linear-gradient(to right, transparent calc(42ch + 7px), var(--line) calc(42ch + 7px), var(--line) calc(42ch + 8px), transparent calc(42ch + 8px)); background-attachment: local; }
+/* 편집 칸 (사장님 11/07): 줄 번호 없음 · 편집 칸 폭 = 종이 42칸 그대로 → 편집 칸에서 줄이 바뀌는 자리 = 종이에서 줄이 바뀌는 자리
+   영문 · 숫자 1칸 · 한글 · 기호 2칸인 고정폭 글꼴(굴림체) · 글자마다 줄을 바꿈(낱말 단위 아님 · 빈칸도 칸) · 남는 폭은 글씨 크기로 (tplFit) */
+.tpledbox { display: flex; justify-content: center; flex: 1; min-height: 0; border: 1px solid var(--line); border-radius: 6px; overflow-x: auto; overflow-y: hidden; background: var(--surface-2); }
+.tpledit textarea { flex: none; width: calc(42ch + 2px); box-sizing: content-box; min-height: 0; resize: none; border: 0; border-left: 1px dashed var(--line); border-right: 1px dashed var(--line); padding: 7px 8px; white-space: break-spaces; word-break: break-all; overflow-wrap: anywhere; overflow-x: hidden; overflow-y: auto; font-family: "GulimChe", "굴림체", "D2Coding", "WenQuanYi Zen Hei Mono", monospace; font-size: 13px; line-height: 1.5; background: var(--surface); color: var(--fg); outline: none; }
 .tpldirty { color: var(--amber); font-size: 11.5px; }
 .tplhint { min-height: 16px; }
 .tplsamp { display: flex; gap: 3px; flex-wrap: wrap; }
@@ -2711,22 +2707,30 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     ["줄 앞", [["#", "2배 크게 · 가운데 (칸도 2배 — 한 줄 한글 10자)", "line"], ["##", "3배 크게 · 가운데", "line"], ["+", "세로 2배 (중간 · 폭은 그대로)", "line"], ["^", "가운데", "line"], ["*", "굵게 (^* · #* 처럼 붙여 씀)", "line"], ["---", "점선 줄", "rule"], ["===", "두 줄", "rule"]]],
     ["조건 · 자리", [["[네이버]", "네이버 예약 마일리지 줄 — 누계를 알 때만", "line"], ["[현장]", "현장 입장 손님만", "line"], ["[사은권]", "사은권 회차만", "line"], ["[이벤트]", "재방문 이벤트 손님만 · 한 줄이면 도전 · 성공 양식 자리", "line"], ["[기한]", "다음 기한이 있을 때만", "line"], ["[사은품]", "한 줄 = 성공일 때 제공상품 자리", "rule"], ["[자르기]", "한 줄 = 그 자리에서 종이 자름 (쿠폰 떼기)", "rule"]]],
   ];
-  /** 편집 칸 줄마다 종이에서 몇 줄인지 (42칸) — 조각 · 자리 줄은 '조각' · 이 예시에 안 나오는 줄은 · */
-  function tplGutter(text, v) {
-    const codes = new Set(tplKinds().filter((x) => x.frag).map((x) => `{${x.code}}`).concat(["[이벤트]", "{이벤트안내}", "[사은품]"]));
-    return String(text).split("\n").map((l) => {
-      if (codes.has(l.trim())) return `<b class="gf">조각</b>`;
-      const n = rowsOf(receiptLines(l, v, true)).length;
-      return n === 0 ? `<b class="g0">·</b>` : n > 1 ? `<b class="g2">${n}줄</b>` : "";
-    }).map((x, i) => `<div><span class="gn">${i + 1}</span>${x}</div>`).join("");
+  /** 편집 칸 폭 = 종이 42칸 (사장님 11/07): 편집 칸이 가진 폭에 42칸이 꼭 차게 글씨 크기를 맞춤 · 한글이 영문 2칸이 아닌 글꼴이면 알림 */
+  function tplFit() {
+    const ta = $("tpl-text"), box = ta && ta.parentElement;
+    if (!ta || !box || !box.clientWidth) return;
+    const probe = document.createElement("span");
+    probe.style.cssText = "position:absolute;left:-9999px;top:0;visibility:hidden;white-space:pre;font-size:100px";
+    probe.style.fontFamily = getComputedStyle(ta).fontFamily;
+    document.body.appendChild(probe);
+    const w = (t) => { probe.textContent = t; return probe.getBoundingClientRect().width; };
+    const w42 = w("0".repeat(42)), wk = w("가".repeat(21));
+    probe.remove();
+    const room = box.clientWidth - 16 - 6; // 안쪽 여백 · 테두리
+    const fs = Math.max(11, Math.min(19, Math.floor((room / w42) * 100 * 4) / 4));
+    ta.style.fontSize = `${fs}px`;
+    const bad = Math.abs(wk - w42) > 1;
+    const hint = $("tpl-hint");
+    if (hint && bad) hint.innerHTML = `<b style="color:var(--amber)">이 PC 에 굴림체가 없어 편집 칸 줄바꿈이 종이와 조금 다를 수 있어요 — 오른쪽 미리보기가 실제</b>`;
   }
   /** 편집 칸 글이 바뀜 → 저장 안 한 글 · 미리보기 · 줄 수 (다시 그리지 않음 — 커서 그대로) */
   function tplInput(v) {
     const kd = tplKind();
     if (v === kd.get()) TPLD.delete(kd.k); else TPLD.set(kd.k, v);
-    const [text, val] = kd.view(v), pp = $("tpl-paper"), gut = $("tpl-gut");
+    const [text, val] = kd.view(v), pp = $("tpl-paper");
     if (pp) pp.innerHTML = paperHtml(text, val);
-    if (gut) gut.innerHTML = tplGutter(v, val);
     const dirty = TPLD.has(kd.k), sv = $("tpl-save"), mk = $("tpl-dirty"), row = document.querySelector(`#sheet .tplrow[data-k="${CSS.escape(kd.k)}"]`);
     if (sv) sv.disabled = !dirty;
     if (mk) mk.hidden = !dirty;
@@ -2805,13 +2809,13 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
           <div class="tplcol tplcodesbox"><div class="tplhd">코드 목록</div><div class="tplcodes">${codes}</div></div>
         </div>
         <div class="tplcol tpledit"><div class="tplhd">편집 <span class="help">${esc(kd.name)}</span><b class="tpldirty" id="tpl-dirty" ${dirty ? "" : "hidden"}>저장 안 됨</b><button class="btn btn-sm btn-ink" id="tpl-save" data-act="tplSave" ${dirty ? "" : "disabled"}>저장</button></div>
-          <div class="tpledbox"><div class="tplgut" id="tpl-gut" aria-hidden="true">${tplGutter(txt, vv)}</div><textarea id="tpl-text" wrap="off" spellcheck="false" aria-label="${esc(kd.name)}"${kd.empty ? ` placeholder="비어 있으면 ${esc(kd.empty)}"` : ""}>${esc(txt)}</textarea></div>
-          <div class="help tplhint" id="tpl-hint">왼쪽 숫자 = 그 줄이 종이에서 찍히는 줄 수 (42칸 넘으면 '2줄') · 코드를 누르면 커서 자리에 · 고친 뒤 [저장]</div></div>
+          <div class="tpledbox"><textarea id="tpl-text" wrap="soft" spellcheck="false" aria-label="${esc(kd.name)}"${kd.empty ? ` placeholder="비어 있으면 ${esc(kd.empty)}"` : ""}>${esc(txt)}</textarea></div>
+          <div class="help tplhint" id="tpl-hint">편집 칸 폭 = 종이 42칸 — 여기서 줄이 바뀌면 종이에서도 바뀜 (# 큰 글씨 · {코드} 줄은 미리보기가 실제) · 코드를 누르면 커서 자리에 · 고친 뒤 [저장]</div></div>
         <div class="tplcol tplview"><div class="tplhd">미리보기 <span class="help">42칸 그대로</span><span class="help" id="tpl-empty" ${!txt.trim() && kd.empty ? "" : "hidden"}>(비어 있어 ${esc(kd.empty || "")})</span><button class="btn btn-sm" data-act="tplTest" title="이 양식 — 미리보기 그대로 (저장 안 한 글도)">샘플 출력</button></div>
           ${kd.samp ? `<div class="tplsamp">${TPL_SAMPS.map(([k, t]) => `<button class="btn btn-sm ${(sheet.tsamp || "start") === k ? "btn-ink" : ""}" data-act="tplSamp" data-s="${k}">${t}</button>`).join("")}</div>` : ""}
           <div class="paper" id="tpl-paper">${paperHtml(vt, vv)}</div></div>
       </div>`;
-    return { html, after: () => { evScroll("tpl-paper"); const r = document.querySelector("#sheet .tplrow.on"); if (r && r.scrollIntoView) r.scrollIntoView({ block: "nearest" }); } };
+    return { html, after: () => { tplFit(); evScroll("tpl-paper"); const r = document.querySelector("#sheet .tplrow.on"); if (r && r.scrollIntoView) r.scrollIntoView({ block: "nearest" }); } };
   }
   /** 운영 설정 한 쪽 (왼쪽 메뉴에서 고른 것) → { html, after(그린 뒤 할 일) } */
   function setPage(tab) {
@@ -5866,7 +5870,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     renderSheet(); toast(kd.frag ? `이름을 바꿨어요 — 코드 {${old}} → {${kd.f ? kd.f.code : codeOf(name)}} (양식 안 줄도 바꿈)` : "이름을 바꿨어요");
   });
   // 편집 칸을 내리면 왼쪽 줄 수 칸도 같이
-  document.addEventListener("scroll", (e) => { if (e.target && e.target.id === "tpl-text") { const g = $("tpl-gut"); if (g) g.scrollTop = e.target.scrollTop; } }, true); // 영수증 설정: 편집 칸에 커서를 둔 적이 있음 → 코드는 커서 자리에
+  window.addEventListener("resize", () => { if (sheet.mode === "settings" && sheet.tab === "prints") tplFit(); }); // 편집 칸 글씨 크기 다시 (창 크기)
   document.addEventListener("change", (e) => { if (/^cap-(target|max|ceil|p1|p2|p3|boost)$/.test(e.target.id)) renderSheet(); if (e.target.id === "note-m") noteFlush(); }); // 숫자를 다 넣으면 계획 다시
   window.__deskTest = { sync: SYNC_T, projection, capWalkOut, notes: () => Object.fromEntries(NOTES), evLoadCfg, today: () => TODAY, useDueText, printSecs, PRINT_: () => PRINT, sealOf, withSeal, SEAL, evSample: (i) => evSample(i), sealClear: () => sealCache.clear(), EV_: () => EV, liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, bk: (id) => (bookings[TODAY] || []).find((b) => b.id === id), useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capRanges, capPlan, capRun, capApply, capTick, capMoving: () => capMoveN > 0, capTeamExtra, capState: () => JSON.parse(JSON.stringify(capState)), capLock: (ts) => { capState.locks = ts.slice(); saveCapState(); }, capKeysAt, returnKeys: (id, ks) => { const h = holders().find((x) => x.id === id); if (h) { returnKeys(h, ks); renderAll(); } }, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: (v) => enterText(v), formFor: (v) => ticketText(v), splitForm, joinForms, lastPrint: () => LASTPRINT, BC2_: () => BC2, holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, sheet, evOf: (b) => evOf(b),
     evLog: (from) => { const L = evLog(from); return { from: L.from, count: L.count, people: Object.fromEntries([...L.people].map(([k, p]) => [k, JSON.parse(JSON.stringify(p))])) }; },

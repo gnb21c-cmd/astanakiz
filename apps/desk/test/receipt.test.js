@@ -244,7 +244,8 @@ test("입장권 양식 네이버 · 현장 따로 (사장님 10/28): 예전 한 
     assert.deepStrictEqual(await p2.$$eval("#sheet .tplrow .tn", (e) => e.map((x) => x.textContent)), ["네이버 예약용", "현장입장자용"]);
     const nText = await p2.inputValue("#tpl-text");
     assert.ok(!/\[현장\]/.test(nText) && /\{누계\}/.test(nText), "네이버 양식엔 [현장] 줄 없음");
-    assert.strictEqual(await p2.getAttribute("#tpl-text", "wrap"), "off", "편집 칸은 스스로 줄을 바꾸지 않음");
+    assert.strictEqual(await p2.getAttribute("#tpl-text", "wrap"), "soft", "편집 칸은 종이처럼 42칸에서 줄을 바꿈 (사장님 11/07)");
+    assert.deepStrictEqual(await p2.evaluate(() => { const cs = getComputedStyle(document.getElementById("tpl-text")); return [cs.whiteSpace, cs.wordBreak]; }), ["break-spaces", "break-all"], "글자마다 · 빈칸도 칸");
     await p2.click('#sheet .tplrow[data-k="walk"]');
     const wText = await p2.inputValue("#tpl-text");
     assert.ok(!/\[현장\]|\[네이버\]/.test(wText) && /네이버 예약하고/.test(wText), "현장 양식엔 표시 없이 현장 줄만");
@@ -273,10 +274,16 @@ test("입장권 양식 네이버 · 현장 따로 (사장님 10/28): 예전 한 
     await p2.evaluate(() => { const t = document.getElementById("tpl-text"); t.setSelectionRange(t.value.length, t.value.length); });
     await p2.click('#sheet .tplcode[data-c="---"]');
     assert.strictEqual(await p2.inputValue("#tpl-text"), "^* 현장 전용\n[현장]#{퇴장시간}{열쇠}번\n---", "선은 새 줄");
-    // 42칸 그대로: 편집 칸 왼쪽 = 그 줄이 종이에서 몇 줄 · 미리보기 줄 = 실제 출력 줄 (11/06)
+    // 42칸 그대로 (11/06 · 사장님 11/07 다시): 줄 번호 없음 · 편집 칸 폭 = 종이 42칸 → 편집 칸에서 줄이 바뀌는 자리 = 종이에서 바뀌는 자리
     const LONG = "가나다라마바사아자차카타파하 가나다라마바사아자차카타파하 끝"; // 한글 28자(56칸) + 띄어쓰기 2 + 끝 = 60칸 → 2줄
+    assert.strictEqual(await p2.$("#tpl-gut"), null, "줄 번호 칸 없음");
+    const vis = (t) => p2.evaluate((x) => { const ta = document.getElementById("tpl-text"); ta.value = x; const cs = getComputedStyle(ta), lh = parseFloat(cs.lineHeight), pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom), h0 = ta.style.height; ta.style.height = "0px"; const n = Math.round((ta.scrollHeight - pad) / lh); ta.style.height = h0; return n; }, t);
+    const rowsN = (t) => p2.evaluate((x) => window.__deskTest.escposParts(x, {}, false).filter((y) => y.t != null).map((y) => y.t).join("").replace(/\n$/, "").split("\n").length, t);
+    for (const t of ["가".repeat(21), "가".repeat(21) + "a", "a".repeat(42), "a".repeat(43), LONG, "가".repeat(20) + "a 나", "1. 취식은 카페식음료/유아식 만 허용됩니다.", "5. 2시간 30분 주차등록은 신발장 위에서 하시고 5시간 필요한 연속이용객은 직원에게 요청"]) {
+      assert.strictEqual(await vis(t), await rowsN(t), `편집 칸 줄 수 = 종이 줄 수: ${t}`);
+    }
+    assert.deepStrictEqual([await vis("가".repeat(21)), await vis("가".repeat(21) + "a"), await vis(LONG)], [1, 2, 2], "42칸까지 한 줄 · 43칸이면 두 줄");
     await p2.fill("#tpl-text", `^* 현장 전용\n${LONG}\n#가나다라마바사아자차카타`); // 2배 한글 12자 = 48칸 → 2줄
-    assert.deepStrictEqual(await p2.$$eval("#tpl-gut > div", (e) => e.map((x) => (x.querySelector("b") || {}).textContent || "")), ["", "2줄", "2줄"]);
     const prevRows = await p2.$$eval("#tpl-paper .pl", (e) => e.map((x) => x.textContent));
     assert.deepStrictEqual(prevRows.slice(1), ["가나다라마바사아자차카타파하 가나다라마바", "사아자차카타파하 끝", "가나다라마바사아자차", "카타"], "미리보기 = 42칸에서 나눈 줄 (한글 20자 + 띄어쓰기 = 41칸 · 2배는 한글 10자)");
     const sent = await p2.evaluate((t) => { const T = window.__deskTest; return T.escposParts(t, Object.assign({}, T.PRINT_ ? {} : {}, { 구분: "현장", _현장: true }), false).filter((x) => x.t != null).map((x) => x.t); }, `^* 현장 전용\n${LONG}\n#가나다라마바사아자차카타`);

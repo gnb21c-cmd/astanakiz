@@ -61,7 +61,6 @@ test("한가위 조각 양식: 공통양식 {한가위양식} 자리에 이벤�
     // (재)공통양식에 {한가위양식} 자리 · 맨 위 '이벤트'
     await pick(page, "evbase");
     await page.fill("#tpl-text", COMMON);
-    assert.match((await page.textContent("#tpl-gut")).replace(/\s+/g, " "), /5조각/, "편집 칸 왼쪽: 조각 줄");
     await page.click("#sheet [data-act=tplSamp][data-s=walkev]");
     assert.match((await page.textContent("#tpl-paper")).replace(/\s+/g, " "), /한 가 위 이 벤 트|한가위 이벤트/, "이벤트 입장 손님 예시 = 조각이 그 자리에");
     await page.click("#tpl-save");
