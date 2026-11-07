@@ -12,7 +12,12 @@ const { NAVER_DRIVER_SOURCE } = require("./naver-driver");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // 키즈 입장권만 (단체 · 열쇠분실 상품은 뺌)
-const isKidsTicket = (name) => /입장권/.test(name) && !/단체/.test(name);
+// + 숏타임 상품 (사장님 11/05 · 고침 11/07): 이름이 '10시 매진 시 숏타임 80분' 이라 '입장권'이 없어 2.18 까지 칸 · 손님을 통째로 못 읽었음
+//   → 10:00 칸 = 1시간 50분 + 숏타임 (최대 20) · 숏타임 손님 카드도 10:00 에 (데스크가 숏타임 표시 · 11:20 퇴장 · 수량 자동조절은 안 건드림)
+const SHORT_RE = /[숏솟]\s*타임/;
+const isKidsTicket = (name) => (/입장권/.test(name) || SHORT_RE.test(name)) && !/단체/.test(name);
+// 칸이 덜 떴는지 셀 때는 늘 있는 입장권 칸만 (숏타임 칸은 사장님이 열 때만 생겨 칸 수가 바뀜)
+const isBaseTicket = (name) => /입장권/.test(name) && !/단체/.test(name);
 
 /** 네이버 예약관리 주소(https://partner.booking.naver.com/bizes/653244/...)에서 목록·현황 주소 만들기 */
 function naverUrls(anyUrl) {
@@ -28,6 +33,7 @@ class NaverSync {
     this.urls = opts.urls || null;
     this.timeout = opts.timeout || 10000;
     this.isTicket = opts.isTicket || isKidsTicket;
+    this.isBase = opts.isTicket || isBaseTicket; // 칸 수 검사용
     this.today = opts.today || (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }); // 이 PC 날짜 (시험은 바꿔 넣음)
     this.cells = new Map(); // 날짜 → { n(입장권 칸 수), low, times } — 칸이 덜 뜬 화면을 알아봄 (사장님 10/31)
     this.onStep = opts.onStep || (() => {});
@@ -136,7 +142,7 @@ class NaverSync {
   /** 날짜를 맞춘 뒤 시간 칸이 다 뜰 때까지 (사장님 10/31 — 날짜 글자만 바뀌고 칸이 아직 안 뜬 화면을 읽어 '입장권 칸 0개'로 받아들였음)
       로딩 표시가 없고 입장권 칸 수가 세 번 이어 같으면 · 6초가 넘으면 그대로 (그날 칸이 정말 없을 수 있음 — 판단은 loadDay 의 cellCheck) */
   async settle(s) {
-    const n = (x) => x.slots.filter((c) => this.isTicket(c.product)).length;
+    const n = (x) => x.slots.filter((c) => this.isBase(c.product)).length;
     let prev = -1, same = 0;
     for (const t0 = Date.now(); Date.now() - t0 < 6000; ) {
       const k = s.loading ? -1 : n(s);
@@ -209,7 +215,7 @@ class NaverSync {
     g = await this.goDate(day);
     if (!g.ok) return g;
     const slots = g.state.slots.filter((s) => this.isTicket(s.product));
-    const bad = this.cellCheck(day, slots.length);
+    const bad = this.cellCheck(day, slots.filter((s) => this.isBase(s.product)).length);
     if (bad) { this.step(bad); return { ok: false, partial: true, why: bad }; }
     if (!this.days.has(day)) this.days.set(day, new Map());
     const cache = this.days.get(day);
@@ -512,4 +518,4 @@ class NaverSync {
   }
 }
 
-module.exports = { NaverSync, isKidsTicket, naverUrls };
+module.exports = { NaverSync, isKidsTicket, isBaseTicket, naverUrls };

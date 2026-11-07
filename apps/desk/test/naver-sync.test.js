@@ -54,6 +54,28 @@ test("하루 예약 읽기: 예약 목록 + 예약현황 카드 (입장권만, �
   }
 });
 
+test("숏타임 상품도 읽음 (사장님 11/07 — 이름 '10시 매진 시 숏타임 80분'에 '입장권'이 없어 2.18 까지 칸 · 손님을 못 읽었음) · 칸 수 검사는 늘 있는 입장권 칸만", async () => {
+  const { isKidsTicket, isBaseTicket } = require("../src/naver-sync");
+  assert.deepStrictEqual(["10시 매진 시 숏타임 80분", "솟타임 80분", "평일 무제한 / 휴일 1시간 50분 입장권", "야간자유 입장권", "[평일] 단체 10시~13시 대관", "열쇠분실[미반납]결제"].map(isKidsTicket), [true, true, true, true, false, false]);
+  assert.strictEqual(isBaseTicket("10시 매진 시 숏타임 80분"), false);
+  const { browser, sync } = await open("?short=1", "&short=1");
+  try {
+    const r = await sync.loadDay("2026-10-05");
+    assert.ok(r.ok, r.why);
+    const sh = r.slots.filter((s) => /숏타임/.test(s.product));
+    assert.deepStrictEqual(sh.map((s) => [s.time, s.cap, s.conf, s.done]), [["10:00", 10, 2, 1]], "숏타임 칸 10:00 · 판매 10 · 확정 2 · 이용완료 1");
+    const ten = r.slots.filter((s) => s.time === "10:00").reduce((a, s) => a + s.cap, 0);
+    assert.strictEqual(ten, 20, "10:00 = 1시간 50분 10 + 숏타임 10");
+    const by = Object.fromEntries(r.bookings.map((b) => [b.no, b]));
+    assert.deepStrictEqual([by["1374100201"].name, by["1374100201"].qty, by["1374100201"].status, by["1374100201"].time, by["1374100201"].product], ["숏손님", 2, "확정", "10:00", "10시 매진 시 숏타임 80분"]);
+    assert.deepStrictEqual([by["1374100202"].status, by["1374100202"].doneCount], ["완료", 5]);
+    assert.strictEqual(r.bookings.length, 10, "입장권 8 + 숏타임 2");
+    assert.strictEqual(sync.cells.get("2026-10-05").n, r.slots.filter((s) => !/숏타임/.test(s.product)).length, "칸 수 검사는 숏타임 칸을 빼고 셈 (숏타임을 닫아도 '덜 뜸'이 아님)");
+  } finally {
+    await browser.close();
+  }
+});
+
 test("날짜 이동: 다른 날로 갔다가 돌아옴 · 두 번째 읽기는 카드를 다시 열지 않음", async () => {
   const { browser, sync } = await open();
   try {

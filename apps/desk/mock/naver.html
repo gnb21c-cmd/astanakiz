@@ -46,6 +46,7 @@
   const KEY = "mockNaver3";
   const DOW = ["일", "월", "화", "수", "목", "금", "토"];
   const PRODUCTS = ["평일 무제한 / 휴일 1시간 50분 입장권", "야간자유 입장권", "[평일] 단체 10시~13시 대관", "열쇠분실[미반납]결제"];
+  if (P.get("short")) PRODUCTS.push("10시 매진 시 숏타임 80분"); // 숏타임 상품 (사장님 11/05 — 10시 매진 때 사장님이 엶 · 10:00 하나 · 이름에 '입장권' 없음)
   const seed = () => ({
     "2026-10-05": [
       { no: "1367156204", name: "송나라", phone: "010-6687-3285", time: "10:00", product: 0, qty: 1, status: "완료", done: 11, cancel: 2 },
@@ -58,7 +59,10 @@
       { no: "1370988777", name: "단체손님", phone: "010-3333-4444", time: "10:00", product: 2, qty: 1, status: "확정", done: 0, cancel: 0 },
       { no: "1372961203", name: "양용수", phone: "010-8612-2915", time: "16:00", product: 0, qty: 1, status: "확정", done: 1, cancel: 1, visitor: "박소희(010-2785-4295)" },
       { no: "1373000111", name: "입금대기손님", phone: "010-7777-8888", time: "15:30", product: 0, qty: 1, status: "확정", done: 0, cancel: 2, unpaid: true },
-    ],
+    ].concat(P.get("short") ? [
+      { no: "1374100201", name: "숏손님", phone: "010-9090-1010", time: "10:00", product: 4, qty: 2, status: "확정", done: 3, cancel: 0 },
+      { no: "1374100202", name: "숏완료", phone: "010-9090-2020", time: "10:00", product: 4, qty: 1, status: "완료", done: 5, cancel: 0 },
+    ] : []),
   });
   let db;
   try { db = JSON.parse(localStorage.getItem(KEY)) || seed(); } catch (e) { db = seed(); }
@@ -109,7 +113,7 @@
   } else {
     const label = `${D.getFullYear()}. ${D.getMonth() + 1}. ${D.getDate()}. ${DOW[D.getDay()]}` + (P.get("range") ? " ~ 2026. 11. 4. 수" : "");
     const times = []; for (let h = 10; h <= 19; h++) times.push(`${String(h).padStart(2, "0")}:00`, `${String(h).padStart(2, "0")}:30`);
-    const has = (p, t) => (p === 0 && t < "18:00") || (p === 1 && t >= "18:00") || (p === 2 && t === "10:00");
+    const has = (p, t) => (p === 0 && t < "18:00") || (p === 1 && t >= "18:00") || (p === 2 && t === "10:00") || (p === 4 && t === "10:00");
     const btn = (title, n, cls) => `<button type="button" class="btn btn-xs calendar-btn ${cls}" title="${title}" data-act="${title}"><span><span class="StatusButton__text__Mw4v+ text">${title.slice(0, 2)}</span><span class="StatusButton__text__Mw4v+ text">${title.slice(2)}</span></span><span class="number">${n}</span></button>`;
     const cell = (p, t) => {
       if (!has(p, t)) return `<div class="Calendar__week-cell__ntFou Calendar__week-rest__4uV-Y"><div class="Calendar__week-cell-inner__tqaOB"></div></div>`;

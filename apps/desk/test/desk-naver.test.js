@@ -108,3 +108,53 @@ test("데스크가 네이버 예약을 불러오고, 등록 완료 때 네이버
     await browser.close();
   }
 });
+
+test("숏타임 (사장님 11/07): 네이버에서 읽은 10:00 칸 = 1시간 50분 + 숏타임 (판매 최대 20) · 숏타임 손님 카드도 10:00 에 [숏타임] · 11:20 퇴장", async () => {
+  const browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+    const naverPage = await ctx.newPage();
+    await naverPage.goto(NAVER + "?short=1");
+    await naverPage.evaluate(() => localStorage.clear());
+    await naverPage.goto(NAVER + "?short=1");
+    const naver = new NaverSync((code) => naverPage.evaluate(code), { urls: { list: NAVER + "?view=list&short=1", calendar: NAVER + "?view=calendar&short=1" } });
+    const desk = await ctx.newPage();
+    await desk.clock.install({ time: new Date("2026-10-05T09:56:00") });
+    let q = Promise.resolve();
+    const serial = (fn) => (q = q.then(fn, fn));
+    await desk.exposeFunction("__naverLoad", (day, only) => serial(() => naver.loadDay(day, { only })));
+    await desk.exposeFunction("__naverComplete", (b) => serial(() => naver.complete(b)));
+    await desk.addInitScript(() => {
+      window.desk = {
+        naver: { load: (d, o) => window.__naverLoad(d, o), complete: (b) => window.__naverComplete(b) },
+        state: { load: (day) => localStorage.getItem("test-state-" + day), save: (day, json) => localStorage.setItem("test-state-" + day, json) },
+      };
+    });
+    const errs = [];
+    desk.on("pageerror", (e) => errs.push(e.message));
+    await desk.goto(DESK);
+    await desk.click("[data-act=refresh]");
+    await desk.waitForFunction(() => /불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 30000 });
+    assert.deepStrictEqual(await desk.$$eval('.slot[data-s="600"] .c', (e) => e.map((x) => x.textContent.trim())), ["4", "2", "14"], "10:00 완료 4(3 + 숏 1) · 확정 2(숏) · 잔여 14 (판매 20)");
+    await desk.click('.slot[data-s="600"]');
+    const names = await desk.$$eval(".res .name", (e) => e.map((x) => x.textContent.replace(/\s+/g, " ").trim()));
+    assert.ok(names.some((n) => /숏손님/.test(n)) && names.some((n) => /숏완료/.test(n)), `10:00 카드에 숏타임 손님: ${names.join(" / ")}`);
+    assert.ok(names.some((n) => /송나라/.test(n)) && names.some((n) => /엄효정/.test(n)), "1시간 50분 손님도 같은 칸");
+    const card = desk.locator('.res:has-text("숏손님")');
+    assert.strictEqual((await card.locator(".badge.short").textContent()).trim(), "숏타임");
+    assert.match((await card.textContent()).replace(/\s+/g, " "), /10:00 ~ 11:20 퇴장/);
+    // 이용시간: 숏타임 1시간 20분 · 1시간 50분 손님은 그대로
+    const ids = await desk.$$eval(".res", (e) => Object.fromEntries(e.map((x) => [x.querySelector(".name").textContent.replace(/\s+/g, "").replace(/숏타임|첫방문/g, ""), x.dataset.id])));
+    assert.deepStrictEqual(await desk.evaluate(([a, b]) => [window.__deskTest.bookMinutes(a), window.__deskTest.bookMinutes(b)], [ids["숏손님"], ids["송나라"]]), [80, 110]);
+    // 근무자: 10시 카드에서 숏손님 이름 확인 → 열쇠 → 입장 → 입장권 퇴장시간 11:20 (일반은 11:50)
+    await card.click();
+    for (let i = 0; i < 6 && !(await desk.$("#enter-done:not([disabled])")); i++) await desk.click(".kpick button:not([disabled]):not(.on) >> nth=0");
+    await desk.click("#enter-done");
+    const out = await desk.evaluate((id) => { const T = window.__deskTest, h = T.holders().find((x) => x.id === id); const v = T.keyVals(h); return { exit: v.퇴장시간, ticket: T.receiptLines(T.formFor(v), v).map((l) => l.t.trim()).join(" | ") }; }, ids["숏손님"]);
+    assert.strictEqual(out.exit, "오전 11시 20분", "숏타임 입장권 퇴장시간");
+    assert.match(out.ticket, /퇴장 {2}오전 11시 20분/);
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
