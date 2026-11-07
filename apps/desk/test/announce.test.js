@@ -35,7 +35,7 @@ test("퇴장 안내 방송: 누른 순간 분홍 열쇠만 (빨강 · 직원 열
   const browser = await launch();
   try {
     const page = await open(browser);
-    await page.evaluate(() => localStorage.clear());
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem("astanakiz-announce", JSON.stringify({ auto: false })); }); // 수동 단추만 (자동은 아래 시험)
     await page.reload();
     const pink = await page.$$eval("#keys .key.pink", (e) => e.map((x) => Number(x.dataset.k)).sort((a, b) => a - b));
     const red = await page.$$eval("#keys .key.red", (e) => e.map((x) => Number(x.dataset.k)));
@@ -74,7 +74,7 @@ test("골든벨: 울리는 순간 배경음악과 함께 골든벨 멘트 자동
   const browser = await launch();
   try {
     const page = await open(browser);
-    await page.evaluate(() => localStorage.clear());
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem("astanakiz-announce", JSON.stringify({ auto: false })); });
     await page.reload();
     await page.evaluate(() => window.__deskTest.setNow(1050)); // 17:30 — 열쇠 19개 · 남은 예약 2장 → 골든벨
     assert.ok(await page.isVisible("#golden"));
@@ -88,7 +88,7 @@ test("골든벨: 울리는 순간 배경음악과 함께 골든벨 멘트 자동
     assert.strictEqual(await page.evaluate(() => window.__deskTest.ann.state().bgms), 2);
     // 골든벨 자동 방송을 끄면 안 함
     const p2 = await open(browser);
-    await p2.evaluate(() => { localStorage.clear(); localStorage.setItem("astanakiz-announce", JSON.stringify({ golden: false })); });
+    await p2.evaluate(() => { localStorage.clear(); localStorage.setItem("astanakiz-announce", JSON.stringify({ golden: false, auto: false })); });
     await p2.reload();
     await p2.evaluate(() => window.__deskTest.setNow(1050));
     assert.ok(await p2.isVisible("#golden"));
@@ -104,7 +104,7 @@ test("운영 설정 → 안내 방송: 멘트 · 목소리 · 되풀이 · 끄�
   const browser = await launch();
   try {
     const page = await open(browser);
-    await page.evaluate(() => localStorage.clear());
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem("astanakiz-announce", JSON.stringify({ auto: false })); });
     await page.reload();
     await page.dblclick("#now");
     await page.click('[data-t="announce"]');
@@ -133,6 +133,46 @@ test("운영 설정 → 안내 방송: 멘트 · 목소리 · 되풀이 · 끄�
     await page.evaluate(() => { window.__deskTest.ann.ANN.on = true; window.__deskTest.sync.demo(true); });
     assert.strictEqual(await page.isHidden("#ann-btn"), true, "사무실 PC 에는 단추 없음");
     assert.deepStrictEqual(await page.evaluate(() => ["annExit", "annGolden", "annTest", "annStop"].map((a) => window.__deskTest.sync.gate(a))), [false, false, true, true]);
+    assert.deepStrictEqual(page.errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("자동 퇴장 안내 (사장님 11/07): 분홍이 되는 순간(1시간 50분) 한 번 · 5분 뒤(1시간 55분) 한 번 더 · 같은 때 열쇠는 한 멘트 · 빨강은 안 부름 · 다시 켜도 또 안 부름 · 수동 단추도", async () => {
+  const browser = await launch();
+  try {
+    const page = await open(browser);
+    await page.evaluate(() => localStorage.clear());
+    await page.reload(); // 체험판 13:50 — 2 · 24 · 25 · 26번 반납 시각 13:50 (막 분홍)
+    const idle = () => page.waitForFunction(() => !window.__deskTest.ann.state().busy, null, { timeout: 15000 });
+    const heard = async (n) => { await page.waitForFunction((x) => window.__said.length >= x, n, { timeout: 15000 }); await idle(); return (await said(page))[n - 1]; };
+    const list = (ks) => `퇴장 안내드립니다. ${ks.map((k) => `${k}번`).join(", ")} 고객님 이용 시간이 끝났습니다. 다음 손님 입장을 위해 열쇠 반납해 주세요.`;
+    assert.strictEqual(await heard(1), list([2, 24, 25, 26]), "13:50 분홍이 되는 순간 — 네 열쇠 한 멘트");
+    for (const m of [831, 832, 834]) { await page.evaluate((x) => window.__deskTest.setNow(x), m); await page.waitForTimeout(1300); }
+    assert.strictEqual((await said(page)).length, 1, "13:51 ~ 13:54 는 조용");
+    await page.evaluate(() => window.__deskTest.setNow(835));
+    assert.strictEqual(await heard(2), list([2, 24, 25, 26]), "13:55 (1시간 55분) 한 번 더");
+    await page.evaluate(() => window.__deskTest.setNow(836)); await page.waitForTimeout(1300);
+    assert.strictEqual((await said(page)).length, 2, "세 번째는 없음");
+    await page.evaluate(() => window.__deskTest.setNow(860)); // 14:20 — 3 · 27 · 28번(네이버) · 29번(현장) 분홍 / 2 · 24 … 은 빨강
+    assert.strictEqual(await heard(3), list([3, 27, 28, 29]), "14:20 — 빨강이 된 2 · 24 · 25 · 26번은 안 부름");
+    await page.evaluate(() => window.__deskTest.setNow(865));
+    assert.strictEqual(await heard(4), list([3, 27, 28, 29]));
+    // 수동: 근무자가 언제든 — 그 순간 분홍 열쇠 모두
+    await page.click("#ann-btn");
+    assert.strictEqual(await heard(5), list([3, 27, 28, 29]));
+    // 다시 켜도(같은 날) 이미 부른 것은 또 안 부름 — 체험판은 13:50 으로 돌아감
+    await page.reload();
+    await page.waitForTimeout(3500);
+    assert.deepStrictEqual(await said(page), [], "다시 켜도 13:50 첫 방송을 또 하지 않음");
+    // 자동을 끄면 안 함 · 사무실 PC(미리 보기)도 안 함
+    await page.evaluate(() => { window.__deskTest.ann.ANN.auto = false; window.__deskTest.setNow(890); });
+    await page.waitForTimeout(2500);
+    assert.deepStrictEqual(await said(page), [], "자동을 끄면 14:50 에도 조용");
+    await page.evaluate(() => { window.__deskTest.ann.ANN.auto = true; window.__deskTest.sync.demo(true); window.__deskTest.setNow(890); });
+    await page.waitForTimeout(2500);
+    assert.deepStrictEqual(await said(page), [], "사무실 PC 는 자동 방송 안 함");
     assert.deepStrictEqual(page.errs, []);
   } finally {
     await browser.close();
