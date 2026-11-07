@@ -158,7 +158,7 @@ function createDesk() {
     height: 768,
     title: "아스타나키즈 입장 데스크",
     icon: path.join(__dirname, "icon.png"), // 작업표시줄 · 창 아이콘 = 브랜드 로고 (설치 아이콘은 build/icon.ico)
-    webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true },
+    webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, autoplayPolicy: "no-user-gesture-required" }, // 안내 방송 (11/07): 골든벨 자동 방송이 누르지 않아도 소리 나게
   });
   deskWin.setMenuBarVisibility(false);
   // 창이 앞으로 올 때마다 화면(웹 페이지)에도 키보드 포커스를 줌 (사장님 10/26: 메모 칸을 눌러도 커서가 어쩌다 안 생김)

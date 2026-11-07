@@ -15,7 +15,7 @@ const crypto = require("crypto");
 const zlib = require("zlib");
 
 /** 함께 쓰는 설정 (settings.json 키) — 프린터 포트 · 아마노 · 네이버 주소 · 보고 열쇠 · 쿠폰 봉인 열쇠 · 손님 기록은 각 PC 에만 */
-const SHARED = ["peaks", "capAuto", "unpaidCancel", "stockAuto", "printForm", "printSet", "bc2Forms", "bc", "visitEvent", "walkEvent", "survey", "liveOn"];
+const SHARED = ["peaks", "capAuto", "unpaidCancel", "stockAuto", "printForm", "printSet", "bc2Forms", "bc", "visitEvent", "walkEvent", "survey", "liveOn", "announce"]; // announce = 안내 방송 (11/07 · 목소리는 각 PC annVoice)
 const ROLES = ["pos", "office"];
 const other = (role) => (role === "pos" ? "office" : "pos");
 const ALPHA = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"; // 헷갈리는 0 · 1 · I · O 없음 (32자 → 16자리 = 80비트)

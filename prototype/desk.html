@@ -543,6 +543,14 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 .keyhead { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
 .keyhead .stat { font-size: 12.5px; color: var(--muted); }
 .keyhead .stat b { color: var(--fg); font-size: 15px; }
+/* 안내 방송 (11/07): 열쇠판 위 [퇴장 안내 방송 n] — 분홍 열쇠가 있으면 분홍 테두리 · 방송 중이면 [방송 멈춤] */
+.annbtn { margin-right: auto; border: 1.5px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--muted); font-size: 12.5px; font-weight: 700; padding: 3px 9px; cursor: pointer; }
+.annbtn.has { border-color: var(--pink); color: var(--fg); background: color-mix(in srgb, var(--pink) 22%, var(--surface)); }
+.annbtn.has b { color: var(--pink-fg); background: var(--pink); border-radius: 6px; padding: 0 5px; margin-left: 3px; }
+.annbtn.busy { border-color: var(--red); color: var(--red); }
+.annbtn:disabled { opacity: .55; cursor: default; }
+.anntext { width: 100%; box-sizing: border-box; resize: vertical; font-size: 13px; line-height: 1.5; }
+.gbtns { display: flex; gap: 8px; justify-content: center; }
 .keys { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); grid-template-rows: repeat(5, minmax(0, 1fr)); gap: 4px; flex: 1 1 0; min-height: 0; } /* 열쇠판이 남는 높이를 다 채움 · 5줄 같은 높이 (사장님 10/8) */
 .keys .key { aspect-ratio: auto; height: auto; min-height: 0; row-gap: 7px; } /* 번호와 이름 사이 띄움 (사장님 10/8) */
 .key { aspect-ratio: 1 / .98; max-width: 100%; border-radius: 8px; border: 1.5px solid var(--line); background: var(--surface-2); color: var(--faint); display: grid; align-content: center; justify-items: center; padding: 1px; line-height: 1.1; min-width: 0; overflow: hidden; }
@@ -787,6 +795,8 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     <section class="panel" aria-labelledby="h-keys">
       <div class="keyhead">
         <h2 id="h-keys">열쇠</h2>
+        <!-- 안내 방송 (사장님 11/07): 누른 순간 분홍 열쇠 번호를 매장 스피커로 · 숫자 = 지금 분홍 열쇠 수 -->
+        <button class="annbtn" id="ann-btn" data-act="annExit" disabled>퇴장 안내 방송</button>
         <span class="stat num" id="key-stat"></span>
       </div>
       <div class="keys" id="keys"></div>
@@ -835,7 +845,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   <div class="gbox"><div class="gtitle">골든벨</div>
     <p class="gmsg" id="golden-msg">골든벨 울려주세요~!!<br>지금 시간부터 모든 고객 시간제한 없는 무제한 이용임을 알려주세요~~!!</p>
     <p class="gsub num" id="golden-sub"></p>
-    <button class="btn btn-ink" data-act="goldenOk">확인</button></div>
+    <div class="gbtns"><button class="btn" data-act="annGolden">골든벨 방송 다시</button><button class="btn btn-ink" data-act="goldenOk">확인</button></div></div>
 </div>
 </div>
 <!-- 반납안내 커튼 (화면 전체 · 1024×768 판 밖에 둠) -->
@@ -891,6 +901,12 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   const SYNC_ROLE = (() => { try { return (SYNC && SYNC.role()) || ""; } catch (e) { return ""; } })();
   let OFFICE = SYNC_ROLE === "office"; // 체험판 '사무실 PC 화면 미리 보기'에서도 켬
   const SYNCV = { st: null, info: null, snapAt: 0, snapText: "", dayOff: "", last: null, demo: false, stale: false, sentAt: 0, lastSnap: "" };
+  /* 안내 방송 (사장님 11/07) — 설정(두 PC 가 같이) · 이 PC 목소리 · 지금 방송 상태 (아래 announce) */
+  const ANN = { on: true, chime: true, bgm: true, golden: true, repeat: 1, rate: 0.95, volume: 1,
+    exitText: "퇴장 안내드립니다. {열쇠} 고객님 이용 시간이 끝났습니다. 다음 손님 입장을 위해 열쇠 반납해 주세요.",
+    goldenText: "지금부터 모든 고객의 퇴장 시간 제한이 없어집니다. 자유로이 퇴장하시며 열쇠만 꼭 반납해 주세요." };
+  const ANNV = { voice: "" };
+  const ANNS = { busy: "", token: 0, bgm: null, last: null, said: [], chimes: 0, bgms: 0 };
   /* 글 칸 커서 되살리기 (사장님 10/26: 메모 칸을 눌러도 커서가 어쩌다 생기고 어쩌다 안 생겨 글이 안 써짐)
      설치한 앱(Electron · Windows)은 확인 창(confirm)을 닫은 뒤나 숨은 창(네이버 · 아마노 · 톡톡)이 잠깐 앞에 왔다 간 뒤
      창은 앞인데 키보드 포커스가 없어 글 칸에 커서가 안 생기는 일이 있음 →
@@ -1686,6 +1702,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       <span class="row"><span>테두리</span><span><i class="l-nv"></i>네이버</span><span><i class="l-walk"></i>현장</span><span><i class="l-svc"></i>서비스</span></span></div>`;
     $("keys").innerHTML = html;
     $("bulk-btn").disabled = holders().reduce((a, h) => a + h.keys.length, 0) < 2; // 열쇠 2개 이상 나가면 켜짐
+    renderAnnBtn(); // 퇴장 안내 방송 — 분홍 열쇠 수
   }
 
   // ── 주차 (아마노 화면 동기화) ───────────────────
@@ -2326,6 +2343,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     golden = { at: now, keys: n, rest };
     $("golden-sub").textContent = `${hm(now)} · 안에 있는 열쇠 ${n}개 · 남은 예약 ${rest}장 → 지금 열쇠와 앞으로 들어오는 손님 모두 무제한으로 바꿨어요`;
     $("golden").hidden = false;
+    annGoldenAuto(); // 안내 방송 (사장님 11/07): 배경음악과 함께 골든벨 멘트
     renderAll();
   }
   function renderAll() { if (!OFFICE) { saveState(); evSync(); hvSync(); notesSync(); bcWatch(); } $("now").textContent = hm(now); $("refresh-at").textContent = refreshText(); $("refresh-at").style.color = (naverErr || (bookings[TODAY] || []).some((b) => b.naverPending && b.naverWhy)) && !naverBusy ? "var(--red)" : ""; renderSlots(); renderRes(); renderKeys(); renderCars(); if (!OFFICE) goldenCheck(); renderMemoBoxes(); renderCapForce(); renderSyncChip(); }
@@ -2635,7 +2653,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     }
   }
   // ── 운영 설정 V2.0 (사장님 10/21): 왼쪽 메뉴 · [?] 설명 · 기준 · 근무자 ─────────────
-  const SET_MENU = [["season", "비성수기 설정"], ["printer", "프린터 설정"], ["prints", "프린트물 설정"], ["event", "재방문 이벤트"], ["staff", "근무자 등록"], ["api", "API 연결 설정"], ["naver", "네이버 설정"], ["cust", "고객 세부 관리"], ["etc", "기타"], ["sync", "두 PC 연결"]];
+  const SET_MENU = [["season", "비성수기 설정"], ["printer", "프린터 설정"], ["prints", "프린트물 설정"], ["event", "재방문 이벤트"], ["staff", "근무자 등록"], ["api", "API 연결 설정"], ["naver", "네이버 설정"], ["cust", "고객 세부 관리"], ["etc", "기타"], ["announce", "안내 방송"], ["sync", "두 PC 연결"]];
   /** 메뉴 옆 작은 상태 (들어가 보지 않아도 켜졌는지) */
   function setBadge(k) {
     if (k === "season") return `기간 ${RULES.peaks.length}`;
@@ -2647,6 +2665,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     if (k === "naver") { const n = (RULES.capAuto.on ? 1 : 0) + (ST.view && ST.view.cfg && ST.view.cfg.on ? 1 : 0); return n ? `켜짐 ${n}` : "꺼짐"; }
     if (k === "etc") return [WEV.name ? `${WEV.name} 이벤트` : "", SV.on ? "설문 켜짐" : ""].filter(Boolean).join(" · ");
     if (k === "sync") return syncBadge();
+    if (k === "announce") return !ANN.on ? "꺼짐" : !SYN ? "음성 없음" : annKo().length ? `켜짐${ANN.golden ? " · 골든벨" : ""}` : "한국어 음성 없음";
     if (k === "cust") { if (!custList) { custLoad(); return ""; } const n = custList.filter((x) => x.bc).length; return n ? `BC ${n}명` : "BC · 마일리지 SKIP"; }
     return "";
   }
@@ -2853,6 +2872,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   /** 운영 설정 한 쪽 (왼쪽 메뉴에서 고른 것) → { html, after(그린 뒤 할 일) } */
   function setPage(tab) {
       if (tab === "sync") return syncPage(); // 두 PC 연결 (11/06)
+      if (tab === "announce") return annPage(); // 안내 방송 (11/07)
       if (tab === "event") {
         if (!(EV.cur >= 0 && EV.cur <= 2)) EV.cur = 0; // 미리보기 예시 (1번 안내 · 2번 성공) — 양식 고치기는 프린트물 설정
         const L = EV.from ? evLog() : null, i = EV.cur, period = isDay(EV.from) && isDay(EV.to) ? `${krDate(EV.from)} ~ ${krDate(EV.to)}` : "";
@@ -5533,6 +5553,179 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     document.addEventListener("pointercancel", clear);
     $("keys").addEventListener("contextmenu", (e) => e.preventDefault()); // 터치로 꾹 누르면 뜨는 메뉴 · 오른쪽 클릭 막기
   })();
+  // ── 안내 방송 (사장님 11/07): POS PC 스피커 출력 → 매장 앰프 · Windows 한국어 음성(웹 음성 합성)으로 읽음 ──
+  //   [퇴장 안내 방송] (열쇠판 위) = 누른 순간 분홍 열쇠(반납 시간 ~ 10분) 번호를 모아 읽음 · 빨강(이미 10분 넘음)과 직원 열쇠는 뺌
+  //   골든벨이 울리면 배경음악과 함께 골든벨 멘트를 자동으로 (열쇠는 지금처럼 모두 무제한) · 알림음 · 배경음악은 데스크가 직접 만든 소리(저작권 없음)
+  //   멘트 · 목소리 · 빠르기 · 크기 · 되풀이는 운영 설정 → 안내 방송 (목소리는 그 PC 것 · 나머지는 두 PC 가 같이)
+  const SYN = typeof window.speechSynthesis !== "undefined" && window.speechSynthesis && typeof window.SpeechSynthesisUtterance === "function" ? window.speechSynthesis : null;
+  let annVoices = [];
+  const annLoadVoices = () => { if (!SYN) return; try { annVoices = SYN.getVoices() || []; } catch (e) { annVoices = []; } if (sheet.mode === "settings" && sheet.tab === "announce") syncSheetSoon(); };
+  if (SYN) { annLoadVoices(); try { SYN.addEventListener("voiceschanged", annLoadVoices); } catch (e) { SYN.onvoiceschanged = annLoadVoices; } }
+  const annKo = () => annVoices.filter((v) => /^ko/i.test(v.lang || ""));
+  const annPickVoice = () => annKo().find((v) => v.voiceURI === ANNV.voice) || annKo().find((v) => /heami|해미/i.test(v.name)) || annKo()[0] || null;
+  function annLoad(v) {
+    if (!v || typeof v !== "object") return;
+    for (const k of ["on", "chime", "bgm", "golden"]) if (typeof v[k] === "boolean") ANN[k] = v[k];
+    if ([1, 2, 3].includes(v.repeat)) ANN.repeat = v.repeat;
+    if (v.rate >= 0.6 && v.rate <= 1.4) ANN.rate = v.rate;
+    if (v.volume >= 0.1 && v.volume <= 1) ANN.volume = v.volume;
+    for (const k of ["exitText", "goldenText"]) if (typeof v[k] === "string" && v[k].trim()) ANN[k] = v[k].slice(0, 300);
+  }
+  const annSave = () => { const v = JSON.parse(JSON.stringify(ANN)); if (APP && window.desk.config) window.desk.config.set({ announce: v }); else try { localStorage.setItem("astanakiz-announce", JSON.stringify(v)); } catch (e) { /* 저장 못 해도 동작 */ } };
+  const annSaveVoice = () => { if (APP && window.desk.config) window.desk.config.set({ annVoice: ANNV.voice }); else try { localStorage.setItem("astanakiz-annvoice", ANNV.voice); } catch (e) { /* 없음 */ } };
+  if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c && c.announce) annLoad(c.announce); if (c && typeof c.annVoice === "string") ANNV.voice = c.annVoice; renderAnnBtn(); }).catch(() => {});
+  else try { annLoad(JSON.parse(localStorage.getItem("astanakiz-announce"))); ANNV.voice = localStorage.getItem("astanakiz-annvoice") || ""; } catch (e) { /* 없음 */ }
+  /** 지금 분홍 열쇠 번호 (작은 번호부터) — 직원 열쇠(손님과 안 이은 서비스 키)는 뺌 */
+  const annPink = () => holders().filter((h) => !(h.svc && !h.of)).flatMap((h) => h.keys.filter((k) => keyColor(h, k) === "pink")).sort((a, b) => a - b);
+  const annKeys = (ks) => ks.map((k) => `${k}번`).join(", ");
+  const annExitText = (ks) => ANN.exitText.replace(/\{열쇠\}/g, annKeys(ks));
+  /** 오디오 (알림음 · 배경음악) — 앱(Electron)은 누르지 않아도 소리가 남 · 체험판 브라우저는 한 번 누른 뒤부터 */
+  let annCtx = null;
+  const annAudio = () => { try { annCtx = annCtx || new (window.AudioContext || window.webkitAudioContext)(); if (annCtx.state === "suspended") annCtx.resume(); } catch (e) { annCtx = null; } return annCtx; };
+  /** 띵동댕동 (위로 올라가는 네 음 · 끝나는 데 걸리는 초) */
+  function annChime() {
+    const c = annAudio(); if (!c) return 0;
+    const t0 = c.currentTime + 0.05;
+    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+      const o = c.createOscillator(), g = c.createGain(), t = t0 + i * 0.42;
+      o.type = "sine"; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.3 * ANN.volume, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.3);
+      o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + 1.35);
+    });
+    ANNS.chimes++;
+    return 2.4;
+  }
+  /** 밝은 배경음악 (C → G → Am → F 아르페지오 · 2분까지 · stop 하면 1.5초에 걸쳐 작아짐) */
+  function annBgm() {
+    const c = annAudio(); if (!c) return null;
+    const out = c.createGain(), t0 = c.currentTime + 0.1;
+    out.gain.setValueAtTime(0.0001, t0); out.gain.linearRampToValueAtTime(0.11 * ANN.volume, t0 + 1.5); out.connect(c.destination);
+    const chords = [[261.63, 329.63, 392.0], [196.0, 246.94, 293.66], [220.0, 261.63, 329.63], [174.61, 220.0, 261.63]];
+    for (let bar = 0; bar < 120; bar++) {
+      const ch = chords[bar % 4], tb = t0 + bar * 1.2;
+      [ch[0] * 2, ch[1] * 2, ch[2] * 2, ch[1] * 2].forEach((f, i) => {
+        const o = c.createOscillator(), g = c.createGain(), t = tb + i * 0.3;
+        o.type = "triangle"; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.5, t + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+        o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.95);
+      });
+      const p = c.createOscillator(), pg = c.createGain(); // 낮은 받침음
+      p.type = "sine"; p.frequency.value = ch[0] / 2; pg.gain.setValueAtTime(0.25, tb); pg.gain.linearRampToValueAtTime(0.0001, tb + 1.2);
+      p.connect(pg); pg.connect(out); p.start(tb); p.stop(tb + 1.2);
+    }
+    ANNS.bgms++;
+    return { stop: () => { try { const n = c.currentTime; out.gain.cancelScheduledValues(n); out.gain.setValueAtTime(out.gain.value, n); out.gain.linearRampToValueAtTime(0.0001, n + 1.5); setTimeout(() => out.disconnect(), 1700); } catch (e) { /* 이미 끝남 */ } } };
+  }
+  const annSleep = (ms, tok) => new Promise((r) => setTimeout(r, ms)).then(() => tok === ANNS.token);
+  /** 한 번 읽기 (끝나면 풀림 · 20초 넘게 안 끝나면 그냥 다음으로) */
+  function annSay(text) {
+    return new Promise((res) => {
+      if (!SYN) { res(); return; }
+      const u = new window.SpeechSynthesisUtterance(text);
+      u.lang = "ko-KR"; const v = annPickVoice(); if (v) u.voice = v;
+      u.rate = ANN.rate; u.volume = ANN.volume;
+      const done = () => { clearTimeout(t); res(); };
+      const t = setTimeout(done, 20000);
+      u.onend = done; u.onerror = done;
+      ANNS.said.push({ text, voice: v ? v.name : "", at: hm(now) });
+      if (ANNS.said.length > 20) ANNS.said.shift();
+      try { SYN.speak(u); } catch (e) { done(); }
+    });
+  }
+  /** 방송: 알림음 → 멘트(되풀이) · 골든벨은 배경음악을 깔고 */
+  async function announce(kind, text) {
+    if (!SYN) { toast("이 PC 에서는 음성 방송을 할 수 없어요 (음성 합성 없음)", 6000); return; }
+    if (!annKo().length) toast("이 PC 에 한국어 음성이 없어요 — Windows 설정 → 시간 및 언어 → 음성 → 음성 추가 → 한국어 (그동안 다른 목소리로 읽어요)", 8000);
+    annStop(true);
+    const tok = ++ANNS.token;
+    ANNS.busy = kind; renderAnnBtn();
+    const bgm = kind === "golden" && ANN.bgm ? annBgm() : null;
+    ANNS.bgm = bgm;
+    try {
+      if (bgm && !(await annSleep(1800, tok))) return;
+      const w = ANN.chime ? annChime() : 0;
+      if (w && !(await annSleep(w * 1000, tok))) return;
+      for (let i = 0; i < ANN.repeat; i++) {
+        if (tok !== ANNS.token) return;
+        await annSay(text);
+        if (i < ANN.repeat - 1 && !(await annSleep(800, tok))) return;
+      }
+      if (bgm) await annSleep(1500, tok);
+    } finally {
+      if (tok === ANNS.token) { if (bgm) bgm.stop(); ANNS.bgm = null; ANNS.busy = ""; ANNS.last = { kind, text, at: hm(now) }; renderAnnBtn(); }
+    }
+  }
+  /** 멈춤 (quiet = 새 방송을 시작하며 앞 방송을 끊음) */
+  function annStop(quiet) {
+    ANNS.token++;
+    try { if (SYN) SYN.cancel(); } catch (e) { /* 없음 */ }
+    if (ANNS.bgm) { ANNS.bgm.stop(); ANNS.bgm = null; }
+    if (ANNS.busy) { ANNS.busy = ""; renderAnnBtn(); if (!quiet) toast("방송을 멈췄어요"); }
+  }
+  /** 골든벨이 울린 순간 (goldenCheck) — 켜져 있으면 배경음악과 함께 */
+  function annGoldenAuto() { if (ANN.on && ANN.golden && !OFFICE) announce("golden", ANN.goldenText); }
+  /** 열쇠판 위 [퇴장 안내 방송] — 분홍 열쇠 수 · 방송 중이면 [방송 멈춤] */
+  function renderAnnBtn() {
+    const b = $("ann-btn"); if (!b) return;
+    b.hidden = !ANN.on || OFFICE;
+    const n = annPink().length;
+    b.classList.toggle("has", n > 0); b.classList.toggle("busy", !!ANNS.busy);
+    b.disabled = !ANNS.busy && !n;
+    b.innerHTML = ANNS.busy ? `방송 멈춤` : `퇴장 안내 방송${n ? ` <b class="num">${n}</b>` : ""}`;
+    b.title = ANNS.busy ? "누르면 방송을 멈춰요" : n ? `분홍 열쇠 ${annKeys(annPink())} — 누르면 "${annExitText(annPink())}"` : "지금 분홍 열쇠(반납 시간 ~ 10분)가 없어요";
+  }
+  /** 운영 설정 → 안내 방송 */
+  function annPage() {
+    const ko = annKo(), v = annPickVoice(), dis = SYN ? "" : "disabled";
+    const voiceOpts = (ko.length ? ko : annVoices).map((x) => `<option value="${esc(x.voiceURI)}" ${v && x.voiceURI === v.voiceURI ? "selected" : ""}>${esc(x.name)}${x.lang ? ` (${esc(x.lang)})` : ""}</option>`).join("");
+    const sel = (id, list, cur) => `<select id="${id}" class="cfg" style="width:110px" ${dis}>${list.map(([val, t]) => `<option value="${val}" ${String(cur) === String(val) ? "selected" : ""}>${t}</option>`).join("")}</select>`;
+    const last = ANNS.last ? `마지막 방송 ${esc(ANNS.last.at)} — ${esc(ANNS.last.text.slice(0, 60))}${ANNS.last.text.length > 60 ? "…" : ""}` : "아직 방송 안 함";
+    const html = `
+      <div class="setcard plain stack"><b>안내 방송 <span class="help">POS PC 스피커(헤드폰) 출력 → 매장 앰프 · Windows 소리 출력 장치를 그 단자로</span></b>
+        <label class="chk"><input type="checkbox" id="ann-on" ${ANN.on ? "checked" : ""}> <b>안내 방송 쓰기</b> <span class="help">열쇠판 위 [퇴장 안내 방송] · 골든벨 자동 방송</span></label>
+        <div class="field"><span class="label">목소리 <span class="help">${SYN ? (ko.length ? `이 PC 한국어 음성 ${ko.length}개` : `<b style="color:var(--amber)">한국어 음성이 없어요 — Windows 설정 → 시간 및 언어 → 음성 → 음성 추가 → 한국어</b>`) : "이 PC 에서는 음성 합성을 쓸 수 없어요"}</span></span>
+          <div class="btns" style="align-items:center"><select id="ann-voice" class="cfg" style="min-width:240px" ${dis}>${voiceOpts || `<option value="">(목소리 없음)</option>`}</select>
+            <label class="help" for="ann-rate">빠르기</label>${sel("ann-rate", [[0.8, "느리게"], [0.9, "조금 느리게"], [0.95, "보통"], [1.05, "조금 빠르게"], [1.15, "빠르게"]], ANN.rate)}
+            <label class="help" for="ann-vol">크기</label>${sel("ann-vol", [[0.5, "50%"], [0.7, "70%"], [0.85, "85%"], [1, "100%"]], ANN.volume)}
+            <label class="help" for="ann-rep">되풀이</label>${sel("ann-rep", [[1, "한 번"], [2, "두 번"], [3, "세 번"]], ANN.repeat)}</div></div>
+        <label class="chk"><input type="checkbox" id="ann-chime" ${ANN.chime ? "checked" : ""}> 멘트 앞에 알림음 (띵동댕동)</label>
+      </div>
+      <div class="setcard plain stack"><b>퇴장 안내 <span class="help">열쇠판 위 [퇴장 안내 방송]을 누른 순간 분홍 열쇠 번호 · {열쇠} 자리에 "3번, 12번, 27번"</span></b>
+        <textarea id="ann-exit" class="cfg anntext" rows="3" maxlength="300">${esc(ANN.exitText)}</textarea>
+        <div class="btns"><button class="btn btn-sm" data-act="annTest" data-k="exit" ${dis}>시험 방송 (3번, 12번)</button><span class="help">지금 분홍 열쇠 ${annPink().length ? annKeys(annPink()) : "없음"}</span></div>
+      </div>
+      <div class="setcard plain stack"><b>골든벨 <span class="help">골든벨이 울리면 자동으로 · 열쇠는 지금처럼 모두 무제한</span></b>
+        <label class="chk"><input type="checkbox" id="ann-golden" ${ANN.golden ? "checked" : ""}> 골든벨이 울리면 자동 방송</label>
+        <label class="chk"><input type="checkbox" id="ann-bgm" ${ANN.bgm ? "checked" : ""}> 배경음악 깔기 (데스크가 만든 밝은 음악)</label>
+        <textarea id="ann-gtext" class="cfg anntext" rows="3" maxlength="300">${esc(ANN.goldenText)}</textarea>
+        <div class="btns"><button class="btn btn-sm" data-act="annTest" data-k="golden" ${dis}>시험 방송</button><button class="btn btn-sm" data-act="annStop">방송 멈춤</button><span class="help" id="ann-last">${last}</span></div>
+      </div>`;
+    return { html };
+  }
+  /** 운영 설정 → 안내 방송의 칸 */
+  function annInput(t) {
+    if (t.id === "ann-on" || t.id === "ann-chime" || t.id === "ann-golden" || t.id === "ann-bgm") ANN[{ "ann-on": "on", "ann-chime": "chime", "ann-golden": "golden", "ann-bgm": "bgm" }[t.id]] = t.checked;
+    else if (t.id === "ann-rate") ANN.rate = Number(t.value) || 0.95;
+    else if (t.id === "ann-vol") ANN.volume = Number(t.value) || 1;
+    else if (t.id === "ann-rep") ANN.repeat = Number(t.value) || 1;
+    else if (t.id === "ann-exit" || t.id === "ann-gtext") { const v = t.value.slice(0, 300); if (!v.trim()) return; ANN[t.id === "ann-exit" ? "exitText" : "goldenText"] = v; }
+    else if (t.id === "ann-voice") { ANNV.voice = t.value; annSaveVoice(); return; }
+    else return;
+    annSave(); renderAnnBtn();
+  }
+  Object.assign(acts, {
+    annExit() {
+      if (ANNS.busy) { annStop(); return; }
+      const ks = annPink();
+      if (!ks.length) { toast("지금 분홍 열쇠(반납 시간 ~ 10분)가 없어요"); return; }
+      announce("exit", annExitText(ks));
+      toast(`퇴장 안내 방송: ${annKeys(ks)}`, 4000);
+    },
+    annGolden() { announce("golden", ANN.goldenText); },
+    annTest(btn) { if (btn.dataset.k === "golden") announce("golden", ANN.goldenText); else announce("exit", annExitText([3, 12])); },
+    annStop() { annStop(); },
+  });
+
   // ── 두 PC 연결 (사장님 11/06): 현장 POS ↔ 사무실 PC · 같은 버전끼리 (앱 본체 desk-sync.js · docs/SYNC.md) ──
   //   우편함으로 주고받는 것 (사장님 11/06 다시): 운영 설정 일체 · 관리자 메시지(메모장) · 자동 수량조절 켜고 끄기(설정) · 키 현황
   //   네이버 예약 · 고객 카드는 우편함으로 안 보냄 → 사무실 PC 가 네이버에서 직접 읽기만 (이용완료 · 수량 · 취소 · 재고는 현장 POS 만) · 주차는 사무실에 없음
@@ -5621,6 +5814,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       if (k === "walkEvent" && v) WEV.name = String(v.name || "").slice(0, 10);
       if (k === "survey" && v) svLoadCfg(v);
       if (k === "liveOn") LIVE.on = v !== false;
+      if (k === "announce" && v) { annLoad(v); renderAnnBtn(); }
     }
     renderAll();
     if (sheet.mode === "settings") syncSheetSoon();
@@ -5631,7 +5825,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     "memoOpen", "memoTab", "memoTo", "memoSend", "memoAck", "memoFin", "memoUnfin", "memoRecall", "memoAdd", "memoDone", "memoUndo", "memoDel",
     "capCell", "addPeak", "delPeak", "evApply", "evOff", "evTpl", "evOpen", "tplGo", "tplRow", "tplSamp", "tplSave", "tplDef", "tplNew", "tplDel", "tplCode",
     "staffAdd", "staffDel", "svPick", "svAdd", "svDel", "svToggle", "liveToggle", "svKeySave", "svKeyDel", "stToggle", "printMode", "drawerPin", "findPorts", "pickPort", "findPrinters", "pickPrinter", "bcFilter",
-    "naverShow", "naverHome", "syncRole", "syncCodeNew", "syncCodeSave", "syncRelaunch", "syncOpen", "syncDemo"]);
+    "naverShow", "naverHome", "annTest", "annStop", "syncRole", "syncCodeNew", "syncCodeSave", "syncRelaunch", "syncOpen", "syncDemo"]);
   function officeGate(btn) {
     const a = btn.dataset.act;
     if (OFFICE_OK.has(a)) return true;
@@ -5787,6 +5981,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   });
   document.addEventListener("input", (e) => {
     const t = e.target;
+    if (t.id && t.id.startsWith("ann-")) { if (t.tagName === "TEXTAREA") { clearTimeout(t._ann); t._ann = setTimeout(() => annInput(t), 600); } else annInput(t); return; } // 안내 방송 (11/07)
     // 메모장 (V2.0): 쓰던 글은 다시 그려도 남게 · 찾기는 아래만 다시
     if (sheet.mode === "memo" && (t.id === "memo-new" || t.id === "memo-msg")) sheet.draft[t.id] = t.value;
     if (t.id === "wev-name") { WEV.name = t.value.trim().slice(0, 10); wevSave(); $("wev-preview").textContent = `[${wevLabel()}]`;  }
@@ -5906,7 +6101,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   // 편집 칸을 내리면 왼쪽 줄 수 칸도 같이
   window.addEventListener("resize", () => { if (sheet.mode === "settings" && sheet.tab === "prints") tplFit(); }); // 편집 칸 글씨 크기 다시 (창 크기)
   document.addEventListener("change", (e) => { if (/^cap-(target|max|ceil|p1|p2|p3|boost)$/.test(e.target.id)) renderSheet(); if (e.target.id === "note-m") noteFlush(); }); // 숫자를 다 넣으면 계획 다시
-  window.__deskTest = { sync: SYNC_T, projection, capWalkOut, notes: () => Object.fromEntries(NOTES), evLoadCfg, today: () => TODAY, useDueText, printSecs, PRINT_: () => PRINT, sealOf, withSeal, SEAL, evSample: (i) => evSample(i), sealClear: () => sealCache.clear(), EV_: () => EV, liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, bk: (id) => (bookings[TODAY] || []).find((b) => b.id === id), useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capRanges, capPlan, capRun, capApply, capTick, capMoving: () => capMoveN > 0, capTeamExtra, capState: () => JSON.parse(JSON.stringify(capState)), capLock: (ts) => { capState.locks = ts.slice(); saveCapState(); }, capKeysAt, returnKeys: (id, ks) => { const h = holders().find((x) => x.id === id); if (h) { returnKeys(h, ks); renderAll(); } }, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: (v) => enterText(v), formFor: (v) => ticketText(v), splitForm, joinForms, lastPrint: () => LASTPRINT, BC2_: () => BC2, holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, sheet, evOf: (b) => evOf(b),
+  window.__deskTest = { ann: { pink: () => annPink(), text: (ks) => annExitText(ks), state: () => ANNS, ANN, stop: () => annStop() }, sync: SYNC_T, projection, capWalkOut, notes: () => Object.fromEntries(NOTES), evLoadCfg, today: () => TODAY, useDueText, printSecs, PRINT_: () => PRINT, sealOf, withSeal, SEAL, evSample: (i) => evSample(i), sealClear: () => sealCache.clear(), EV_: () => EV, liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, bk: (id) => (bookings[TODAY] || []).find((b) => b.id === id), useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capRanges, capPlan, capRun, capApply, capTick, capMoving: () => capMoveN > 0, capTeamExtra, capState: () => JSON.parse(JSON.stringify(capState)), capLock: (ts) => { capState.locks = ts.slice(); saveCapState(); }, capKeysAt, returnKeys: (id, ks) => { const h = holders().find((x) => x.id === id); if (h) { returnKeys(h, ks); renderAll(); } }, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: (v) => enterText(v), formFor: (v) => ticketText(v), splitForm, joinForms, lastPrint: () => LASTPRINT, BC2_: () => BC2, holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, sheet, evOf: (b) => evOf(b),
     evLog: (from) => { const L = evLog(from); return { from: L.from, count: L.count, people: Object.fromEntries([...L.people].map(([k, p]) => [k, JSON.parse(JSON.stringify(p))])) }; },
     // 장부에 지난 방문 한 줄 넣기: o = { day, n(네이버 순번, 기본 = 지금 완료 수), base, st("안내" | "성공"), due, from(장부 · 기본 지금 이벤트), no }
     evsPayload: () => evsPayload(),
