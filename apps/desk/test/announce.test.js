@@ -139,7 +139,7 @@ test("운영 설정 → 안내 방송: 멘트 · 목소리 · 되풀이 · 끄�
   }
 });
 
-test("자동 퇴장 안내 (사장님 11/07): 분홍이 되는 순간(1시간 50분) 한 번 · 5분 뒤(1시간 55분) 한 번 더 · 같은 때 열쇠는 한 멘트 · 빨강은 안 부름 · 다시 켜도 또 안 부름 · 수동 단추도", async () => {
+test("자동 퇴장 안내 (사장님 11/07): 분홍이 되는 순간(1시간 50분) 한 번 · 5분 뒤(1시간 55분) 그 순간 분홍인 열쇠만 한 번 더 · 같은 때 열쇠는 한 멘트 · 빨강은 안 부름 · 다시 켜도 또 안 부름 · 수동 단추도", async () => {
   const browser = await launch();
   try {
     const page = await open(browser);
@@ -151,12 +151,14 @@ test("자동 퇴장 안내 (사장님 11/07): 분홍이 되는 순간(1시간 50
     assert.strictEqual(await heard(1), list([2, 24, 25, 26]), "13:50 분홍이 되는 순간 — 네 열쇠 한 멘트");
     for (const m of [831, 832, 834]) { await page.evaluate((x) => window.__deskTest.setNow(x), m); await page.waitForTimeout(1300); }
     assert.strictEqual((await said(page)).length, 1, "13:51 ~ 13:54 는 조용");
+    // 13:54 에 24번(조아인 24 · 25 중 하나) · 26번(한지안) 반납 → 13:55 에는 그 순간 분홍인 2 · 25번만 (사장님 11/07)
+    await page.evaluate(() => { const T = window.__deskTest, of = (k) => T.holders().find((h) => h.keys.includes(k)).id; T.returnKeys(of(24), [24]); T.returnKeys(of(26), [26]); });
     await page.evaluate(() => window.__deskTest.setNow(835));
-    assert.strictEqual(await heard(2), list([2, 24, 25, 26]), "13:55 (1시간 55분) 한 번 더");
+    assert.strictEqual(await heard(2), list([2, 25]), "13:55 (1시간 55분) — 그 순간 분홍인 열쇠만 (반납한 24 · 26번 빼고)");
     await page.evaluate(() => window.__deskTest.setNow(836)); await page.waitForTimeout(1300);
     assert.strictEqual((await said(page)).length, 2, "세 번째는 없음");
     await page.evaluate(() => window.__deskTest.setNow(860)); // 14:20 — 3 · 27 · 28번(네이버) · 29번(현장) 분홍 / 2 · 24 … 은 빨강
-    assert.strictEqual(await heard(3), list([3, 27, 28, 29]), "14:20 — 빨강이 된 2 · 24 · 25 · 26번은 안 부름");
+    assert.strictEqual(await heard(3), list([3, 27, 28, 29]), "14:20 — 빨강이 된 2 · 25번은 안 부름");
     await page.evaluate(() => window.__deskTest.setNow(865));
     assert.strictEqual(await heard(4), list([3, 27, 28, 29]));
     // 수동: 근무자가 언제든 — 그 순간 분홍 열쇠 모두

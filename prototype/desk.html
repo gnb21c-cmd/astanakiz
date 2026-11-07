@@ -5675,7 +5675,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     if (ANNS.bgm) { ANNS.bgm.stop(); ANNS.bgm = null; }
     if (ANNS.busy) { ANNS.busy = ""; renderAnnBtn(); if (!quiet) toast("방송을 멈췄어요"); }
   }
-  /* 자동 퇴장 안내 (사장님 11/07): 열쇠가 분홍이 되는 순간(반납 시각 = 1시간 50분) 한 번 · 5분 뒤(1시간 55분) 한 번 더
+  /* 자동 퇴장 안내 (사장님 11/07): 열쇠가 분홍이 되는 순간(반납 시각 = 1시간 50분) 한 번 · 5분 뒤(1시간 55분) 한 번 더 — 두 번째도 그 순간 분홍인(아직 반납 안 한) 열쇠만
      같은 때 걸린 열쇠는 한 멘트로 · 방송 중이면 끝난 뒤 (분홍 10분 안이면 늦게라도) · 빨강이 되면 안 부름 · 직원 열쇠 · 무제한(골든벨 · 18시 뒤) 없음
      부른 것은 손님 · 열쇠 · 반납 시각 · 몇 번째로 오늘 이 PC 에 남김 → 다시 켜도 또 안 부름 · 연장해 반납 시각이 바뀌면 새로 */
   const ANN_DONE_KEY = "astanakiz-anndone-" + TODAY;
