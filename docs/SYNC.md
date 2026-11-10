@@ -70,7 +70,8 @@
 // 풀면 — 현장 POS: { n, at, build, set: { 키: [바꾼 때 ms, 값] }, memo, mm: { su, u: { id: ms }, gone: { id: ms } }, acks: [], snap: 키 현황 | null, seen }
 //        사무실 PC: { n, at, build, set, memo, mm, cmds: [], open: true }
 // 키 현황 snap = { v: 2, day, at, b: [입장한 예약 { id, no, slot, naverSlot, qty, product, naverProduct, status, keys, enteredAt, outAt, overPaid, useMin, keyUse, chainHead, keysTaken, bulkOut, visitEnd, naverPending, naverWhy }],
-//                  w: 현장 입장(전화번호 뺌), s: 서비스 키(이름 · 전화 · 연결 손님 이름 뺌), x: 시험 기록 삭제, ig, mv: 옮긴 카드 시간, g: 골든벨 }
+//                  w: 현장 입장(전화번호 뺌), s: 서비스 키(이름 · 전화 · 연결 손님 이름 뺌), x: 시험 기록 삭제, ig, mv: 옮긴 카드 시간, g: 골든벨,
+//                  r: 대관 [{ id, name: 단체 이름, paidOn: 입금일 }] (다음 판~ · 사무실은 보기만) }
 ```
 - 명령 통로(cmds · acks)는 앱 본체에 있으나 이 버전 화면은 쓰지 않음 (사무실은 네이버에 넣지 않음 — 사장님 11/06)
 - 각 PC 앱 폴더 `desk-sync.json` = 설정 바꾼 때(meta) · 메모장 바꾼 때(mm) · 처리한 명령 id(done) · 연결 코드는 `settings.json` `syncCodeEnc`(Windows 암호화) · 역할 `syncRole`

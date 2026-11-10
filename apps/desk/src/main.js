@@ -891,6 +891,18 @@ ipcMain.handle("event:send", async (_e, job) => {
   if (json.length >= 5000) return { ok: false, code: 0, why: "글이 너무 길어요" };
   return boardPatch(`deskStats/event-${day}`, json, job && job.at, "deskStats (event-날짜)");
 });
+// 대관 (사장님 11/10): 대관이 있는 날 데스크 [대관]에 적은 단체 이름 · 입금일(astanakiz-rental · 금액 · 손님 연락처 없음)을
+//   적거나 고치거나 지울 때마다 boards/{열쇠}/deskStats/rental-{오늘} 에 통째로 덮어씀 → 보고 앱 키즈 실시간 '키즈대관' (보고 시스템 docs/KIDS_RENTAL.md)
+//   사무실 PC 는 보내지 않음 (현장 POS 만 적음)
+ipcMain.handle("rental:send", async (_e, job) => {
+  if (RUN_ROLE === "office") return { ok: false, code: 0, why: "사무실 PC 는 보내지 않아요" };
+  const json = String((job && job.json) || "");
+  let day = "";
+  try { const x = JSON.parse(json); if (x && x.type === "astanakiz-rental" && x.v === 1 && Array.isArray(x.list)) day = String(x.day || ""); } catch (err) { /* 모양 틀림 */ }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return { ok: false, code: 0, why: "모양이 틀림" };
+  if (json.length >= 10000) return { ok: false, code: 0, why: "글이 너무 길어요" };
+  return boardPatch(`deskStats/rental-${day}`, json, job && job.at, "deskStats (rental-날짜)");
+});
 ipcMain.handle("history:send", async (_e, job) => {
   const json = String((job && job.json) || "");
   if (!/^[{][\s\S]*astanakiz-revisit/.test(json)) return { ok: false, code: 0, why: "모양이 틀림" };

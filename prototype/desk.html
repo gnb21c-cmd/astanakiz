@@ -107,7 +107,31 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .top .capforce.on .cfknob { background: var(--ok); }
 .top .capforce.on .cfknob::after { left: 12px; }
 /* 두 PC 연결 (11/06): 맨 위 작은 표시 · 사무실 PC 는 근무자 일 버튼을 흐리게 */
-.top .synchip { flex: none; border: 1.5px solid var(--line); border-radius: 8px; padding: 3px 7px; font-size: 11px; font-weight: 700; line-height: 1.2; background: var(--surface); color: var(--muted); cursor: pointer; white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.top .synchip { flex: none; border: 1.5px solid var(--line); border-radius: 8px; padding: 2px 6px; font-size: 10.5px; font-weight: 700; line-height: 1.15; background: var(--surface); color: var(--muted); cursor: pointer; white-space: nowrap; max-width: 92px; overflow: hidden; text-overflow: ellipsis; text-align: center; } /* 11/10: 두 줄로 작게 · 오른쪽 묶음 (가운데 커튼 손잡이와 겹쳐서 옮김) */
+.top .synchip span { display: block; overflow: hidden; text-overflow: ellipsis; }
+/* 대관 (사장님 11/10): 맨 위 오른쪽 · 오늘 적은 대관이 있으면 건수 · 테두리 색 */
+.top .rgrp .rentbtn { padding: 2px 7px; }
+.top .rgrp .rentbtn.on { border-color: var(--accent); color: var(--accent); }
+.top .rgrp .rentbtn b { font-size: 15px; margin-left: 2px; }
+.top .tgrp { display: flex; flex-direction: column; gap: 2px; flex: none; } /* 체험판 시계 (+5분 · +30분) 위아래 — 앱에서는 없음 */
+.top .tgrp .btn { min-height: 0; padding: 0 5px; font-size: 10.5px; line-height: 1.25; border-radius: 5px; }
+.top .tgrp[hidden] { display: none; }
+/* 오른쪽 묶음이 가운데 커튼 손잡이에 닿을 때만 (두 PC 연결 · 대관 · 다른 날 판매수가 함께 보일 때 · 창이 작을 때) 조금씩 줄임 — fitTop */
+.top.tight1 .rgrp .manualbtn { font-size: 10.5px; line-height: 1.15; white-space: normal; width: 46px; padding: 1px 4px; }
+.top.tight2 .rgrp { gap: 2px; }
+.top.tight2 .rgrp .sold:not(.manualbtn) { font-size: 12px; padding: 2px 4px; }
+.top.tight2 .rgrp .sold b { font-size: 15px; }
+.top.tight2 .synchip { max-width: 72px; padding: 2px 4px; }
+.rentlist { display: grid; gap: 4px; margin: 4px 0 8px; }
+.rentlist .rrow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 8px; align-items: center; padding: 6px 10px; border-radius: 8px; background: var(--surface-2); font-size: 15px; }
+.rentlist .rrow.on { outline: 2px solid var(--accent); }
+.rentlist .rrow b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rentlist .empty { color: var(--muted); font-size: 13.5px; padding: 6px 2px; }
+.rentform { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 10px; }
+.rentform .field { min-width: 0; }
+.rentform .field input { min-width: 0; }
+.rentform input[type=date] { font-size: 18px; padding: 8px 8px; letter-spacing: 0; }
+.rentst.bad { color: var(--red); font-weight: 700; } .rentst.ok { color: var(--ok); }
 .top .synchip.ok { border-color: var(--ok); color: var(--fg); }
 .top .synchip.warn { border-color: var(--amber); color: var(--amber); }
 .top .synchip.bad { border-color: var(--red); color: var(--red); }
@@ -755,12 +779,14 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     <button class="btn btn-sm posgo" data-act="drawer" title="POS와 연결된 현금통을 엶 (POS가 꺼져 있어도)">환전 오픈</button>
     <!-- 사장님 10/21: 사람이 몰리는 비수기 평일 — 근무자가 체크하면 그날만 네이버 판매 수량 자동조절 (다음 날은 다시 꺼짐 · 시간제인 날은 저절로 켜져 있음) -->
     <label class="capforce" id="capforce"><input type="checkbox" id="capforce-on" role="switch" aria-label="오늘 수량조절"><span class="cfknob" aria-hidden="true"></span><span>오늘<br>수량조절</span></label>
-    <!-- 두 PC 연결 (사장님 11/06): 사무실 PC = 현장 화면 몇 시 기준 · 현장 POS = 사무실이 보고 있으면 -->
-    <button class="synchip" id="syncchip" data-act="syncOpen" hidden></button>
+    <!-- 체험판 시계 (앱에서는 없음) — 위아래 두 줄 · 가운데 커튼 손잡이에 안 가리게 (11/10) -->
+    <span class="tgrp"><button class="btn btn-sm" data-act="time" data-min="5">+5분</button><button class="btn btn-sm" data-act="time" data-min="30">+30분</button></span>
     <span class="spacer"></span>
-    <button class="btn btn-sm" data-act="time" data-min="5">+5분</button>
-    <button class="btn btn-sm" data-act="time" data-min="30">+30분</button>
     <span class="rgrp">
+    <!-- 두 PC 연결 (사장님 11/06): 사무실 PC = 현장 화면 몇 시 기준 · 현장 POS = 사무실이 보고 있으면 — 11/10 오른쪽으로 (가운데 커튼 손잡이와 겹쳐서) -->
+    <button class="synchip" id="syncchip" data-act="syncOpen" hidden></button>
+    <!-- 대관 (사장님 11/10): 대관이 있는 날 단체 이름 · 입금일 → 보고 앱 키즈 실시간 '키즈대관' -->
+    <button class="sold rentbtn" id="rent-btn" data-act="rentOpen" title="대관 — 단체 이름 · 입금일을 적으면 보고 앱으로 보내요">대관</button>
     <button class="sold manualbtn" data-act="manual" title="입장 · 퇴장 · 화면 위치별 조작 방법">근무자 메뉴얼</button>
     <button class="sold" id="sold" data-act="soldList" aria-live="polite" title="누르면 오늘 입장권 목록"></button>
     <!-- V2.0 (사장님 10/21): 시계는 맨 오른쪽 · 1.5초 안에 두 번 누르면 운영 설정 (관리자만 앎 — 버튼은 없앰) -->
@@ -1269,6 +1295,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   const STATE_KEY = "astanakiz-desk-" + TODAY;
   const SAVE_FIELDS = ["id", "day", "no", "slot", "name", "phone", "qty", "product", "naverProduct", "pay", "cancels", "prevDone", "visitNo", "visitEnd", "proxy", "visitor", "status", "keys", "enteredAt", "outAt", "overPaid", "naverPending", "naverWhy", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut", "naverSlot", "sv", "giftDue", "giftGiven", "plusT"];
   let stateReady = !APP; // 저장본을 읽기 전에는 저장하지 않음
+  let rentals = []; // 대관 (사장님 11/10): 오늘 적은 단체 이름 · 입금일 [{ id, name, paidOn, at }] — 오늘 저장 파일(r) · 보고 앱 '키즈대관'
   let svExtra = {}; // 설문: 오늘 근무자가 [+]로 직접 더한 수 { 번호: 건수 } — 예약 없이 이벤트로 들어온 손님 등 (사장님 10/15 · 따로 기록은 없음)
   let pendingSaved = []; // 예전 형식(예약번호만 있는) 저장본 — 네이버에서 그 예약을 불러오면 합침
   /* 열쇠 기록: 그 손님이 받은 열쇠 번호는 반납해도 남김(keysTaken) — 다음날 아침 없는 열쇠를 마지막에 누가 썼는지 찾아 연락 (사장님 10/8)
@@ -1279,7 +1306,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     for (const h of (bookings[TODAY] || []).concat(walkins, svcKeys)) noteKeys(h);
     if (!APP || !stateReady) return;
     const b = (bookings[TODAY] || []).filter((x) => x.enteredAt != null).map((x) => Object.fromEntries(SAVE_FIELDS.filter((k) => x[k] !== undefined).map((k) => [k, x[k]])));
-    const json = JSON.stringify({ v: 2, b: b.concat(pendingSaved.filter((p) => !b.some((x) => x.no === p.no))), w: walkins, x: [...testOut], ig: [...extIgnored], mv: [...moved], g: golden, sa: svExtra, s: svcKeys, seq, posSeq });
+    const json = JSON.stringify({ v: 2, b: b.concat(pendingSaved.filter((p) => !b.some((x) => x.no === p.no))), w: walkins, x: [...testOut], ig: [...extIgnored], mv: [...moved], g: golden, sa: svExtra, s: svcKeys, r: rentals, seq, posSeq });
     try { if (window.desk.state) window.desk.state.save(TODAY, json); } catch (e) { /* 파일 저장 실패 */ }
     try { localStorage.setItem(STATE_KEY, json); } catch (e) { /* 저장 못 해도 화면은 동작 */ }
   }
@@ -1302,6 +1329,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       for (const [no, s] of st.mv || []) moved.set(no, s);
       if (st.g) golden = st.g;
       if (st.sa && typeof st.sa === "object") svExtra = st.sa;
+      if (Array.isArray(st.r)) rentals = st.r.filter((x) => x && typeof x.name === "string" && x.name);
       const full = (st.b || []).filter((x) => x.name && x.slot != null);
       pendingSaved = (st.b || []).filter((x) => !(x.name && x.slot != null));
       bookings[TODAY] = full.map((x) => Object.assign({ day: TODAY, keys: [], enteredAt: null, outAt: null }, x, { naverBusy: false }));
@@ -2356,7 +2384,18 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     annGoldenAuto(); // 안내 방송 (사장님 11/07): 배경음악과 함께 골든벨 멘트
     renderAll();
   }
-  function renderAll() { if (!OFFICE) { saveState(); evSync(); hvSync(); notesSync(); bcWatch(); } $("now").textContent = hm(now); $("refresh-at").textContent = refreshText(); $("refresh-at").style.color = (naverErr || (bookings[TODAY] || []).some((b) => b.naverPending && b.naverWhy)) && !naverBusy ? "var(--red)" : ""; renderSlots(); renderRes(); renderKeys(); renderCars(); if (!OFFICE) goldenCheck(); renderMemoBoxes(); renderCapForce(); renderSyncChip(); }
+  function renderAll() { if (!OFFICE) { saveState(); evSync(); hvSync(); notesSync(); bcWatch(); } $("now").textContent = hm(now); $("refresh-at").textContent = refreshText(); $("refresh-at").style.color = (naverErr || (bookings[TODAY] || []).some((b) => b.naverPending && b.naverWhy)) && !naverBusy ? "var(--red)" : ""; renderSlots(); renderRes(); renderKeys(); renderCars(); if (!OFFICE) goldenCheck(); renderMemoBoxes(); renderCapForce(); renderSyncChip(); renderRentBtn(); fitTop(); }
+  /** 맨 위 오른쪽 묶음(두 PC 연결 · 대관 · 근무자 메뉴얼 · 총 판매수 · 시계)이 가운데 커튼 손잡이에 가리면 조금씩 줄임 (사장님 11/10 — 겹치지 않게)
+      손잡이는 1024×768 판 밖(창 가운데 · 크기 그대로)이라 창 크기마다 재서 맞춤 · 커튼이 내려와 손잡이가 숨어도 마지막 크기로 */
+  var topTabW = 0; // var: 처음 그릴 때(이 줄보다 먼저)도 쓰임
+  function fitTop() {
+    const top = document.querySelector(".top"), g = top && top.querySelector(".rgrp"), tab = $("curtain-tab");
+    if (!g || !tab) return;
+    if (tab.offsetWidth) topTabW = tab.offsetWidth;
+    const edge = window.innerWidth / 2 + (topTabW || 200) / 2 + 6;
+    top.classList.remove("tight1", "tight2");
+    for (const c of ["tight1", "tight2"]) { if (g.getBoundingClientRect().left >= edge) return; top.classList.add(c); }
+  }
   /** 맨 위 [오늘 수량조절] 스위치 (사장님 10/21): 설정과 상관없이 근무자가 그날만 켜고 끔 · 다음 날은 기본(시간제인 날 = 설정 · 평일 = 꺼짐) */
   function renderCapForce() {
     const el = $("capforce"), cb = $("capforce-on");
@@ -2403,6 +2442,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     { const t = sheet.mode === "enter" || sheet.mode === "key" ? noteTarget() : null; el.classList.toggle("bcred", !!t && (bcHit(t, 1) || bcHit(t, 2))); el.classList.toggle("bcred2", !!t && bcHit(t, 2)); if (!t) sheet.bcAsk = false; } // BC 원아웃 = 고객 카드 테두리 빨강 (사장님 10/26)
     if (sheet.mode === "memo") { el.innerHTML = memoSheetHtml(); return; }
     if (sheet.mode === "manual") { el.innerHTML = manualHtml(); return; }
+    if (sheet.mode === "rent") { el.innerHTML = rentHtml(); return; }
     if (sheet.mode === "enter") {
       const b = findB(sheet.id);
       const ch = chainOf(b), ci = ch.indexOf(b);
@@ -4240,6 +4280,100 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       <span class="help num ${L && !L.ok ? "evwarn" : ""}">오늘 ${n}명 · 매일 20:00 (설문과 같이 · 설문이 없어도) · ${esc(st)}</span></div>`;
   }
 
+  // ── 대관 → 보고 앱 (사장님 11/10) ─────────────────────
+  /* 대관이 있는 날: 맨 위 [대관] → 대관 주체(단체 이름) · 입금일 → [확인] → 보고 앱 키즈 실시간 '키즈대관' 칸 (예전 이벤트 칸 자리)
+     - 대관료 매출은 입금한 날 그대로 (보고 앱이 자금 기록으로 셈) — 데스크는 '실제로 와서 쓴 날'의 기록만 (금액 · 손님 연락처 없음)
+     - 오늘 것만 · 오늘 저장 파일(r)에 남음 · 적거나 고치거나 지울 때마다 boards/{보고 열쇠}/deskStats/rental-{오늘} 에 통째로 덮어씀 (모두 지우면 빈 목록)
+     - 못 보내면 10분 뒤 다시 · 껐다 켜도 안 보낸 것이 있으면 보냄 · 사무실 PC 는 보기만 (키 현황과 함께 받음)
+     - 모양은 보고 시스템 docs/KIDS_RENTAL.md (astanakiz-rental · 단체 이름 30자 · 하루 20건 · 전화번호처럼 보이는 글은 받지 않음) */
+  const RENT_MAX = 20;
+  const RENT_PHONE = /\d{2,4}[-\s.]?\d{3,4}[-\s.]?\d{4}/;
+  const RS = { day: "", sig: "", last: null, retry: null };
+  const RS_APP = () => APP && !!(window.desk && window.desk.rental);
+  if (RS_APP() && window.desk.config) window.desk.config.get().then((c) => { const v = c && c.rentalStat; if (v && v.day === TODAY) Object.assign(RS, { day: v.day, sig: String(v.sig || ""), last: v.last || null }); }).catch(() => {});
+  const rsSaveCfg = () => { if (RS_APP() && window.desk.config) window.desk.config.set({ rentalStat: { day: RS.day, sig: RS.sig, last: RS.last } }); };
+  const rentMd = (d) => (d ? (d.slice(0, 4) === TODAY.slice(0, 4) ? `${+d.slice(5, 7)}/${+d.slice(8, 10)}` : `${d.slice(2, 4)}/${+d.slice(5, 7)}/${+d.slice(8, 10)}`) : "—");
+  /** 보낼 글 — 단체 이름 · 입금일만 */
+  const rentPayload = () => ({ type: "astanakiz-rental", v: 1, day: TODAY, sentAt: `${TODAY} ${hm(now)}`, list: rentals.map((r) => ({ name: r.name, paidOn: r.paidOn || null })) });
+  const rentSig = () => JSON.stringify(rentals.map((r) => [r.name, r.paidOn || null]));
+  /** 보고 앱이 아직 모르는 바뀐 것이 있나 (오늘 처음이면 빈 목록과 비교 — 대관이 없는 날은 안 보냄) */
+  const rentDirty = () => rentSig() !== (RS.day === TODAY ? RS.sig : "[]");
+  let rentBusy = false;
+  async function rentSend(why) {
+    if (rentBusy || !RS_APP() || OFFICE) return;
+    if (!svKey.has) { RS.last = { at: `${TODAY} ${hm(now)}`, ok: false, why: "보고 열쇠 없음", n: rentals.length }; if (sheet.mode === "rent") renderSheet(); return; }
+    rentBusy = true;
+    const p = rentPayload(), sig = rentSig(), at = `${TODAY} ${hm(now)}`;
+    const r = await window.desk.rental.send({ json: JSON.stringify(p), at }).catch((e) => ({ ok: false, why: String(e) }));
+    rentBusy = false;
+    RS.last = { at, ok: !!(r && r.ok), why: (r && r.why) || "", n: p.list.length };
+    if (RS.last.ok) { RS.day = TODAY; RS.sig = sig; RS.retry = null; } else RS.retry = { day: TODAY, m: now + 10 };
+    rsSaveCfg();
+    if (RS.last.ok) { if (why !== "auto") toast(p.list.length ? `대관 ${p.list.length}건을 보고 앱으로 보냈어요` : "대관 기록을 지운 것을 보고 앱에 알렸어요 (오늘 0건)"); }
+    else toast(`대관 기록은 저장했어요 — 보고 앱으로는 못 보냈어요: ${RS.last.why} (10분 뒤 다시)`, 6000);
+    if (sheet.mode === "rent") renderSheet();
+  }
+  /** 1초마다: 바뀐 것이 있으면 보냄 (못 보냈으면 10분 뒤 · 보고 열쇠가 생기면 그때) */
+  function rentTick() {
+    if (!RS_APP() || OFFICE || !stateReady || rentBusy || !svKey.has || !rentDirty()) return;
+    if (RS.retry && RS.retry.day === TODAY && now < RS.retry.m) return;
+    rentSend("auto");
+  }
+  function renderRentBtn() {
+    const el = $("rent-btn"); if (!el) return;
+    const n = rentals.length;
+    el.innerHTML = n ? `대관<b class="num">${n}</b>` : "대관";
+    el.classList.toggle("on", n > 0);
+    el.setAttribute("aria-label", n ? `대관 오늘 ${n}건` : "대관");
+  }
+  /** 보고 앱으로 보낸 상태 한 줄 */
+  function rentStatus() {
+    if (OFFICE) return { cls: "", t: "사무실 PC — 대관은 현장 POS 에서 적어요 (여기는 보기만)" };
+    if (!RS_APP()) return { cls: "", t: "체험판 — 저장만 해요 (설치한 앱에서 보고 앱으로 보내요)" };
+    if (!svKey.has) return { cls: "bad", t: "보고 열쇠가 없어 보고 앱으로 못 보내요 — 운영 설정 → 기타 '보고 열쇠'" };
+    const L = RS.last;
+    if (rentBusy) return { cls: "", t: "보고 앱으로 보내는 중…" };
+    if (L && !L.ok) return { cls: "bad", t: `못 보냄 ${L.at.slice(11)} — ${L.why} · ${RS.retry ? `${hm(RS.retry.m)}에 다시` : "다시 보내 주세요"}` };
+    if (rentDirty()) return { cls: "", t: "곧 보고 앱으로 보내요" };
+    return RS.day === TODAY && L ? { cls: "ok", t: `보고 앱으로 보냄 ${L.at.slice(11)} · 오늘 ${L.n}건` } : { cls: "", t: "적으면 바로 보고 앱으로 보내요" };
+  }
+  function rentHtml() {
+    const ro = OFFICE, st = rentStatus(), ed = sheet.edit ? rentals.find((r) => r.id === sheet.edit) : null;
+    const rows = rentals.map((r) => `<div class="rrow ${ed === r ? "on" : ""}"><b>${esc(r.name)}</b><span class="num">입금 ${esc(rentMd(r.paidOn))}</span>${ro ? "<span></span><span></span>" : `<button class="btn btn-sm" data-act="rentEdit" data-id="${esc(r.id)}">고치기</button><button class="btn btn-sm" data-act="rentDel" data-id="${esc(r.id)}">지우기</button>`}</div>`).join("");
+    const form = ro ? "" : `
+        <div class="rentform">
+          <div class="field"><label class="label" for="rent-name">대관 주체 <span class="help">단체 이름 (어린이집 · 유치원 등)</span></label><input id="rent-name" maxlength="30" autocomplete="off" spellcheck="false" placeholder="예: 햇살어린이집" value="${esc(sheet.rn || "")}" data-autofocus></div>
+          <div class="field"><label class="label" for="rent-paid">입금일 <span class="help">대관료가 들어온 날</span></label><input id="rent-paid" type="date" min="${shiftDay(TODAY, -366)}" max="${TODAY}" value="${esc(sheet.rp || "")}"></div>
+        </div>`;
+    return `
+        <h3 id="sheet-title">대관 — 오늘 ${esc(dateLabel(TODAY))} <button class="x" data-act="close" aria-label="닫기">×</button></h3>
+        <p class="help">대관이 있는 날 단체 이름 · 입금일을 적어요. 보고 앱 '키즈 실시간'의 키즈대관 칸에 보여요 (대관료는 입금한 날 매출로 이미 들어가요).</p>
+        <div class="rentlist" role="list" aria-label="오늘 대관">${rows || `<div class="empty">오늘 적은 대관이 없어요</div>`}</div>${form}
+        <div class="help rentst ${st.cls}" id="rent-st">${esc(st.t)}</div>
+        <div class="sheet-foot">${ro ? "" : ed ? `<button class="btn" data-act="rentNew">고치기 그만</button>` : ""}<button class="btn" data-act="close">닫기</button>${ro ? "" : `<button class="btn btn-ink" data-act="rentSave">${ed ? "고친 대로 확인" : "확인"}</button>`}</div>`;
+  }
+  /** [확인]: 단체 이름 · 입금일 검사 → 오늘 저장 파일 → 보고 앱 */
+  function rentSave() {
+    const nm = $("rent-name"), pd = $("rent-paid");
+    if (!nm || !pd) return;
+    const name = nm.value.replace(/\s+/g, " ").trim().slice(0, 30), paidOn = pd.value;
+    const bad = (msg, el) => { toast(msg); el.focus(); };
+    if (!name) return bad("대관 주체(단체 이름)를 적어 주세요", nm);
+    if (RENT_PHONE.test(name)) return bad("전화번호는 적지 않아요 — 단체 이름만 적어 주세요", nm);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(paidOn)) return bad("입금일을 골라 주세요", pd);
+    if (paidOn > TODAY) return bad("입금일이 오늘보다 뒤예요 — 대관료가 들어온 날을 골라 주세요", pd);
+    if (paidOn < shiftDay(TODAY, -366)) return bad("입금일을 확인해 주세요 (1년 안)", pd);
+    const ed = sheet.edit ? rentals.find((r) => r.id === sheet.edit) : null;
+    if (rentals.some((r) => r !== ed && r.name === name && r.paidOn === paidOn)) return bad("이미 적혀 있어요", nm);
+    if (!ed && rentals.length >= RENT_MAX) return bad(`하루 ${RENT_MAX}건까지 적을 수 있어요`, nm);
+    if (ed) Object.assign(ed, { name, paidOn });
+    else rentals.push({ id: "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name, paidOn, at: hm(now) });
+    Object.assign(sheet, { edit: null, rn: "", rp: "" });
+    saveState(); renderRentBtn(); renderSheet();
+    if (RS_APP()) rentSend("save"); else toast(`대관 ${ed ? "고침" : "적음"}: ${name} (입금 ${rentMd(paidOn)}) — 체험판은 저장만 해요`);
+    focusFirst();
+  }
+
   // ── 네이버 재고 자동 오픈 (사장님 10/20) ─────────────────────
   /* 매일 오늘 + 30일 날짜를 두 상품(평일 무제한 / 휴일 1시간 50분 · 야간자유) 모두 회차마다 재고 10개로 — 앱 본체(main.js stockTick · naver-stock.js)가
      10:30 → 실패하면 12:00 → 16:00 → 20:20 에 (어느 때든 성공하면 그날 남은 것은 안 함). 1.54: 확인하지 않고 바로 [재고수정] (이미 넣은 날도 10개로)
@@ -4321,7 +4455,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       ["6", "<b>열쇠판</b> — 숫자 = 열쇠 번호 · 바탕색 = 이용 시간 · 테두리 = 네이버(흰색) / 현장(파랑) / 서비스(흰 점선)"],
       ["7", "<b>키즈상담 · 카페상담</b> (붉은 숫자 = 새 상담) · <b>열쇠 일괄 반납처리</b> (마감)"],
       ["8", "<b>주차등록</b> — 차량번호로 찾아 할인 (뒤에 열린 아마노와 같이 움직임)"],
-      ["9", "<b>근무자 메뉴얼 · 총 판매수</b> (누르면 입장권 목록) · 지금 시각 · 맨 왼쪽 <b>통합 데스크</b> 글자를 누르면 데스크만 작업표시줄로"],
+      ["9", "<b>대관</b> (대관이 있는 날 단체 이름 · 입금일 → 보고 앱) · <b>근무자 메뉴얼 · 총 판매수</b> (누르면 입장권 목록) · 지금 시각 · 맨 왼쪽 <b>통합 데스크</b> 글자를 누르면 데스크만 작업표시줄로"],
     ];
     const tile = (bg, line, fg, dash) => `<span class="mankey" style="background:${bg};border:2px ${dash ? "dashed" : "solid"} ${line};color:${fg}">12</span>`;
     return `<h3 id="sheet-title">근무자 메뉴얼 <span class="help">내려 보면서 읽어요 · 그림의 번호 = 화면 위치</span><button class="x" data-act="close" aria-label="닫기">×</button></h3>
@@ -4706,6 +4840,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     if (!OFFICE) { // 사무실 PC 는 그 밖의 자동 일 없음 (현장 POS 가 함)
     svTick(); // 설문 누적 20:00 보고
     evsTick(); // 이벤트 입장 수 20:00 보고 (설문과 같이 · 설문이 없어도)
+    rentTick(); // 대관 기록 → 보고 앱 (바뀌면 바로 · 실패하면 10분 뒤)
     liveTick(); // 폰 실시간 현황 (1분마다 · 바뀌면 5초 안에)
     hvTick(); // 재방문 간격 20:00 보고 · 지난 기록 읽기 진행
     stTick(); // 네이버 재고 자동 오픈 진행
@@ -5027,6 +5162,20 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     // [이벤트 입장] (사장님 10/21): 결제 없이 — 나머지는 [결제 완료 · 열쇠 등록]과 같음 (열쇠 · 입장권 · 설문 · 인원) · 총 판매수에는 안 셈
     walkEvent() { if (!sheet.svc) walkReg(WEV.name); },
     evsSendNow() { evsSend("manual"); },
+    // 대관 (사장님 11/10)
+    rentOpen() { openSheet({ mode: "rent", edit: null, rn: "", rp: "" }); },
+    rentEdit(btn) { const r = rentals.find((x) => x.id === btn.dataset.id); if (!r) return; Object.assign(sheet, { edit: r.id, rn: r.name, rp: r.paidOn || "" }); renderSheet(); focusFirst(); },
+    rentNew() { Object.assign(sheet, { edit: null, rn: "", rp: "" }); renderSheet(); focusFirst(); },
+    rentSave() { rentSave(); },
+    rentDel(btn) {
+      const i = rentals.findIndex((x) => x.id === btn.dataset.id); if (i < 0) return;
+      const r = rentals[i];
+      if (!confirm(`${r.name} (입금 ${rentMd(r.paidOn)}) 대관 기록을 지울까요?\n보고 앱에서도 빠져요.`)) return;
+      rentals.splice(i, 1);
+      if (sheet.edit === r.id) Object.assign(sheet, { edit: null, rn: "", rp: "" });
+      saveState(); renderRentBtn(); renderSheet();
+      if (RS_APP()) rentSend("save"); else toast(`대관 지움: ${r.name}`);
+    },
     bulkReturn() { openSheet({ mode: "bulk" }); },
     extPick(btn) { sheet.extPick = btn.dataset.k; renderSheet(); },
     // 추가 예약 알림 [확인]: 고른 대로 열쇠 반납 시각을 바꾸고 네이버 이용완료 (그대로 두기면 아무것도 안 함)
@@ -5785,7 +5934,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     const b = (bookings[TODAY] || []).filter((x) => x.enteredAt != null).map((x) => pick(x, KEY_FIELDS));
     const w = walkins.map((x) => Object.assign({}, x, { phone: "" }));
     const s = svcKeys.map((x) => Object.assign({}, x, { phone: "", name: x.of ? "" : x.name, of: x.of ? pick(x.of, ["id", "k", "no", "posNo", "keys", "slot", "enteredAt"]) : null }));
-    return { v: 2, day: TODAY, at: hm(now), b, w, s, x: [...testOut], ig: [...extIgnored], mv: [...moved], g: golden };
+    return { v: 2, day: TODAY, at: hm(now), b, w, s, x: [...testOut], ig: [...extIgnored], mv: [...moved], g: golden, r: rentals.map((r) => ({ id: r.id, name: r.name, paidOn: r.paidOn })) };
   }
   /** 사무실 PC: 키 현황을 사무실 네이버 카드에 붙임 (예약번호로) · 네이버에 아직 없는 입장은 '예약 손님' 카드로 · 현장 · 서비스 키는 그대로 */
   function syncApply(s, at) {
@@ -5825,6 +5974,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     moved.clear(); for (const [no, v] of s.mv || []) moved.set(no, v);
     for (const o of list) if (o.no && moved.has(o.no)) o.slot = moved.get(o.no);
     golden = J(s.g);
+    rentals = Array.isArray(s.r) ? J(s.r) : [];
     renderAll();
     if (sheet.mode && sheet.mode !== "settings" && sheet.mode !== "memo") syncSheetSoon();
   }
@@ -5873,7 +6023,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     "memoOpen", "memoTab", "memoTo", "memoSend", "memoAck", "memoFin", "memoUnfin", "memoRecall", "memoAdd", "memoDone", "memoUndo", "memoDel",
     "capCell", "addPeak", "delPeak", "evApply", "evOff", "evTpl", "evOpen", "tplGo", "tplRow", "tplSamp", "tplSave", "tplDef", "tplNew", "tplDel", "tplCode",
     "staffAdd", "staffDel", "svPick", "svAdd", "svDel", "svToggle", "liveToggle", "svKeySave", "svKeyDel", "stToggle", "printMode", "drawerPin", "findPorts", "pickPort", "findPrinters", "pickPrinter", "bcFilter",
-    "naverShow", "naverHome", "annTest", "annStop", "syncRole", "syncCodeNew", "syncCodeSave", "syncRelaunch", "syncOpen", "syncDemo"]);
+    "naverShow", "naverHome", "annTest", "annStop", "syncRole", "syncCodeNew", "syncCodeSave", "syncRelaunch", "syncOpen", "syncDemo", "rentOpen"]);
   function officeGate(btn) {
     const a = btn.dataset.act;
     if (OFFICE_OK.has(a)) return true;
@@ -5883,27 +6033,32 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   /** 맨 위 작은 표시 */
   function syncChip() {
     const st = SYNCV.st;
-    if (SYNCV.demo) return { text: "사무실 PC 미리 보기 · 누르면 끝", cls: "ok", title: "체험판: 사무실 PC 에서 보이는 화면 — 근무자 일은 막히고 키 현황은 현장 POS 에서 와요" };
+    if (SYNCV.demo) return { a: "사무실 미리 보기", b: "누르면 끝", cls: "ok", title: "체험판: 사무실 PC 에서 보이는 화면 — 근무자 일은 막히고 키 현황은 현장 POS 에서 와요" };
     if (!SYNC_ROLE) return null;
     const bad = st && (st.why || st.getWhy || st.putWhy);
     if (SYNC_ROLE === "pos") {
-      if (bad) return { text: "두 PC 연결 확인", cls: "bad", title: bad };
-      return st && st.peer && st.peer.active ? { text: "사무실 PC 연결됨", cls: "ok", title: `사무실 PC 가 키 현황을 보고 있어요 (ver.${st.peer.build})` } : null;
+      if (bad) return { a: "두 PC", b: "연결 확인", cls: "bad", title: bad };
+      return st && st.peer && st.peer.active ? { a: "사무실 PC", b: "연결됨", cls: "ok", title: `사무실 PC 가 키 현황을 보고 있어요 (ver.${st.peer.build})` } : null;
     }
-    if (st && st.why) return { text: st.same === false ? "버전이 달라요" : "연결 코드 확인", cls: "bad", title: st.why };
-    if (bad) return { text: "현장 POS 연결 안 됨", cls: "bad", title: bad };
-    if (SYNCV.dayOff) return { text: `현장 POS 날짜가 달라요 (${SYNCV.dayOff})`, cls: "bad", title: "두 PC 의 날짜 · 시계를 확인해 주세요" };
-    if (!SYNCV.snapAt) return { text: "사무실 PC · 키 현황 기다리는 중", cls: "warn", title: "현장 POS 가 켜져 있으면 15초 안에 와요" };
+    if (st && st.why) return st.same === false ? { a: "버전이", b: "달라요", cls: "bad", title: st.why } : { a: "연결 코드", b: "확인", cls: "bad", title: st.why };
+    if (bad) return { a: "현장 POS", b: "연결 안 됨", cls: "bad", title: bad };
+    if (SYNCV.dayOff) return { a: "현장 POS", b: "날짜가 달라요", cls: "bad", title: `현장 POS 날짜 ${SYNCV.dayOff} — 두 PC 의 날짜 · 시계를 확인해 주세요` };
+    if (!SYNCV.snapAt) return { a: "사무실 PC", b: "키 현황 기다림", cls: "warn", title: "현장 POS 가 켜져 있으면 15초 안에 와요" };
     const ago = Math.floor((Date.now() - SYNCV.snapAt) / 60000), t = SYNCV.snapText.slice(11, 16);
-    return ago >= 3 ? { text: `사무실 PC · 키 현황 ${ago}분째 소식 없음`, cls: "warn", title: `마지막 키 현황 ${SYNCV.snapText} (현장 POS 꺼짐 · 인터넷 확인)` } : { text: `사무실 PC · 키 현황 ${t} 기준`, cls: "ok", title: `현장 POS 키 현황 ${SYNCV.snapText} 기준 · 예약 카드는 이 PC 가 네이버에서 읽음` };
+    return ago >= 3 ? { a: "키 현황 소식", b: `${ago}분째 없음`, cls: "warn", title: `마지막 키 현황 ${SYNCV.snapText} (현장 POS 꺼짐 · 인터넷 확인)` } : { a: "사무실 PC", b: `키 현황 ${t}`, cls: "ok", title: `현장 POS 키 현황 ${SYNCV.snapText} 기준 · 예약 카드는 이 PC 가 네이버에서 읽음` };
   }
+  var topChip = ""; // 맨 위 표시가 바뀌면 오른쪽 묶음 다시 맞춤 (fitTop)
   function renderSyncChip() {
     const el = $("syncchip"); if (!el) return;
     const c = syncChip();
     el.hidden = !c;
+    if (!c && topChip) { topChip = ""; fitTop(); }
     document.body.classList.toggle("office", OFFICE);
     if (!c) return;
-    el.textContent = c.text; el.className = `synchip ${c.cls}`; el.title = c.title || "";
+    const html = `<span>${esc(c.a)}</span><span>${esc(c.b)}</span>`;
+    if (el.innerHTML !== html) el.innerHTML = html;
+    el.className = `synchip ${c.cls}`; el.title = c.title || ""; el.setAttribute("aria-label", `${c.a} ${c.b}`);
+    if (topChip !== html) { topChip = html; fitTop(); }
   }
   const syncAgo = (ms) => { if (!ms) return ""; const s = Math.max(0, Math.round((Date.now() - ms) / 1000)); return s < 60 ? `${s}초 전` : `${Math.floor(s / 60)}분 전`; };
   /** 운영 설정 → 두 PC 연결: 지금 상태 한 줄 */
@@ -6024,6 +6179,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       if (t.id === "memo-new") { e.preventDefault(); acts.memoAdd(); return; }
       if (t.id === "memo-msg") { e.preventDefault(); acts.memoSend(); return; }
     }
+    if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229 && sheet.mode === "rent" && (e.target.id === "rent-name" || e.target.id === "rent-paid")) { e.preventDefault(); rentSave(); return; }
     if (e.key !== "Escape" || !$("pos").hidden) return;
     if (sheet.mode) acts.close();
   });
@@ -6032,6 +6188,8 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     if (t.id && t.id.startsWith("ann-")) { if (t.tagName === "TEXTAREA") { clearTimeout(t._ann); t._ann = setTimeout(() => annInput(t), 600); } else annInput(t); return; } // 안내 방송 (11/07)
     // 메모장 (V2.0): 쓰던 글은 다시 그려도 남게 · 찾기는 아래만 다시
     if (sheet.mode === "memo" && (t.id === "memo-new" || t.id === "memo-msg")) sheet.draft[t.id] = t.value;
+    if (t.id === "rent-name") sheet.rn = t.value; // 대관: 쓰던 글은 다시 그려도 남게
+    if (t.id === "rent-paid") sheet.rp = t.value;
     if (t.id === "wev-name") { WEV.name = t.value.trim().slice(0, 10); wevSave(); $("wev-preview").textContent = `[${wevLabel()}]`;  }
     if (t.id === "bc-q") { sheet.bcq = t.value; renderSheet(); } // BC 손님 찾기 (사장님 10/26)
     if (t.id === "memo-admin") { MEMO.admin = t.value.trim().slice(0, 12) || "관리자"; memoSaveSoon(); }
@@ -6120,13 +6278,15 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     st.style.left = Math.max(0, (window.innerWidth - 1024 * k) / 2) + "px";
     st.style.top = Math.max(0, (window.innerHeight - 768 * k) / 2) + "px";
   }
-  window.addEventListener("resize", fit);
+  window.addEventListener("resize", () => { fit(); fitTop(); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitTop, () => {}); // 글꼴이 늦게 오면 폭이 바뀜
   // 주차 입차일: 기본 전날 (새벽 손님 때문)
   $("car-day").value = shiftDay(TODAY, -1);
   if (APP) {
     // 자정이 지나 날짜가 바뀌면 새 날로 다시 열기 (열쇠·입장 기록은 날짜별로 저장돼 있음). 팝업을 쓰는 중이면 닫은 뒤
     setInterval(() => { if (localKey(new Date()) !== TODAY && !sheet.mode) location.reload(); }, 30 * 1000);
     document.querySelectorAll("[data-act=time]").forEach((b) => (b.hidden = true));
+    document.querySelector(".top .tgrp").hidden = true;
     document.querySelector(".top .tag").textContent = "";
     document.querySelector(".top .tag").title = "";
     if (window.desk.config) window.desk.config.get().then((c) => { if (c && c.build) document.querySelector(".top .tag").textContent = `ver.${c.build}`; }).catch(() => {});
@@ -6149,7 +6309,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   // 편집 칸을 내리면 왼쪽 줄 수 칸도 같이
   window.addEventListener("resize", () => { if (sheet.mode === "settings" && sheet.tab === "prints") tplFit(); }); // 편집 칸 글씨 크기 다시 (창 크기)
   document.addEventListener("change", (e) => { if (/^cap-(target|max|ceil|p1|p2|p3|boost)$/.test(e.target.id)) renderSheet(); if (e.target.id === "note-m") noteFlush(); }); // 숫자를 다 넣으면 계획 다시
-  window.__deskTest = { golden: () => golden, goldenHold: () => goldenHold, longBuy: (id) => { const h = holders().find((x) => x.id === id); return h ? longBuy(h) : null; }, ann: { pink: () => annPink(), text: (ks) => annExitText(ks), state: () => ANNS, ANN, stop: () => annStop(), due: () => annAutoDue(), tick: () => annAutoTick() }, sync: SYNC_T, projection, capWalkOut, notes: () => Object.fromEntries(NOTES), evLoadCfg, today: () => TODAY, useDueText, printSecs, PRINT_: () => PRINT, sealOf, withSeal, SEAL, evSample: (i) => evSample(i), sealClear: () => sealCache.clear(), EV_: () => EV, liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, bk: (id) => (bookings[TODAY] || []).find((b) => b.id === id), useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capRanges, capPlan, capRun, capApply, capTick, capMoving: () => capMoveN > 0, capTeamExtra, capState: () => JSON.parse(JSON.stringify(capState)), capLock: (ts) => { capState.locks = ts.slice(); saveCapState(); }, capKeysAt, returnKeys: (id, ks) => { const h = holders().find((x) => x.id === id); if (h) { returnKeys(h, ks); renderAll(); } }, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: (v) => enterText(v), formFor: (v) => ticketText(v), splitForm, joinForms, lastPrint: () => LASTPRINT, BC2_: () => BC2, holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, sheet, evOf: (b) => evOf(b),
+  window.__deskTest = { rent: { list: () => rentals, payload: () => rentPayload(), RS, dirty: () => rentDirty() }, fitTop, golden: () => golden, goldenHold: () => goldenHold, longBuy: (id) => { const h = holders().find((x) => x.id === id); return h ? longBuy(h) : null; }, ann: { pink: () => annPink(), text: (ks) => annExitText(ks), state: () => ANNS, ANN, stop: () => annStop(), due: () => annAutoDue(), tick: () => annAutoTick() }, sync: SYNC_T, projection, capWalkOut, notes: () => Object.fromEntries(NOTES), evLoadCfg, today: () => TODAY, useDueText, printSecs, PRINT_: () => PRINT, sealOf, withSeal, SEAL, evSample: (i) => evSample(i), sealClear: () => sealCache.clear(), EV_: () => EV, liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, bk: (id) => (bookings[TODAY] || []).find((b) => b.id === id), useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capRanges, capPlan, capRun, capApply, capTick, capMoving: () => capMoveN > 0, capTeamExtra, capState: () => JSON.parse(JSON.stringify(capState)), capLock: (ts) => { capState.locks = ts.slice(); saveCapState(); }, capKeysAt, returnKeys: (id, ks) => { const h = holders().find((x) => x.id === id); if (h) { returnKeys(h, ks); renderAll(); } }, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: (v) => enterText(v), formFor: (v) => ticketText(v), splitForm, joinForms, lastPrint: () => LASTPRINT, BC2_: () => BC2, holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, sheet, evOf: (b) => evOf(b),
     evLog: (from) => { const L = evLog(from); return { from: L.from, count: L.count, people: Object.fromEntries([...L.people].map(([k, p]) => [k, JSON.parse(JSON.stringify(p))])) }; },
     // 장부에 지난 방문 한 줄 넣기: o = { day, n(네이버 순번, 기본 = 지금 완료 수), base, st("안내" | "성공"), due, from(장부 · 기본 지금 이벤트), no }
     evsPayload: () => evsPayload(),

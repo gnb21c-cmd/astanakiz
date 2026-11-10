@@ -50,7 +50,7 @@ test("사무실 PC 키 현황: 현장 열쇠판 그대로 · 이름 · 전화 ·
     await A.click("#sheet [data-act=close] >> nth=0");
     const snap = await snapOf(A);
     for (const s of ["손님메모비밀글", "사무실확인", "01077770000", "찟재명", "01020039595"]) assert.ok(!snap.includes(s), `키 현황에 '${s}' 없음 (이름 · 전화 · 메모는 안 보냄)`);
-    assert.deepStrictEqual(Object.keys(JSON.parse(snap)).sort(), ["at", "b", "day", "g", "ig", "mv", "s", "v", "w", "x"].sort(), "네이버 칸 · 고객 카드 · 수량 기록은 안 보냄");
+    assert.deepStrictEqual(Object.keys(JSON.parse(snap)).sort(), ["at", "b", "day", "g", "ig", "mv", "r", "s", "v", "w", "x"].sort(), "네이버 칸 · 고객 카드 · 수량 기록은 안 보냄 (r = 대관 단체 이름 · 입금일 · 11/10)");
 
     // 사무실 PC (체험판 미리 보기) — 네이버 예약은 이 PC 가 읽은 것 (체험 예시 = 현장과 같은 예약, '사무실확인'은 아직 없음)
     const B = await open(ctx);
@@ -64,7 +64,7 @@ test("사무실 PC 키 현황: 현장 열쇠판 그대로 · 이름 · 전화 ·
     }
     const strip = (b) => b.filter((x) => !ent.keys.some((kk) => x.startsWith(kk + ":")));
     assert.deepStrictEqual(strip(boardB), strip(boardA), "다른 열쇠는 이름까지 같음 (이름은 사무실 네이버 카드에서)");
-    assert.strictEqual((await B.textContent("#syncchip")).trim(), "사무실 PC 미리 보기 · 누르면 끝");
+    assert.strictEqual(await B.getAttribute("#syncchip", "aria-label"), "사무실 미리 보기 누르면 끝"); // 11/10: 두 줄 · 오른쪽 묶음
     // 사무실 네이버를 다시 읽어 그 예약이 나옴 → 그 카드에 붙음 ('예약 손님' 카드는 없어짐)
     await B.evaluate((no) => { const T = window.__deskTest; const i = T.addBooking(T.today(), "14:00", "사무실확인", "01077770000", 2, {}); T.bk(i).no = no; }, ent.no);
     await applyTo(B, snap, "13:50:10");
