@@ -4486,7 +4486,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   /* 맨 위 [근무자 메뉴얼] → 입장 · 퇴장 · 화면 위치별 조작 (내려 보며 읽기)
      그림 = prototype/manual/*.jpg (체험판 화면 · apps/desk/tools/manual-shots.js 로 다시 찍음 · 설치본은 desk.html 옆 manual/)
      MANUAL_MARKS = 그림 1의 번호 자리 (% · 찍을 때 나온 값) */
-  const MANUAL_MARKS = [[13.9, 0.6], [39.4, 0], [1, 5.3], [1, 12.3], [23.4, 12.3], [48.7, 10.3], [48.7, 59.5], [48.7, 66.5], [72.8, 0.5]];
+  const MANUAL_MARKS = [[13.9, 0.6], [39.4, 0], [1, 5.3], [1, 12.3], [23.4, 12.3], [48.7, 10.3], [48.7, 59.5], [48.7, 66.5], [68.8, 0.5]];
   const MANUAL_TOC = [["man1", "① 화면 한눈에"], ["man2", "② 예약 손님 입장"], ["man3", "③ 현장 손님 입장"], ["man4", "④ 퇴장 · 열쇠 반납"], ["man5", "⑤ 마감 · 일괄 반납"], ["man6", "⑥ 주차등록"], ["man7", "⑦ 메모장"], ["man8", "⑧ 이럴 땐"]];
   const manImg = (f, alt) => `<img src="manual/${f}" alt="${alt}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'help',textContent:'(그림을 못 불러옴 — ${alt})'}))">`;
   const manSteps = (rows, tip) => `<div class="mansteps">${rows.map((r, i) => `<div><span class="n">${i + 1}</span><span>${r}</span></div>`).join("")}${tip ? `<div class="tip">${tip}</div>` : ""}</div>`;

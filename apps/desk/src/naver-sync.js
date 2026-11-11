@@ -272,7 +272,7 @@ class NaverSync {
         live.add(key);
         if (opts.only && s.time !== opts.only) continue; // 그 시간만
         const c = cache.get(key);
-        if (c && c.count === n && !opts.only) continue; // 숫자가 그대로면 기억한 카드 그대로
+        if (c && c.count === n && !c.retry && !opts.only) continue; // 숫자가 그대로면 기억한 카드 그대로 (부분취소를 아직 못 맞춘 칸은 다시 · 11/11)
         const r = await this.readSlotCards(s.product, s.time, kind, n);
         if (!r.ok) return r;
         opened = true;
@@ -283,7 +283,8 @@ class NaverSync {
         // 부분취소인데 누구 것인지 모르면(여러 장 산 카드가 둘 이상) 그 카드들의 상세를 열어 환불정보를 읽음 (최대 4장 · 못 읽으면 데스크가 근무자에게 물음)
         const asks = [...partialFix(r.cards, n, kind).entries()].filter(([, f]) => f.ask).map(([no]) => no).slice(0, 4);
         if (asks.length) await this.readRefunds(s.product, s.time, kind, r.cards, asks);
-        cache.set(key, { count: n, time: s.time, product: s.product, status: kind === "확정" ? "확정" : "완료", cards: r.cards });
+        const retry = asks.length > 0 && [...partialFix(r.cards, n, kind).values()].some((f) => f.ask); // 상세를 못 열었으면 다음 불러오기 때 다시 (근무자가 고르지 않게)
+        cache.set(key, { count: n, time: s.time, product: s.product, status: kind === "확정" ? "확정" : "완료", cards: r.cards, retry });
       }
     }
     for (const key of [...cache.keys()]) if (!live.has(key)) cache.delete(key); // 비워진 칸 (취소 등)

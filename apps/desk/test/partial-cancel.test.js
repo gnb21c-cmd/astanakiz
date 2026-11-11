@@ -32,13 +32,14 @@ test("partialFix: 칸 숫자 − 카드 합 = 부분취소 장수 · 여러 장 
 });
 
 /** 가짜 네이버(?partial=1) → 앱 본체 NaverSync → 데스크 */
-async function open(browser, extra = "") {
+async function open(browser, extra = "", pre = null) {
   const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
   const np = await ctx.newPage();
   const q = "?partial=1" + extra;
   await np.goto(NAVER + q);
   await np.evaluate(() => localStorage.clear());
   await np.goto(NAVER + q);
+  if (pre) await np.evaluate(pre);
   const naver = new NaverSync((code) => np.evaluate(code), { urls: { list: NAVER + "?view=list&partial=1" + extra, calendar: NAVER + "?view=calendar&partial=1" + extra } });
   const desk = await ctx.newPage();
   await desk.clock.install({ time: new Date("2026-10-05T10:56:00") });
@@ -57,7 +58,7 @@ async function open(browser, extra = "") {
   await desk.goto(DESK);
   await desk.click("[data-act=refresh]");
   await desk.waitForFunction(() => /불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 60000 });
-  return { desk, errs };
+  return { desk, errs, np };
 }
 const cells = (desk, t) => desk.$$eval(`.slot[data-s="${t}"] .c`, (e) => e.map((x) => x.textContent.trim()));
 const qtyRows = (desk) => desk.$$eval(".res", (e) => Object.fromEntries(e.map((x) => [x.querySelector(".name").textContent.replace(/\s+|첫방문/g, ""), [...x.querySelectorAll("dt")].find((d) => d.textContent === "수량").nextElementSibling.textContent.replace(/\s+/g, " ").trim()])));
@@ -124,6 +125,24 @@ test("부분취소: 예약 상세를 못 열면 '부분취소 확인' → 근무
     await desk.click('.slot[data-s="750"]');
     assert.deepStrictEqual(await qtyRows(desk), { "두장손님나": "4인 입장권 2", "세장손님나": "4인 입장권 2 부분취소 1장 · 처음 3장" });
     assert.deepStrictEqual(JSON.parse(await desk.evaluate(() => localStorage.getItem("test-state-2026-10-05"))).pq, { 1375200103: 2 });
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("부분취소: 예약 상세를 처음에 못 열어도 다음 불러오기 때 앱이 다시 열어 맞춤 (근무자가 고르지 않음)", async () => {
+  const browser = await launch();
+  try {
+    const { desk, errs, np } = await open(browser, "", () => localStorage.setItem("mockNoDetail", "1"));
+    await desk.click('.slot[data-s="750"]');
+    assert.deepStrictEqual(await qtyRows(desk), { "두장손님나": "4인 입장권 2 부분취소 확인", "세장손님나": "4인 입장권 3 부분취소 확인" });
+    await np.evaluate(() => localStorage.removeItem("mockNoDetail")); // 네이버 상세가 다시 열림
+    await desk.click("[data-act=refresh]"); // 자동 불러오기와 같은 길 (칸 숫자는 그대로여도 못 맞춘 칸은 다시 읽음)
+    await desk.waitForFunction(() => /불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 60000 });
+    await desk.click('.slot[data-s="750"]');
+    assert.deepStrictEqual(await qtyRows(desk), { "두장손님나": "4인 입장권 2", "세장손님나": "4인 입장권 2 부분취소 1장 · 처음 3장" });
+    assert.deepStrictEqual(await desk.evaluate(() => window.__deskTest.qtyPicks()), {}, "근무자가 고른 것 없음");
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();

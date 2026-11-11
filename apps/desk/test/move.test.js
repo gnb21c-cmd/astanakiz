@@ -168,6 +168,9 @@ test("카드 시간을 옮기면 네이버 판매 수량도: 원래 시간 +장�
     await desk.goto(DESK);
     await loaded();
     await desk.evaluate(() => { window.__deskTest.RULES.capAuto.on = true; }); // 수량 자동조절 켠 날
+    // 켜자마자 지난 차례(13:55) 자동조절이 한 번 돎 → 끝난 뒤에 재고 옮김 (그 사이에 돌면 옮긴 수량과 엇갈려 가끔 틀렸음 · 11/11)
+    await desk.waitForFunction(() => /수량조절 \d\d:\d\d/.test(document.getElementById("refresh-at").textContent), null, { timeout: 70000 });
+    await desk.waitForFunction(() => !window.__deskTest.capMoving(), null, { timeout: 60000 });
     const c0 = await caps();
 
     // ① 허정은 14:00 → 15:00 : 14:00 +1 · 15:00 −1 (줄이는 칸부터)

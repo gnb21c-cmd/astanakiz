@@ -214,7 +214,7 @@
       if (b && (b.dataset.act === "예약가능" || b.dataset.act === "잔여예약")) { const c = b.closest("[data-p]"); setTimeout(() => go({ sel: "", cap: JSON.stringify({ p: +c.dataset.p, t: c.dataset.t }) }), 150); return; }
       if (b && (b.dataset.act === "확정" || b.dataset.act === "이용완료")) { const c = b.closest("[data-p]"); setTimeout(() => go({ sel: JSON.stringify({ p: +c.dataset.p, t: c.dataset.t, s: b.dataset.act === "확정" ? "확정" : "완료" }) }), 150); return; }
       const ua = e.target.closest("[data-tst_click_link]");
-      if (ua && sel && ua.closest('[class*="List__contents-box"]') && !P.get("nodetail")) { e.preventDefault(); setTimeout(() => go({ sel: JSON.stringify(Object.assign({}, sel, { d: ua.dataset.tst_click_link })) }), 150); return; }
+      if (ua && sel && ua.closest('[class*="List__contents-box"]') && !P.get("nodetail") && localStorage.getItem("mockNoDetail") !== "1") { e.preventDefault(); setTimeout(() => go({ sel: JSON.stringify(Object.assign({}, sel, { d: ua.dataset.tst_click_link })) }), 150); return; }
       const tab = e.target.closest("[data-tab]");
       if (tab) { e.preventDefault(); setTimeout(() => go({ sel: JSON.stringify(Object.assign(sel, { s: tab.dataset.tab })) }), 150); return; }
       const cx = e.target.closest("[data-cancel]");
