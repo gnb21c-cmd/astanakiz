@@ -132,6 +132,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .rentform .field input { min-width: 0; }
 .rentform input[type=date] { font-size: 18px; padding: 8px 8px; letter-spacing: 0; }
 .rentst.bad { color: var(--red); font-weight: 700; } .rentst.ok { color: var(--ok); }
+/* 부분취소 (사장님 11/11): 카드 수량 옆 — 정해졌으면 회색 글 · 누구 것인지 모르면 노란 '부분취소 확인' */
+.qcut { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.qask { font-size: 12px; font-weight: 800; color: #3a2a00; background: var(--yellow); border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
+.qpick { display: inline-flex; gap: 6px; margin-left: 6px; vertical-align: middle; }
+.qpick .btn { min-width: 52px; }
 .top .synchip.ok { border-color: var(--ok); color: var(--fg); }
 .top .synchip.warn { border-color: var(--amber); color: var(--amber); }
 .top .synchip.bad { border-color: var(--red); color: var(--red); }
@@ -1239,6 +1244,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       const b = old.get(n.no) || { id: "b" + seq++, keys: [], enteredAt: null, outAt: null, visitNo: null };
       Object.assign(b, {
         day, no: n.no, naverSlot: toMin(n.time), slot: day === TODAY && moved.has(n.no) ? moved.get(n.no) : toMin(n.time), name: n.name, phone: n.phone, qty: n.qty,
+        qtyBooked: n.qtyBooked || null, qtyCut: n.qtyCut || 0, qtyAsk: n.qtyAsk || null, qtyAskRaw: n.qtyAsk || null, qtyPicked: false, qtySrc: n.qtySrc || "", // 부분취소 (11/11): 남은 장수 · 처음 수량 · 누구 것인지 모름
         product: (n.qtyText || "").replace(/\s*\d+\s*$/, "") || "입장권", naverProduct: n.product, pay: n.pay || "",
         cancels: n.cancelCount,
         proxy: !!n.proxy, visitor: n.visitor || "", unpaid: !!n.unpaid, // 대리예약 · 방문자 · 입금대기 (10/8)
@@ -1255,7 +1261,38 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     // 네이버에서 사라진 예약(취소)은 열쇠를 받지 않았을 때만 뺌
     for (const b of old.values()) if (!list.includes(b) && (b.keys.length || (only && (b.naverSlot ?? b.slot) !== toMin(only)))) list.push(b); // 한 시간만 불러왔으면 다른 시간 예약은 그대로
     bookings[day] = list;
+    qtySettle(day);
   }
+  /* 부분취소 (사장님 11/11 — 5장 예약 → 4장 부분취소 → 1장 입장인데 카드는 5장): 네이버 예약 카드 '수량'은 처음 결제한 수 그대로라
+     앱 본체(naver-sync.js partialFix)가 시간 칸 숫자(남은 장수)와 카드 합을 견줘 남은 장수(qty) · 처음 수량(qtyBooked) · 취소 장수(qtyCut)를 줌
+     (칸에 예약이 1건이면 뜨는 예약 상세 · 누구 것인지 모를 때 앱이 열어 본 예약 상세의 '환불정보' 환불내역 X n 이 먼저 — qtySrc "detail" · 나머지는 칸 숫자 "cell")
+     → 열쇠(지급할 열쇠 수) · 입장권 · 명단 '수량' · 폰 현황 손님 줄이 모두 남은 장수로 (보고 앱 장수 · 매출은 원래 네이버 칸 숫자라 그대로 맞음)
+     그 칸에 여러 장 산 카드가 둘 이상이면 누구 것인지 몰라 qtyAsk → 근무자가 입장 창에서 실제 장수를 고름(qtyPicks) · 하나를 고르면 남은 것은 셈으로 맞춰짐 */
+  function qtySettle(day) {
+    const groups = new Map();
+    for (const b of bookings[day] || []) {
+      if (!b.qtyAskRaw) continue; // 네이버가 준 '누구 것인지 모름' 그대로 (고른 뒤에도 다시 셈할 때 씀)
+      const k = `${b.naverProduct}|${b.naverSlot}|${b.status}|${b.qtyAskRaw.n}|${b.qtyAskRaw.sum}`;
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(b);
+    }
+    for (const g of groups.values()) {
+      const orig = (b) => b.qtyBooked || b.qty;
+      let cut = g[0].qtyAskRaw.cut;
+      const open = [];
+      for (const b of g) {
+        const o = orig(b), p = Number(qtyPicks[b.no]) || 0;
+        if (day === TODAY && p >= 1 && p <= o) { Object.assign(b, { qty: p, qtyBooked: o, qtyCut: o - p, qtyAsk: null, qtyPicked: true }); cut -= o - p; }
+        else { Object.assign(b, { qty: o, qtyBooked: o, qtyCut: 0, qtyAsk: b.qtyAskRaw, qtyPicked: false }); open.push(b); }
+      }
+      if (cut <= 0) for (const b of open) Object.assign(b, { qtyAsk: null }); // 고른 것으로 다 맞음 → 나머지는 취소 없음
+      else if (open.length === 1 && orig(open[0]) - cut >= 1) Object.assign(open[0], { qty: orig(open[0]) - cut, qtyCut: cut, qtyAsk: null }); // 하나 남음 → 나머지 취소 장수가 그 손님 것
+      for (const b of g) if (!b.qtyCut && !b.qtyAsk) b.qtyBooked = null;
+    }
+  }
+  /** 카드 수량 옆 글 */
+  const qtyNote = (b) => (b.qtyAsk ? ` <span class="qask" title="네이버 시간 칸 ${b.qtyAsk.n}장 · 카드 합 ${b.qtyAsk.sum}장 — ${b.qtyAsk.cut}장 부분취소가 누구 것인지 몰라요 (입장 창에서 골라 주세요)">부분취소 확인</span>`
+    : b.qtyCut ? ` <span class="qcut">부분취소 ${b.qtyCut}장 · 처음 ${b.qtyBooked}장</span>` : "");
   // 네이버에 아직 이용완료를 못 누른 예약(연속예약의 뒤 예약 · '네이버 없이 등록')을 차례로 처리, 실패하면 2분마다 다시
   let flushing = false;
   /* 입장 처리는 열쇠를 바로 등록하고, 네이버 이용완료는 여기서 뒤에서 차례로 (근무자가 기다리지 않게 · 현장 10/6)
@@ -1293,8 +1330,9 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
      - 앱: 저장 폴더(%APPDATA%\아스타나키즈 입장 데스크\desk-state\날짜.json)에 바로 씀 (갑자기 꺼져도 남게) + 브라우저 저장소에도 한 벌
      - 켜자마자 빈 화면으로 저장본을 덮어쓰지 않게: 저장본을 먼저 읽어 들인 뒤부터 저장 */
   const STATE_KEY = "astanakiz-desk-" + TODAY;
-  const SAVE_FIELDS = ["id", "day", "no", "slot", "name", "phone", "qty", "product", "naverProduct", "pay", "cancels", "prevDone", "visitNo", "visitEnd", "proxy", "visitor", "status", "keys", "enteredAt", "outAt", "overPaid", "naverPending", "naverWhy", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut", "naverSlot", "sv", "giftDue", "giftGiven", "plusT"];
+  const SAVE_FIELDS = ["id", "day", "no", "slot", "name", "phone", "qty", "qtyBooked", "qtyCut", "qtySrc", "qtyPicked", "product", "naverProduct", "pay", "cancels", "prevDone", "visitNo", "visitEnd", "proxy", "visitor", "status", "keys", "enteredAt", "outAt", "overPaid", "naverPending", "naverWhy", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut", "naverSlot", "sv", "giftDue", "giftGiven", "plusT"];
   let stateReady = !APP; // 저장본을 읽기 전에는 저장하지 않음
+  let qtyPicks = {}; // 부분취소 (사장님 11/11): 누구 것인지 모를 때 근무자가 고른 실제 장수 { 예약번호: 장수 } — 오늘 저장 파일(pq)
   let rentals = []; // 대관 (사장님 11/10): 오늘 적은 단체 이름 · 입금일 [{ id, name, paidOn, at }] — 오늘 저장 파일(r) · 보고 앱 '키즈대관'
   let svExtra = {}; // 설문: 오늘 근무자가 [+]로 직접 더한 수 { 번호: 건수 } — 예약 없이 이벤트로 들어온 손님 등 (사장님 10/15 · 따로 기록은 없음)
   let pendingSaved = []; // 예전 형식(예약번호만 있는) 저장본 — 네이버에서 그 예약을 불러오면 합침
@@ -1306,7 +1344,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     for (const h of (bookings[TODAY] || []).concat(walkins, svcKeys)) noteKeys(h);
     if (!APP || !stateReady) return;
     const b = (bookings[TODAY] || []).filter((x) => x.enteredAt != null).map((x) => Object.fromEntries(SAVE_FIELDS.filter((k) => x[k] !== undefined).map((k) => [k, x[k]])));
-    const json = JSON.stringify({ v: 2, b: b.concat(pendingSaved.filter((p) => !b.some((x) => x.no === p.no))), w: walkins, x: [...testOut], ig: [...extIgnored], mv: [...moved], g: golden, sa: svExtra, s: svcKeys, r: rentals, seq, posSeq });
+    const json = JSON.stringify({ v: 2, b: b.concat(pendingSaved.filter((p) => !b.some((x) => x.no === p.no))), w: walkins, x: [...testOut], ig: [...extIgnored], mv: [...moved], g: golden, sa: svExtra, s: svcKeys, r: rentals, pq: qtyPicks, seq, posSeq });
     try { if (window.desk.state) window.desk.state.save(TODAY, json); } catch (e) { /* 파일 저장 실패 */ }
     try { localStorage.setItem(STATE_KEY, json); } catch (e) { /* 저장 못 해도 화면은 동작 */ }
   }
@@ -1330,6 +1368,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       if (st.g) golden = st.g;
       if (st.sa && typeof st.sa === "object") svExtra = st.sa;
       if (Array.isArray(st.r)) rentals = st.r.filter((x) => x && typeof x.name === "string" && x.name);
+      if (st.pq && typeof st.pq === "object") qtyPicks = st.pq;
       const full = (st.b || []).filter((x) => x.name && x.slot != null);
       pendingSaved = (st.b || []).filter((x) => !(x.name && x.slot != null));
       bookings[TODAY] = full.map((x) => Object.assign({ day: TODAY, keys: [], enteredAt: null, outAt: null }, x, { naverBusy: false }));
@@ -1705,7 +1744,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
         <dl class="kv">
           <dt>전화번호</dt><dd class="phone num">${fmtPhone(b.phone)}</dd>${visitorRow(b)}
           <dt>이용일시</dt><dd class="num">${when}${isShort(b) && bookMinutes(b) != null ? ` <b class="shortend">~ ${hm(b.slot + bookMinutes(b))} 퇴장</b>` : ""}${b.naverSlot != null && b.naverSlot !== b.slot ? ` <span class="moved">네이버 ${hm(b.naverSlot)}</span>` : ""}</dd>
-          <dt>수량</dt><dd>${b.product} ${qtyNum(b.qty)}</dd>
+          <dt>수량</dt><dd>${b.product} ${qtyNum(b.qty)}${qtyNote(b)}</dd>
           <dt>결제상태</dt><dd><span class="badge paid">${b.pay}</span></dd>
         </dl>
         <div class="act">${act}</div>
@@ -2455,11 +2494,13 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       let pickHtml = "";
       // 설문조사 (사장님 10/14): 대상 손님은 번호를 먼저 눌러야 열쇠를 고름
       const sv = canEnter ? svFor(b) : null, svLock = !!sv && sheet.sv == null;
+      // 부분취소 (11/11): 같은 시간 예약 중 누구 것인지 모르는 카드가 있으면 그 장수를 먼저 고름 (열쇠 수가 달라지니)
+      const qAsk = canEnter ? party.concat([b]).find((x) => x.qtyAsk) : null, qLock = !!qAsk;
       if (b.status === "확정") {
         let btns = "";
         for (let k = 1; k <= RULES.keys; k++) {
           const used = !!holderOf(k), on = sheet.keys.includes(k);
-          btns += `<button type="button" class="num ${on ? "on" : ""}" data-act="pickKey" data-k="${k}" ${used || !canEnter || svLock ? "disabled" : ""} aria-pressed="${on}" aria-label="${k}번${used ? " 지급됨" : ""}">${k}</button>`;
+          btns += `<button type="button" class="num ${on ? "on" : ""}" data-act="pickKey" data-k="${k}" ${used || !canEnter || svLock || qLock ? "disabled" : ""} aria-pressed="${on}" aria-label="${k}번${used ? " 지급됨" : ""}">${k}</button>`;
         }
         pickHtml = `<div class="field"><span class="label">지급할 열쇠 <span class="help num">${svLock ? `<b class="svwarn">설문 번호를 먼저 눌러 주세요</b> · ` : ""}${party.length > 1 ? "같은 시간 예약 합계" : "예약 수량"} ${need}개만큼 누르세요 · ${sheet.keys.length}/${need} · 흐린 번호는 이미 지급됨</span></span><div class="kpick">${btns}</div></div>`;
       }
@@ -2469,7 +2510,11 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
         : `<div class="banner"><b>같은 시간 예약 ${party.length}건</b> (${party.map((x) => `${x.qty}장`).join(" + ")}) — 같은 손님이 나눠 예약했어요. 한 번에 입장 · 열쇠 ${need}개 · 네이버 ${party.length}건 모두 이용완료</div>`;
       const oddN = oddNext(b);
       const oddNote = partyNote + (oddN.length ? `<div class="banner warn"><b>⚠ 연속이용 아님</b> — ${oddN.map((o) => `${hm(o.other.slot)} 예약과 ${o.gap > 0 ? `${o.gap}분 비어요` : `${-o.gap}분 겹쳐요`}`).join(", ")}. 연속이용은 2시간 이내 간격 예약만이에요. 이 예약은 따로 1시간 50분 — 끝나면 나갔다가 다음 예약 시간에 다시 입장하도록 안내해 주세요 (중간에 열쇠가 모자랄 수 있어요)</div>` : "");
-      const note = oddNote + chainNote + (b.status !== "확정" ? "" : b.day !== TODAY ? `<div class="banner warn">이용일(${b.day.slice(5).replace("-", "/")})에 입장 처리할 수 있어요</div>`
+      const qOpts = (x) => { const o = x.qtyBooked || x.qty, lo = Math.max(1, o - x.qtyAsk.cut); return Array.from({ length: o - lo + 1 }, (_, i) => lo + i); };
+      const qNote = qAsk ? `<div class="banner warn"><b>⚠ 부분취소 확인</b> — ${hm(qAsk.slot)} 네이버 칸은 ${qAsk.qtyAsk.n}장인데 예약 카드 합은 ${qAsk.qtyAsk.sum}장이에요 (${qAsk.qtyAsk.cut}장 부분취소). 네이버 카드는 처음 수량이 그대로라 누구 것인지 몰라요 — ${qAsk === b ? "이 손님" : `${esc(qAsk.name)}님(같은 시간 예약)`} 실제 장수를 골라 주세요 (손님께 확인 · 네이버 예약 상세의 취소 내역)
+          <span class="qpick">${qOpts(qAsk).map((k) => `<button class="btn btn-sm num" data-act="qtyPick" data-id="${qAsk.id}" data-n="${k}">${k}장</button>`).join("")}</span></div>`
+        : b.qtyCut ? `<div class="banner"><b>부분취소</b> — 처음 ${b.qtyBooked}장 중 ${b.qtyCut}장 취소 · <b>남은 ${b.qty}장</b>만 입장 (${b.qtyPicked ? "근무자가 고름" : b.qtySrc === "detail" ? "네이버 예약 상세의 환불정보로 맞춤" : "네이버 시간 칸 숫자로 맞춤"})</div>` : "";
+      const note = qNote + oddNote + chainNote + (b.status !== "확정" ? "" : b.day !== TODAY ? `<div class="banner warn">이용일(${b.day.slice(5).replace("-", "/")})에 입장 처리할 수 있어요</div>`
         : early ? `<div class="banner">예약 ${hm(b.slot)}보다 일찍 입장 — 근무자 판단으로 가능해요 (손님 안내 기준은 ${hm(b.slot - RULES.earlyMinutes)}). ${m == null ? "" : `이용시간은 예약 시간부터라 일찍 온 만큼 더 놀 수 있어요 (반납 ${hm(b.slot + m)})`}</div>` : "");
       el.innerHTML = `
         <h3 id="sheet-title">네이버 예약자 <button class="x" data-act="close" aria-label="닫기">×</button></h3>${bcAskHtml()}
@@ -2479,14 +2524,14 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
           <dt>전화번호</dt><dd class="num">${fmtPhone(b.phone)}</dd>${visitorRow(b)}
           <dt>이용일시</dt><dd class="num">${hm(b.slot)} ${m == null ? "· 무제한" : `~ ${hm(b.slot + m)} (${dur(m)})`}${b.naverSlot != null && b.naverSlot !== b.slot ? ` <span class="moved">네이버 ${hm(b.naverSlot)}</span>` : ""}${b.day === TODAY && b.no ? `
             <span class="mvrow" aria-label="예약시간 변경">→ <button class="btn btn-sm" data-act="mvSlot" data-d="-30" aria-label="앞 시간" ${(sheet.mv ?? b.slot) <= SLOTS[0] ? "disabled" : ""}>◀</button><b class="num">${hm(sheet.mv ?? b.slot)}</b><button class="btn btn-sm" data-act="mvSlot" data-d="30" aria-label="뒤 시간" ${(sheet.mv ?? b.slot) >= SLOTS[SLOTS.length - 1] ? "disabled" : ""}>▶</button><button class="btn btn-sm btn-ink" data-act="mvDo" ${(sheet.mv ?? b.slot) === b.slot ? "disabled" : ""}>변경</button></span>` : ""}</dd>
-          <dt>수량</dt><dd>${b.product} ${qtyNum(b.qty)}</dd>
+          <dt>수량</dt><dd>${b.product} ${qtyNum(b.qty)}${qtyNote(b)}</dd>
           <dt>결제상태</dt><dd>${b.pay}</dd>${noteRow(b)}
           ${b.status === "완료" ? `<dt>열쇠</dt><dd>${b.keys.length ? `<div class="bigkeys">${b.keys.map((k) => `<span class="bigkey num">${k}</span>`).join("")}</div>` : b.outAt != null ? `<span class="num">${b.enteredAt != null ? hm(b.enteredAt) + " 입장 · " : ""}${hm(b.outAt)} 퇴장 (반납함)</span>` : "-"}</dd>` : ""}
         </dl>${sv ? `<div class="svbox ${svLock ? "need" : "ok"}">${svButtons(sv)}</div>` : ""}</div>
         ${bc3Html(b)}${note}${pickHtml}
         <div class="sheet-foot">${b.status === "확정"
           ? `${sheet.naverErr ? `<div class="banner warn" style="flex-basis:100%">네이버 이용완료 실패: ${esc(sheet.naverErr)}</div><button class="btn" data-act="doEnter" data-skip-naver="1">네이버 없이 열쇠만 등록</button>` : ""}
-             <button class="btn" data-act="close">닫기</button><button class="btn btn-ink" id="enter-done" data-act="doEnter" ${canEnter && sheet.keys.length === need && !sheet.busy && !svLock ? "" : "disabled"}>${sheet.busy ? "네이버 이용완료 중…" : sheet.naverErr ? "다시 시도" : "등록 완료"}</button>`
+             <button class="btn" data-act="close">닫기</button><button class="btn btn-ink" id="enter-done" data-act="doEnter" ${canEnter && sheet.keys.length === need && !sheet.busy && !svLock && !qLock ? "" : "disabled"}>${sheet.busy ? "네이버 이용완료 중…" : sheet.naverErr ? "다시 시도" : "등록 완료"}</button>`
           : `<button class="btn btn-ink" data-act="close" data-autofocus>닫기</button>`}</div>`;
       return;
     }
@@ -5162,6 +5207,16 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     // [이벤트 입장] (사장님 10/21): 결제 없이 — 나머지는 [결제 완료 · 열쇠 등록]과 같음 (열쇠 · 입장권 · 설문 · 인원) · 총 판매수에는 안 셈
     walkEvent() { if (!sheet.svc) walkReg(WEV.name); },
     evsSendNow() { evsSend("manual"); },
+    // 부분취소 (사장님 11/11): 누구 것인지 모를 때 근무자가 실제 장수를 고름
+    qtyPick(btn) {
+      const b = findB(btn.dataset.id), n = Number(btn.dataset.n);
+      if (!b || !(n >= 1)) return;
+      qtyPicks[b.no] = n;
+      qtySettle(b.day);
+      sheet.keys = [];
+      saveState(); renderAll(); renderSheet();
+      toast(`${b.name}님 ${n}장으로 맞춤 (처음 ${b.qtyBooked || n}장${b.qtyCut ? ` · ${b.qtyCut}장 부분취소` : ""})`);
+    },
     // 대관 (사장님 11/10)
     rentOpen() { openSheet({ mode: "rent", edit: null, rn: "", rp: "" }); },
     rentEdit(btn) { const r = rentals.find((x) => x.id === btn.dataset.id); if (!r) return; Object.assign(sheet, { edit: r.id, rn: r.name, rp: r.paidOn || "" }); renderSheet(); focusFirst(); },
@@ -5927,7 +5982,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   //   우편함으로 주고받는 것 (사장님 11/06 다시): 운영 설정 일체 · 관리자 메시지(메모장) · 자동 수량조절 켜고 끄기(설정) · 키 현황
   //   네이버 예약 · 고객 카드는 우편함으로 안 보냄 → 사무실 PC 가 네이버에서 직접 읽기만 (이용완료 · 수량 · 취소 · 재고는 현장 POS 만) · 주차는 사무실에 없음
   //   키 현황 = 입장한 예약의 열쇠 · 입장 · 반납 시각 (예약번호로 사무실 네이버 카드에 붙임) · 현장 · 서비스 키 — 이름 · 전화번호는 빼고 보냄
-  const KEY_FIELDS = ["id", "no", "slot", "naverSlot", "qty", "product", "naverProduct", "status", "keys", "enteredAt", "outAt", "overPaid", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut", "visitEnd", "naverPending", "naverWhy", "plusT"];
+  const KEY_FIELDS = ["id", "no", "slot", "naverSlot", "qty", "qtyBooked", "qtyCut", "qtyAsk", "qtySrc", "qtyPicked", "product", "naverProduct", "status", "keys", "enteredAt", "outAt", "overPaid", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut", "visitEnd", "naverPending", "naverWhy", "plusT"];
   /** 현장 POS: 키 현황 (사무실로 보낼 것) — 오늘만 */
   function syncSnap() {
     const pick = (x, fs) => Object.fromEntries(fs.filter((k) => x[k] !== undefined).map((k) => [k, x[k]]));
@@ -6309,7 +6364,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   // 편집 칸을 내리면 왼쪽 줄 수 칸도 같이
   window.addEventListener("resize", () => { if (sheet.mode === "settings" && sheet.tab === "prints") tplFit(); }); // 편집 칸 글씨 크기 다시 (창 크기)
   document.addEventListener("change", (e) => { if (/^cap-(target|max|ceil|p1|p2|p3|boost)$/.test(e.target.id)) renderSheet(); if (e.target.id === "note-m") noteFlush(); }); // 숫자를 다 넣으면 계획 다시
-  window.__deskTest = { rent: { list: () => rentals, payload: () => rentPayload(), RS, dirty: () => rentDirty() }, fitTop, golden: () => golden, goldenHold: () => goldenHold, longBuy: (id) => { const h = holders().find((x) => x.id === id); return h ? longBuy(h) : null; }, ann: { pink: () => annPink(), text: (ks) => annExitText(ks), state: () => ANNS, ANN, stop: () => annStop(), due: () => annAutoDue(), tick: () => annAutoTick() }, sync: SYNC_T, projection, capWalkOut, notes: () => Object.fromEntries(NOTES), evLoadCfg, today: () => TODAY, useDueText, printSecs, PRINT_: () => PRINT, sealOf, withSeal, SEAL, evSample: (i) => evSample(i), sealClear: () => sealCache.clear(), EV_: () => EV, liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, bk: (id) => (bookings[TODAY] || []).find((b) => b.id === id), useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capRanges, capPlan, capRun, capApply, capTick, capMoving: () => capMoveN > 0, capTeamExtra, capState: () => JSON.parse(JSON.stringify(capState)), capLock: (ts) => { capState.locks = ts.slice(); saveCapState(); }, capKeysAt, returnKeys: (id, ks) => { const h = holders().find((x) => x.id === id); if (h) { returnKeys(h, ks); renderAll(); } }, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: (v) => enterText(v), formFor: (v) => ticketText(v), splitForm, joinForms, lastPrint: () => LASTPRINT, BC2_: () => BC2, holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, sheet, evOf: (b) => evOf(b),
+  window.__deskTest = { qtyPicks: () => qtyPicks, rent: { list: () => rentals, payload: () => rentPayload(), RS, dirty: () => rentDirty() }, fitTop, golden: () => golden, goldenHold: () => goldenHold, longBuy: (id) => { const h = holders().find((x) => x.id === id); return h ? longBuy(h) : null; }, ann: { pink: () => annPink(), text: (ks) => annExitText(ks), state: () => ANNS, ANN, stop: () => annStop(), due: () => annAutoDue(), tick: () => annAutoTick() }, sync: SYNC_T, projection, capWalkOut, notes: () => Object.fromEntries(NOTES), evLoadCfg, today: () => TODAY, useDueText, printSecs, PRINT_: () => PRINT, sealOf, withSeal, SEAL, evSample: (i) => evSample(i), sealClear: () => sealCache.clear(), EV_: () => EV, liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, bk: (id) => (bookings[TODAY] || []).find((b) => b.id === id), useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capRanges, capPlan, capRun, capApply, capTick, capMoving: () => capMoveN > 0, capTeamExtra, capState: () => JSON.parse(JSON.stringify(capState)), capLock: (ts) => { capState.locks = ts.slice(); saveCapState(); }, capKeysAt, returnKeys: (id, ks) => { const h = holders().find((x) => x.id === id); if (h) { returnKeys(h, ks); renderAll(); } }, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: (v) => enterText(v), formFor: (v) => ticketText(v), splitForm, joinForms, lastPrint: () => LASTPRINT, BC2_: () => BC2, holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, sheet, evOf: (b) => evOf(b),
     evLog: (from) => { const L = evLog(from); return { from: L.from, count: L.count, people: Object.fromEntries([...L.people].map(([k, p]) => [k, JSON.parse(JSON.stringify(p))])) }; },
     // 장부에 지난 방문 한 줄 넣기: o = { day, n(네이버 순번, 기본 = 지금 완료 수), base, st("안내" | "성공"), due, from(장부 · 기본 지금 이벤트), no }
     evsPayload: () => evsPayload(),

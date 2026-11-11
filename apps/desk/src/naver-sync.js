@@ -18,6 +18,30 @@ const SHORT_RE = /[숏솟]\s*타임/;
 const isKidsTicket = (name) => (/입장권/.test(name) || SHORT_RE.test(name)) && !/단체/.test(name);
 // 칸이 덜 떴는지 셀 때는 늘 있는 입장권 칸만 (숏타임 칸은 사장님이 열 때만 생겨 칸 수가 바뀜)
 const isBaseTicket = (name) => /입장권/.test(name) && !/단체/.test(name);
+/* 부분취소 (사장님 11/11 — 5장 예약 → 4장 부분취소 → 1장 입장인데 데스크 카드는 5장)
+   네이버는 부분취소를 예약현황 칸 숫자(확정 · 이용완료 · 잔여)에는 바로 반영하지만 예약 카드의 '수량'은 처음 결제한 수 그대로 보여 줌
+   → 칸(상품 · 시각 · 확정/이용완료)마다 카드 수량 합(sum)이 칸 숫자(n)보다 크면 그 차(cut = sum − n)가 부분취소된 장수
+   - 여러 장 산 카드(2장 이상)가 그 칸에 하나뿐이면 그 카드가 cut 장 취소 → { qty: 남은 장수, booked: 처음 수량, cut }
+   - 둘 이상이면 누구 것인지 모름 → 그 카드들에 { ask: { n, sum, cut } } (데스크가 '부분취소 확인' · 근무자가 실제 장수를 고름)
+   - 카드를 다 못 읽어 sum ≤ n 이면 손대지 않음 · 카드 배지가 다른 상태(신청 · 취소 등)면 셈에서 뺌
+   - 예약 상세정보를 읽은 카드(칸에 예약이 1건 · 또는 상세를 열어 봄)는 '환불정보'의 환불내역 장수(refund)가 정확한 답 → 그것을 먼저 (src "detail")
+     나머지 카드만 칸 숫자로 맞춤 (src "cell") */
+const kindOf = (st) => (/^(이용)?완료$/.test(st) ? "이용완료" : st === "확정" ? "확정" : st ? "기타" : "");
+function partialFix(cards, n, kind) {
+  const out = new Map();
+  const same = cards.filter((c) => { const k = kindOf(String(c.status || "").trim()); return !k || k === kind; });
+  const q = (c) => Number(c.qty) || 1;
+  const known = (c) => Number.isInteger(c.refund) && c.refund >= 0 && c.refund < q(c);
+  let rest = n;
+  for (const c of same) if (known(c)) { rest -= q(c) - c.refund; if (c.refund > 0) out.set(c.no, { qty: q(c) - c.refund, booked: q(c), cut: c.refund, src: "detail" }); }
+  const open = same.filter((c) => !known(c));
+  const sum = open.reduce((a, c) => a + q(c), 0), cut = sum - rest;
+  if (!(n > 0) || cut <= 0) return out;
+  const multi = open.filter((c) => q(c) >= 2);
+  if (multi.length === 1 && q(multi[0]) - cut >= 1) out.set(multi[0].no, { qty: q(multi[0]) - cut, booked: q(multi[0]), cut, src: "cell" });
+  else for (const c of multi) out.set(c.no, { ask: { n, sum: sum + (n - rest), cut } });
+  return out;
+}
 
 /** 네이버 예약관리 주소(https://partner.booking.naver.com/bizes/653244/...)에서 목록·현황 주소 만들기 */
 function naverUrls(anyUrl) {
@@ -201,11 +225,29 @@ class NaverSync {
     const got = new Map();
     for (let i = 0; i < 30; i++) {
       for (const c of (await this.read()).cards) if (c.no) got.set(c.no, c);
-      if (want > 0 && [...got.values()].reduce((a, c) => a + (Number(c.qty) || 1), 0) >= want) break;
+      // 장수가 칸 숫자와 딱 맞으면 그만 · 넘으면(부분취소 — 카드는 처음 수량) 끝까지 내려 모두 읽음 (누구 것인지 맞추려고 · 11/11)
+      if (want > 0 && [...got.values()].reduce((a, c) => a + (Number(c.qty) || 1), 0) === want) break;
       if (!(await this.moreCards())) break;
     }
     this.step(`${time} ${kind}: 카드 ${got.size}장`);
     return { ok: true, cards: [...got.values()] };
+  }
+  /** 부분취소 (11/11): 목록 카드를 하나씩 눌러 '예약 상세정보'의 환불정보(환불내역 X n)를 읽어 그 카드에 refund 로 붙임 · 다음 카드를 위해 칸을 다시 엶 */
+  async readRefunds(product, time, kind, cards, nos) {
+    for (const no of nos) {
+      this.step(`${time} 부분취소 확인 — 예약 상세 여는 중`);
+      const r = await this.call(`window.__naver.openCard(${JSON.stringify(no)})`).catch(() => null);
+      if (r && r.ok) {
+        for (let i = 0; i < 16; i++) {
+          await sleep(250);
+          const d = (await this.read()).cards;
+          if (d.length === 1 && d[0].no === no && d[0].refund != null) { const c = cards.find((x) => x.no === no); if (c) c.refund = d[0].refund; break; }
+        }
+      }
+      const o = await this.openSlot(product, time, kind); // 목록으로 돌아감 (닫고 칸을 다시 누름)
+      if (!o.ok) break;
+      for (let i = 0; i < 24 && !(await this.read()).cards.length; i++) await sleep(250);
+    }
   }
   /** opts.only = "14:00" 이면 그 시간 칸만 다시 열어 읽음 (기억한 카드도 무시) — 근무자가 시간 칸을 누를 때 */
   async loadDay(day, opts = {}) {
@@ -238,6 +280,9 @@ class NaverSync {
           warn.push(`${s.time} ${kind}`);
           continue; // 못 읽은 칸은 기억하지 않음 (다음에 다시)
         }
+        // 부분취소인데 누구 것인지 모르면(여러 장 산 카드가 둘 이상) 그 카드들의 상세를 열어 환불정보를 읽음 (최대 4장 · 못 읽으면 데스크가 근무자에게 물음)
+        const asks = [...partialFix(r.cards, n, kind).entries()].filter(([, f]) => f.ask).map(([no]) => no).slice(0, 4);
+        if (asks.length) await this.readRefunds(s.product, s.time, kind, r.cards, asks);
         cache.set(key, { count: n, time: s.time, product: s.product, status: kind === "확정" ? "확정" : "완료", cards: r.cards });
       }
     }
@@ -245,13 +290,16 @@ class NaverSync {
     if (opened) await this.act("window.__naver.closePanel()");
     const seen = new Set();
     const bookings = [];
-    for (const c of cache.values())
+    for (const c of cache.values()) {
+      const fix = partialFix(c.cards, c.count, c.status === "완료" ? "이용완료" : "확정"); // 부분취소 (11/11)
       for (const x of c.cards) {
         if (seen.has(x.no)) continue;
         seen.add(x.no);
-        bookings.push({ no: x.no, status: c.status, name: x.name, phone: x.phone, time: c.time, product: c.product, qty: x.qty, qtyText: x.qtyText, pay: x.pay, doneCount: x.doneCount, cancelCount: x.cancelCount,
+        const f = fix.get(x.no) || {};
+        bookings.push({ no: x.no, status: c.status, name: x.name, phone: x.phone, time: c.time, product: c.product, qty: f.qty || x.qty, qtyBooked: f.booked || null, qtyCut: f.cut || 0, qtyAsk: f.ask || null, qtySrc: f.src || "", qtyText: x.qtyText, pay: x.pay, doneCount: x.doneCount, cancelCount: x.cancelCount,
           proxy: !!x.proxy, visitor: x.visitor || "", unpaid: c.status === "확정" && !x.canComplete && !!x.canCancel && !/결제완료/.test(x.pay || "") }); // 대리예약 · 입금대기
       }
+    }
     return { ok: true, day, warn: warn.length ? `카드를 못 읽은 칸: ${warn.join(", ")}` : "", slots: slots.map((s) => ({ time: s.time, product: s.product, cap: s.avail + s.conf + s.done + s.apply, conf: s.conf + s.apply, done: s.done })), bookings };
   }
   /** 그날 이용완료한 입장권 예약만 { no, name, phone, time, qty, doneCount(카드 완료 n) } — 지난 방문 기록 읽기(재방문 간격 · 사장님 10/19)
@@ -518,4 +566,4 @@ class NaverSync {
   }
 }
 
-module.exports = { NaverSync, isKidsTicket, isBaseTicket, naverUrls };
+module.exports = { NaverSync, isKidsTicket, isBaseTicket, naverUrls, partialFix };

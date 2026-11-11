@@ -22,7 +22,7 @@
    - 이용완료는 두 단계 (현장 화면 10/6): 카드의 [이용완료] → 오른쪽이 '이용완료' 화면("이용완료 시 사용자에게 이용완료 알림이 발송됩니다.")으로 바뀜 → 맨 아래 초록 [이용완료]: window.confirm 이면 자동 확인, 화면 안 창이면 "하시겠습니까" 글자 옆 [확인] */
 
 function installNaverDriver() {
-  if (window.__naver && window.__naver.v === 12) return true;
+  if (window.__naver && window.__naver.v === 13) return true;
 
   const norm = (s) => String(s || "").replace(/\s+/g, "");
   const vis = (el) => !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== "hidden");
@@ -183,6 +183,22 @@ function installNaverDriver() {
     }
     return [null, 0];
   };
+  /* 부분취소 장수 (사장님 11/11 — 실제 예약 상세 화면): '결제/환불정보' → '환불정보' 아래 취소 건마다
+       "2026. 11. 11.(수) 오전 11:09 취소완료" · 결제상태 환불완료 · 환불내역 "[평일할인]4인 입장권(12,000X1)" · 환불금액 …
+     → '환불내역' 값의 "X n" 을 모두 더함 (X 가 없으면 1건 = 1장) · 결제 · 환불 정보가 없는 칸(목록 요약 카드)은 null = 모름 */
+  const refundOf = (c) => {
+    const all = norm(c.textContent);
+    if (!/원결제금액|환불정보|결제\/환불/.test(all)) return null;
+    let n = 0;
+    for (const e of [...c.querySelectorAll("*")].filter((x) => vis(x) && norm(x.textContent) === "환불내역" && ![...x.children].some((y) => norm(y.textContent) === "환불내역"))) {
+      const v = e.nextElementSibling || (e.parentElement && e.parentElement.nextElementSibling);
+      const t = v ? txt(v) : "";
+      if (!t) continue;
+      const m = t.match(/[X×x]\s*(\d+)\s*\)?\s*$/) || t.match(/[X×x]\s*(\d+)\s*\)/);
+      n += m ? +m[1] : 1;
+    }
+    return n;
+  };
   const readCard = (c) => {
     const [doneCount, cancelCount] = visitsOf(c);
     const badge = c.querySelector("[data-tst_booking_status]") || cls(c, "Summary__user-state") || leafs(c).find((e) => !e.closest("button, a") && /^(확정|완료|이용완료|취소|신청|노쇼)$/.test(norm(e.textContent)));
@@ -208,6 +224,7 @@ function installNaverDriver() {
       canCancel: clickables(c).some((b) => textOf(b) === "예약취소"),
       proxy: leafs(c).some((e) => norm(e.textContent) === "대리예약"), // 대리예약 스티커
       visitor: field(c, "방문자"), // "박소희(010-2785-4295)"
+      refund: refundOf(c), // 부분취소된 장수 (예약 상세의 환불정보 · 목록 카드면 null)
     };
   };
 
@@ -282,7 +299,16 @@ function installNaverDriver() {
   window.alert = () => {};
 
   window.__naver = {
-    v: 12,
+    v: 13,
+    /** 목록 카드의 손님 칸(예약번호 링크)을 눌러 그 예약의 '예약 상세정보'를 엶 — [이용완료] · [예약취소] 단추는 누르지 않음 (부분취소 환불정보를 읽으려고 · 11/11) */
+    openCard(no) {
+      const card = $$('[class*="List__contents-box"]').filter(vis).find((c) => field(c, "예약번호") === String(no));
+      if (!card) return { ok: false, why: "카드 없음" };
+      const t = card.querySelector(`a[data-tst_click_link="${String(no).replace(/[^0-9A-Za-z_-]/g, "")}"]`) || cls(card, "Summary__name") || cls(card, "Summary__user-area");
+      if (!t || t.closest("button") || /이용완료|예약취소/.test(textOf(t))) return { ok: false, why: "누를 곳 없음" };
+      t.click();
+      return { ok: true };
+    },
     read() {
       const page = cls(document, "Calendar__inner-contents") ? "calendar" : $$('a[class*="contents-user"]').length || cls(document, "BookingListView__root") ? "list" : "";
       const total = (document.body.innerText.match(/(\d+)\s*건\s*내려받기/) || [])[1];
