@@ -62,6 +62,9 @@
     ].concat(P.get("short") ? [
       { no: "1374100201", name: "숏손님", phone: "010-9090-1010", time: "10:00", product: 4, qty: 2, status: "확정", done: 3, cancel: 0 },
       { no: "1374100202", name: "숏완료", phone: "010-9090-2020", time: "10:00", product: 4, qty: 1, status: "완료", done: 5, cancel: 0 },
+    ] : []).concat(P.get("night21") ? [
+      { no: "1376300101", name: "밤손님가", phone: "010-8200-2001", time: "21:00", product: 0, qty: 2, status: "확정", done: 3, cancel: 0 },
+      { no: "1376300102", name: "밤손님나", phone: "010-8200-2002", time: "21:00", product: 0, qty: 1, status: "확정", done: 0, cancel: 0 },
     ] : []).concat(P.get("partial") ? [
       // 부분취소 (사장님 11/11): cut = 부분취소된 장수 — 카드 '수량'은 처음 그대로, 칸 숫자 · 잔여는 남은 장수
       { no: "1375200101", name: "부분취소가", phone: "010-8100-1001", time: "11:00", product: 0, qty: 5, cut: 4, status: "확정", done: 2, cancel: 0 },
@@ -121,7 +124,8 @@
   } else {
     const label = `${D.getFullYear()}. ${D.getMonth() + 1}. ${D.getDate()}. ${DOW[D.getDay()]}` + (P.get("range") ? " ~ 2026. 11. 4. 수" : "");
     const times = []; for (let h = 10; h <= 19; h++) times.push(`${String(h).padStart(2, "0")}:00`, `${String(h).padStart(2, "0")}:30`);
-    const has = (p, t) => (p === 0 && t < "18:00") || (p === 1 && t >= "18:00") || (p === 2 && t === "10:00") || (p === 4 && t === "10:00");
+    if (P.get("night21")) times.push("21:00"); // 21:00 회차 (사장님 11/12 — 이벤트로 무제한 상품에 21시 회차를 날마다 더함)
+    const has = (p, t) => (p === 0 && (t < "18:00" || (t === "21:00" && !!P.get("night21")))) || (p === 1 && t >= "18:00" && t <= "19:30") || (p === 2 && t === "10:00") || (p === 4 && t === "10:00");
     const btn = (title, n, cls) => `<button type="button" class="btn btn-xs calendar-btn ${cls}" title="${title}" data-act="${title}"><span><span class="StatusButton__text__Mw4v+ text">${title.slice(0, 2)}</span><span class="StatusButton__text__Mw4v+ text">${title.slice(2)}</span></span><span class="number">${n}</span></button>`;
     const cell = (p, t) => {
       if (!has(p, t)) return `<div class="Calendar__week-cell__ntFou Calendar__week-rest__4uV-Y"><div class="Calendar__week-cell-inner__tqaOB"></div></div>`;

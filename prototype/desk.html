@@ -908,7 +908,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     slotCap: 10,            // 네이버 시간대별 판매 수량 (체험용 — 실제는 네이버 값)
     // 네이버 예약 자동 불러오기: 09:50부터 매시 20분 · 50분 (마지막 입장 19:30 전 19:20까지)
     //   그 사이에 들어온 예약(예: 09:58에 10:00 예약)은 근무자가 [새로고침]으로 바로 불러옴
-    naverAuto: { from: "09:50", until: "19:20", at: [20, 50] },
+    naverAuto: { from: "09:50", until: "19:20", at: [20, 50] }, // 오늘 더 늦은 회차가 있으면 그 회차 10분 전까지 (autoUntil · 11/12)
     // 입금대기 예약 자동 취소 (사장님 10/8): 네이버를 불러올 때마다(30분마다) 결제를 안 한 예약([이용완료] 없이 [예약취소]만)이
     //   지금부터 2시간 안 타임(이미 시작한 지금 타임 포함)에 있으면 [예약취소]. 결제한 예약은 절대 누르지 않음 (취소 직전에 카드를 다시 읽어 확인)
     unpaidCancel: { on: true, within: 120 },
@@ -1013,10 +1013,15 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   let lastRefresh = APP ? null : toMin("13:50");
   let todayAt = lastRefresh; // 오늘 예약을 마지막으로 불러온 시각 (자동 불러오기 기준)
   let autoTry = null;        // 자동 불러오기를 마지막으로 시도한 시각 (실패하면 5분 뒤 다시)
+  /** 자동 불러오기 끝 시각 (분): 기본 19:20 · 오늘 네이버에 더 늦은 회차(이벤트 21:00 등 — 사장님 11/12)가 있으면 그 회차 10분 전까지 */
+  function autoUntil() {
+    const late = Object.entries((typeof naverSlots === "object" && naverSlots[TODAY]) || {}).filter(([, o]) => o.cap || o.conf || o.done).map(([t]) => Number(t));
+    return Math.max(toMin(RULES.naverAuto.until), late.length ? Math.max(...late) - 10 : 0);
+  }
   /** 자동 불러오기 시각 목록 (분) */
   const autoTimes = () => {
     const a = RULES.naverAuto, out = [];
-    for (let m = toMin(a.from); m <= toMin(a.until); m++) if (a.at.includes(m % 60)) out.push(m);
+    for (let m = toMin(a.from); m <= autoUntil(); m++) if (a.at.includes(m % 60)) out.push(m);
     return out;
   };
   /** 지금(m)까지 지난 가장 최근 자동 시각 · 다음 자동 시각 (없으면 null) */
@@ -1024,6 +1029,16 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   const autoNext = (m) => autoTimes().find((t) => t > m) ?? null;
   let viewDay = TODAY;
   let selSlot = APP ? Math.min(19 * 60 + 30, Math.max(600, Math.ceil((now + 5) / 30) * 30)) : toMin("14:00");
+  /* 기본 칸(10:00 ~ 19:30) 뒤 회차 (사장님 11/12 — 이벤트로 무제한 상품에 21:00 회차): 시간표 줄은 네이버 칸대로 생기지만
+     켤 때 고르는 칸이 19:30 에 머물러 21:00 손님 카드가 안 보였음 → 오늘 네이버를 읽은 뒤 19:30 이 지났으면 지금 다음 회차로 (근무자가 시간 칸을 누르기 전까지) */
+  let selAuto = APP;
+  function selLate() {
+    if (!selAuto || viewDay !== TODAY) return;
+    const want = Math.ceil((now + 5) / 30) * 30;
+    if (want <= 19 * 60 + 30) return;
+    const ds = daySlots(TODAY), t = ds.find((s) => s >= want) ?? ds[ds.length - 1];
+    if (t != null) selSlot = t;
+  }
 
   // ── 네이버 예약 (예시) ────────────────────────────
   // 날짜별 예약 목록. 오늘 것은 정해 두고, 다른 날은 예시로 만들어 냄
@@ -1228,6 +1243,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     if (day === TODAY && !OFFICE) setTimeout(unpaidSweep, 500); // 입금대기 예약 자동 취소 (사장님 10/8)
     bcScan++; // 쓰리아웃 자동 전액 취소: 실패한 예약은 다음 네이버 불러오기 때 다시 (사장님 10/26)
     if (!only) { lastRefresh = now; if (day === TODAY) todayAt = now; }
+    if (day === TODAY && !only) selLate();
     renderAll();
     if (loud) toast(only ? `${only} 예약 ${r.bookings.filter((b) => b.time === only).length}건 다시 불러옴` : `네이버 예약 ${r.bookings.length}건 불러옴`);
   }
@@ -3077,7 +3093,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
             <li>열쇠 색: 예약 입장시간부터 1시간 50분까지 검정 → 2시간까지 분홍 → 그 뒤 빨강</li>
             <li>초과요금: 1:50:01부터 카운트, 2:00:00 정각 5,000원 · 10분이 꽉 찰 때마다 5,000원 × 열쇠 수</li>
             <li>골든벨: 1시간 50분 제한이 있는 날 ${RULES.golden.from} 이후 안에 있는 열쇠 ${RULES.golden.keys}개 이하 · 남은 예약 ${RULES.golden.rest}장 이하 — 둘 다 되면 알림창 · 그때부터 모든 손님 무제한${golden ? ` (오늘 ${hm(golden.at)} 울림)` : ` (지금 열쇠 ${holders().reduce((a, h) => a + h.keys.length, 0)}개 · 남은 예약 ${restBooked()}장)`}</li>
-            <li>네이버 예약 자동 불러오기: ${RULES.naverAuto.from}부터 매시 ${RULES.naverAuto.at.join("분 · ")}분 (${RULES.naverAuto.until}까지) · 그 사이에 들어온 예약은 [새로고침]</li>
+            <li>네이버 예약 자동 불러오기: ${RULES.naverAuto.from}부터 매시 ${RULES.naverAuto.at.join("분 · ")}분 (${hm(autoUntil())}까지 — 기본 ${RULES.naverAuto.until} · 21:00 같은 늦은 회차가 있는 날은 그 회차 10분 전까지) · 그 사이에 들어온 예약은 [새로고침]</li>
           </ul>
 `;
         return { html };
@@ -5003,7 +5019,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     time(btn) { now += Number(btn.dataset.min); renderAll(); autoLoad(); if (sheet.mode === "key") renderSheet(); },
     day(btn) { viewDay = shiftDay(viewDay, Number(btn.dataset.d)); renderAll(); },
     // 시간 칸을 누르면 그 시간만 네이버에서 다시 불러옴 (전체는 위의 [새로고침])
-    slot(btn) { selSlot = Number(btn.dataset.s); renderAll(); if (APP) loadNaver(viewDay, false, hm(selSlot)); },
+    slot(btn) { selSlot = Number(btn.dataset.s); selAuto = false; renderAll(); if (APP) loadNaver(viewDay, false, hm(selSlot)); },
     openRes(el) { openSheet({ mode: "enter", id: el.dataset.id, keys: [] }); },
     pickKey(btn) {
       const k = Number(btn.dataset.k), b = findB(sheet.id), need = partyNeed(b);
