@@ -303,6 +303,18 @@ class NaverSync {
     }
     return { ok: true, day, warn: warn.length ? `카드를 못 읽은 칸: ${warn.join(", ")}` : "", slots: slots.map((s) => ({ time: s.time, product: s.product, cap: s.avail + s.conf + s.done + s.apply, conf: s.conf + s.apply, done: s.done })), bookings };
   }
+  /** 칸 숫자만 (카드는 안 엶 · 가벼움) — 수량 관찰 기록 (사장님 11/13: 사장님이 직접 수량을 조절하는 날을 5분마다 남겨 배움) */
+  async readCells(day) {
+    let g = await this.goView("calendar");
+    if (!g.ok) return g;
+    await this.tidy();
+    g = await this.goDate(day);
+    if (!g.ok) return g;
+    const slots = g.state.slots.filter((s) => this.isTicket(s.product));
+    const bad = this.cellCheck(day, slots.filter((s) => this.isBase(s.product)).length);
+    if (bad) return { ok: false, partial: true, why: bad };
+    return { ok: true, day, slots: slots.map((s) => ({ time: s.time, product: s.product, cap: s.avail + s.conf + s.done + s.apply, conf: s.conf + s.apply, done: s.done })) };
+  }
   /** 그날 이용완료한 입장권 예약만 { no, name, phone, time, qty, doneCount(카드 완료 n) } — 지난 방문 기록 읽기(재방문 간격 · 사장님 10/19)
       [이용완료] 칸만 열고(확정은 안 엶) 기억(days)에 안 남김 → 200일을 읽어도 메모리가 늘지 않음 · 못 읽은 칸이 있으면 warn */
   async loadDone(day) {

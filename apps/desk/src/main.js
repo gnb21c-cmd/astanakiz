@@ -420,6 +420,30 @@ ipcMain.handle("naver:load", nwrap((day, only) => naver.loadDay(day, { only }), 
 // 두 PC 연결 (11/06): 사무실 PC 는 네이버를 읽기만 — 이용완료 · 판매 수량 · 취소는 현장 POS 만
 const posOnly = (h) => (e, ...a) => (RUN_ROLE === "office" ? { ok: false, why: "사무실 PC 는 네이버를 읽기만 해요 (현장 POS 에서)" } : h(e, ...a));
 ipcMain.handle("naver:complete", posOnly(nwrap((b) => naver.complete(b))));
+ipcMain.handle("naver:cells", posOnly(nwrap((day) => naver.readCells(day), 60000))); // 수량 관찰 기록 (11/13): 칸 숫자만 · 카드는 안 엶
+/* 수량 관찰 기록 (사장님 11/13 — 평일에 자동조절을 끄고 직접 수량을 조절하는 날을 배우려고)
+   데스크가 5분마다 네이버 칸 숫자(회차당 수량 · 확정 · 완료 · 잔여)와 그때 열쇠 현황을 보냄 → 바탕화면 '아스타나키즈-수량관찰/수량관찰-날짜.csv' 에 한 줄씩
+   손님 이름 · 전화번호 없음 (숫자만) · 사장님이 그날 밤 파일을 보내 주면 조절 방식을 배움 */
+const CW_HEAD = "날짜,시각,회차,상품,판매수량,확정,완료,잔여,바뀜,안에있는열쇠,빈열쇠,현장판매누적,현장가능,수량자동조절";
+const csvCell = (v) => { const t = String(v == null ? "" : v); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+ipcMain.handle("capwatch:add", (_e, rec) => {
+  if (RUN_ROLE === "office") return { ok: false, why: "사무실 PC 는 기록하지 않아요" };
+  const day = String((rec && rec.day) || ""), at = String((rec && rec.at) || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !/^\d{2}:\d{2}$/.test(at) || !Array.isArray(rec.rows) || rec.rows.length > 80) return { ok: false, why: "모양이 틀림" };
+  const n = (x) => (Number.isFinite(+x) ? Math.round(+x) : "");
+  const d = rec.desk || {};
+  const lines = rec.rows.map((r) => [day, at, String(r.t || "").slice(0, 5), String(r.product || "").slice(0, 40), n(r.cap), n(r.conf), n(r.done), n(r.left), String(r.chg || "").slice(0, 12), n(d.inside), n(d.free), n(d.walk), n(d.walkable), d.auto ? "켜짐" : "꺼짐"].map(csvCell).join(","));
+  try {
+    const dir = path.join(app.getPath("desktop"), "아스타나키즈-수량관찰");
+    fs.mkdirSync(dir, { recursive: true });
+    const f = path.join(dir, `수량관찰-${day}.csv`);
+    if (!fs.existsSync(f)) fs.writeFileSync(f, "\ufeff" + CW_HEAD + "\r\n");
+    fs.appendFileSync(f, lines.join("\r\n") + "\r\n");
+    return { ok: true, file: f };
+  } catch (err) {
+    return { ok: false, why: `파일을 못 씀: ${err.message || err}` };
+  }
+});
 ipcMain.handle("naver:setCap", posOnly(nwrap((c) => naver.setCap(c))));
 ipcMain.handle("naver:cancel", posOnly(nwrap((b) => naver.cancel(Object.assign({}, b, { paidOk: false }))))); // 입금대기 예약 자동 취소 { day, time, product, no, qty } // 판매 수량 자동 조절 { day, product, time, n }
 ipcMain.handle("naver:cancelPaid", posOnly(nwrap((b) => naver.cancelPaid(b)))); // BC 쓰리아웃 자동 전액 취소 (전액환불을 고른 뒤 [예약 취소] · 사장님 10/26)

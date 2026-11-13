@@ -3108,6 +3108,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
         }).join("");
         const html = `
           <div class="field setcard plain"><span class="label">매일 재고 열기 <span class="help">기준의 상품 · 기간 · 재고로 네이버 예약상품 날짜를 열어요</span></span><div id="st-row" class="field">${stRow()}</div></div>
+          <div class="field setcard plain"><span class="label">수량 관찰 기록 <span class="help">사장님이 직접 수량을 조절하는 날 — 5분마다 남김 (11/13)</span></span><div id="cw-row" class="field">${cwRow()}</div></div>
           <div class="setcard plain stack">
           <div class="field"><span class="label">판매 수량 자동조절</span><label class="chk"><input type="checkbox" id="cap-on" ${A.on ? "checked" : ""}> <b>매시 5 · 15 · 25 · 35 · 45 · 55분에 네이버 판매 수량 자동 조절</b> <span class="help">(시간제인 날: 성수기 · 휴일 기본 · 그날만 바꾸려면 맨 위 [오늘 수량조절])</span></label>
             <div class="help longhelp" data-q="수량 자동조절이란">미리 예상하지 않고 <b>지금까지 들어온 예약만 보고</b> 조금씩 바꿔요. 처음엔 모든 타임 ${RULES.slotCap}장(네 타임 합 ${A.target}). <b>곧 다가오는 타임이 매진</b>이면 한 장 더(10분에 한 장 · 최대 ${A.max}) — 그만큼 뒤 3타임 중 <b>예약이 가장 적은 타임</b>에서 한 장 줄여 네 타임 합은 그대로. 늘린 자리가 안 팔리고 그 타임이 시작하면 줄였던 타임에 돌려줘요. 뒤 3타임이 모두 1순위면 줄이지 않고 <b>여러 장 산 팀</b>(같은 이름 · 전화번호는 합침 · 2장 2건 또는 3장 1건마다 한 장)만큼 늘리고, 그 3타임은 일찍 반납한 열쇠가 생길 때까지 더 바꾸지 않아요. 뒤가 모두 매진이면 최대 11까지만. <b>저녁 몰림 시간</b>(${esc(A.boost || "")})은 곧 다가오지 않아도 매진이면 ${A.max} 넘게 늘리고, 17:00 ~ 18:30 · 18:00 ~ 19:30 처럼 네 타임 합이 ${A.target}을 넘지 않게 3순위 타임에서 줄여요. 늘리기 전에 그 손님이 있는 동안 열쇠 ${RULES.keys}개가 모자라지 않는지 봐요. 현장 판매는 같은 셈으로 초록(그 수만큼) · 빨강. 비수기 평일은 하지 않아요.</div>
@@ -4435,6 +4436,50 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     focusFirst();
   }
 
+  // ── 수량 관찰 기록 (사장님 11/13) ─────────────────────
+  /* 평일에 자동조절을 끄고 사장님이 직접 네이버 수량을 조절하는 날 — 어떻게 바꾸는지 배우려고 5분마다 기록
+     - 네이버 칸 숫자만 읽음(카드는 안 엶 · 가벼움): 회차당 수량 · 확정 · 완료 · 잔여 + 앞 기록과 달라진 수량(10→12)
+     - 그때 데스크: 안에 있는 열쇠 · 빈 열쇠 · 현장 판매 누적 · 현장 가능 · 수량 자동조절 켜짐/꺼짐
+     - 현장 POS 바탕화면 '아스타나키즈-수량관찰/수량관찰-날짜.csv' (손님 정보 없음) · 09:50 ~ 그날 마지막 회차까지 · 운영 설정 → 네이버 설정에서 끄기 */
+  const CW = { on: true, lastM: -1, n: 0, last: null, prev: {}, busy: false };
+  const CW_APP = () => APP && !!(window.desk && window.desk.naver && window.desk.naver.cells && window.desk.capWatch);
+  if (CW_APP() && window.desk.config) window.desk.config.get().then((c) => { const v = c && c.capWatch; if (v && v.on === false) CW.on = false; }).catch(() => {});
+  const cwShort = (p) => String(p || "").replace(/\s*입장권$/, "").split(" / ")[0];
+  function cwTick() {
+    if (!CW_APP() || OFFICE || !CW.on || CW.busy || !stateReady || now % 5 !== 0 || CW.lastM === now) return;
+    if (now < toMin(RULES.naverAuto.from) || now > autoUntil() + 10) return;
+    CW.lastM = now;
+    cwRecord();
+  }
+  async function cwRecord() {
+    CW.busy = true;
+    const at = hm(now);
+    try {
+      const r = await window.desk.naver.cells(TODAY).catch((e) => ({ ok: false, why: String(e) }));
+      if (!r || !r.ok) { CW.last = { at, ok: false, why: (r && r.why) || "네이버를 못 읽음" }; return; }
+      const rows = r.slots.slice().sort((a, b) => a.time.localeCompare(b.time) || a.product.localeCompare(b.product)).map((x) => {
+        const k = `${x.time}|${x.product}`, was = CW.prev[k];
+        CW.prev[k] = x.cap;
+        return { t: x.time, product: cwShort(x.product), cap: x.cap, conf: x.conf, done: x.done, left: Math.max(0, x.cap - x.conf - x.done), chg: was != null && was !== x.cap ? `${was}→${x.cap}` : "" };
+      });
+      const pj = projection();
+      const desk = { inside: holders().reduce((a, h) => a + h.keys.length, 0), free: freeKeys().length, walk: walkTickets(TODAY), walkable: pj.base, auto: capToday() };
+      const w = await window.desk.capWatch.add({ day: TODAY, at, rows, desk }).catch((e) => ({ ok: false, why: String(e) }));
+      CW.n += w && w.ok ? 1 : 0;
+      CW.last = { at, ok: !!(w && w.ok), why: (w && w.why) || "", changes: rows.filter((x) => x.chg).map((x) => `${x.t} ${x.chg}`) };
+    } finally {
+      CW.busy = false;
+      const el = $("cw-row"); if (el && sheet.mode === "settings" && sheet.tab === "naver") el.innerHTML = cwRow();
+    }
+  }
+  function cwRow() {
+    const L = CW.last;
+    const st = !CW_APP() ? "체험판: 설치한 앱(현장 POS)에서 기록해요" : OFFICE ? "사무실 PC 는 기록하지 않아요 (현장 POS 가 기록)" : !CW.on ? "꺼짐" : L ? `오늘 ${CW.n}번 · 마지막 ${L.at} ${L.ok ? (L.changes.length ? `바뀐 수량 ${L.changes.join(", ")}` : "그대로") : `못 함: ${L.why}`}` : "다음 5분에 시작";
+    return `<div class="btns" style="align-items:center"><button type="button" class="svswitch ${CW.on ? "on" : ""}" role="switch" aria-checked="${CW.on}" data-act="cwToggle" ${CW_APP() && !OFFICE ? "" : "disabled"}><span class="knob"></span><b>수량 관찰 기록 ${CW.on ? "켜짐" : "꺼짐"}</b></button></div>
+      <span class="help">5분마다 네이버 칸 숫자(판매 수량 · 확정 · 완료 · 잔여)와 열쇠 현황을 현장 POS 바탕화면 <b>'아스타나키즈-수량관찰'</b> 폴더에 (손님 정보 없음) — 사장님이 직접 조절한 날의 방식을 배우려고</span>
+      <span class="help ${L && !L.ok ? "evwarn" : ""}" id="cw-text">${esc(st)}</span>`;
+  }
+
   // ── 네이버 재고 자동 오픈 (사장님 10/20) ─────────────────────
   /* 매일 오늘 + 30일 날짜를 두 상품(평일 무제한 / 휴일 1시간 50분 · 야간자유) 모두 회차마다 재고 10개로 — 앱 본체(main.js stockTick · naver-stock.js)가
      10:30 → 실패하면 12:00 → 16:00 → 20:20 에 (어느 때든 성공하면 그날 남은 것은 안 함). 1.54: 확인하지 않고 바로 [재고수정] (이미 넣은 날도 10개로)
@@ -4901,6 +4946,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     if (!OFFICE) { // 사무실 PC 는 그 밖의 자동 일 없음 (현장 POS 가 함)
     svTick(); // 설문 누적 20:00 보고
     evsTick(); // 이벤트 입장 수 20:00 보고 (설문과 같이 · 설문이 없어도)
+    cwTick(); // 수량 관찰 기록 (5분마다 · 11/13)
     rentTick(); // 대관 기록 → 보고 앱 (바뀌면 바로 · 실패하면 10분 뒤)
     liveTick(); // 폰 실시간 현황 (1분마다 · 바뀌면 5초 안에)
     hvTick(); // 재방문 간격 20:00 보고 · 지난 기록 읽기 진행
@@ -5223,6 +5269,8 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     // [이벤트 입장] (사장님 10/21): 결제 없이 — 나머지는 [결제 완료 · 열쇠 등록]과 같음 (열쇠 · 입장권 · 설문 · 인원) · 총 판매수에는 안 셈
     walkEvent() { if (!sheet.svc) walkReg(WEV.name); },
     evsSendNow() { evsSend("manual"); },
+    // 수량 관찰 기록 (11/13)
+    cwToggle() { CW.on = !CW.on; if (window.desk && window.desk.config) window.desk.config.set({ capWatch: { on: CW.on } }); const el = $("cw-row"); if (el) el.innerHTML = cwRow(); toast(`수량 관찰 기록 ${CW.on ? "켬 — 5분마다 남겨요" : "끔"}`); },
     // 부분취소 (사장님 11/11): 누구 것인지 모를 때 근무자가 실제 장수를 고름
     qtyPick(btn) {
       const b = findB(btn.dataset.id), n = Number(btn.dataset.n);
@@ -6388,7 +6436,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   // 편집 칸을 내리면 왼쪽 줄 수 칸도 같이
   window.addEventListener("resize", () => { if (sheet.mode === "settings" && sheet.tab === "prints") tplFit(); }); // 편집 칸 글씨 크기 다시 (창 크기)
   document.addEventListener("change", (e) => { if (/^cap-(target|max|ceil|p1|p2|p3|boost)$/.test(e.target.id)) renderSheet(); if (e.target.id === "note-m") noteFlush(); }); // 숫자를 다 넣으면 계획 다시
-  window.__deskTest = { qtyPicks: () => qtyPicks, rent: { list: () => rentals, payload: () => rentPayload(), RS, dirty: () => rentDirty() }, fitTop, golden: () => golden, goldenHold: () => goldenHold, longBuy: (id) => { const h = holders().find((x) => x.id === id); return h ? longBuy(h) : null; }, ann: { pink: () => annPink(), text: (ks) => annExitText(ks), state: () => ANNS, ANN, stop: () => annStop(), due: () => annAutoDue(), tick: () => annAutoTick() }, sync: SYNC_T, projection, capWalkOut, notes: () => Object.fromEntries(NOTES), evLoadCfg, today: () => TODAY, useDueText, printSecs, PRINT_: () => PRINT, sealOf, withSeal, SEAL, evSample: (i) => evSample(i), sealClear: () => sealCache.clear(), EV_: () => EV, liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, bk: (id) => (bookings[TODAY] || []).find((b) => b.id === id), useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capRanges, capPlan, capRun, capApply, capTick, capMoving: () => capMoveN > 0, capTeamExtra, capState: () => JSON.parse(JSON.stringify(capState)), capLock: (ts) => { capState.locks = ts.slice(); saveCapState(); }, capKeysAt, returnKeys: (id, ks) => { const h = holders().find((x) => x.id === id); if (h) { returnKeys(h, ks); renderAll(); } }, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: (v) => enterText(v), formFor: (v) => ticketText(v), splitForm, joinForms, lastPrint: () => LASTPRINT, BC2_: () => BC2, holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, sheet, evOf: (b) => evOf(b),
+  window.__deskTest = { CW, qtyPicks: () => qtyPicks, rent: { list: () => rentals, payload: () => rentPayload(), RS, dirty: () => rentDirty() }, fitTop, golden: () => golden, goldenHold: () => goldenHold, longBuy: (id) => { const h = holders().find((x) => x.id === id); return h ? longBuy(h) : null; }, ann: { pink: () => annPink(), text: (ks) => annExitText(ks), state: () => ANNS, ANN, stop: () => annStop(), due: () => annAutoDue(), tick: () => annAutoTick() }, sync: SYNC_T, projection, capWalkOut, notes: () => Object.fromEntries(NOTES), evLoadCfg, today: () => TODAY, useDueText, printSecs, PRINT_: () => PRINT, sealOf, withSeal, SEAL, evSample: (i) => evSample(i), sealClear: () => sealCache.clear(), EV_: () => EV, liveSnap, LIVE, svcKeys: () => svcKeys, extScan, extFor: (id) => { const h = holders().find((x) => x.id === id || x.name === id); return h ? extFor(h) : null; }, addBooking: (...a) => { const b = booking(...a); return b.id; }, bk: (id) => (bookings[TODAY] || []).find((b) => b.id === id), useOf, holders2: () => holders().map((h) => ({ id: h.id, name: h.name, keys: h.keys.slice(), slot: h.slot, end: extEnd(h) })), planCaps, capRanges, capPlan, capRun, capApply, capTick, capMoving: () => capMoveN > 0, capTeamExtra, capState: () => JSON.parse(JSON.stringify(capState)), capLock: (ts) => { capState.locks = ts.slice(); saveCapState(); }, capKeysAt, returnKeys: (id, ks) => { const h = holders().find((x) => x.id === id); if (h) { returnKeys(h, ks); renderAll(); } }, capLog, capDemo, capMix, capNoHist, capForecast, capVisible, dayType, capPresent, RULES, walkin, setNow: (m) => { now = m; renderAll(); }, keyVals, receiptLines, escposParts, form: (v) => enterText(v), formFor: (v) => ticketText(v), splitForm, joinForms, lastPrint: () => LASTPRINT, BC2_: () => BC2, holders: () => holders(), LINE_COLS, receiptDocs, sendPrint, PRINT, renderSheet, sheet, evOf: (b) => evOf(b),
     evLog: (from) => { const L = evLog(from); return { from: L.from, count: L.count, people: Object.fromEntries([...L.people].map(([k, p]) => [k, JSON.parse(JSON.stringify(p))])) }; },
     // 장부에 지난 방문 한 줄 넣기: o = { day, n(네이버 순번, 기본 = 지금 완료 수), base, st("안내" | "성공"), due, from(장부 · 기본 지금 이벤트), no }
     evsPayload: () => evsPayload(),

@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld("desk", {
   naver: {
     load: (day, only) => ipcRenderer.invoke("naver:load", day, only), // only = "14:00" 이면 그 시간 칸만
     complete: (b) => ipcRenderer.invoke("naver:complete", b),
+    cells: (day) => ipcRenderer.invoke("naver:cells", day), // 수량 관찰 기록 (11/13): 칸 숫자만
     setCap: (c) => ipcRenderer.invoke("naver:setCap", c),
     cancel: (b) => ipcRenderer.invoke("naver:cancel", b), // 입금대기 예약 취소 // 판매 수량 바꾸기 { day, product, time, n }
     cancelPaid: (b) => ipcRenderer.invoke("naver:cancelPaid", b), // BC 쓰리아웃 자동 전액 취소 (전액환불을 고른 뒤 [예약 취소] · 사장님 10/26)
@@ -57,6 +58,7 @@ contextBridge.exposeInMainWorld("desk", {
   // 이벤트 입장 수 (사장님 10/21): 매일 20:00 그날 현장 [이벤트 입장] 수를 보고 시스템으로 → { ok, code, why }
   eventStat: { send: (job) => ipcRenderer.invoke("event:send", job) },
   rental: { send: (job) => ipcRenderer.invoke("rental:send", job) }, // 대관 → 보고 앱 (11/10)
+  capWatch: { add: (rec) => ipcRenderer.invoke("capwatch:add", rec) }, // 수량 관찰 기록 (11/13)
   // 네이버 재고 자동 오픈 (사장님 10/20): 매일 오늘 + 30일 · 10:30 / 12:00 / 16:00 / 20:20 · [확인만] dry · [지금 한 번]
   stock: {
     run: (opts) => ipcRenderer.invoke("stock:run", opts),
