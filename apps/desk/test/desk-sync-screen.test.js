@@ -157,3 +157,46 @@ test("반대편 PC 에서 바꾼 설정이 화면에 바로: 프린트물 설정
     await browser.close();
   }
 });
+
+/* 맨 위 표시가 까닭을 그대로 (사장님 11/13 — 사무실 PC 에 '키 현황 기다림'만 떠서 무엇이 빠졌는지 몰랐음)
+   보고 열쇠가 없거나 연결 코드가 없으면 연결이 시작도 안 됨 · 보고 클라우드 규칙(deskSync)이 없으면 403 · 현장 POS 글이 한 번도 없으면 현장 쪽 */
+test("두 PC 연결 표시: 보고 열쇠 없음 · 연결 코드 없음 · 규칙 거절(403) · 현장 POS 소식 없음 · 현장 POS 도 까닭 표시", async () => {
+  const browser = await launch();
+  try {
+    const chip = async (role, info, st, waitMs = 0) => {
+      const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+      const page = await ctx.newPage();
+      await page.clock.install({ time: new Date("2026-11-13T15:12:00") });
+      await page.addInitScript(([role, info, st]) => {
+        const subs = {};
+        window.desk = {
+          naver: { load: async (day) => ({ ok: true, day, slots: [], bookings: [] }), complete: async () => ({ ok: true }) },
+          state: { load: () => null, save: () => {} },
+          config: { get: async () => ({ build: "2.22" }), set: async () => ({ ok: true }) },
+          sync: { role: () => role, get: async () => Object.assign({ role, runRole: role, build: "2.22", status: st }, info), set: async () => ({ ok: true }), relaunch: () => {}, snap: () => {}, on: (ch, fn) => { subs[ch] = fn; } },
+        };
+        window.__syncSubs = subs;
+      }, [role, info, st]);
+      const errs = [];
+      page.on("pageerror", (e) => errs.push(e.message));
+      await page.goto(DESK);
+      await page.clock.runFor(1500 + waitMs);
+      const r = { label: await page.getAttribute("#syncchip", "aria-label"), hidden: await page.isHidden("#syncchip"), errs };
+      await ctx.close();
+      return r;
+    };
+    const ready = { ready: true, why: "", getWhy: "", putWhy: "", peer: { build: "", at: "", seen: 0, active: false }, lastGet: 1, lastPut: 1 };
+    assert.strictEqual((await chip("office", { hasKey: false }, { ready: false })).label, "보고 열쇠 넣어 주세요");
+    assert.strictEqual((await chip("office", { hasKey: true }, { ready: false })).label, "연결 코드 넣어 주세요");
+    assert.strictEqual((await chip("office", { hasKey: true }, Object.assign({}, ready, { getWhy: "열쇠나 모양이 틀림 (403) — 보고 시스템 규칙에 deskSync 가 있는지" }))).label, "보고 클라우드 규칙 확인");
+    assert.strictEqual((await chip("office", { hasKey: true }, ready)).label, "사무실 PC 키 현황 기다림", "켠 바로 뒤는 기다림");
+    const silent = await chip("office", { hasKey: true }, ready, 31000);
+    assert.deepStrictEqual([silent.label, silent.errs], ["현장 POS 소식 없음", []], "30초가 지나도 현장 POS 글이 없으면 현장 쪽");
+    // 현장 POS: 예전엔 문제가 있어도 표시가 숨어 있었음
+    assert.strictEqual((await chip("pos", { hasKey: false }, { ready: false })).label, "보고 열쇠 넣어 주세요");
+    assert.strictEqual((await chip("pos", { hasKey: true }, { ready: false })).label, "연결 코드 만들어 주세요");
+    assert.strictEqual((await chip("pos", { hasKey: true }, ready)).hidden, true, "준비됐고 사무실이 꺼져 있으면 숨김 (그대로)");
+  } finally {
+    await browser.close();
+  }
+});

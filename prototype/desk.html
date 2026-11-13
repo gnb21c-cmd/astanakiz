@@ -931,7 +931,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   const SYNC = APP && window.desk.sync ? window.desk.sync : null;
   const SYNC_ROLE = (() => { try { return (SYNC && SYNC.role()) || ""; } catch (e) { return ""; } })();
   let OFFICE = SYNC_ROLE === "office"; // 체험판 '사무실 PC 화면 미리 보기'에서도 켬
-  const SYNCV = { st: null, info: null, snapAt: 0, snapText: "", dayOff: "", last: null, demo: false, stale: false, sentAt: 0, lastSnap: "" };
+  const SYNCV = { t0: Date.now(), st: null, info: null, snapAt: 0, snapText: "", dayOff: "", last: null, demo: false, stale: false, sentAt: 0, lastSnap: "" };
   /* 안내 방송 (사장님 11/07) — 설정(두 PC 가 같이) · 이 PC 목소리 · 지금 방송 상태 (아래 announce) */
   const ANN = { on: true, auto: true, again: 5, chime: true, bgm: true, golden: true, repeat: 1, rate: 0.95, volume: 1,
     exitText: "퇴장 안내드립니다. {열쇠} 고객님 이용 시간이 끝났습니다. 다음 손님 입장을 위해 열쇠 반납해 주세요.",
@@ -6107,6 +6107,12 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     if (SYNCV.demo) return { a: "사무실 미리 보기", b: "누르면 끝", cls: "ok", title: "체험판: 사무실 PC 에서 보이는 화면 — 근무자 일은 막히고 키 현황은 현장 POS 에서 와요" };
     if (!SYNC_ROLE) return null;
     const bad = st && (st.why || st.getWhy || st.putWhy);
+    /* 까닭을 그대로 (사장님 11/13 — 사무실 PC 에 '키 현황 기다림'만 떠서 무엇이 빠졌는지 몰랐음: 보고 열쇠 · 연결 코드가 없으면 연결이 시작도 안 됨) */
+    const I = SYNCV.info;
+    const why = I && !I.hasKey ? { a: "보고 열쇠", b: "넣어 주세요", cls: "bad", title: "운영 설정 → 기타 → 보고 앱 '보고 열쇠' — 현장 POS 와 같은 열쇠 (두 PC 연결은 보고 열쇠 + 연결 코드가 둘 다 있어야 시작해요)" }
+      : st && st.ready === false ? { a: "연결 코드", b: SYNC_ROLE === "pos" ? "만들어 주세요" : "넣어 주세요", cls: "bad", title: SYNC_ROLE === "pos" ? "운영 설정 → 두 PC 연결 → [새 코드 만들기]" : "운영 설정 → 두 PC 연결 → 현장 POS 화면의 연결 코드 16자리" }
+      : bad && /403/.test(bad) ? { a: "보고 클라우드", b: "규칙 확인", cls: "bad", title: `${bad} — 보고 시스템 Firebase 규칙에 두 PC 연결(deskSync)이 있어야 해요 (astanakiz docs/SYNC.md)` } : null;
+    if (why) return why;
     if (SYNC_ROLE === "pos") {
       if (bad) return { a: "두 PC", b: "연결 확인", cls: "bad", title: bad };
       return st && st.peer && st.peer.active ? { a: "사무실 PC", b: "연결됨", cls: "ok", title: `사무실 PC 가 키 현황을 보고 있어요 (ver.${st.peer.build})` } : null;
@@ -6114,6 +6120,8 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     if (st && st.why) return st.same === false ? { a: "버전이", b: "달라요", cls: "bad", title: st.why } : { a: "연결 코드", b: "확인", cls: "bad", title: st.why };
     if (bad) return { a: "현장 POS", b: "연결 안 됨", cls: "bad", title: bad };
     if (SYNCV.dayOff) return { a: "현장 POS", b: "날짜가 달라요", cls: "bad", title: `현장 POS 날짜 ${SYNCV.dayOff} — 두 PC 의 날짜 · 시계를 확인해 주세요` };
+    // 사무실 PC 는 우편함을 읽고 있는데 현장 POS 글이 한 번도 없음 → 현장 POS 쪽 (역할 · 다시 켜기 · 보고 열쇠 · 버전)
+    if (!SYNCV.snapAt && st && st.lastGet && !(st.peer && st.peer.seen) && Date.now() - SYNCV.t0 > 30000) return { a: "현장 POS", b: "소식 없음", cls: "warn", title: "사무실 PC 는 준비됐어요 — 현장 POS 에서 운영 설정 → 두 PC 연결: 역할 '현장 POS (본 PC)' · [지금 다시 켜기] · 사무실과 같은 보고 열쇠 · 같은 버전인지 확인" };
     if (!SYNCV.snapAt) return { a: "사무실 PC", b: "키 현황 기다림", cls: "warn", title: "현장 POS 가 켜져 있으면 15초 안에 와요" };
     const ago = Math.floor((Date.now() - SYNCV.snapAt) / 60000), t = SYNCV.snapText.slice(11, 16);
     return ago >= 3 ? { a: "키 현황 소식", b: `${ago}분째 없음`, cls: "warn", title: `마지막 키 현황 ${SYNCV.snapText} (현장 POS 꺼짐 · 인터넷 확인)` } : { a: "사무실 PC", b: `키 현황 ${t}`, cls: "ok", title: `현장 POS 키 현황 ${SYNCV.snapText} 기준 · 예약 카드는 이 PC 가 네이버에서 읽음` };
