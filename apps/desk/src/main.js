@@ -3,7 +3,7 @@
    - 아마노 창은 이 프로그램이 열어 두고, 가려진 채로 칸에 입력하고 버튼을 누른다 (화면 좌표가 아니라 페이지 안의 글자로 찾으므로 가려져도 됨)
    - 로그인이 풀렸을 때만 "아마노 화면 보기"로 앞으로 꺼내 근무자가 로그인한다
    - POS "결제하기"는 이미 켜진 POS 창을 앞으로 띄우기만 한다 */
-const { app, BrowserWindow, ipcMain, safeStorage, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, safeStorage, shell, clipboard } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const { execFile, spawn } = require("child_process");
@@ -426,6 +426,22 @@ ipcMain.handle("naver:cells", posOnly(nwrap((day) => naver.readCells(day), 60000
    손님 이름 · 전화번호 없음 (숫자만) · 사장님이 그날 밤 파일을 보내 주면 조절 방식을 배움 */
 const CW_HEAD = "날짜,시각,회차,상품,판매수량,확정,완료,잔여,바뀜,안에있는열쇠,빈열쇠,현장판매누적,현장가능,수량자동조절";
 const csvCell = (v) => { const t = String(v == null ? "" : v); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+// 재방문 안내 이미지 (사장님 11/15): 바탕화면 '아스타나키즈-재방문안내/재방문안내_D-5_날짜.jpg' (손님 정보 없음 — 기한 · 사은품만)
+ipcMain.handle("revimg:save", (_e, job) => {
+  const name = String((job && job.name) || ""), url = String((job && job.dataUrl) || "");
+  if (!/^재방문안내_D-\d{1,2}_\d{4}-\d{2}-\d{2}\.jpg$/.test(name) || !url.startsWith("data:image/jpeg;base64,") || url.length > 4000000) return { ok: false, why: "모양이 틀림" };
+  try {
+    const dir = path.join(app.getPath("desktop"), "아스타나키즈-재방문안내");
+    fs.mkdirSync(dir, { recursive: true });
+    const f = path.join(dir, name);
+    fs.writeFileSync(f, Buffer.from(url.slice(url.indexOf(",") + 1), "base64"));
+    return { ok: true, file: f };
+  } catch (err) {
+    return { ok: false, why: `파일을 못 씀: ${err.message || err}` };
+  }
+});
+// 글 복사 (재방문 안내 번호 · 문구) — 데스크 창이 포커스를 잃어도 되게 본체 클립보드로
+ipcMain.handle("clip:write", (_e, text) => { const t = String(text || ""); if (!t || t.length > 20000) return false; clipboard.writeText(t); return true; });
 ipcMain.handle("capwatch:add", (_e, rec) => {
   if (RUN_ROLE === "office") return { ok: false, why: "사무실 PC 는 기록하지 않아요" };
   const day = String((rec && rec.day) || ""), at = String((rec && rec.at) || "");
