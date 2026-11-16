@@ -10,7 +10,7 @@ const { execFile, spawn } = require("child_process");
 const { AmanoSync } = require("./amano-sync");
 const { NaverSync, naverUrls } = require("./naver-sync");
 const { TALK_COUNT_JS, talkMerge } = require("./talk-driver");
-const { TalkSend } = require("./naver-talksend");
+const { TalkSend, TALKSEND_DRIVER_SOURCE } = require("./naver-talksend");
 
 const SETTINGS_FILE = () => path.join(app.getPath("userData"), "settings.json");
 const DEFAULTS = {
@@ -463,7 +463,9 @@ let talkJob = null;
 let talkPopWait = null;
 const TALKSEND_TEST = !!process.env.DESK_TALKSEND_TEST; // 시험(가짜 화면)만: 시각 제한 없음 · file: 대화창
 const talkPopOk = (url) => /^https:\/\/([a-z0-9-]+\.)*talk\.naver\.com\//i.test(url) || (TALKSEND_TEST && /^file:/.test(url));
-const spUrlOk = (u) => /^https:\/\/([a-z0-9-]+\.)*smartplace\.naver\.com\//i.test(u) || (TALKSEND_TEST && /^file:/.test(u));
+// 스마트플레이스 '고객' 화면 주소: 네이버(…naver.com) 안이면 됨 — 예약관리(partner.booking.naver.com) 안에서 열리기도 함 (2.23 현장 11/16: smartplace 주소만 받아 막혔음)
+//   진짜 고객 화면인지는 기억할 때 화면 안(예약·주문 탭 + 이름/전화번호 검색 칸)으로 확인
+const spUrlOk = (u) => /^https:\/\/([a-z0-9-]+\.)*naver\.com\//i.test(u) || (TALKSEND_TEST && /^file:/.test(u));
 const REV_DIR = () => path.join(app.getPath("desktop"), "아스타나키즈-재방문안내");
 /** 보낼 사진: 사장님이 둔 '보낼사진_D-n' 이 먼저 · 없으면 그날 만든 안내 이미지 */
 function revImageFile(left) {
@@ -560,15 +562,41 @@ function talkSendRun(req) {
 ipcMain.handle("talksend:run", posOnly((_e, req) => talkSendRun(req)));
 ipcMain.handle("talksend:status", () => talkView());
 ipcMain.handle("talksend:stop", () => { if (talkJob && talkJob.running) talkJob.stopReq = true; return talkView(); });
-// 네이버 화면 보기에서 스마트플레이스 [고객] 화면까지 들어간 뒤 누르면 그 주소를 톡톡 보내기 시작 화면으로
-ipcMain.handle("talksend:setHome", () => {
+/* 네이버 화면 보기에서 스마트플레이스 [고객] 화면까지 들어간 뒤 누르면 그 주소를 톡톡 보내기 시작 화면으로
+   - 네이버 창뿐 아니라 [고객]이 새 창으로 열렸어도 · 화면 안 액자(iframe)여도 찾음: 화면 안에 '예약·주문' 탭과 이름/전화번호 검색 칸이 있는 곳
+   - 못 찾으면 지금 네이버 창들 화면을 바탕화면 '아스타나키즈-진단'에 남기고 주소를 알려 줌 (개발자가 화면 구조를 맞춤) */
+async function spFind() {
+  const wins = [naverWin].concat(BrowserWindow.getAllWindows().filter((w) => w !== naverWin && w !== deskWin)).filter((w) => w && !w.isDestroyed() && spUrlOk(w.webContents.getURL()) && !/talk\.naver\.com/i.test(w.webContents.getURL()));
+  const seen = [];
+  for (const w of wins) {
+    const wc = w.webContents;
+    const frames = wc.mainFrame ? wc.mainFrame.framesInSubtree : [];
+    for (const f of frames.length ? frames : [null]) {
+      const url = f ? f.url : wc.getURL();
+      if (!spUrlOk(url)) continue;
+      const code = `(() => { (${TALKSEND_DRIVER_SOURCE})(); const s = window.__tsend.state(); return { customers: s.customers, nav: s.navCustomers }; })()`;
+      const s = await timed(f ? f.executeJavaScript(code, true) : wc.executeJavaScript(code, true), 5000, "응답 없음").catch(() => null);
+      seen.push({ url, win: w, customers: !!(s && s.customers) });
+      if (s && s.customers) return { url, win: w, seen };
+    }
+  }
+  return { url: "", seen };
+}
+const urlShort = (u) => { try { const x = new URL(u); return x.host + x.pathname; } catch (e) { return String(u).slice(0, 80); } };
+ipcMain.handle("talksend:setHome", async () => {
   if (!naverWin || naverWin.isDestroyed()) return { ok: false, why: "네이버 창이 없음" };
-  const u = naverWin.webContents.getURL();
-  if (!spUrlOk(u)) return { ok: false, why: "스마트플레이스(smartplace.naver.com) [고객] 화면에서 눌러 주세요" };
-  settings.spUrl = u;
+  const r = await spFind();
+  if (!r.url) {
+    // 진단: 지금 열린 네이버 창들 화면 (손님 정보가 있을 수 있으니 개발 확인용으로만)
+    const stamp = stampNow(), wins = [...new Set(r.seen.map((x) => x.win))];
+    for (const [i, w] of wins.entries()) await dumpWin(w, `톡톡시작-못찾음-${stamp}-${i + 1}`).catch(() => {});
+    const where = r.seen.map((x) => urlShort(x.url)).filter((x, i, a) => a.indexOf(x) === i).slice(0, 3).join(" · ") || "네이버 창 없음";
+    return { ok: false, why: `고객 화면(위 '예약·주문' · 이름/전화번호 검색 칸)을 못 찾았어요 — 지금 네이버 창: ${where} · 화면을 바탕화면 '아스타나키즈-진단'에 남겼어요` };
+  }
+  settings.spUrl = r.url;
   saveSettings();
   if (deskWin) deskWin.focus();
-  return { ok: true, url: u };
+  return { ok: true, url: r.url, other: r.win !== naverWin };
 });
 ipcMain.handle("capwatch:add", (_e, rec) => {
   if (RUN_ROLE === "office") return { ok: false, why: "사무실 PC 는 기록하지 않아요" };
