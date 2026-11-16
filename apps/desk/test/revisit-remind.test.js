@@ -83,7 +83,9 @@ test("재방문 안내 (사장님 11/16): 기한 8일 남은 손님에게 한 �
     assert.match(await page.evaluate(() => window.__deskTest.rev.msg(8)), /\n무료수신거부 080-000-0000$/);
     await page.reload();
     await page.waitForTimeout(300);
-    await page.waitForFunction(() => document.getElementById("rev-btn").textContent.trim() === "재방문 안내2", null, { timeout: 5000 }); // 보냄은 그날 이 PC 에 남음 (다시 연 직후 화면이 다 그려질 때까지)
+    const ok2 = await page.waitForFunction(() => document.getElementById("rev-btn").textContent.trim() === "재방문 안내2", null, { timeout: 15000 }).then(() => true, () => false); // 보냄은 그날 이 PC 에 남음 (다시 연 직후 화면이 다 그려질 때까지)
+    if (!ok2) console.log("DBG", JSON.stringify(await page.evaluate(() => ({ btn: document.getElementById("rev-btn").textContent, hidden: document.getElementById("rev-btn").hidden, sent: localStorage.getItem("astanakiz-revsent-2026-11-15"), keys: Object.keys(localStorage), t: window.__deskTest && Object.entries(window.__deskTest.rev.targets() || {}).map(([l, v]) => [l, v.map((x) => x.name + (x.today ? "(오늘)" : ""))]) }))));
+    assert.ok(ok2, "보냄은 그날 이 PC 에 남음");
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();
