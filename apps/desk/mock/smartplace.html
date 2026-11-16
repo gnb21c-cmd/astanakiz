@@ -1,0 +1,75 @@
+<!doctype html>
+<!-- 가짜 스마트플레이스 '고객' 화면 (사장님 화면 사진 11/16 모양 · 가짜 손님만)
+     왼쪽 메뉴 [고객] → 위 '예약·주문' 탭 → 검색 칸 앞 선택(이름 ∨ / 전화번호) → 목록(이름 · 전화번호 — 어떤 손님은 '유*석' · '***-****-1313' 처럼 가려짐)
+     → 줄을 누르면 오른쪽 고객 카드(등록경로 · 전화번호 · 이메일 · 특이사항 · [톡톡 대화하기]) → 새 창(팝업)으로 톡톡 대화창 (talkchat.html)
+     ?home=1 = 처음 화면(메뉴만) · 시험: localStorage mockSpData = 손님 목록을 바꿈 -->
+<html lang="ko"><head><meta charset="utf-8"><title>스마트플레이스</title>
+<style>
+  body { margin: 0; font: 14px sans-serif; }
+  .wrap { display: grid; grid-template-columns: 170px 1fr; min-height: 100vh; }
+  nav { background: #222; color: #ddd; padding: 10px 0; }
+  nav a { display: block; color: #ddd; padding: 8px 14px; text-decoration: none; }
+  nav a.on { color: #fff; font-weight: 700; }
+  main { padding: 14px 20px; }
+  .Tab__tab { display: inline-block; padding: 6px 12px; cursor: pointer; } .Tab__on { border-bottom: 2px solid #000; font-weight: 700; }
+  .Search__box { display: flex; gap: 6px; align-items: center; border: 1px solid #888; border-radius: 6px; padding: 4px 8px; width: 380px; margin: 10px 0; position: relative; }
+  .Search__type { border: 0; background: none; cursor: pointer; }
+  .Search__options { position: absolute; top: 34px; left: 0; background: #fff; border: 1px solid #ccc; }
+  .Search__options li { list-style: none; padding: 6px 14px; cursor: pointer; }
+  .Customer__body { display: grid; grid-template-columns: 240px 1fr; gap: 10px; }
+  .CustomerList__row { display: flex; gap: 12px; padding: 8px; border-bottom: 1px solid #eee; cursor: pointer; }
+  .CustomerCard__root { border-left: 1px solid #ddd; padding: 10px 16px; }
+  .CustomerCard__item { display: flex; gap: 10px; }
+</style></head><body>
+<script>
+  const P = new URLSearchParams(location.search);
+  const go = (o) => { const q = new URLSearchParams(Object.assign(Object.fromEntries(P), o)); location.href = location.pathname + "?" + q; };
+  // 가짜 손님 — m: 가려 보임(이름 · 번호) · talk: 톡톡 대화하기 단추가 있음
+  const DEF = [
+    { id: "c1", name: "김가람", phone: "010-3000-1313", m: false, talk: true, path: "네이버 예약 (kgr****)" },
+    { id: "c2", name: "유민석", phone: "010-3100-1313", m: true, talk: true, path: "네이버 예약 (ymsk****)" },
+    { id: "c3", name: "이하늘", phone: "010-3192-1313", m: false, talk: true, path: "네이버 예약 (hnl****)" },
+    { id: "c4", name: "정수림", phone: "010-3400-1313", m: true, talk: true, path: "네이버 예약 (jsr****)" },
+    { id: "c5", name: "정아림", phone: "010-3500-1313", m: true, talk: true, path: "네이버 예약 (jar****)" },
+    { id: "c6", name: "나단비", phone: "010-3300-2424", m: false, talk: true, path: "네이버 예약 (ndb****)" },
+    { id: "c7", name: "나보비", phone: "010-3600-2424", m: true, talk: true, path: "네이버 예약 (nbb****)" },
+    { id: "c8", name: "톡없음", phone: "010-3700-5555", m: false, talk: false, path: "직접 등록" },
+  ];
+  let DATA = DEF;
+  try { const d = JSON.parse(localStorage.getItem("mockSpData") || "null"); if (Array.isArray(d)) DATA = d; } catch (e) { DATA = DEF; }
+  const maskName = (n) => (n.length <= 2 ? n[0] + "*" : n[0] + "*".repeat(n.length - 2) + n[n.length - 1]);
+  const showName = (c) => (c.m ? maskName(c.name) : c.name);
+  const showPhone = (c) => (c.m ? "***-****-" + c.phone.slice(-4) : c.phone);
+  const type = P.get("type") || "이름", q = P.get("q") || "", sel = P.get("sel") || "";
+  const hits = !q ? [] : DATA.filter((c) => (type === "전화번호" ? c.phone.replace(/\D/g, "").endsWith(q.replace(/\D/g, "")) : showName(c).includes(q) || c.name === q));
+  const nav = ["업체정보", "예약", "스마트콜", "마케팅", "리뷰", "고객", "통계", "비즈니스 스쿨"].map((t) => `<a href="#" class="${t === "고객" && !P.get("home") ? "on" : ""}" data-nav="${t}">${t}</a>`).join("");
+  let main = "<h2>아스타나키즈</h2><p>업체 홈</p>";
+  if (!P.get("home")) {
+    const c = hits.find((x) => x.id === sel);
+    main = `<div><span class="Tab__tab Tab__on">예약·주문</span><span class="Tab__tab">스마트콜</span></div>
+      <div class="Search__box"><button type="button" class="Search__type" id="stype">${type} ∨</button>
+        <ul class="Search__options" id="sopts" hidden><li data-type="이름">이름</li><li data-type="전화번호">전화번호</li></ul>
+        <input type="text" class="Search__input" id="sq" value="${q}" placeholder="이름 또는 전화번호를 입력하세요"><button type="button" class="Search__clear" aria-label="지우기">×</button><button type="button" class="Search__btn" aria-label="검색"><svg width="12" height="12"></svg></button></div>
+      <p>${hits.length}명 <a href="#">고객 개인정보보호에 대해 알아보세요!</a></p>
+      <div class="Customer__body"><div class="CustomerList__root"><div class="CustomerList__head"><span>이름↑</span> <span>전화번호</span></div>
+        ${hits.map((x) => `<div class="CustomerList__row" data-id="${x.id}"><span class="CustomerList__name">${showName(x)}</span><span class="CustomerList__phone">${showPhone(x)}</span></div>`).join("")}</div>
+        <div class="CustomerCard__root">${c ? `<h3 class="CustomerCard__name">${showName(c)}</h3><button type="button">정보변경</button>
+          <div class="CustomerCard__item"><span>등록경로</span><span>${c.path}</span></div>
+          <div class="CustomerCard__item"><span>전화번호</span><span>${showPhone(c)}</span></div>
+          <div class="CustomerCard__item"><span>이메일</span><span>${c.m ? "" : "fake@example.com"}</span></div>
+          <div class="CustomerCard__item"><span>특이사항</span><span></span></div>
+          ${c.talk ? `<button type="button" class="CustomerCard__talk" id="talk">톡톡 대화하기</button>` : ""}
+          <h4>예약내역</h4><p>총 예약 1</p>` : ""}</div></div>`;
+  }
+  document.body.innerHTML = `<div class="wrap"><nav><b>아스타나키즈</b>${nav}</nav><main>${main}</main></div>`;
+  document.addEventListener("click", (e) => {
+    const n = e.target.closest("[data-nav]"); if (n) { e.preventDefault(); if (n.dataset.nav === "고객") setTimeout(() => go({ home: "", q: "", sel: "" }), 150); return; }
+    if (e.target.closest("#stype")) { document.getElementById("sopts").hidden = !document.getElementById("sopts").hidden; return; }
+    const o = e.target.closest("[data-type]"); if (o) { setTimeout(() => go({ type: o.dataset.type, q: document.getElementById("sq").value, sel: "" }), 100); return; }
+    if (e.target.closest(".Search__btn")) { setTimeout(() => go({ q: document.getElementById("sq").value, sel: "" }), 150); return; }
+    const r = e.target.closest(".CustomerList__row"); if (r) { setTimeout(() => go({ sel: r.dataset.id }), 150); return; }
+    if (e.target.closest("#talk")) { const c = DATA.find((x) => x.id === sel); window.open(`talkchat.html?u=${encodeURIComponent(c.id)}&frm=prsv&mode=popup`, "talk_" + c.id, "popup,width=900,height=700"); }
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.id === "sq") setTimeout(() => go({ q: e.target.value, sel: "" }), 150); });
+</script>
+</body></html>

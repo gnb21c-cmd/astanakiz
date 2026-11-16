@@ -10,6 +10,7 @@ const { execFile, spawn } = require("child_process");
 const { AmanoSync } = require("./amano-sync");
 const { NaverSync, naverUrls } = require("./naver-sync");
 const { TALK_COUNT_JS, talkMerge } = require("./talk-driver");
+const { TalkSend } = require("./naver-talksend");
 
 const SETTINGS_FILE = () => path.join(app.getPath("userData"), "settings.json");
 const DEFAULTS = {
@@ -20,6 +21,7 @@ const DEFAULTS = {
   naverUrl: "https://partner.booking.naver.com/", // 네이버 예약관리 시작 화면 (예약현황). 처음 로그인 뒤 '지금 화면을 시작 화면으로'
   amanoId: "", // 아마노 아이디
   amanoPwEnc: "", // 아마노 비밀번호: Windows 암호화로 이 PC 계정만 풀 수 있게 저장 (저장소·설치파일에 넣지 않음)
+  spUrl: "", // 스마트플레이스 '고객' 화면 주소 (재방문 안내 톡톡 보내기 시작 화면 · 11/16). 저장소에 적지 않고 운영 설정 '지금 화면을 …으로'로 이 PC 에만
   talkUrls: { kids: "", cafe: "" }, // 네이버 톡톡 상담 목록 주소 (계정마다). 저장소에 적지 않고 운영 설정 '지금 화면을 …으로'로 기억
   surveyKeyEnc: "", // 설문 보고함 '보고 열쇠' (보고 앱 주소 …/b/{열쇠}/): Windows 암호화로 이 PC 에만 (저장소·설치파일에 넣지 않음 · 10/15)
 };
@@ -132,7 +134,13 @@ function openNaver() {
   naverWin = new BrowserWindow({ width: 1280, height: 800, show: false, skipTaskbar: true, title: "네이버 예약관리 (입장 데스크가 읽는 중)", webPreferences: { partition: "persist:naver", backgroundThrottling: false } });
   naverWin.setMenuBarVisibility(false);
   // 재고 자동 오픈 중에는 새 창을 열지 않음 (10/20 현장 1.52: 리뷰 작성자 MY플레이스 창이 열림)
-  naverWin.webContents.setWindowOpenHandler(() => (stockJob && stockJob.running ? { action: "deny" } : { action: "allow" }));
+  naverWin.webContents.setWindowOpenHandler(({ url }) => {
+    if (stockJob && stockJob.running) return { action: "deny" };
+    // 톡톡 보내기 중 (11/16): [톡톡 대화하기]가 여는 대화창만 · 숨긴 채로 (근무자 화면을 가리지 않게)
+    if (talkJob && talkJob.running) return talkPopOk(url) ? { action: "allow", overrideBrowserWindowOptions: { show: false, skipTaskbar: true, width: 900, height: 760, webPreferences: { backgroundThrottling: false } } } : { action: "deny" };
+    return { action: "allow" };
+  });
+  naverWin.webContents.on("did-create-window", (win) => { if (talkPopWait) talkPopWait(win); });
   naverWin.loadURL(settings.naverUrl);
   naverWin.once("ready-to-show", () => {
     naverWin.showInactive();
@@ -442,6 +450,126 @@ ipcMain.handle("revimg:save", (_e, job) => {
 });
 // 글 복사 (재방문 안내 번호 · 문구) — 데스크 창이 포커스를 잃어도 되게 본체 클립보드로
 ipcMain.handle("clip:write", (_e, text) => { const t = String(text || ""); if (!t || t.length > 20000) return false; clipboard.writeText(t); return true; });
+/* 재방문 안내 → 네이버 톡톡 보내기 (사장님 11/16 화면 사진 순서 · naver-talksend.js)
+   예약 읽는 네이버 창(같은 로그인)에서 스마트플레이스 '고객' → 전화번호 뒷번호 4자리 → 손님 맞추기 → 고객 카드 확인 → [톡톡 대화하기] 새 창(숨김)
+   → 글(맨 앞 (광고) · 맨 아래 수신거부) [전송] → 사진: 파일 고르기 창 없이 대화창의 사진 칸에 바로 넣음 (Chrome 개발 도구 명령 DOM.setFileInputFiles)
+   - 사진 = 바탕화면 '아스타나키즈-재방문안내' 폴더: '보낼사진_D-5.jpg'(사장님이 둔 사진)가 있으면 그것 · 없으면 그날 만든 '재방문안내_D-5_날짜.jpg'
+     (화면이 보낸 경로는 안 받음 — 그 폴더 안 정해진 이름만)
+   - 현장 POS 만 · 08~21시 · 재고 오픈 중이면 안 함 · 맞는 손님이 하나로 안 정해지면 건너뜀 · 화면이 이상하면 거기서 멈춤
+   - 한 사람씩 네이버 줄에 넣음 → 사람 사이에 입장 이용완료 · 예약 불러오기가 끼어들 수 있음 (보내는 동안 입장이 막히지 않게)
+   - [확인만 해 보기] = 대화창까지 열고 아무것도 안 보냄 · 첫 사람 화면을 '아스타나키즈-진단'에 (화면 구조 확인용)
+   - 끝나면 네이버 창을 예약현황(오늘)으로 돌려놓음 */
+let talkJob = null;
+let talkPopWait = null;
+const TALKSEND_TEST = !!process.env.DESK_TALKSEND_TEST; // 시험(가짜 화면)만: 시각 제한 없음 · file: 대화창
+const talkPopOk = (url) => /^https:\/\/([a-z0-9-]+\.)*talk\.naver\.com\//i.test(url) || (TALKSEND_TEST && /^file:/.test(url));
+const spUrlOk = (u) => /^https:\/\/([a-z0-9-]+\.)*smartplace\.naver\.com\//i.test(u) || (TALKSEND_TEST && /^file:/.test(u));
+const REV_DIR = () => path.join(app.getPath("desktop"), "아스타나키즈-재방문안내");
+/** 보낼 사진: 사장님이 둔 '보낼사진_D-n' 이 먼저 · 없으면 그날 만든 안내 이미지 */
+function revImageFile(left) {
+  for (const f of [`보낼사진_D-${left}.jpg`, `보낼사진_D-${left}.jpeg`, `보낼사진_D-${left}.png`, `재방문안내_D-${left}_${localToday()}.jpg`]) {
+    const p = path.join(REV_DIR(), f);
+    try { if (fs.statSync(p).isFile()) return p; } catch (e) { /* 다음 */ }
+  }
+  return "";
+}
+/** 대화창의 사진 칸에 파일 넣기 (파일 고르기 창 없이) */
+async function cdpSetFile(wc, selector, file) {
+  const dbg = wc.debugger, was = dbg.isAttached();
+  if (!was) dbg.attach("1.3");
+  try {
+    const { root } = await dbg.sendCommand("DOM.getDocument", { depth: 0 });
+    const { nodeId } = await dbg.sendCommand("DOM.querySelector", { nodeId: root.nodeId, selector });
+    if (!nodeId) throw new Error("대화창의 사진 칸을 못 찾음");
+    await dbg.sendCommand("DOM.setFileInputFiles", { nodeId, files: [file] });
+  } finally {
+    if (!was) try { dbg.detach(); } catch (e) { /* 이미 떨어짐 */ }
+  }
+}
+const talkView = () => ({ ok: true, job: talkJob && { ...talkJob, stopReq: undefined } });
+const talkTell = (ch) => { if (deskWin && !deskWin.isDestroyed()) deskWin.webContents.send(ch, talkView()); };
+function talkSendRun(req) {
+  if (talkJob && talkJob.running) return talkView();
+  if (!naverWin || naverWin.isDestroyed() || !naver) return { ok: false, why: "네이버 창이 아직 열리지 않음" };
+  if (stockJob && stockJob.running) return { ok: false, why: "재고 자동 오픈 중이에요 — 끝난 뒤에" };
+  const h = new Date().getHours();
+  if (!TALKSEND_TEST && (h < 8 || h >= 21)) return { ok: false, why: "톡톡 안내는 08~21시에만 보내요" };
+  const sp = settings.spUrl || "";
+  if (!spUrlOk(sp)) return { ok: false, why: "스마트플레이스 '고객' 화면 주소가 없어요 — 운영 설정 → 네이버: 네이버 화면 보기에서 스마트플레이스 [고객] 화면까지 들어간 뒤 [지금 화면을 톡톡 보내기 시작 화면으로]" };
+  const dry = !!(req && req.dry);
+  const list = (req && Array.isArray(req.list) ? req.list : []).slice(0, 60).map((x) => ({ key: String((x && x.key) || "").slice(0, 80), name: String((x && x.name) || "").trim().slice(0, 20), phone: String((x && x.phone) || "").replace(/\D/g, ""), left: Number(x && x.left) }))
+    .filter((x) => x.key && x.name && /^01\d{8,9}$/.test(x.phone) && [5, 3].includes(x.left));
+  if (!list.length) return { ok: false, why: "보낼 사람이 없어요" };
+  const text = {};
+  for (const l of [5, 3]) { const t = String((req.text && req.text[l]) || "").slice(0, 1000); text[l] = /^\(광고\)/.test(t.trim()) ? t.trim() : ""; }
+  const imgs = {};
+  for (const l of new Set(list.map((x) => x.left))) {
+    imgs[l] = revImageFile(l);
+    if (!imgs[l]) return { ok: false, why: `D-${l} 안내 이미지가 없어요 — [이미지 저장]을 먼저` };
+    if (!dry && !text[l]) return { ok: false, why: `D-${l} 문구가 없어요 (맨 앞 '(광고)')` };
+  }
+  const me = (talkJob = { running: true, dry, auto: !!(req && req.auto), at: localNow(), total: list.length, step: "", why: "", results: [], imgs: Object.fromEntries(Object.entries(imgs).map(([k, v]) => [k, path.basename(v)])) });
+  const stamp = stampNow();
+  let pop = null, first = true;
+  const ts = new TalkSend((code) => timed(naverWin.webContents.executeJavaScript(code, true), 8000, "네이버 화면이 응답하지 않음"), {
+    home: sp,
+    go: (u) => naverWin.loadURL(u).catch(() => {}),
+    popup: () => new Promise((res) => {
+      const t = setTimeout(() => { talkPopWait = null; res(null); }, 15000);
+      talkPopWait = (win) => {
+        talkPopWait = null; clearTimeout(t); pop = win;
+        res({
+          exec: (code) => timed(win.webContents.executeJavaScript(code, true), 8000, "톡톡 대화창이 응답하지 않음"),
+          setFile: (sel, file) => cdpSetFile(win.webContents, sel, file),
+          close: async () => { if (!win.isDestroyed()) win.destroy(); pop = null; },
+        });
+      };
+    }),
+    // 확인만: 첫 사람 화면(고객 목록 · 카드 · 대화창)을 진단 폴더에 — 실제 화면 구조 확인용 (손님 정보가 있으니 개발 확인용으로만)
+    shot: async (name) => { if (dry && first) await dumpWin(name >= "3" && pop && !pop.isDestroyed() ? pop : naverWin, `톡톡보내기-확인-${stamp}-${name}`); },
+    onStep: (msg) => { me.step = msg; talkTell("talksend:progress"); },
+  });
+  (async () => {
+    try {
+      for (const x of list) {
+        if (me.stopReq) break;
+        const job = { key: x.key, name: x.name, phone: x.phone, text: text[x.left], image: imgs[x.left] };
+        const r = await serial("naver", () => timed(ts.one(job, dry), 3 * 60000, "한 사람에 3분 넘게 걸림")).catch((e) => ({ ok: false, step: "오류", why: String((e && e.message) || e).slice(0, 200) }));
+        first = false;
+        me.results.push({ key: x.key, name: x.name, at: localNow().slice(11), ok: !!r.ok, skip: !!r.skip, step: r.step || "", how: r.how || "", why: r.why || "", sent: r.sent || null });
+        if (!r.ok && !r.skip) { await dumpWin(pop && !pop.isDestroyed() ? pop : naverWin, `톡톡보내기-멈춤-${stamp}`).catch(() => {}); me.why = `${x.name}: ${r.why || r.step}`; }
+        if (pop && !pop.isDestroyed()) pop.destroy();
+        talkTell("talksend:progress");
+        if (!r.ok && !r.skip) break; // 화면이 이상함 → 다음 사람은 안 함
+        await new Promise((z) => setTimeout(z, 1500)); // 사람 사이 숨 고르기
+      }
+    } catch (e) {
+      me.why = String((e && e.message) || e);
+    }
+    talkPopWait = null;
+    me.running = false;
+    me.end = localNow();
+    me.stopped = !!me.stopReq;
+    // 네이버 창을 예약현황(오늘)으로 돌려놓음 · 못 가면 시작 화면 주소로
+    const back = await serial("naver", () => timed(naver.goView("calendar").then((g) => (g.ok ? naver.goDate(localToday()) : g)), 120000, "")).catch(() => null);
+    if (!back || !back.ok) await naverWin.loadURL(settings.naverUrl).catch(() => {});
+    talkTell("talksend:done");
+  })();
+  return talkView();
+}
+ipcMain.handle("talksend:run", posOnly((_e, req) => talkSendRun(req)));
+ipcMain.handle("talksend:status", () => talkView());
+ipcMain.handle("talksend:stop", () => { if (talkJob && talkJob.running) talkJob.stopReq = true; return talkView(); });
+// 네이버 화면 보기에서 스마트플레이스 [고객] 화면까지 들어간 뒤 누르면 그 주소를 톡톡 보내기 시작 화면으로
+ipcMain.handle("talksend:setHome", () => {
+  if (!naverWin || naverWin.isDestroyed()) return { ok: false, why: "네이버 창이 없음" };
+  const u = naverWin.webContents.getURL();
+  if (!spUrlOk(u)) return { ok: false, why: "스마트플레이스(smartplace.naver.com) [고객] 화면에서 눌러 주세요" };
+  settings.spUrl = u;
+  saveSettings();
+  if (deskWin) deskWin.focus();
+  return { ok: true, url: u };
+});
 ipcMain.handle("capwatch:add", (_e, rec) => {
   if (RUN_ROLE === "office") return { ok: false, why: "사무실 PC 는 기록하지 않아요" };
   const day = String((rec && rec.day) || ""), at = String((rec && rec.at) || "");

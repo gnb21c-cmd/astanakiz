@@ -60,6 +60,15 @@ contextBridge.exposeInMainWorld("desk", {
   rental: { send: (job) => ipcRenderer.invoke("rental:send", job) }, // 대관 → 보고 앱 (11/10)
   capWatch: { add: (rec) => ipcRenderer.invoke("capwatch:add", rec) }, // 수량 관찰 기록 (11/13)
   revImg: { save: (job) => ipcRenderer.invoke("revimg:save", job) }, // 재방문 안내 이미지 (11/15)
+  // 재방문 안내 → 네이버 톡톡 보내기 (11/16): run({ dry, list:[{key, name, phone, left}], text:{5, 3} }) · 진행은 onProgress · 끝은 onDone
+  talkSend: {
+    run: (req) => ipcRenderer.invoke("talksend:run", req),
+    status: () => ipcRenderer.invoke("talksend:status"),
+    stop: () => ipcRenderer.invoke("talksend:stop"),
+    setHome: () => ipcRenderer.invoke("talksend:setHome"),
+    onProgress: (cb) => ipcRenderer.on("talksend:progress", (_e, v) => cb(v)),
+    onDone: (cb) => ipcRenderer.on("talksend:done", (_e, v) => cb(v)),
+  },
   clip: (text) => ipcRenderer.invoke("clip:write", text), // 글 복사
   // 네이버 재고 자동 오픈 (사장님 10/20): 매일 오늘 + 30일 · 10:30 / 12:00 / 16:00 / 20:20 · [확인만] dry · [지금 한 번]
   stock: {

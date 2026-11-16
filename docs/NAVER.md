@@ -121,6 +121,13 @@ API는 쓰지 않는다. 앱이 맨 뒤에 **네이버 예약관리(스마트플
 - 네이버 예약 시간은 바꾸지 않음. 데스크가 카드만 옮김: `naverSlot`(네이버 원래 시간) · `slot`(데스크 시간)
 - `complete` · `cancel` 은 늘 `naverSlot` 시간 칸에서 · 한 시간 칸만 다시 불러올 때도 `naverSlot` 기준 · 시험 `test/move.test.js`
 
+## 재방문 안내 → 톡톡 보내기 (사장님 11/16 화면 사진 순서)
+- `naver-talksend.js`: 스마트플레이스 [고객] → '예약·주문' → 검색 선택 '전화번호' → 뒷번호 4자리 → 목록에서 맞추기(`pickRow`: 번호가 다 보이면 번호 · 가려진 줄은 이름 모양(`nameLike`) + 뒷번호가 하나뿐일 때만) → 고객 카드 확인(`cardOk`) → [톡톡 대화하기] 새 창 → 글 [전송] → 사진 칸(input type=file)에 파일
+- 화면 클래스 이름 대신 글자로 찾음: 고객 · 예약·주문 · 이름/전화번호 · 등록경로 · 전화번호 · 톡톡 대화하기 · '메시지를 입력해 주세요' · 전송
+- 앱(main.js `talksend:*`): 예약 읽는 네이버 창에서 · [톡톡 대화하기] 새 창은 talk.naver.com 만 숨긴 채 열어 잡음(`did-create-window`) · 사진은 Chrome 개발 도구 명령 `DOM.setFileInputFiles` 로 (윈도 파일 고르기 창 없음 · 한글 이름 파일은 영문 이름 복사본으로) · 한 사람씩 네이버 줄에
+- 시작 화면 주소 `settings.spUrl` (smartplace.naver.com · 이 PC 에만) · 가짜 화면 `mock/smartplace.html` · `mock/talkchat.html` · 시험 `talk-send.test.js`
+- 실제 화면과 다르면: [확인만 해 보기] 뒤 바탕화면 '아스타나키즈-진단'의 '톡톡보내기-확인-…' 화면을 보고 맞춤
+
 ## 코드와 시험
 | 파일 | 내용 |
 |---|---|

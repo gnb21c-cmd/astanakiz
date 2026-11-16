@@ -591,6 +591,16 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 .revlist { display: grid; gap: 4px; margin-top: 8px; }
 .rvrow { display: grid; grid-template-columns: 90px 130px minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 5px 10px; border-radius: 8px; background: var(--surface-2); font-size: 14px; }
 .rvrow.sent { opacity: .6; } .rvrow.today { opacity: .55; } .rvrow .rvtoday { white-space: nowrap; }
+.rvrow .rvtalk { grid-column: 1 / -1; font-size: 12.5px; color: var(--muted); }
+.rvrow .rvtalk.evwarn { color: var(--red); }
+/* 재방문 안내 → 네이버 톡톡 (11/16) */
+.rtbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; margin: 0 0 10px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--surface); }
+.rtbar.run { border-color: var(--ink); }
+.rtbar .rtwide { flex-basis: 100%; }
+.rtlogs { display: grid; gap: 4px; max-height: 260px; overflow: auto; }
+.rtlog summary { cursor: pointer; font-size: 13.5px; padding: 4px 2px; }
+.rtlrow { display: grid; grid-template-columns: 70px 92px 34px 110px minmax(0, 1fr); gap: 6px; align-items: center; font-size: 12.5px; padding: 3px 8px; border-radius: 6px; background: var(--surface-2); margin: 2px 0; }
+.rtlrow .rts.ok { color: var(--ink); font-weight: 700; } .rtlrow .rts.bad { color: var(--red); font-weight: 700; }
 
 .anntext { width: 100%; box-sizing: border-box; resize: vertical; font-size: 13px; line-height: 1.5; }
 .gbtns { display: flex; gap: 8px; justify-content: center; }
@@ -3026,6 +3036,10 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
               <div class="field"><span class="label">재방문 안내 문자 <span class="help">기한 5일 · 3일 남은 손님 (열쇠판 위 [재방문 안내])</span></span>
                 <input id="ev-optout" class="cfg" maxlength="60" placeholder="예: 무료수신거부 080-000-0000" value="${esc(EV.optout || "")}" autocomplete="off" aria-label="수신거부 안내 (문자 맨 아래)">
                 <span class="help">광고 문자 맨 아래에 붙는 <b>무료 수신거부 방법</b> — 문자 맨 앞 '(광고)'는 데스크가 붙여요</span></div>
+              <div class="field"><span class="label">재방문 안내 톡톡 <span class="help">네이버 스마트플레이스 고객 → 톡톡 대화창 (시작 화면은 API 연결 설정 → 네이버)</span></span>
+                <div id="rt-auto">${rtAutoRow()}</div></div>
+              <div class="field"><span class="label">톡톡 자동알림 기록 <span class="help">날짜마다 대상 · 결과 — 이름 · 전화 뒷번호로 톡톡 대화창에서 직접 찾아 확인하거나 수동으로 보내세요</span></span>
+                <div class="rtlogs">${rtLogHtml()}</div></div>
               <div class="field"><span class="label">손님 찾기 ${APP && window.desk.ledger && window.desk.ledger.open ? `<button class="btn btn-sm" data-act="evOpen">바탕화면 폴더</button>` : ""}</span>
                 <span class="help">${L && L.count ? `기록 ${L.people.size}명 · 이용완료 ${L.count}건 · ` : ""}${APP ? "바탕화면 + 앱 폴더 두 곳에 저장" : "체험판: 이 브라우저에만 (앱은 바탕화면 + 앱 폴더)"}${evSaveErr ? ` <b class="evwarn">⚠ 저장 확인: ${esc(evSaveErr)}</b>` : ""}</span>
                 <input id="ev-q" class="cfg" placeholder="이름 또는 전화 뒷번호" value="${esc(EV.q)}" autocomplete="off" aria-label="손님 찾기 (이름 또는 전화 뒷번호)">
@@ -3174,6 +3188,9 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
           <div class="field"><span class="label">네이버 예약관리 <span class="help">처음 한 번: '네이버 화면 보기'로 로그인(<b>'로그인 상태 유지' 꼭 체크</b> — 안 하면 앱을 껐다 켤 때 풀림) → 예약현황 화면까지 들어간 뒤 '지금 화면을 시작 화면으로'</span></span>
             <div class="btns"><button class="btn" data-act="naverShow" ${dis}>네이버 화면 보기 (로그인)</button><button class="btn" data-act="naverHome" ${dis}>지금 화면을 시작 화면으로</button><button class="btn" data-act="naverDump" ${dis}>네이버 화면 저장 (문제 확인용)</button></div>
             ${c.naverUrl ? `<span class="help">시작 화면: ${esc(c.naverUrl)}</span>` : ""}</div>
+          <div class="field"><span class="label">재방문 안내 톡톡 보내기 <span class="help">처음 한 번: '네이버 화면 보기' → 스마트플레이스(smartplace.naver.com) 왼쪽 메뉴 <b>[고객]</b> 화면까지 들어간 뒤 '지금 화면을 톡톡 보내기 시작 화면으로' (예약과 같은 로그인)</span></span>
+            <div class="btns"><button class="btn" data-act="naverShow" ${dis}>네이버 화면 보기</button><button class="btn" data-act="spHome" ${dis}>지금 화면을 톡톡 보내기 시작 화면으로</button></div>
+            <span class="help">${c.spUrl ? `시작 화면: ${esc(c.spUrl)}` : "아직 안 정함"}</span></div>
           <div class="field"><span class="label">네이버 톡톡 상담 (키즈상담 · 카페상담 버튼) <span class="help">예약과 같은 네이버 아이디 · 처음 한 번: '톡톡 화면 보기' → 그 계정(아스타나키즈 / 카페아스타나)의 <b>상담관리</b> 목록 화면까지 들어간 뒤 창을 닫고 '지금 화면을 …으로'</span></span>
             ${Object.entries(TALK_NAME).map(([k, t]) => `<div class="btns"><b style="min-width:64px">${t}</b><button class="btn btn-sm" data-act="talkSetup" data-k="${k}" ${dis}>톡톡 화면 보기</button><button class="btn btn-sm" data-act="talkHome" data-k="${k}" ${dis}>지금 화면을 ${t}으로</button><button class="btn btn-sm" data-act="talkDump" data-k="${k}" ${dis}>화면 저장 (문제 확인용)</button></div>
             <span class="help">${(c.talkUrls || {})[k] ? `${t} 화면: ${esc(c.talkUrls[k])}` : `${t}: 아직 안 정함`}</span>`).join("")}</div>
@@ -4548,6 +4565,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   function renderRevBtn() {
     const el = $("rev-btn"); if (!el) return;
     const t = revTargets();
+    if (t) rtLogSync(); // 톡톡 자동알림 기록: 그날 대상 (바뀐 게 없으면 안 씀)
     const ids = t ? REV_LEFT.flatMap((l) => t[l].filter((x) => !x.today).map((x) => `${l}|${x.k}`)) : [];
     el.hidden = !ids.length;
     if (!ids.length) return;
@@ -4654,29 +4672,197 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     center("네이버에서 '아스타나키즈' 예약하고 오세요", 884, F(700, 25), BROWN);
     center(o.left <= 3 ? "놓치지 마세요! 기다리고 있을게요" : "아이와 함께 또 만나요", 922, F(600, 20), ACC);
   }
-  function revHtml() {
-    const t = revTargets() || { 5: [], 3: [] };
-    const md = (d) => `${+d.slice(5, 7)}/${+d.slice(8, 10)}`;
-    const sec = (l) => {
+  function revSec(l) {
+      const t = revTargets() || { 5: [], 3: [] };
+      const md = (d) => `${+d.slice(5, 7)}/${+d.slice(8, 10)}`;
       const list = t[l], send = list.filter((x) => !x.today), done = send.filter((x) => revSent[`${l}|${x.k}`]).length;
       const rows = list.map((x) => {
         const id = `${l}|${x.k}`, sent = revSent[id];
         return `<div class="rvrow ${x.today ? "today" : ""} ${sent ? "sent" : ""}"><b>${esc(x.name)}</b><span class="num">${esc(fmtPhone(x.phone))}</span><span class="help">방문 ${x.visits}번 · ${x.ok ? `${esc(EV.gift)} ${x.ok}번 받음` : "아직 안 받음"} · 마지막 ${md(x.last)}</span>${x.today ? `<span class="help rvtoday">오늘 방문 — 안 보내도 돼요</span><span></span>`
-          : `<button class="btn btn-sm" data-act="revCopy" data-v="${esc(digits(x.phone))}">번호 복사</button><button class="btn btn-sm ${sent ? "btn-ink" : ""}" data-act="revSentT" data-id="${esc(id)}" aria-pressed="${!!sent}">${sent ? `보냄 ${esc(sent)}` : "보냄"}</button>`}</div>`;
+          : `<button class="btn btn-sm" data-act="revCopy" data-v="${esc(digits(x.phone))}">번호 복사</button><button class="btn btn-sm ${sent ? "btn-ink" : ""}" data-act="revSentT" data-id="${esc(id)}" aria-pressed="${!!sent}">${sent ? `보냄 ${esc(sent)}` : "보냄"}</button>`}${x.today ? "" : rtRowNote(id)}</div>`;
       }).join("");
       return `<section class="revsec ${l <= 3 ? "d3" : "d5"}"><h4>D-${l} <span class="num">· 기한 ${esc(revDueText(revDue(l)))}</span> <small>${send.length}명 · 보냄 ${done}</small></h4>
         ${list.length ? `<div class="revgrid"><img class="revimg" id="rev-img-${l}" alt="D-${l} 안내 이미지"><div class="revside">
           <div class="btns"><button class="btn btn-sm" data-act="revSave" data-l="${l}">이미지 저장</button><button class="btn btn-sm" data-act="revText" data-l="${l}">문구 복사</button><button class="btn btn-sm" data-act="revAll" data-l="${l}" ${send.length ? "" : "disabled"}>번호 모두 복사</button></div>
           <pre class="revmsg" id="rev-msg-${l}">${esc(revMsg(l))}</pre></div></div>
         <div class="revlist">${rows}</div>` : `<div class="help">오늘은 없어요</div>`}</section>`;
-    };
+  }
+  function revHtml() {
     return `<h3 id="sheet-title">재방문 안내 — ${esc(dateLabel(TODAY))} <span class="help">어제 마감 기준</span><button class="x" data-act="close" aria-label="닫기">×</button></h3>
       <p class="help">재방문 이벤트 손님 중 ${esc(EV.gift)} 기한이 <b>5일 · 3일</b> 남은 사람이에요 (아직 안 받은 사람 · 받고 다시 ${EV.days}일이 도는 사람). 문자(MMS)나 톡톡으로 이미지 · 문구를 보내고 [보냄]을 눌러 주세요.</p>
       ${EV.optout ? "" : `<div class="banner warn">광고 문자는 맨 아래에 <b>무료 수신거부 방법</b>이 있어야 해요 — 운영 설정 → 재방문 이벤트 '수신거부 안내'에 넣어 주세요 (관리자)</div>`}
-      <div class="revbody">${REV_LEFT.map(sec).join("")}</div>
+      ${rtBar()}
+      <div class="revbody">${REV_LEFT.map(revSec).join("")}</div>
       <div class="sheet-foot"><button class="btn btn-ink" data-act="close" data-autofocus>닫기</button></div>`;
   }
   function revFill() { for (const l of REV_LEFT) { const el = $("rev-img-" + l); if (el) revImage(l).then((u) => { if (el.isConnected) el.src = u; }); } }
+  // ── 재방문 안내 → 네이버 톡톡으로 보내기 (사장님 11/16 화면 사진 순서) ──
+  /* 앱 본체(main.js talksend · naver-talksend.js)가 예약 읽는 네이버 창에서: 스마트플레이스 [고객] → 검색 선택 '전화번호' → 뒷번호 4자리
+     → 손님 맞추기 (번호가 다 보이면 번호로 · 가려진 '유*석 ***-****-1313' 은 이름 모양 + 뒷번호가 하나뿐일 때만) → 고객 카드 확인 → [톡톡 대화하기] 새 창(숨김)
+     → 글(맨 앞 (광고) · 맨 아래 수신거부) [전송] → 사진(파일 고르기 창 없이 바로)
+     - [확인만 해 보기]: 대화창까지 열고 아무것도 안 보냄 (누가 맞춰지는지 · 화면이 맞는지) · [톡톡으로 보내기 n명]: 한 번 더 눌러야 시작 · [멈추기]
+     - 보낸 사람은 '보냄 톡톡 hh:mm' · 못 맞춘 사람은 줄에 까닭 (근무자가 번호 복사로 직접) · 결과는 그날 이 PC 에만 (astanakiz-revtalk-날짜)
+     - 현장 POS 앱만 · 08~21시 · 사진 = 바탕화면 '아스타나키즈-재방문안내'의 '보낼사진_D-5.jpg'(사장님이 둔 사진, 있으면) 또는 그날 안내 이미지 */
+  const RT = { job: null, arm: 0, armT: 0 };
+  const RT_APP = () => APP && !OFFICE && !!(window.desk && window.desk.talkSend);
+  const REV_TALK = () => "astanakiz-revtalk-" + TODAY;
+  let revTalk = (() => { try { return JSON.parse(localStorage.getItem(REV_TALK())) || {}; } catch (e) { return {}; } })();
+  const revTalkSave = () => { try { localStorage.setItem(REV_TALK(), JSON.stringify(revTalk)); } catch (e) { /* 저장 못 해도 화면은 동작 */ } };
+  /** 톡톡으로 보낼 사람: 오늘 안 온 · 아직 '보냄'이 아닌 · 휴대폰 번호가 있는 사람 (D-5 · D-3 차례) */
+  function rtList() {
+    const t = revTargets(); if (!t) return [];
+    return REV_LEFT.flatMap((l) => t[l].filter((x) => !x.today && !revSent[`${l}|${x.k}`] && /^01\d{8,9}$/.test(digits(x.phone))).map((x) => ({ key: `${l}|${x.k}`, name: x.name, phone: digits(x.phone), left: l })));
+  }
+  /** 앱이 알려 준 진행 · 결과 → 줄마다 남기고 보낸 사람은 '보냄 톡톡 hh:mm' (한 번만 — 근무자가 '보냄'을 풀면 그대로) */
+  const rtSeen = new Set();
+  function rtApply(v) {
+    const j = v && v.job;
+    if (!j) return;
+    RT.job = j;
+    for (const r of j.results || []) {
+      const once = `${j.at}|${j.dry ? "d" : "s"}|${r.key}`;
+      if (rtSeen.has(once)) continue;
+      rtSeen.add(once);
+      revTalk[r.key] = { dry: !!j.dry, ok: r.ok, skip: r.skip, how: r.how, why: r.why, at: r.at, sent: r.sent || null };
+      if (!j.dry && r.ok) revSent[r.key] = "톡톡 " + r.at;
+      if (!j.dry) rtLogPut(r.key, r.ok ? "성공" : r.sent && r.sent.text ? "글만" : r.skip ? "건너뜀" : "실패", r.ok ? "" : r.why || r.step || "", r.at, !!j.auto);
+    }
+    if (!j.dry && !j.running && j.end && !rtSeen.has(`${j.at}|end`)) { rtSeen.add(`${j.at}|end`); rtLogRun(j); }
+    revTalkSave(); revSaveSent(); renderRevBtn();
+    rtPaint();
+  }
+  /* 톡톡 자동알림 기록 (사장님 11/16): 날짜마다 대상(D-5 · D-3) 몇 명 · 사람마다 결과(성공 · 실패 · 건너뜀 · 글만 · 직접 · 안 보냄 · 오늘 방문) · 까닭
+     - 이름 · 전화 뒷 4자리만 (사장님이 톡톡 대화창에서 직접 찾아 제대로 갔는지 보거나 수동으로 보냄) — 전화번호 전체는 안 남김
+     - 현장 POS 에만 (localStorage astanakiz-revtalklog · 사무실 PC · 클라우드로 안 감) · 90일 지나면 지움 */
+  const RT_LOG = "astanakiz-revtalklog";
+  /** 기록 안 손님 구분값: 'D-n|장부 열쇠'를 짧은 해시로 (장부 열쇠에 전화번호가 들어 있어 90일 기록에는 안 남김) */
+  const rtKey = (id) => { let h = 0x811c9dc5; for (const ch of String(id)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 0x01000193) >>> 0; } return String(id).split("|")[0] + "|" + h.toString(36); };
+  let rtLogStr = null;
+  const rtLogGet = () => { try { return JSON.parse(localStorage.getItem(RT_LOG)) || {}; } catch (e) { return {}; } };
+  function rtLogWrite(L) {
+    const old = shiftDay(TODAY, -90);
+    for (const d of Object.keys(L)) if (!isDay(d) || d < old) delete L[d];
+    const str = JSON.stringify(L);
+    if (str === rtLogStr) return;
+    rtLogStr = str;
+    try { localStorage.setItem(RT_LOG, str); } catch (e) { /* 저장 못 해도 화면은 동작 */ }
+  }
+  /** 오늘 기록에 대상을 맞춤 (새 사람 더함 · 오늘 온 사람 표시) — 결과는 그대로 둠 */
+  function rtLogDay(L) {
+    const t = revTargets(); if (!t) return null;
+    const R = L[TODAY] || (L[TODAY] = { t: {}, p: {}, runs: [] });
+    for (const l of REV_LEFT) {
+      R.t[l] = t[l].length;
+      for (const x of t[l]) {
+        const id = rtKey(`${l}|${x.k}`), P = R.p[id] || (R.p[id] = { n: x.name, d: digits(x.phone).slice(-4), l, s: "안 보냄", w: "", at: "" });
+        if (x.today && P.s === "안 보냄") P.s = "오늘 방문";
+      }
+    }
+    return R;
+  }
+  function rtLogSync() { try { if (OFFICE) return; const L = rtLogGet(), R = rtLogDay(L); if (R) rtLogWrite(L); } catch (e) { /* 처음 그릴 때(아직 준비 전)는 넘어감 */ } }
+  function rtLogPut(id, st, why, at, auto) {
+    if (OFFICE) return;
+    const L = rtLogGet(), R = rtLogDay(L); id = rtKey(id); if (!R || !R.p[id]) return;
+    Object.assign(R.p[id], { s: st, w: String(why || "").slice(0, 120), at: at || hm(now), auto: !!auto });
+    rtLogWrite(L);
+  }
+  function rtLogRun(j) {
+    if (OFFICE) return;
+    const L = rtLogGet(), R = rtLogDay(L); if (!R) return;
+    R.runs.push({ at: String(j.at || "").slice(11), auto: !!j.auto, n: j.total, ok: j.results.filter((r) => r.ok).length, skip: j.results.filter((r) => r.skip).length, why: String(j.why || "").slice(0, 120), stop: !!j.stopped });
+    R.runs = R.runs.slice(-10);
+    rtLogWrite(L);
+  }
+  /** 근무자가 '보냄'을 직접 누름/풂 → 톡톡으로 성공한 사람이 아니면 '직접' / '안 보냄' */
+  function rtLogMark(id, on) {
+    if (OFFICE) return;
+    const L = rtLogGet(), R = rtLogDay(L); id = rtKey(id); if (!R || !R.p[id]) return;
+    const P = R.p[id];
+    if (on && P.s !== "성공") { P.w = P.s === "안 보냄" || P.s === "오늘 방문" ? "" : `톡톡 ${P.s}${P.w ? ": " + P.w : ""}`; P.s = "직접"; P.at = hm(now); }
+    else if (!on && P.s === "직접") { P.s = "안 보냄"; P.at = ""; }
+    rtLogWrite(L);
+  }
+  const RT_ST = ["성공", "글만", "직접", "실패", "건너뜀", "안 보냄", "오늘 방문"];
+  function rtLogHtml() {
+    if (OFFICE) return `<span class="help">톡톡 기록은 현장 POS 에만 있어요 (손님 이름이 들어 있어 사무실 PC 로 안 보냄)</span>`;
+    const L = rtLogGet(), days = Object.keys(L).filter(isDay).sort().reverse().slice(0, 30);
+    if (!days.length) return `<span class="help">아직 기록이 없어요 — 재방문 안내 대상이 있는 날부터 남아요</span>`;
+    return days.map((d, i) => {
+      const R = L[d], P = Object.values(R.p || {}).sort((a, b) => b.l - a.l || RT_ST.indexOf(a.s) - RT_ST.indexOf(b.s) || String(a.n).localeCompare(String(b.n), "ko"));
+      const cnt = (st) => P.filter((x) => x.s === st).length;
+      const sum = ["성공", "글만", "직접", "실패", "건너뜀", "안 보냄"].filter((st) => cnt(st)).map((st) => `${st} ${cnt(st)}`).join(" · ");
+      const runs = (R.runs || []).map((r) => `${r.auto ? "자동" : "직접"} ${r.at}`).join(", ");
+      return `<details class="rtlog" ${i ? "" : "open"}><summary><b>${esc(dateLabel(d))}</b> 대상 ${P.length}명 <span class="help">(D-5 ${(R.t || {})[5] || 0} · D-3 ${(R.t || {})[3] || 0})</span> ${esc(sum)}${runs ? ` <span class="help">· 보낸 때 ${esc(runs)}</span>` : ""}</summary>
+        ${P.map((x) => `<div class="rtlrow"><b>${esc(x.n)}</b><span class="num">뒷번호 ${esc(x.d)}</span><span>D-${x.l}</span><span class="rts ${x.s === "성공" ? "ok" : /실패|건너뜀|글만/.test(x.s) ? "bad" : ""}">${esc(x.s)}${x.at ? ` ${esc(x.at)}` : ""}${x.auto ? " (자동)" : ""}</span><span class="help">${esc(x.w || "")}</span></div>`).join("")}</details>`;
+    }).join("");
+  }
+  /* 매일 자동으로 보내기 (기본 꺼짐 — 처음에는 [확인만 해 보기] · 직접 보내기로 결과를 본 뒤 켬)
+     켜면 매일 정한 시각(기본 11:00, 08~21시) 뒤 한 번: D-5 · D-3 중 아직 안 보낸 사람에게 · 앱이 꺼져 있었으면 켜진 뒤 그날 안에 · 그날 한 번만 */
+  RT.auto = { on: false, at: "11:00" };
+  if (RT_APP() && window.desk.config) window.desk.config.get().then((c) => { const v = c && c.revTalkAuto; if (v) RT.auto = { on: !!v.on, at: /^\d{2}:\d{2}$/.test(v.at || "") ? v.at : "11:00" }; }).catch(() => {});
+  function rtTick() {
+    if (!RT_APP() || !RT.auto.on || OFFICE || (RT.job && RT.job.running) || RT.autoDay === TODAY) return;
+    if (now < toMin(RT.auto.at) || now < 8 * 60 || now >= 21 * 60) return;
+    const k = "astanakiz-revtalk-auto-" + TODAY;
+    RT.autoDay = TODAY;
+    try { if (localStorage.getItem(k)) return; localStorage.setItem(k, hm(now)); } catch (e) { /* 그날 한 번 */ }
+    if (!EV.optout || !rtList().length) return;
+    rtStart(false, true);
+  }
+  function rtAutoRow() {
+    const dis = RT_APP() && !OFFICE ? "" : "disabled";
+    return `<div class="btns" style="align-items:center"><button type="button" class="svswitch ${RT.auto.on ? "on" : ""}" role="switch" aria-checked="${RT.auto.on}" data-act="rtAutoToggle" ${dis}><span class="knob"></span><b>매일 자동으로 보내기 ${RT.auto.on ? "켜짐" : "꺼짐"}</b></button>
+      <input type="time" id="rt-auto-at" class="date-in" value="${esc(RT.auto.at)}" min="08:00" max="20:30" aria-label="자동으로 보낼 시각" ${dis}></div>
+      <span class="help">${RT_APP() && !OFFICE ? `켜면 매일 ${esc(RT.auto.at)} 뒤 한 번 (08~21시 · 앱이 켜져 있을 때) D-5 · D-3 손님 중 아직 안 보낸 사람에게 톡톡으로 — 처음에는 꺼 둔 채 [확인만 해 보기] · 직접 보내기로 결과를 본 뒤 켜 주세요` : "현장 POS 앱에서만"}${EV.optout ? "" : " · <b class=\"evwarn\">수신거부 안내가 있어야 보내요</b>"}</span>`;
+  }
+  /** 창이 열려 있으면 막대 · 명단만 다시 (내린 자리 그대로) */
+  function rtPaint() {
+    if (sheet.mode !== "rev") return;
+    const bar = $("rt-bar"); if (bar) bar.outerHTML = rtBar();
+    const body = document.querySelector("#sheet .revbody");
+    if (body) { const y = body.scrollTop; body.innerHTML = REV_LEFT.map(revSec).join(""); body.scrollTop = y; revFill(); }
+  }
+  const rtSum = (j) => {
+    const ok = j.results.filter((r) => r.ok).length, skip = j.results.filter((r) => r.skip).length;
+    return `${j.dry ? "확인만" : "보냄"} ${ok}명${skip ? ` · 건너뜀 ${skip}명` : ""}${j.why ? ` · 멈춤: ${j.why}` : j.stopped ? " · 근무자가 멈춤" : ""}${j.end ? ` (${j.end.slice(11)})` : ""}`;
+  };
+  function rtRowNote(id) {
+    const r = revTalk[id]; if (!r) return "";
+    const t = r.dry ? (r.ok ? `톡톡 확인 ✓ ${r.how === "번호" ? "번호로 맞춤" : "가린 번호 · 이름으로 맞춤"} (안 보냄)` : `톡톡 확인: ${r.why || "못 함"}`)
+      : r.ok ? "" : r.sent && r.sent.text ? `톡톡 글만 보냄 — 사진은 직접 (${r.why || ""})` : `톡톡 ${r.skip ? "건너뜀" : "못 보냄"}: ${r.why || ""} — 번호 복사로 직접`;
+    return t ? `<span class="rvtalk ${r.ok ? "" : "evwarn"}">${esc(t)}</span>` : "";
+  }
+  function rtBar() {
+    const j = RT.job;
+    if (!RT_APP()) return `<div class="rtbar" id="rt-bar"><b>네이버 톡톡</b><span class="help">현장 POS 앱에서 [톡톡으로 보내기] — 스마트플레이스 고객에서 손님을 찾아 글 · 안내 이미지를 보내요</span></div>`;
+    if (j && j.running) return `<div class="rtbar run" id="rt-bar"><b>네이버 톡톡 ${j.dry ? "확인 중" : "보내는 중"}</b><span class="num">${j.results.length}/${j.total}</span><span class="help">${esc(j.step || "")}</span><button class="btn btn-sm" data-act="rtStop">멈추기</button></div>`;
+    const n = rtList().length, armed = RT.arm > Date.now();
+    return `<div class="rtbar" id="rt-bar"><b>네이버 톡톡</b><button class="btn btn-sm" data-act="rtRun" data-dry="1" ${n ? "" : "disabled"}>확인만 해 보기</button><button class="btn btn-sm ${armed ? "btn-red" : "btn-ink"}" data-act="rtRun" ${n && EV.optout ? "" : "disabled"}>${armed ? `한 번 더 누르면 ${n}명에게 보내요` : `톡톡으로 보내기 ${n}명`}</button>${j && j.end ? `<span class="help ${j.why ? "evwarn" : ""}">지난번: ${esc(rtSum(j))}</span>` : ""}
+      <span class="help rtwide">스마트플레이스 고객에서 전화번호 뒷번호로 찾아 이름까지 맞는 손님에게 글(맨 앞 (광고) · 맨 아래 수신거부) → 안내 이미지. 맞는 사람이 하나로 안 정해지면 건너뛰고 줄에 까닭이 나와요 (번호 복사로 직접)</span></div>`;
+  }
+  /** 시작: 그날 안내 이미지를 바탕화면 '아스타나키즈-재방문안내'에 저장한 뒤 (앱은 그 폴더 파일만 보냄 · 사장님 사진 '보낼사진_D-n' 이 있으면 그것) */
+  async function rtStart(dry, auto) {
+    const list = rtList();
+    if (!RT_APP() || !list.length || (RT.job && RT.job.running)) return;
+    for (const l of new Set(list.map((x) => x.left))) {
+      const r = await window.desk.revImg.save({ name: `재방문안내_D-${l}_${TODAY}.jpg`, dataUrl: await revImage(l) }).catch((e) => ({ ok: false, why: String(e) }));
+      if (!r || !r.ok) { toast(`안내 이미지를 저장하지 못해 톡톡을 시작하지 않았어요: ${(r && r.why) || ""}`, 8000); return; }
+    }
+    const v = await window.desk.talkSend.run({ dry, auto, list, text: { 5: revMsg(5), 3: revMsg(3) } }).catch((e) => ({ ok: false, why: String(e) }));
+    if (!v || !v.ok) {
+      toast(`톡톡 ${dry ? "확인" : "보내기"}를 시작하지 못했어요: ${(v && v.why) || ""}`, 8000);
+      if (auto) rtLogRun({ at: `${TODAY} ${hm(now)}`, auto: true, total: list.length, results: [], why: `시작 못 함: ${(v && v.why) || ""}` });
+      return;
+    }
+    rtApply(v);
+    toast(dry ? `톡톡 확인만 — ${list.length}명 대화창까지 열어 보고 안 보내요` : `톡톡으로 ${list.length}명에게 ${auto ? "자동으로 " : ""}보내요 — 한 사람씩 (사이에 입장 처리도 돼요)`, 5000);
+  }
+  if (RT_APP()) {
+    window.desk.talkSend.status().then(rtApply, () => {});
+    window.desk.talkSend.onProgress(rtApply);
+    window.desk.talkSend.onDone((v) => { rtApply(v); const j = v && v.job; if (j) toast(`네이버 톡톡 ${rtSum(j)}`, 8000); });
+  }
   /** 글 복사 — 앱은 본체 클립보드 · 체험판은 브라우저 */
   async function revClip(text, what) {
     let ok = false;
@@ -5153,6 +5339,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     svTick(); // 설문 누적 20:00 보고
     evsTick(); // 이벤트 입장 수 20:00 보고 (설문과 같이 · 설문이 없어도)
     cwTick(); // 수량 관찰 기록 (5분마다 · 11/13)
+    rtTick(); // 재방문 안내 톡톡 매일 자동 보내기 (켰을 때 · 11/16)
     rentTick(); // 대관 기록 → 보고 앱 (바뀌면 바로 · 실패하면 10분 뒤)
     liveTick(); // 폰 실시간 현황 (1분마다 · 바뀌면 5초 안에)
     hvTick(); // 재방문 간격 20:00 보고 · 지난 기록 읽기 진행
@@ -5477,10 +5664,30 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     evsSendNow() { evsSend("manual"); },
     // 재방문 안내 (사장님 11/15)
     revOpen() { openSheet({ mode: "rev" }); },
+    // 재방문 안내 → 네이버 톡톡 (11/16): 확인만 · 보내기(한 번 더 눌러야) · 멈추기
+    async rtRun(btn) {
+      if (!RT_APP() || (RT.job && RT.job.running)) return;
+      const dry = !!btn.dataset.dry;
+      if (!rtList().length) return;
+      if (!dry) {
+        if (!EV.optout) { toast("광고 문자는 맨 아래에 무료 수신거부 방법이 있어야 해요 — 운영 설정 → 재방문 이벤트 '수신거부 안내'", 6000); return; }
+        if (!(RT.arm > Date.now())) { RT.arm = Date.now() + 8000; clearTimeout(RT.armT); RT.armT = setTimeout(rtPaint, 8100); rtPaint(); return; }
+        RT.arm = 0;
+      }
+      rtStart(dry, false);
+    },
+    rtAutoToggle() {
+      RT.auto = { ...RT.auto, on: !RT.auto.on };
+      if (RT_APP() && window.desk.config) window.desk.config.set({ revTalkAuto: RT.auto });
+      if (RT.auto.on) { RT.autoDay = ""; try { if (toMin(RT.auto.at) <= now) localStorage.setItem("astanakiz-revtalk-auto-" + TODAY, "켤 때 지남"); } catch (e) { /* 그날 한 번 */ } } // 정한 시각이 지난 뒤 켜면 다음 날부터
+      const el = $("rt-auto"); if (el) el.innerHTML = rtAutoRow();
+      toast(RT.auto.on ? `톡톡 자동 보내기 켬 — 매일 ${RT.auto.at} 뒤 한 번${toMin(RT.auto.at) <= now ? " (오늘은 시각이 지나 내일부터)" : ""}` : "톡톡 자동 보내기 끔");
+    },
+    async rtStop() { if (!RT_APP()) return; rtApply(await window.desk.talkSend.stop()); toast("지금 사람까지 하고 멈춰요"); },
     revCopy(btn) { revClip(btn.dataset.v, "번호를"); },
     revText(btn) { revClip(revMsg(Number(btn.dataset.l)), "문구를"); },
     revAll(btn) { const l = Number(btn.dataset.l), t = revTargets(); const nums = t ? t[l].filter((x) => !x.today).map((x) => digits(x.phone)).filter(Boolean) : []; revClip(nums.join(", "), `번호 ${nums.length}개를`); },
-    revSentT(btn) { const id = btn.dataset.id; if (revSent[id]) delete revSent[id]; else revSent[id] = hm(now); revSaveSent(); renderRevBtn(); renderSheet(); },
+    revSentT(btn) { const id = btn.dataset.id; if (revSent[id]) delete revSent[id]; else revSent[id] = hm(now); revSaveSent(); rtLogMark(id, !!revSent[id]); renderRevBtn(); renderSheet(); },
     async revSave(btn) {
       const l = Number(btn.dataset.l), url = await revImage(l), name = `재방문안내_D-${l}_${TODAY}.jpg`;
       if (APP && window.desk.revImg) {
@@ -5983,6 +6190,12 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       if (!APP || !window.desk.naver.dump) return;
       const r = await window.desk.naver.dump();
       toast(r && r.ok ? "바탕화면 '아스타나키즈-진단' 폴더에 저장했어요" : `저장 못 함: ${(r && r.why) || ""}`);
+    },
+    async spHome() {
+      if (!APP || !window.desk.talkSend) return;
+      const r = await window.desk.talkSend.setHome();
+      CFG = await window.desk.config.get();
+      toast(r && r.ok ? "톡톡 보내기 시작 화면(스마트플레이스 고객)을 기억했어요" : (r && r.why) || "기억하지 못했어요", 6000); renderSheet();
     },
     async naverHome() {
       const r = await window.desk.naver.setHome();
@@ -6551,6 +6764,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     if (t.id === "ev-seal") { EV.seal = t.checked; evSaveCfg(); $("ev-paper").innerHTML = evPrev(); evScroll("ev-paper"); toast(t.checked ? "쿠폰을 보안 무늬 그림으로 찍어요 — [시험 출력]으로 확인해 보세요" : "쿠폰을 예전처럼 글자로 찍어요"); }
     if (t.id === "ev-use" || t.id === "ev-useu") { EV.useUnit = $("ev-useu").value === "일" ? "일" : "개월"; EV.useN = useClamp($("ev-use").value, EV.useUnit); evSaveCfg(); $("ev-paper").innerHTML = evPrev(); evScroll("ev-paper"); $("ev-usehelp").textContent = useHelp(); }
     if (t.id === "ev-optout") { EV.optout = t.value.trim().slice(0, 60); evSaveCfg(); }
+    if (t.id === "rt-auto-at" && /^\d{2}:\d{2}$/.test(t.value) && RT_APP()) { RT.auto = { ...RT.auto, at: t.value < "08:00" ? "08:00" : t.value > "20:30" ? "20:30" : t.value }; window.desk.config.set({ revTalkAuto: RT.auto }); const el = $("rt-auto"); if (el) el.innerHTML = rtAutoRow(); }
     if (t.id === "ev-gift") { EV.gift = t.value.trim(); evSaveCfg(); $("ev-paper").innerHTML = evPrev(); evScroll("ev-paper"); $("ev-dates").textContent = evDatesText(); }
     if (t.id === "sv-from" || t.id === "sv-to") { SV[t.id === "sv-from" ? "from" : "to"] = t.value; svSaveCfg(); renderSheet(); }
     if (t.id === "sv-send") { SV.send = t.checked; svSaveCfg(); toast(t.checked ? "설문 누적을 매일 20:00 보고앱에 보내요" : "설문 보고앱 보내기를 껐어요"); }
