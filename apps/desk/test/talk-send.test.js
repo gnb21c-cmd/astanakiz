@@ -365,3 +365,58 @@ test("매일 자동으로 보내기: 켜 두면 정한 시각(11:00) 뒤 한 번
     await browser.close();
   }
 });
+
+test("기준이 바뀐 날(5일 · 3일 → 8일): 아침에 적힌 5일 · 3일 줄은 기록에서 빠짐(보낸 줄은 남김) · 안내 글도 8일 · 수신거부 안내가 없으면 자동은 기다렸다가 넣은 뒤 그날 보냄", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    await page.clock.install({ time: new Date("2026-11-15T10:58:00") });
+    await page.addInitScript((led) => {
+      if (!localStorage.getItem("astanakiz-visitlog-2026-10-26")) {
+        localStorage.setItem("astanakiz-visitlog-2026-10-26", led);
+        // 2.23 이 아침에 적은 기록 (5일 · 3일 기준)
+        localStorage.setItem("astanakiz-revtalklog", JSON.stringify({ "2026-11-15": { t: { 5: 2, 3: 1 }, p: { "5|aa": { n: "옛손님가", d: "1111", l: 5, s: "안 보냄", w: "", at: "" }, "5|bb": { n: "옛손님나", d: "2222", l: 5, s: "성공", w: "", at: "09:10" }, "3|cc": { n: "옛손님다", d: "3333", l: 3, s: "오늘 방문", w: "", at: "" } }, runs: [] } }));
+      }
+      window.__runs = []; window.__cb = {};
+      const cfg = { build: "2.24", revTalkAuto: { on: true, at: "11:00" }, visitEvent: { ver: 2, on: true, from: "2026-10-26", to: "2026-11-30", days: 20, gift: "수제돈까스", optout: "" } };
+      window.desk = {
+        naver: { load: async (day) => ({ ok: true, day, slots: [], bookings: [] }), complete: async () => ({ ok: true }) },
+        state: { load: () => null, save: () => {} },
+        config: { get: async () => cfg, set: async (p) => { Object.assign(cfg, p); return { ok: true }; } },
+        revImg: { save: async () => ({ ok: true }) },
+        talkSend: {
+          run: async (req) => { window.__runs.push(JSON.parse(JSON.stringify(req))); return { ok: true, job: { running: true, dry: false, auto: !!req.auto, at: "2026-11-15 11:00", total: req.list.length, step: "", why: "", results: [] } }; },
+          status: async () => ({ ok: true, job: null }), stop: async () => ({ ok: true, job: null }), setHome: async () => ({ ok: true }),
+          onProgress: (cb) => { window.__cb.progress = cb; }, onDone: (cb) => { window.__cb.done = cb; },
+        },
+      };
+    }, LEDGER);
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK);
+    await page.clock.runFor(3 * 60000); // 11:01 — 수신거부 안내가 없어 기다림
+    assert.strictEqual(await page.evaluate(() => window.__runs.length), 0, "수신거부 안내가 없으면 안 보냄");
+    await page.dblclick("#now");
+    await page.click("[data-t=event]");
+    assert.match(await page.textContent("#rt-auto"), /기한 8일 남은 손님\(손님께는 '7일'\) 중 아직 안 보낸 사람에게/);
+    assert.ok(!/D-5 · D-3/.test(await page.textContent("#rt-auto")));
+    assert.match(await page.textContent("#rt-auto"), /수신거부 안내가 있어야 보내요/);
+    const sum = await page.$eval(".rtlogs details summary", (e) => e.textContent.replace(/\s+/g, " "));
+    assert.match(sum, /대상 5명 \(D-8 4\) 성공 1 /, "5일 · 3일 '안 보냄' · '오늘 방문' 줄은 빠지고 보낸 줄(옛손님나)은 남음");
+    const names = await page.$$eval(".rtlogs .rtlrow b", (e) => e.map((x) => x.textContent));
+    assert.ok(names.includes("옛손님나") && !names.includes("옛손님가") && !names.includes("옛손님다"), names.join());
+    // 수신거부 안내를 넣으면 그날 안에 한 번
+    await page.fill("#ev-optout", "무료수신거부 080-000-0000");
+    await page.click("#sheet [data-act=close]");
+    await page.clock.runFor(3000);
+    await page.waitForFunction(() => window.__runs.length === 1);
+    const run = await page.evaluate(() => window.__runs[0]);
+    assert.deepStrictEqual([run.auto, run.list.map((x) => [x.name, x.left])], [true, [["가손님", 8], ["나손님", 8], ["바손님", 8]]], "8일 남은 사람만");
+    assert.match(run.text[8], /고객님 아직 7일 남았습니다\. 7일 안에 방문하셔서 수제돈까스 받아가세요\.[\s\S]*무료수신거부 080-000-0000$/);
+    await page.clock.runFor(60000);
+    assert.strictEqual(await page.evaluate(() => window.__runs.length), 1, "그날 한 번만");
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});

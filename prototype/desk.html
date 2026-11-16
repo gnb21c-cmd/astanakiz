@@ -4850,6 +4850,9 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   function rtLogDay(L) {
     const t = revTargets(); if (!t) return null;
     const R = L[TODAY] || (L[TODAY] = { t: {}, p: {}, runs: [] });
+    // 기준이 바뀐 날 (11/16: 5일 · 3일 → 8일): 지금 기준이 아닌 줄 중 보내거나 표시한 적 없는 것은 뺌 — 그 손님에게는 안 보냄
+    for (const k of Object.keys(R.t)) if (!REV_LEFT.includes(Number(k))) delete R.t[k];
+    for (const [id, P] of Object.entries(R.p)) if (!REV_LEFT.includes(Number(P.l)) && (P.s === "안 보냄" || P.s === "오늘 방문")) delete R.p[id];
     for (const l of REV_LEFT) {
       R.t[l] = t[l].length;
       for (const x of t[l]) {
@@ -4903,17 +4906,18 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   function rtTick() {
     if (!RT_APP() || !RT.auto.on || OFFICE || (RT.job && RT.job.running) || RT.autoDay === TODAY) return;
     if (now < toMin(RT.auto.at) || now < 8 * 60 || now >= 21 * 60) return;
+    if (!EV.optout) return; // 수신거부 안내가 없으면 기다림 (넣으면 그날 안에 한 번)
     const k = "astanakiz-revtalk-auto-" + TODAY;
     RT.autoDay = TODAY;
     try { if (localStorage.getItem(k)) return; localStorage.setItem(k, hm(now)); } catch (e) { /* 그날 한 번 */ }
-    if (!EV.optout || !rtList().length) return;
+    if (!rtList().length) return;
     rtStart(false, true);
   }
   function rtAutoRow() {
     const dis = RT_APP() && !OFFICE ? "" : "disabled";
     return `<div class="btns" style="align-items:center"><button type="button" class="svswitch ${RT.auto.on ? "on" : ""}" role="switch" aria-checked="${RT.auto.on}" data-act="rtAutoToggle" ${dis}><span class="knob"></span><b>매일 자동으로 보내기 ${RT.auto.on ? "켜짐" : "꺼짐"}</b></button>
       <input type="time" id="rt-auto-at" class="date-in" value="${esc(RT.auto.at)}" min="08:00" max="20:30" aria-label="자동으로 보낼 시각" ${dis}></div>
-      <span class="help">${RT_APP() && !OFFICE ? `켜면 매일 ${esc(RT.auto.at)} 뒤 한 번 (08~21시 · 앱이 켜져 있을 때) D-5 · D-3 손님 중 아직 안 보낸 사람에게 톡톡으로 — 처음에는 꺼 둔 채 [확인만 해 보기] · 직접 보내기로 결과를 본 뒤 켜 주세요` : "현장 POS 앱에서만"}${EV.optout ? "" : " · <b class=\"evwarn\">수신거부 안내가 있어야 보내요</b>"}</span>`;
+      <span class="help">${RT_APP() && !OFFICE ? `켜면 매일 ${esc(RT.auto.at)} 뒤 한 번 (08~21시 · 앱이 켜져 있을 때) 기한 ${REV_LEFT.join("일 · ")}일 남은 손님(손님께는 '${REV_LEFT.map(revSay).join("일 · ")}일') 중 아직 안 보낸 사람에게 톡톡으로 — 처음에는 꺼 둔 채 [확인만 해 보기] · 직접 보내기로 결과를 본 뒤 켜 주세요` : "현장 POS 앱에서만"}${EV.optout ? "" : " · <b class=\"evwarn\">수신거부 안내가 있어야 보내요 (위 '재방문 안내 문자' 칸)</b>"}</span>`;
   }
   /** 창이 열려 있으면 막대 · 명단만 다시 (내린 자리 그대로) */
   function rtPaint() {
