@@ -4772,9 +4772,9 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       const rows = list.map((x) => {
         const id = `${l}|${x.k}`, sent = revSent[id];
         return `<div class="rvrow ${x.today ? "today" : ""} ${sent ? "sent" : ""}"><b>${esc(x.name)}</b><span class="num">${esc(fmtPhone(x.phone))}</span><span class="help">방문 ${x.visits}번 · ${x.ok ? `${esc(EV.gift)} ${x.ok}번 받음` : "아직 안 받음"} · 마지막 ${md(x.last)}</span>${x.today ? `<span class="help rvtoday">오늘 방문 — 안 보내도 돼요</span><span></span>`
-          : `<button class="btn btn-sm" data-act="revCopy" data-v="${esc(digits(x.phone))}">번호 복사</button><button class="btn btn-sm ${sent ? "btn-ink" : ""}" data-act="revSentT" data-id="${esc(id)}" aria-pressed="${!!sent}">${sent ? `보냄 ${esc(sent)}` : "보냄"}</button>`}${x.today ? "" : rtRowNote(id)}</div>`;
+          : `<button class="btn btn-sm" data-act="revCopy" data-v="${esc(digits(x.phone))}">번호 복사</button><button class="btn btn-sm ${sent ? "btn-ink" : ""}" data-act="revSentT" data-id="${esc(id)}" aria-pressed="${!!sent}" title="이 단추는 보내지 않아요 — 문자 등으로 직접 보낸 뒤 눌러 '보냄'으로 표시만 해요 (톡톡은 위 [톡톡으로 보내기])">${!sent ? "직접 보냄 표시" : /^톡톡/.test(sent) ? `톡톡 보냄 ✓ ${esc(sent.replace(/^톡톡\s*/, ""))}` : `직접 보냄 ✓ ${esc(sent)}`}</button>`}${x.today ? "" : rtRowNote(id)}</div>`;
       }).join("");
-      return `<section class="revsec ${l <= 3 ? "d3" : "d5"}"><h4>D-${l} <span class="num">· 기한 ${esc(revDueText(revDue(l)))} · 손님께는 '${revSay(l)}일'</span> <small>${send.length}명 · 보냄 ${done}</small></h4>
+      return `<section class="revsec ${l <= 3 ? "d3" : "d5"}"><h4>D-${l} <span class="num">· 기한 ${esc(revDueText(revDue(l)))} · 손님께는 '${revSay(l)}일'</span> <small>${send.length}명 · 보냄 ${done}</small>${send.some((x) => revSent[`${l}|${x.k}`] && !/^톡톡/.test(revSent[`${l}|${x.k}`])) ? ` <button class="btn btn-sm" data-act="revSentClear" data-l="${l}" title="직접 표시한 '보냄'만 풀어요 (톡톡으로 보낸 것은 그대로)">표시 모두 풀기</button>` : ""}</h4>
         ${list.length ? `<div class="revgrid"><div><img class="revimg" id="rev-img-${l}" alt="D-${l} 안내 이미지"><span class="help revcap" id="rev-imgcap-${l}"></span>
           ${OFFICE ? "" : `<div class="btns"><button class="btn btn-sm btn-ink" data-act="revPick" data-l="${l}">그림 고르기</button><button class="btn btn-sm" data-act="revClear" data-l="${l}" id="rev-imgclr-${l}" hidden>그림 빼기</button></div>`}</div><div class="revside">
           <div class="btns"><button class="btn btn-sm" data-act="revSave" data-l="${l}">이미지 저장</button><button class="btn btn-sm" data-act="revText" data-l="${l}">문구 복사</button><button class="btn btn-sm" data-act="revAll" data-l="${l}" ${send.length ? "" : "disabled"}>번호 모두 복사</button></div>
@@ -4814,10 +4814,12 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   let revTalk = (() => { try { return JSON.parse(localStorage.getItem(REV_TALK())) || {}; } catch (e) { return {}; } })();
   const revTalkSave = () => { try { localStorage.setItem(REV_TALK(), JSON.stringify(revTalk)); } catch (e) { /* 저장 못 해도 화면은 동작 */ } };
   /** 톡톡으로 보낼 사람: 오늘 안 온 · 아직 '보냄'이 아닌 · 휴대폰 번호가 있는 사람 (D-5 · D-3 차례) */
-  function rtList() {
+  function rtList(all) {
     const t = revTargets(); if (!t) return [];
-    return REV_LEFT.flatMap((l) => t[l].filter((x) => !x.today && !revSent[`${l}|${x.k}`] && /^01\d{8,9}$/.test(digits(x.phone))).map((x) => ({ key: `${l}|${x.k}`, name: x.name, phone: digits(x.phone), left: l })));
+    return REV_LEFT.flatMap((l) => t[l].filter((x) => !x.today && (all || !revSent[`${l}|${x.k}`]) && /^01\d{8,9}$/.test(digits(x.phone))).map((x) => ({ key: `${l}|${x.k}`, name: x.name, phone: digits(x.phone), left: l })));
   }
+  /** 확인만 해 보기 대상: 아직 안 보낸 사람 · 모두 '보냄'이면 전체 (확인은 보내지 않으니 · 2.25 현장 11/16: 모두 보냄이라 단추가 안 눌렸음) */
+  const rtDryList = () => { const a = rtList(); return a.length ? a : rtList(true); };
   /** 앱이 알려 준 진행 · 결과 → 줄마다 남기고 보낸 사람은 '보냄 톡톡 hh:mm' (한 번만 — 근무자가 '보냄'을 풀면 그대로) */
   const rtSeen = new Set();
   function rtApply(v) {
@@ -4946,13 +4948,13 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     const j = RT.job;
     if (!RT_APP()) return `<div class="rtbar" id="rt-bar"><b>네이버 톡톡</b><span class="help">현장 POS 앱에서 [톡톡으로 보내기] — 스마트플레이스 고객에서 손님을 찾아 글 · 안내 이미지를 보내요</span></div>`;
     if (j && j.running) return `<div class="rtbar run" id="rt-bar"><b>네이버 톡톡 ${j.dry ? "확인 중" : "보내는 중"}</b><span class="num">${j.results.length}/${j.total}</span><span class="help">${esc(j.step || "")}</span><button class="btn btn-sm" data-act="rtStop">멈추기</button></div>`;
-    const n = rtList().length, armed = RT.arm > Date.now();
-    return `<div class="rtbar" id="rt-bar"><b>네이버 톡톡</b><button class="btn btn-sm" data-act="rtRun" data-dry="1" ${n ? "" : "disabled"}>확인만 해 보기</button><button class="btn btn-sm ${armed ? "btn-red" : "btn-ink"}" data-act="rtRun" ${n && EV.optout ? "" : "disabled"}>${armed ? `한 번 더 누르면 ${n}명에게 보내요` : `톡톡으로 보내기 ${n}명`}</button>${j && j.end ? `<span class="help ${j.why ? "evwarn" : ""}">지난번: ${esc(rtSum(j))}</span>` : ""}
+    const n = rtList().length, nd = rtDryList().length, armed = RT.arm > Date.now();
+    return `<div class="rtbar" id="rt-bar"><b>네이버 톡톡</b><button class="btn btn-sm" data-act="rtRun" data-dry="1" ${nd ? "" : "disabled"}>확인만 해 보기${n ? "" : nd ? ` (보낸 사람 포함 ${nd}명)` : ""}</button><button class="btn btn-sm ${armed ? "btn-red" : "btn-ink"}" data-act="rtRun" ${n && EV.optout ? "" : "disabled"}>${armed ? `한 번 더 누르면 ${n}명에게 보내요` : `톡톡으로 보내기 ${n}명`}</button>${j && j.end ? `<span class="help ${j.why ? "evwarn" : ""}">지난번: ${esc(rtSum(j))}</span>` : ""}
       <span class="help rtwide">스마트플레이스 고객에서 전화번호 뒷번호로 찾아 이름까지 맞는 손님에게 글(맨 앞 (광고) · 맨 아래 수신거부) → 안내 이미지. 맞는 사람이 하나로 안 정해지면 건너뛰고 줄에 까닭이 나와요 (번호 복사로 직접)</span></div>`;
   }
   /** 시작: 그날 안내 이미지를 바탕화면 '아스타나키즈-재방문안내'에 저장한 뒤 (앱은 그 폴더 파일만 보냄 · 사장님 사진 '보낼사진_D-n' 이 있으면 그것) */
   async function rtStart(dry, auto) {
-    const list = rtList();
+    const list = dry ? rtDryList() : rtList();
     if (!RT_APP() || !list.length || (RT.job && RT.job.running)) return;
     for (const l of new Set(list.map((x) => x.left))) {
       if (await revOwnLoad(l)) continue; // 사장님 그림('보낼사진_D-n')이 있으면 앱이 그것을 보냄
@@ -4965,7 +4967,10 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       if (auto) rtLogRun({ at: `${TODAY} ${hm(now)}`, auto: true, total: list.length, results: [], why: `시작 못 함: ${(v && v.why) || ""}` });
       return;
     }
-    rtApply(v);
+    // 새로 시작한 사람들의 예전 결과(빨간 글)는 지움 — 이번 결과로 다시 채움
+    for (const x of list) if (revTalk[x.key] && !(revTalk[x.key].ok && !revTalk[x.key].dry)) delete revTalk[x.key];
+    revTalkSave();
+    rtApply(v); rtPaint();
     toast(dry ? `톡톡 확인만 — ${list.length}명 대화창까지 열어 보고 안 보내요` : `톡톡으로 ${list.length}명에게 ${auto ? "자동으로 " : ""}보내요 — 한 사람씩 (사이에 입장 처리도 돼요)`, 5000);
   }
   if (RT_APP()) {
@@ -5797,7 +5802,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     async rtRun(btn) {
       if (!RT_APP() || (RT.job && RT.job.running)) return;
       const dry = !!btn.dataset.dry;
-      if (!rtList().length) return;
+      if (!(dry ? rtDryList() : rtList()).length) return;
       if (!dry) {
         if (!EV.optout) { toast("광고 문자는 맨 아래에 무료 수신거부 방법이 있어야 해요 — 운영 설정 → 재방문 이벤트 '수신거부 안내'", 6000); return; }
         if (!(RT.arm > Date.now())) { RT.arm = Date.now() + 8000; clearTimeout(RT.armT); RT.armT = setTimeout(rtPaint, 8100); rtPaint(); return; }
@@ -5816,6 +5821,12 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     revCopy(btn) { revClip(btn.dataset.v, "번호를"); },
     revText(btn) { revClip(revMsg(Number(btn.dataset.l)), "문구를"); },
     revAll(btn) { const l = Number(btn.dataset.l), t = revTargets(); const nums = t ? t[l].filter((x) => !x.today).map((x) => digits(x.phone)).filter(Boolean) : []; revClip(nums.join(", "), `번호 ${nums.length}개를`); },
+    /** 직접 표시한 '보냄'을 한 번에 풂 (톡톡으로 보낸 것은 그대로) */
+    revSentClear(btn) {
+      const l = Number(btn.dataset.l); let n = 0;
+      for (const id of Object.keys(revSent)) if (id.startsWith(l + "|") && !/^톡톡/.test(revSent[id])) { delete revSent[id]; rtLogMark(id, false); n++; }
+      revSaveSent(); renderRevBtn(); renderSheet(); toast(`직접 표시한 '보냄' ${n}개를 풀었어요 — 이제 [톡톡으로 보내기] 대상이에요`);
+    },
     revSentT(btn) { const id = btn.dataset.id; if (revSent[id]) delete revSent[id]; else revSent[id] = hm(now); revSaveSent(); rtLogMark(id, !!revSent[id]); renderRevBtn(); renderSheet(); },
     async revSave(btn) {
       const l = Number(btn.dataset.l);

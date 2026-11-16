@@ -60,17 +60,18 @@ function installTalkSendDriver() {
   };
   /** 전화번호 칸: 글자 전체가 번호 모양인 가장 작은 칸 — 뒷번호만 초록으로 따로 칠한 두 조각(010-3732- + 6371)도 한 칸으로 */
   const phoneEls = (root = document) => $$("*", root).filter((e) => vis(e) && PHONE.test(norm(e.textContent)) && ![...e.children].some((c) => PHONE.test(norm(c.textContent))));
-  /** 목록 줄: 전화번호 칸마다 { name, phone } (오른쪽 고객 카드 · 처음에 저절로 뜨는 첫 손님 카드는 뺌) */
+  /** 목록 줄: 전화번호 칸마다 { name, phone, el(누를 이름) } — 화면 위치로 짝지음: 같은 줄 높이 · 번호 왼쪽 가장 가까운 이름 (2.25 현장 11/16: 이름 칸 · 번호 칸이 따로 그려지면 줄을 못 읽었음)
+      오른쪽 고객 카드(처음에 저절로 뜨는 첫 손님 카드) · 왼쪽 메뉴 · 표 머리글은 뺌 */
+  const listPhones = () => { const cb = cardBox(); return phoneEls().filter((e) => !(cb && cb.contains(e)) && !e.closest("nav, aside")); };
   const rows = () => {
-    const out = [], cb = cardBox();
-    for (const ph of phoneEls()) {
-      if (cb && cb.contains(ph)) continue; // 오른쪽 고객 카드는 빼고
-      let row = ph.parentElement;
-      for (let k = 0; row && k < 4 && !nameEl(row, ph); k++) row = row.parentElement;
-      if (!row) continue;
-      const nm = nameEl(row, ph);
-      if (!nm || phoneEls(row).length !== 1) continue;
-      out.push({ name: norm(nm.textContent), phone: norm(ph.textContent), el: row });
+    const cb = cardBox(), out = [];
+    const names = $$("*").filter((e) => vis(e) && (isText(e, NAME) || (!e.children.length && NAME.test(norm(e.textContent)))) && !BADGE.test(norm(own(e) || e.textContent)) && !(cb && cb.contains(e)) && !e.closest("nav, aside") && !inHead(e) && !e.closest("[class*=Index], [class*=index]"));
+    for (const ph of listPhones()) {
+      const pr = R(ph), cy = pr.top + pr.height / 2, band = Math.max(pr.height, 18) * 0.75;
+      const nm = names.map((e) => ({ e, r: R(e) })).filter(({ r }) => Math.abs(r.top + r.height / 2 - cy) < band && r.right <= pr.left + 4 && pr.left - r.right < 420)
+        .sort((a, b) => b.r.right - a.r.right)[0];
+      if (!nm) continue;
+      out.push({ name: norm(own(nm.e) || nm.e.textContent), phone: norm(ph.textContent), el: nm.e });
     }
     return out;
   };
@@ -107,6 +108,7 @@ function installTalkSendDriver() {
         q: inp ? inp.value : "",
         count: countOf(inp),
         rows: rows().map(({ name, phone }) => ({ name, phone })),
+        phonesSeen: listPhones().length,
         card: c,
         chat: area ? { input: true, send: !!byText("전송").length, file: $$("input[type=file]").length > 0, imgs: $$("img").length, len: document.body.innerText.length } : null,
       };
@@ -129,9 +131,10 @@ function installTalkSendDriver() {
       return { ok: press(clickable(c.e)) };
     },
     /** 검색: 글을 넣고 돋보기 (사장님 11/16: 돋보기를 눌러야 찾음) — 돋보기 = 검색 칸과 같은 줄 · 오른쪽 140px 안 맨 오른쪽 단추 (지우기 ⊗ 는 뺌) · 못 찾으면 Enter */
+    typeQuery(q) { const inp = searchInput(); if (!inp) return { ok: false, why: "검색 칸을 못 찾음" }; inp.focus(); setVal(inp, q); return { ok: true }; },
     search(q) {
       const inp = searchInput(); if (!inp) return { ok: false, why: "검색 칸을 못 찾음" };
-      inp.focus(); setVal(inp, q);
+      inp.focus(); if (q != null && inp.value !== q) setVal(inp, q);
       const tg = typeToggle(inp), ir = R(inp), cy = ir.top + ir.height / 2, band = Math.max(ir.height, 24);
       const clear = (b) => /지우|삭제|clear|reset|delete|remove/i.test([b.getAttribute("aria-label"), b.title, typeof b.className === "string" ? b.className : ""].join(" "));
       const btn = $$("button, [role=button], a").filter((b) => vis(b) && b !== tg && !(tg && tg.contains(b)) && !clear(b) && (() => { const r = R(b); return Math.abs(r.top + r.height / 2 - cy) < band && r.left >= ir.right - 6 && r.left <= ir.right + 140; })())
@@ -141,7 +144,7 @@ function installTalkSendDriver() {
       return { ok: true, how: "Enter" };
     },
     /** 목록 i 번째 줄 누르기 */
-    openRow(i) { const r = rows()[i]; if (!r) return { ok: false, why: "그 줄이 없음" }; const nm = nameEl(r.el); return { ok: press(clickable(nm) || r.el) }; },
+    openRow(i) { const r = rows()[i]; if (!r) return { ok: false, why: "그 줄이 없음" }; return { ok: press(clickable(r.el) || r.el) }; },
     /** 카드의 [톡톡 대화하기] */
     talk() { const c = byText("톡톡 대화하기")[0]; if (!c) return { ok: false, why: "[톡톡 대화하기]를 못 찾음" }; clickable(c).click(); return { ok: true }; },
     /** 대화창: 글 넣기 · [전송] */
@@ -250,10 +253,20 @@ class TalkSend {
     if (!r.ok) return Object.assign({ step: "고객 화면" }, r);
     const last4 = digits(job.phone).slice(-4);
     step(`뒷번호 ${last4} 검색`);
+    // 번호를 넣고 → 화면이 받을 틈 → 칸에 번호가 들어간 것을 보고 → 돋보기 (넣자마자 누르면 빈 칸으로 찾을 수 있음 · 2.25 현장 11/16)
+    const tq = await this.call(`window.__tsend.typeQuery(${JSON.stringify(last4)})`);
+    if (!tq.ok) return Object.assign({ step: "검색" }, tq);
+    await sleep(500);
+    if (!(await this.until((x) => x.q === last4, 3000))) await this.call(`window.__tsend.typeQuery(${JSON.stringify(last4)})`);
+    await sleep(200);
     const q = await this.call(`window.__tsend.search(${JSON.stringify(last4)})`);
     if (!q.ok) return Object.assign({ step: "검색" }, q);
+    await sleep(600);
     let s = await this.until((x) => x.customers && x.q === last4 && (x.rows.length > 0 || x.count === 0), 10000);
-    if (!s) return { ok: false, step: "검색", why: "검색 결과가 안 뜸" };
+    if (!s) {
+      const z = await this.state().catch(() => null);
+      return { ok: false, step: "검색", why: z ? `검색 결과가 안 뜸 (선택 '${z.type || "?"}' · 칸 '${z.q}' · ${z.count == null ? "?" : z.count}명 · 번호 칸 ${z.phonesSeen} · 읽은 줄 ${z.rows.length} · ${q.how || ""})` : "검색 결과가 안 뜸" };
+    }
     if (s.type !== "전화번호") return { ok: false, step: "검색", why: `검색 선택이 '${s.type || "?"}' — '전화번호'로 찾지 않아 멈춤` };
     s = await this.settle(s); // 앞 검색 목록이 남아 있거나 아직 그리는 중이면 멈출 때까지
     await this.shot("1-검색");

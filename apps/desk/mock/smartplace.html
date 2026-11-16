@@ -53,7 +53,8 @@
         <input type="text" class="Search__input" id="sq" value="${q}" placeholder="이름 또는 전화번호를 입력하세요"><button type="button" class="Search__clear" aria-label="지우기">×</button><button type="button" class="Search__btn" aria-label="검색"><svg width="12" height="12"></svg></button></div>
       <p><span class="Count"><strong>${hits.length}</strong>명</span> <a href="#">고객 개인정보보호에 대해 알아보세요!</a></p>
       <div class="Customer__body"><div class="CustomerList__root"><div class="Index"><span>전체</span> <span>ㄱ</span> <span>ㄴ</span> <span>ㄷ</span></div><div class="CustomerList__head"><button type="button" class="sort">이름↑</button> <button type="button" class="sort">전화번호</button></div>
-        ${hits.map((x) => `<div class="CustomerList__row" data-id="${x.id}"><span class="CustomerList__name">${showName(x)}</span><span class="CustomerList__phone">${listPhone(x)}</span></div>`).join("")}</div>
+        ${P.get("split") ? `<div style="display:flex"><div class="ColName">${hits.map((x) => `<div class="CustomerList__row" data-id="${x.id}" style="height:36px"><span>${showName(x)}</span></div>`).join("")}</div><div class="ColPhone">${hits.map((x) => `<div style="height:36px;padding:8px"><span>${listPhone(x)}</span></div>`).join("")}</div></div>`
+          : hits.map((x) => `<div class="CustomerList__row" data-id="${x.id}"><span class="CustomerList__name">${showName(x)}</span><span class="CustomerList__phone">${listPhone(x)}</span></div>`).join("")}</div>
         <div class="InfoPanel__root">${c ? `<h3 class="InfoPanel__title">${showName(c)}</h3><button type="button">정보변경</button>
           <div class="InfoPanel__item"><span>등록경로</span><span>${c.path}</span></div>
           <div class="InfoPanel__item"><span>전화번호</span><span>${showPhone(c)}</span></div>
@@ -73,10 +74,13 @@
       setTimeout(() => document.body.appendChild(d), 120); return;
     }
     const o = e.target.closest("[data-type]"); if (o) { setTimeout(() => go({ type: o.dataset.type, q: document.getElementById("sq").value, sel: "" }), 100); return; }
-    if (e.target.closest(".Search__btn")) { setTimeout(() => go({ q: document.getElementById("sq").value, sel: "" }), 150); return; }
+    if (e.target.closest(".Search__btn")) { const v = P.get("late") ? lateQ : document.getElementById("sq").value; setTimeout(() => go({ q: v, sel: "" }), 150); return; }
     const r = e.target.closest(".CustomerList__row"); if (r) { setTimeout(() => go({ sel: r.dataset.id }), 150); return; }
     if (e.target.closest("#talk")) { const c = DATA.find((x) => x.id === (sel || (hits[0] || {}).id)); window.open(`talkchat.html?u=${encodeURIComponent(c.id)}&frm=prsv&mode=popup`, "talk_" + c.id, "popup,width=900,height=700"); }
   });
+  // ?late=1: 화면이 입력을 조금 늦게 받음 (넣자마자 돋보기를 누르면 예전 값으로 찾음 — React 처럼)
+  let lateQ = q;
+  document.addEventListener("input", (e) => { if (e.target.id === "sq") { const v = e.target.value; setTimeout(() => { lateQ = v; }, 250); } });
   document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.id === "sq") setTimeout(() => go({ q: e.target.value, sel: "" }), 150); });
 </script>
 </body></html>

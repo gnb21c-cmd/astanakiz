@@ -49,14 +49,14 @@ test("nameLike · pickRow · cardOk: 번호가 보이면 번호로 · 가려진 
 });
 
 /** 가짜 스마트플레이스 처음 화면(?home=1)에서 TalkSend */
-async function open(browser) {
+async function open(browser, extra = "") {
   const ctx = await browser.newContext({ viewport: { width: 1100, height: 760 } });
   const page = await ctx.newPage();
-  await page.goto(SP + "?home=1");
+  await page.goto(SP + "?home=1" + extra);
   await page.evaluate(() => { localStorage.removeItem("mockTalkSent"); localStorage.removeItem("mockSpData"); });
   const steps = [], pops = [];
   const ts = new TalkSend((code) => page.evaluate(code), {
-    home: SP + "?home=1",
+    home: SP + "?home=1" + extra,
     go: (u) => page.goto(u),
     popup: async () => {
       const p = await page.waitForEvent("popup", { timeout: 15000 });
@@ -236,9 +236,9 @@ test("데스크: 확인만 해 보기 → 진행 → 줄마다 맞춘 방법 · 
       { key: "8|01011110002", name: "나손님", at: "10:02", ok: true, skip: false, step: "확인만", how: "가린 번호 · 이름", why: "" },
     ] }));
     let rows = await rowsOf(page);
-    assert.match(rows[0], /가손님 .* 보냄 \| 톡톡 확인 ✓ 번호로 맞춤 \(안 보냄\)$/);
-    assert.match(rows[2], /바손님 .* 보냄 \| 톡톡 확인: 가려진 손님 중 이름 · 뒷번호가 같은 사람이 2명/);
-    assert.match(rows[1], /나손님 .* 보냄 \| 톡톡 확인 ✓ 가린 번호 · 이름으로 맞춤/);
+    assert.match(rows[0], /가손님 .* 직접 보냄 표시 \| 톡톡 확인 ✓ 번호로 맞춤 \(안 보냄\)$/);
+    assert.match(rows[2], /바손님 .* 직접 보냄 표시 \| 톡톡 확인: 가려진 손님 중 이름 · 뒷번호가 같은 사람이 2명/);
+    assert.match(rows[1], /나손님 .* 직접 보냄 표시 \| 톡톡 확인 ✓ 가린 번호 · 이름으로 맞춤/);
     assert.match(await bar(), /톡톡으로 보내기 3명 지난번: 확인만 2명 · 건너뜀 1명 \(10:02\)/, "확인만은 '보냄'으로 안 바꿈");
     // 보내기: 한 번 누르면 묻기만
     await page.click("#rt-bar [data-act=rtRun]:not([data-dry])");
@@ -253,15 +253,15 @@ test("데스크: 확인만 해 보기 → 진행 → 줄마다 맞춘 방법 · 
       { key: "8|01011110002", name: "나손님", at: "10:07", ok: false, skip: false, step: "사진", how: "", why: "사진이 대화창에 안 보임", sent: { text: true } },
     ] }));
     rows = await rowsOf(page);
-    assert.match(rows[0], /가손님 .* 보냄 톡톡 10:05$/, "보낸 사람 = 보냄 톡톡 hh:mm");
-    assert.match(rows[2], /바손님 .* \| 보냄 \| 톡톡 건너뜀: 가려진 손님 중 .* — 번호 복사로 직접$/);
-    assert.match(rows[1], /나손님 .* \| 보냄 \| 톡톡 글만 보냄 — 사진은 직접 \(사진이 대화창에 안 보임\)$/);
+    assert.match(rows[0], /가손님 .* 톡톡 보냄 ✓ 10:05$/, "보낸 사람 = 톡톡 보냄 ✓ hh:mm");
+    assert.match(rows[2], /바손님 .* \| 직접 보냄 표시 \| 톡톡 건너뜀: 가려진 손님 중 .* — 번호 복사로 직접$/);
+    assert.match(rows[1], /나손님 .* \| 직접 보냄 표시 \| 톡톡 글만 보냄 — 사진은 직접 \(사진이 대화창에 안 보임\)$/);
     assert.match(await bar(), /톡톡으로 보내기 2명 지난번: 보냄 1명 · 건너뜀 1명 · 멈춤: 나손님: 사진이 대화창에 안 보임 \(10:07\)/);
     assert.strictEqual((await page.textContent("#rev-btn")).trim(), "재방문 안내2", "남은 사람 2");
     // 다시 그려도(같은 결과가 또 와도) 근무자가 푼 '보냄'은 되살리지 않음
     await page.click("#sheet .rvrow >> nth=0 >> [data-act=revSentT]");
     await page.evaluate((j) => window.__cb.progress({ ok: true, job: j }), job({ dry: false, at: "2026-11-15 10:05", end: "2026-11-15 10:07", results: [{ key: "8|01011110001", name: "가손님", at: "10:05", ok: true, skip: false, step: "보냄", how: "번호", why: "" }] }));
-    assert.match((await rowsOf(page))[0], /\| 보냄$/);
+    assert.match((await rowsOf(page))[0], /\| 직접 보냄 표시$/);
     // 운영 설정 → 재방문 이벤트: 톡톡 자동알림 기록 (그날 대상 · 사람마다 결과 · 이름 + 뒷번호 4자리)
     await page.click("#sheet [data-act=close]");
     await page.dblclick("#now");
@@ -444,6 +444,43 @@ test("안내 그림을 데스크에서 고르기 (사장님 11/16): [그림 고�
     assert.deepStrictEqual(await page.evaluate(() => window.__saves), []);
     await page.click('[data-act=revClear][data-l="8"]');
     await page.waitForFunction(() => /데스크가 만든 안내 그림/.test(document.getElementById("rev-imgcap-8").textContent));
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("2.25 현장 (11/16): 이름 칸 · 번호 칸이 따로 그려져도 화면 위치로 짝지음 · 넣자마자 돋보기를 누르면 빈 칸으로 찾는 화면 → 넣고 기다렸다가 누름", async () => {
+  const browser = await launch();
+  try {
+    const { ts, steps, sent } = await open(browser, "&split=1&late=1");
+    const r = await ts.one({ name: "유민석", phone: "010-3100-1313", text: TEXT, image: IMG }, false);
+    assert.deepStrictEqual(r, { ok: true, step: "보냄", how: "가린 번호 · 이름", sent: { text: true, image: true } }, JSON.stringify({ r, steps }));
+    const r2 = await ts.one({ name: "나단비", phone: "010-3300-2424", image: IMG }, true);
+    assert.strictEqual(r2.ok, true, JSON.stringify(r2));
+    assert.deepStrictEqual((await sent()).map((x) => [x.u, x.kind]), [["c2", "text"], ["c2", "image"]]);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("데스크: 줄 단추는 '직접 보냄 표시'(보내지 않음) · 모두 표시해도 확인만 해 보기는 전체로 · [표시 모두 풀기]는 직접 표시만 풂", async () => {
+  const browser = await launch();
+  try {
+    const { page, errs } = await openDesk(browser);
+    await page.click("#rev-btn");
+    for (let i = 0; i < 3; i++) await page.click(`#sheet .rvrow >> nth=${i} >> [data-act=revSentT]`);
+    const rows = await rowsOf(page);
+    assert.match(rows[0], /직접 보냄 ✓ \d\d:\d\d$/);
+    const bar = () => page.$eval("#rt-bar", (e) => [...e.children].map((c) => c.textContent.replace(/\s+/g, " ").trim()).filter(Boolean).join(" "));
+    assert.match(await bar(), /확인만 해 보기 \(보낸 사람 포함 3명\) 톡톡으로 보내기 0명/);
+    await page.click("#rt-bar [data-act=rtRun][data-dry]");
+    await page.waitForFunction(() => window.__runs.length === 1);
+    assert.deepStrictEqual(await page.evaluate(() => window.__runs[0].list.map((x) => x.name)), ["가손님", "나손님", "바손님"]);
+    await page.evaluate(() => window.__cb.done({ ok: true, job: { running: false, dry: true, at: "2026-11-15 10:00", end: "2026-11-15 10:01", total: 3, step: "", why: "", results: [] } }));
+    await page.click("[data-act=revSentClear]");
+    assert.match(await page.textContent("#toast"), /직접 표시한 '보냄' 3개를 풀었어요/);
+    assert.match(await bar(), /톡톡으로 보내기 3명/);
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();
