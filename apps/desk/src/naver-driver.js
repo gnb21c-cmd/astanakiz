@@ -199,6 +199,8 @@ function installNaverDriver() {
     }
     return n;
   };
+  /** 예약 상세의 '특이사항' (업체가 적어 둔 손님 메모) — 없거나 '-' 면 "" */
+  const noteOf = (c) => { const t = field(c, "특이사항").replace(/\s+/g, " ").trim(); return /^[-–—]?$/.test(t) ? "" : t.slice(0, 300); };
   const readCard = (c) => {
     const [doneCount, cancelCount] = visitsOf(c);
     const badge = c.querySelector("[data-tst_booking_status]") || cls(c, "Summary__user-state") || leafs(c).find((e) => !e.closest("button, a") && /^(확정|완료|이용완료|취소|신청|노쇼)$/.test(norm(e.textContent)));
@@ -225,6 +227,10 @@ function installNaverDriver() {
       proxy: leafs(c).some((e) => norm(e.textContent) === "대리예약"), // 대리예약 스티커
       visitor: field(c, "방문자"), // "박소희(010-2785-4295)"
       refund: refundOf(c), // 부분취소된 장수 (예약 상세의 환불정보 · 목록 카드면 null)
+      // 네이버 블랙리스트 (사장님 11/16): 이름 옆 빨간 '블랙리스트' 표시 → 데스크가 BC 원아웃 · 예약 상세의 '특이사항'을 메모로
+      black: leafs(c).some((e) => norm(e.textContent) === "블랙리스트"),
+      detail: leafs(c).some((e) => norm(e.textContent) === "예약상세정보"), // 예약 상세정보 (목록 카드가 아님)
+      note: leafs(c).some((e) => norm(e.textContent) === "예약상세정보") ? noteOf(c) : null, // 특이사항 (상세에만 · 목록 카드면 null = 모름)
     };
   };
 

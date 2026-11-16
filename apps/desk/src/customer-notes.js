@@ -9,7 +9,9 @@
      (전체 전화번호는 없음 · 이 PC 에만 · 클라우드로 안 보냄) — BC 를 풀면 같이 지움
    쓰리아웃 사유 (사장님 10/26): r3 = 고객 카드에서 쓰리아웃으로 올릴 때 쓴 사유 · r3At = 그때 — 투아웃 · 원아웃으로 내려도 남김 (BC 를 다 풀면 같이 지움)
    BC 투아웃 양식 (사장님 10/27): p2 = 투아웃이 된 뒤 입장권 대신 'BC 투아웃 양식 1번'을 낸 때 → 그다음 방문부터 2번 (투아웃 · 쓰리아웃 동안만)
-   마일리지 SKIP (사장님 10/26): sk = [n, …] — 그 손님의 n번째 예약완료에는 사은권을 안 띄움 (이미 드린 손님 · 목록에 보이려고 이름 · 뒷 4자리도) */
+   마일리지 SKIP (사장님 10/26): sk = [n, …] — 그 손님의 n번째 예약완료에는 사은권을 안 띄움 (이미 드린 손님 · 목록에 보이려고 이름 · 뒷 4자리도)
+   네이버 블랙리스트 (사장님 11/16): nb = 데스크가 네이버 '블랙리스트' 손님을 BC 원아웃으로 처리한 날 · nn = 예약 상세 '특이사항'을 메모로 옮긴 날
+     → 한 번만 (그 뒤 근무자가 BC · 메모를 바꾸면 그대로 둠) · 날짜만 남김 (BC · 메모를 다 풀어도 이 줄은 남아 다시 안 올림) */
 const fs = require("fs");
 const path = require("path");
 
@@ -67,7 +69,10 @@ function set(d, key, note, at) {
     const why = bc ? (o.r3 !== undefined ? cleanWhy(o.r3) : (prev && prev.r3) || "") : "";
     if (why) { n.r3 = why; n.r3At = prev && prev.r3 === why && prev.r3At ? prev.r3At : String(o.r3At || n.at).slice(0, 16); }
   }
-  if (!n.m && !n.k3 && !bc && !sk.length) { delete d.notes[key]; return null; }
+  const nb = String(o.nb !== undefined ? o.nb || "" : (prev && prev.nb) || "").slice(0, 10), nn = String(o.nn !== undefined ? o.nn || "" : (prev && prev.nn) || "").slice(0, 10);
+  if (nb) n.nb = nb;
+  if (nn) n.nn = nn;
+  if (!n.m && !n.k3 && !bc && !sk.length && !nb && !nn) { delete d.notes[key]; return null; }
   d.notes[key] = n;
   return n;
 }

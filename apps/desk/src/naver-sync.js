@@ -54,6 +54,7 @@ function naverUrls(anyUrl) {
 class NaverSync {
   constructor(exec, opts = {}) {
     this.exec = exec;
+    this.noteTries = new Map(); // 블랙리스트 특이사항: 예약번호 → 상세를 열어 본 수 (못 읽어도 세 번까지만)
     this.urls = opts.urls || null;
     this.timeout = opts.timeout || 10000;
     this.isTicket = opts.isTicket || isKidsTicket;
@@ -232,16 +233,20 @@ class NaverSync {
     this.step(`${time} ${kind}: 카드 ${got.size}장`);
     return { ok: true, cards: [...got.values()] };
   }
-  /** 부분취소 (11/11): 목록 카드를 하나씩 눌러 '예약 상세정보'의 환불정보(환불내역 X n)를 읽어 그 카드에 refund 로 붙임 · 다음 카드를 위해 칸을 다시 엶 */
-  async readRefunds(product, time, kind, cards, nos) {
+  /** 부분취소 (11/11) · 블랙리스트 특이사항 (11/16): 목록 카드를 하나씩 눌러 '예약 상세정보'를 열어 환불정보(환불내역 X n → refund) · 특이사항(note)을 그 카드에 붙임 · 다음 카드를 위해 칸을 다시 엶 */
+  async readRefunds(product, time, kind, cards, nos, what = "부분취소 확인") {
     for (const no of nos) {
-      this.step(`${time} 부분취소 확인 — 예약 상세 여는 중`);
+      this.step(`${time} ${what} — 예약 상세 여는 중`);
       const r = await this.call(`window.__naver.openCard(${JSON.stringify(no)})`).catch(() => null);
       if (r && r.ok) {
         for (let i = 0; i < 16; i++) {
           await sleep(250);
           const d = (await this.read()).cards;
-          if (d.length === 1 && d[0].no === no && d[0].refund != null) { const c = cards.find((x) => x.no === no); if (c) c.refund = d[0].refund; break; }
+          if (d.length === 1 && d[0].no === no && (d[0].refund != null || d[0].detail)) {
+            const c = cards.find((x) => x.no === no);
+            if (c) { if (d[0].refund != null) c.refund = d[0].refund; if (d[0].note != null) c.note = d[0].note; if (d[0].black) c.black = true; }
+            break;
+          }
         }
       }
       const o = await this.openSlot(product, time, kind); // 목록으로 돌아감 (닫고 칸을 다시 누름)
@@ -283,7 +288,13 @@ class NaverSync {
         // 부분취소인데 누구 것인지 모르면(여러 장 산 카드가 둘 이상) 그 카드들의 상세를 열어 환불정보를 읽음 (최대 4장 · 못 읽으면 데스크가 근무자에게 물음)
         const asks = [...partialFix(r.cards, n, kind).entries()].filter(([, f]) => f.ask).map(([no]) => no).slice(0, 4);
         if (asks.length) await this.readRefunds(s.product, s.time, kind, r.cards, asks);
-        const retry = asks.length > 0 && [...partialFix(r.cards, n, kind).values()].some((f) => f.ask); // 상세를 못 열었으면 다음 불러오기 때 다시 (근무자가 고르지 않게)
+        // 네이버 블랙리스트 (11/16): 특이사항은 예약 상세에만 → 앞에 읽은 것은 이어받고, 아직 모르는 블랙리스트 카드만 상세를 열어 봄 (칸마다 4장 · 한 예약 세 번까지)
+        if (c) for (const x of r.cards) { const p = c.cards.find((y) => y.no === x.no); if (x.note == null && p && p.note != null) x.note = p.note; }
+        const blk = r.cards.filter((x) => x.black && x.note == null && (this.noteTries.get(x.no) || 0) < 3).map((x) => x.no).slice(0, 4);
+        for (const no of blk) this.noteTries.set(no, (this.noteTries.get(no) || 0) + 1);
+        if (blk.length) await this.readRefunds(s.product, s.time, kind, r.cards, blk, "블랙리스트 특이사항");
+        const retry = (asks.length > 0 && [...partialFix(r.cards, n, kind).values()].some((f) => f.ask)) // 상세를 못 열었으면 다음 불러오기 때 다시 (근무자가 고르지 않게)
+          || r.cards.some((x) => x.black && x.note == null && (this.noteTries.get(x.no) || 0) < 3); // 블랙리스트 특이사항을 아직 못 읽음
         cache.set(key, { count: n, time: s.time, product: s.product, status: kind === "확정" ? "확정" : "완료", cards: r.cards, retry });
       }
     }
@@ -298,7 +309,8 @@ class NaverSync {
         seen.add(x.no);
         const f = fix.get(x.no) || {};
         bookings.push({ no: x.no, status: c.status, name: x.name, phone: x.phone, time: c.time, product: c.product, qty: f.qty || x.qty, qtyBooked: f.booked || null, qtyCut: f.cut || 0, qtyAsk: f.ask || null, qtySrc: f.src || "", qtyText: x.qtyText, pay: x.pay, doneCount: x.doneCount, cancelCount: x.cancelCount,
-          proxy: !!x.proxy, visitor: x.visitor || "", unpaid: c.status === "확정" && !x.canComplete && !!x.canCancel && !/결제완료/.test(x.pay || "") }); // 대리예약 · 입금대기
+          proxy: !!x.proxy, visitor: x.visitor || "", unpaid: c.status === "확정" && !x.canComplete && !!x.canCancel && !/결제완료/.test(x.pay || ""), // 대리예약 · 입금대기
+          black: !!x.black, bnote: x.black && x.note != null ? x.note : null }); // 네이버 블랙리스트 · 그 예약 상세의 특이사항 (모르면 null · 11/16)
       }
     }
     return { ok: true, day, warn: warn.length ? `카드를 못 읽은 칸: ${warn.join(", ")}` : "", slots: slots.map((s) => ({ time: s.time, product: s.product, cap: s.avail + s.conf + s.done + s.apply, conf: s.conf + s.apply, done: s.done })), bookings };

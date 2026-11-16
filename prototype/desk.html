@@ -592,6 +592,7 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 .rvrow { display: grid; grid-template-columns: 90px 130px minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 5px 10px; border-radius: 8px; background: var(--surface-2); font-size: 14px; }
 .rvrow.sent { opacity: .6; } .rvrow.today { opacity: .55; } .rvrow .rvtoday { white-space: nowrap; }
 .rvrow .rvtalk { grid-column: 1 / -1; font-size: 12.5px; color: var(--muted); }
+.nblk { display: inline-block; margin-left: 6px; padding: 0 6px; border: 1.5px solid var(--red); border-radius: 999px; color: var(--red); font-size: 12px; font-weight: 700; vertical-align: middle; } /* 네이버 블랙리스트 (11/16) */
 .rvrow .rvtalk.evwarn { color: var(--red); }
 /* 재방문 안내 → 네이버 톡톡 (11/16) */
 .rtbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; margin: 0 0 10px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--surface); }
@@ -1290,6 +1291,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
         product: (n.qtyText || "").replace(/\s*\d+\s*$/, "") || "입장권", naverProduct: n.product, pay: n.pay || "",
         cancels: n.cancelCount,
         proxy: !!n.proxy, visitor: n.visitor || "", unpaid: !!n.unpaid, // 대리예약 · 방문자 · 입금대기 (10/8)
+        black: !!n.black, bnote: typeof n.bnote === "string" ? n.bnote : typeof b.bnote === "string" ? b.bnote : null, // 네이버 블랙리스트 · 예약 상세 특이사항 (11/16)
       });
       // 네이버 카드의 '완료 n': 미입장이면 이번 방문 전까지, 이용완료면 이번 방문까지 센 수 (못 읽었으면 null)
       if (!done) {
@@ -2563,7 +2565,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       el.innerHTML = `
         <h3 id="sheet-title">네이버 예약자 <button class="x" data-act="close" aria-label="닫기">×</button></h3>${bcAskHtml()}
         <div class="${sv ? "svgrid" : ""}"><dl class="facts">
-          <dt>예약자</dt><dd style="font-size:18px">${nameHtml(b)}${isShort(b) ? ` ${shortBadge(b)}` : ""} <span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span>${noteChecks(b)}</dd>
+          <dt>예약자</dt><dd style="font-size:18px">${nameHtml(b)}${isShort(b) ? ` ${shortBadge(b)}` : ""} <span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span>${b.black ? `<span class="nblk" title="네이버 예약 카드에 '블랙리스트' 표시 — 처음 한 번 BC 원아웃 · 특이사항을 메모로">네이버 블랙리스트</span>` : ""}${noteChecks(b)}</dd>
           <dt>${evActive() && evIn(b.day) ? "이벤트" : "이용완료"}</dt><dd class="num visits big">${visitText(b)}</dd>
           <dt>전화번호</dt><dd class="num">${fmtPhone(b.phone)}</dd>${visitorRow(b)}
           <dt>이용일시</dt><dd class="num">${hm(b.slot)} ${m == null ? "· 무제한" : `~ ${hm(b.slot + m)} (${dur(m)})`}${b.naverSlot != null && b.naverSlot !== b.slot ? ` <span class="moved">네이버 ${hm(b.naverSlot)}</span>` : ""}${b.day === TODAY && b.no ? `
@@ -3825,7 +3827,39 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   const noteAtText = (at) => (!at ? "" : at.slice(0, 10) === TODAY ? at.slice(11, 16) : `${+at.slice(5, 7)}/${+at.slice(8, 10)}`);
   let notesAsking = false;
   /** 화면을 그릴 때마다: 보이는 날 · 오늘 예약 손님 중 아직 안 물어본 손님의 메모를 앱 본체에 한 번에 물음 */
+  /* 네이버 블랙리스트 (사장님 11/16): 네이버 예약 카드 이름 옆 빨간 '블랙리스트' 표시가 있는 손님 (앱 본체 naver-sync 가 black · 예약 상세 '특이사항' bnote 를 줌)
+     ① 처음 보일 때 한 번 BC 원아웃 (이미 원아웃 이상이면 그대로) — 그 뒤 근무자가 내리거나 올리면 그대로 둠 (nb = 처리한 날)
+     ② 예약 상세의 '특이사항'(업체가 네이버에 적어 둔 손님 메모)을 데스크 메모로 — 메모가 비었으면 그대로 넣고,
+        근무자가 적어 둔 메모가 있으면 한 줄이고 합쳐 120자 안일 때만 아래 줄에 (넘치면 근무자 메모를 그대로 둠) · 한 번만 (nn = 옮긴 날)
+     현장 POS 에만 (손님 메모는 사무실 PC · 클라우드로 안 감) */
+  function blackSync() {
+    if (OFFICE) return;
+    const msgs = [];
+    for (const b of (bookings[viewDay] || []).concat(viewDay !== TODAY ? bookings[TODAY] || [] : [])) {
+      if (!b.black) continue;
+      const k = noteKey(b);
+      if (!k || (NOTE_APP() && !NOTES.has(k))) continue; // 이 손님 메모를 앱에 물어본 뒤에
+      const n = NOTES.get(k) || {}, patch = {}, did = [];
+      if (!n.nb) { patch.nb = TODAY; if (bcOf(b) < 1) { Object.assign(patch, { bc: 1, bl: true, nm: b.name || "", p4: digits(b.phone || "").slice(-4) }); did.push("BC 원아웃"); } }
+      if (!n.nn && typeof b.bnote === "string") {
+        patch.nn = TODAY;
+        let t = b.bnote.replace(/\s+/g, " ").trim();
+        if (t.length > NOTE_MAX) t = t.slice(0, NOTE_MAX - 1) + "…";
+        const m = String(n.m || "").trim(), flat = (x) => x.replace(/\s+/g, "");
+        if (t && !m) { patch.m = t; did.push("특이사항을 메모로"); }
+        else if (t && !flat(m).includes(flat(t)) && !m.includes("\n") && m.length + 1 + t.length <= NOTE_MAX) { patch.m = m + "\n" + t; did.push("특이사항을 메모 아래 줄에"); }
+      }
+      if (!Object.keys(patch).length) continue;
+      noteChange(b, patch, true);
+      if (did.length) msgs.push(`${b.name} — ${did.join(" · ")}`);
+    }
+    if (!msgs.length) return;
+    renderRes();
+    if (sheet.mode === "enter" || sheet.mode === "key") renderSheet();
+    toast(`네이버 블랙리스트 손님: ${msgs.join(" / ")}`, 8000);
+  }
   function notesSync() {
+    blackSync(); // 네이버 블랙리스트 → BC 원아웃 · 특이사항을 메모로 (11/16)
     if (!NOTE_APP() || notesAsking) return;
     const keys = [...new Set((bookings[viewDay] || []).concat(bookings[TODAY] || []).map(noteKey).filter((k) => k && !NOTES.has(k)))];
     if (!keys.length) return;
@@ -3836,6 +3870,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       let any = false;
       for (const k of keys) if (!NOTES.has(k)) { const n = r.notes[k] || null; NOTES.set(k, n); if (n) any = true; }
       if (any) { renderRes(); bcWatch(); if (sheet.mode === "enter" || sheet.mode === "key") renderSheet(); }
+      blackSync();
     }, () => { notesAsking = false; });
   }
   const noteTimers = new Map();
@@ -3881,10 +3916,10 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     const show = (ok, text) => { const el = $("note-at"); if (el) { el.textContent = text; el.classList.toggle("evwarn", !ok); } };
     if (!NOTE_APP()) {
       const at = `${TODAY} ${hm(now)}`, gone = !String(n.m || "").trim() && !n.k3 && !bc && !sk.length;
-      try { const o = JSON.parse(localStorage.getItem(NOTE_LS)) || {}; if (gone) delete o[k]; else o[k] = Object.assign({ m: n.m, k3: !!n.k3, bl: bc > 0, bc, at }, bc || sk.length ? { nm: n.nm || "", p4: n.p4 || "" } : {}, bc ? { bcAt: n.bcAt || TODAY } : {}, bc && n.r3 ? { r3: n.r3, r3At: n.r3At || at } : {}, bc >= 2 && n.p2 ? { p2: n.p2 } : {}, sk.length ? { sk } : {}); localStorage.setItem(NOTE_LS, JSON.stringify(o)); } catch (e) { /* 저장 못 해도 화면은 그대로 */ }
+      try { const o = JSON.parse(localStorage.getItem(NOTE_LS)) || {}; if (gone && !n.nb && !n.nn) delete o[k]; else o[k] = Object.assign({ m: n.m, k3: !!n.k3, bl: bc > 0, bc, at }, bc || sk.length ? { nm: n.nm || "", p4: n.p4 || "" } : {}, bc ? { bcAt: n.bcAt || TODAY } : {}, bc && n.r3 ? { r3: n.r3, r3At: n.r3At || at } : {}, bc >= 2 && n.p2 ? { p2: n.p2 } : {}, sk.length ? { sk } : {}, n.nb ? { nb: n.nb } : {}, n.nn ? { nn: n.nn } : {}); localStorage.setItem(NOTE_LS, JSON.stringify(o)); } catch (e) { /* 저장 못 해도 화면은 그대로 */ }
       n.at = gone ? "" : at; show(true, gone ? "" : `${hm(now)} 저장`); return;
     }
-    window.desk.notes.set(Object.assign({ key: k, m: n.m, k3: !!n.k3, bc, bl: bc > 0, nm: n.nm || "", p4: n.p4 || "", sk }, bc && n.r3 ? { r3: n.r3, r3At: n.r3At || "" } : {}, bc >= 2 && n.p2 ? { p2: n.p2 } : {})).then((r) => {
+    window.desk.notes.set(Object.assign({ key: k, m: n.m, k3: !!n.k3, bc, bl: bc > 0, nm: n.nm || "", p4: n.p4 || "", sk }, n.nb ? { nb: n.nb } : {}, n.nn ? { nn: n.nn } : {}, bc && n.r3 ? { r3: n.r3, r3At: n.r3At || "" } : {}, bc >= 2 && n.p2 ? { p2: n.p2 } : {})).then((r) => {
       if (!r || !r.ok) { show(false, `저장 못 함: ${(r && r.why) || "응답 없음"}`); return; }
       const cur = NOTES.get(k); if (cur) cur.at = r.note ? r.note.at : ""; // 쓰는 중인 글은 화면 것을 그대로
       show(true, r.note ? `${noteAtText(r.note.at)} 저장` : "");
