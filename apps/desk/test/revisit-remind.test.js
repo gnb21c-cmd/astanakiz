@@ -43,7 +43,7 @@ test("재방문 안내 (사장님 11/16): 기한 8일 남은 손님에게 한 �
     const errs = [];
     page.on("pageerror", (e) => errs.push(e.message));
     await page.goto(DESK);
-    await page.waitForTimeout(300);
+    await page.waitForFunction(() => window.__deskTest && document.getElementById("rev-btn") && !document.getElementById("rev-btn").hidden, null, { timeout: 15000 }); // 바쁜 컴퓨터에서도 다 그려진 뒤
     const t = await page.evaluate(() => { const r = window.__deskTest.rev.targets(); return Object.fromEntries(Object.entries(r).map(([l, v]) => [l, v.map((x) => [x.name, x.due, x.ok, x.today])])); });
     assert.deepStrictEqual(t, {
       8: [["가손님", "2026-11-23", 0, false], ["나손님", "2026-11-23", 1, false], ["바손님", "2026-11-23", 0, false], ["다손님", "2026-11-23", 0, true]],

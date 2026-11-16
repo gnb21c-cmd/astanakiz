@@ -585,7 +585,8 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 .revsec h4 { margin: 2px 0 8px; font-size: 16px; } .revsec h4 small { color: var(--muted); font-weight: 600; margin-left: 6px; }
 .revsec.d5 h4 { color: #E8792E; } .revsec.d3 h4 { color: var(--red); } .revsec h4 .num, .revsec h4 small { color: var(--fg); }
 .revgrid { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 12px; align-items: start; }
-.revimg { width: 180px; height: 270px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); object-fit: cover; }
+.revimg { width: 180px; height: 270px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); object-fit: contain; }
+.revcap { display: block; width: 180px; margin: 4px 0; font-size: 12px; }
 .revside { display: grid; gap: 8px; }
 .revmsg { margin: 0; white-space: pre-wrap; font: 13px/1.5 var(--font); background: var(--surface-2); border-radius: 8px; padding: 8px 10px; }
 .revlist { display: grid; gap: 4px; margin-top: 8px; }
@@ -4625,12 +4626,14 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   const revLoadImg = (src) => new Promise((res) => { if (!src) { res(null); return; } const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = src; });
   /* 사장님이 고른 안내 그림 (11/16): 현장 POS 바탕화면 '아스타나키즈-재방문안내/보낼사진_D-8.jpg'(또는 .png)가 있으면 창에도 그 그림 · 톡톡도 그 그림
      없으면 데스크가 그린 그림 (홍보 사진 + 남은 날 + 다급한 돼지) */
-  const revOwn = {}; // 남은 날 → { name, url } (창을 열 때마다 다시 봄)
+  const revOwn = {}, revOwnWhy = {}; // 남은 날 → { name, url } (창을 열 때마다 다시 봄) · 못 찾은 까닭 (폴더 안 그림 이름)
   async function revOwnLoad(l) {
-    if (!APP || !window.desk.revImg || !window.desk.revImg.get) return null;
+    if (!APP || !window.desk.revImg || !window.desk.revImg.get) return (revOwn[l] = revDemo[l] || null);
     const r = await window.desk.revImg.get(l).catch(() => null);
-    return (revOwn[l] = r && r.ok ? { name: r.name, url: r.dataUrl } : null);
+    revOwnWhy[l] = r && !r.ok ? `${r.why ? r.why + " · " : ""}${r.files && r.files.length ? `폴더 안 그림: ${r.files.join(", ")}` : "폴더에 그림이 없어요"}` : "";
+    return (revOwn[l] = r && r.ok ? { name: r.name, url: r.dataUrl, from: r.from || "desk", at: r.at || "" } : revDemo[l] || null);
   }
+  const revDemo = {}; // 체험판: [그림 고르기]로 고른 그림 (이 화면에만)
   async function revImage(l, fresh) {
     const own = fresh ? await revOwnLoad(l) : l in revOwn ? revOwn[l] : await revOwnLoad(l);
     if (own) return own.url;
@@ -4772,7 +4775,8 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
           : `<button class="btn btn-sm" data-act="revCopy" data-v="${esc(digits(x.phone))}">번호 복사</button><button class="btn btn-sm ${sent ? "btn-ink" : ""}" data-act="revSentT" data-id="${esc(id)}" aria-pressed="${!!sent}">${sent ? `보냄 ${esc(sent)}` : "보냄"}</button>`}${x.today ? "" : rtRowNote(id)}</div>`;
       }).join("");
       return `<section class="revsec ${l <= 3 ? "d3" : "d5"}"><h4>D-${l} <span class="num">· 기한 ${esc(revDueText(revDue(l)))} · 손님께는 '${revSay(l)}일'</span> <small>${send.length}명 · 보냄 ${done}</small></h4>
-        ${list.length ? `<div class="revgrid"><div><img class="revimg" id="rev-img-${l}" alt="D-${l} 안내 이미지"><span class="help" id="rev-imgcap-${l}"></span></div><div class="revside">
+        ${list.length ? `<div class="revgrid"><div><img class="revimg" id="rev-img-${l}" alt="D-${l} 안내 이미지"><span class="help revcap" id="rev-imgcap-${l}"></span>
+          ${OFFICE ? "" : `<div class="btns"><button class="btn btn-sm btn-ink" data-act="revPick" data-l="${l}">그림 고르기</button><button class="btn btn-sm" data-act="revClear" data-l="${l}" id="rev-imgclr-${l}" hidden>그림 빼기</button></div>`}</div><div class="revside">
           <div class="btns"><button class="btn btn-sm" data-act="revSave" data-l="${l}">이미지 저장</button><button class="btn btn-sm" data-act="revText" data-l="${l}">문구 복사</button><button class="btn btn-sm" data-act="revAll" data-l="${l}" ${send.length ? "" : "disabled"}>번호 모두 복사</button></div>
           <pre class="revmsg" id="rev-msg-${l}">${esc(revMsg(l))}</pre></div></div>
         <div class="revlist">${rows}</div>` : `<div class="help">오늘은 없어요</div>`}</section>`;
@@ -4791,7 +4795,9 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       revImage(l, true).then((u) => {
         if (!el.isConnected) return;
         el.src = u;
-        const cap = $("rev-imgcap-" + l); if (cap) cap.textContent = revOwn[l] ? `바탕화면 '${revOwn[l].name}' (사장님 그림)` : "데스크가 만든 안내 그림";
+        const o = revOwn[l], cap = $("rev-imgcap-" + l);
+        if (cap) cap.textContent = !o ? "데스크가 만든 안내 그림 — [그림 고르기]로 보낼 그림을 넣어 주세요" : o.from === "app" ? `고른 그림: ${o.name}${o.at ? ` (${noteAtText(o.at)})` : ""}` : o.from === "demo" ? `고른 그림: ${o.name} (체험판 — 이 화면에만)` : `바탕화면 '${o.name}'`;
+        const clr = $("rev-imgclr-" + l); if (clr) clr.hidden = !(o && (o.from === "app" || o.from === "demo"));
       });
     }
   }
@@ -5768,6 +5774,25 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     evsSendNow() { evsSend("manual"); },
     // 재방문 안내 (사장님 11/15)
     revOpen() { openSheet({ mode: "rev" }); },
+    // 안내 그림을 데스크에서 고르기 (사장님 11/16): 앱 = 윈도 파일 고르기 창 → 앱 폴더에 저장 · 체험판 = 브라우저 파일 고르기 (이 화면에만)
+    async revPick(btn) {
+      const l = Number(btn.dataset.l);
+      if (APP && window.desk.revImg && window.desk.revImg.pick) {
+        const r = await window.desk.revImg.pick(l).catch((e) => ({ ok: false, why: String(e) }));
+        if (r && r.canceled) return;
+        toast(r && r.ok ? `D-${l} 안내 그림을 넣었어요 — ${r.name} (톡톡도 이 그림)` : `그림을 넣지 못했어요: ${(r && r.why) || ""}`, 6000);
+        revFill(); return;
+      }
+      const inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
+      inp.onchange = () => { const f = inp.files && inp.files[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => { revDemo[l] = { name: f.name, url: String(fr.result), from: "demo" }; revFill(); toast(`D-${l} 안내 그림을 넣었어요 — ${f.name} (체험판: 이 화면에만)`); }; fr.readAsDataURL(f); };
+      inp.click();
+    },
+    async revClear(btn) {
+      const l = Number(btn.dataset.l);
+      if (APP && window.desk.revImg && window.desk.revImg.clear) await window.desk.revImg.clear(l).catch(() => null);
+      delete revDemo[l];
+      revFill(); toast(`D-${l} 고른 그림을 뺐어요`);
+    },
     // 재방문 안내 → 네이버 톡톡 (11/16): 확인만 · 보내기(한 번 더 눌러야) · 멈추기
     async rtRun(btn) {
       if (!RT_APP() || (RT.job && RT.job.running)) return;
@@ -5794,7 +5819,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     revSentT(btn) { const id = btn.dataset.id; if (revSent[id]) delete revSent[id]; else revSent[id] = hm(now); revSaveSent(); rtLogMark(id, !!revSent[id]); renderRevBtn(); renderSheet(); },
     async revSave(btn) {
       const l = Number(btn.dataset.l);
-      if (revOwn[l]) { toast(`바탕화면 '아스타나키즈-재방문안내/${revOwn[l].name}'(사장님 그림)을 보내요 — 그대로 쓰면 돼요`, 6000); return; }
+      if (revOwn[l]) { toast(`고른 그림(${revOwn[l].name})을 그대로 보내요 — 따로 저장하지 않아도 돼요`, 6000); return; }
       const url = await revImage(l), name = `재방문안내_D-${l}_${TODAY}.jpg`;
       if (APP && window.desk.revImg) {
         const r = await window.desk.revImg.save({ name, dataUrl: url }).catch((e) => ({ ok: false, why: String(e) }));

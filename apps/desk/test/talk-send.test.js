@@ -420,3 +420,32 @@ test("기준이 바뀐 날(5일 · 3일 → 8일): 아침에 적힌 5일 · 3일
     await browser.close();
   }
 });
+
+test("안내 그림을 데스크에서 고르기 (사장님 11/16): [그림 고르기] → 미리보기 · '고른 그림: 이름' · [그림 빼기] · 체험판은 브라우저 파일 고르기", async () => {
+  const browser = await launch();
+  try {
+    const { page, errs } = await openDesk(browser);
+    await page.evaluate(() => {
+      window.__own = null;
+      window.desk.revImg.get = async () => (window.__own ? { ok: true, from: "app", name: window.__own, at: "2026-11-15 10:00", dataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==" } : { ok: false, files: [] });
+      window.desk.revImg.pick = async () => { window.__own = "재방문 홍보.png"; return { ok: true, name: window.__own, at: "2026-11-15 10:00" }; };
+      window.desk.revImg.clear = async () => { window.__own = null; return { ok: true }; };
+    });
+    await page.click("#rev-btn");
+    await page.waitForFunction(() => /데스크가 만든 안내 그림/.test(document.getElementById("rev-imgcap-8").textContent));
+    assert.strictEqual(await page.isHidden("#rev-imgclr-8"), true);
+    await page.click('[data-act=revPick][data-l="8"]');
+    await page.waitForFunction(() => /고른 그림: 재방문 홍보\.png/.test(document.getElementById("rev-imgcap-8").textContent));
+    assert.match(await page.getAttribute("#rev-img-8", "src"), /^data:image\/png/);
+    assert.strictEqual(await page.isHidden("#rev-imgclr-8"), false);
+    // 톡톡 보내기: 고른 그림이 있으면 데스크 그림을 따로 저장하지 않음 (앱이 고른 그림을 보냄)
+    await page.click("#rt-bar [data-act=rtRun][data-dry]");
+    await page.waitForFunction(() => window.__runs.length === 1);
+    assert.deepStrictEqual(await page.evaluate(() => window.__saves), []);
+    await page.click('[data-act=revClear][data-l="8"]');
+    await page.waitForFunction(() => /데스크가 만든 안내 그림/.test(document.getElementById("rev-imgcap-8").textContent));
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});

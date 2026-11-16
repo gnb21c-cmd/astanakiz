@@ -20,9 +20,14 @@ function installTalkSendDriver() {
   /** 네이버 안에서만 (다른 곳 · 새 창 링크는 안 누름) — 톡톡 대화하기는 데스크가 새 창을 받아 줌 */
   const inside = (el) => { const a = el.closest("a[href]"); if (!a) return true; const h = a.getAttribute("href") || ""; if (!h || /^(#|javascript:)/i.test(h)) return true; try { return /(^|\.)naver\.com$/.test(new URL(h, location.href).hostname) || new URL(h, location.href).protocol === "file:"; } catch (e) { return false; } };
   const press = (el) => { if (!el || !inside(el)) return false; el.scrollIntoView({ block: "center" }); el.click(); return true; };
-  /** 글자가 딱 그것인 요소 (자기 글자 기준) */
-  const byText = (t, root = document) => leafs(root).filter((e) => norm(e.textContent) === norm(t) || norm(own(e)) === norm(t));
-  const PHONE = /^(?:\d{2,3}|\*{2,3})-(?:\d{3,4}|\*{3,4})-\d{4}$/;
+  /** 글자가 딱 그것인 요소 — 글자만 있는 칸, 또는 아이콘 + 글자 단추처럼 자기 글자가 그것인 칸 (2.24 현장 11/16: 아이콘 붙은 [톡톡 대화하기]를 못 찾았음) */
+  const byText = (t, root = document) => { const w = norm(t); return $$("*", root).filter((e) => vis(e) && ((!e.children.length && norm(e.textContent) === w) || (e.children.length && norm(own(e)) === w && norm(e.textContent) === w))); };
+  // 전화번호 모양: 다 보이거나 가려진 것 (***-****-1313 · 010-****-1313 · 010-30**-1313 …)
+  const PHONE = /^[\d*＊∗●○]{2,3}-[\d*＊∗●○]{3,4}-\d{4}$/;
+  const NAME = /^[가-힣*＊∗●○]{1,8}$/;
+  const BADGE = /^(신규|단골|블랙리스트|예약|주문|완료|확정|노쇼|취소|방문|톡톡|네이버|스마트콜|고객|회원|대리예약|정보변경|등록경로|전화번호|이름|메모|태그|선택)$/;
+  const nameEl = (row, not) => [...row.querySelectorAll("[class*=name], [class*=Name]")].find((e) => e !== not && vis(e) && NAME.test(norm(e.textContent)) && !BADGE.test(norm(e.textContent)))
+    || leafs(row).find((e) => e !== not && NAME.test(norm(e.textContent)) && !BADGE.test(norm(e.textContent)));
   const setVal = (el, v) => {
     const proto = el.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
     Object.getOwnPropertyDescriptor(proto, "value").set.call(el, v);
@@ -30,32 +35,61 @@ function installTalkSendDriver() {
     el.dispatchEvent(new Event("change", { bubbles: true }));
   };
   const searchInput = () => $$("input").filter((i) => vis(i) && /^(text|search|)$/i.test(i.type || "") && !i.closest("nav, aside")).find((i) => { const box = i.closest("form, div"); return box && /이름|전화번호/.test(box.textContent); });
-  const typeToggle = (inp) => { for (let box = inp && inp.parentElement, k = 0; box && k < 4; box = box.parentElement, k++) { const b = $$("button, [role=button], [role=combobox], select", box).find((x) => vis(x) && /^(이름|전화번호)/.test(norm(x.textContent || x.value))); if (b) return b; } return null; };
-  /** 목록 줄: 전화번호 모양 글자를 가진 줄마다 { name, phone } */
+  /* 검색 칸 앞 선택 상자 (2.24 현장 11/16 — 상자가 '이름' 그대로라 뒷번호로 찾으면 0명이었음 · '∨'는 글자가 아닌 그림 · 펼친 목록은 화면 다른 곳에 · 아래 표 머리글에도 '이름↑ · 전화번호')
+     → 화면 위치로: 검색 칸과 같은 줄 · 바로 왼쪽(260px 안)에 글자가 딱 '이름' 또는 '전화번호'인 것 (표 머리글은 뺌) */
+  const R = (e) => e.getBoundingClientRect();
+  const TYPE_RE = /^(이름|전화번호)$/;
+  const isText = (e, re) => re.test(norm(own(e))) || (!e.children.length && re.test(norm(e.textContent)));
+  const inHead = (e) => !!e.closest("thead, th, [role=columnheader]");
+  const typeToggle = (inp) => {
+    if (!inp) return null;
+    const ir = R(inp), cy = ir.top + ir.height / 2, band = Math.max(ir.height, 24);
+    const same = (e) => { const r = R(e); return Math.abs(r.top + r.height / 2 - cy) < band && r.right <= ir.left + 12 && r.left >= ir.left - 260; };
+    const sel = $$("select").find((x) => vis(x) && [...x.options].some((o) => /전화번호/.test(o.text)) && same(x));
+    if (sel) return sel;
+    const c = $$("*").filter((e) => vis(e) && isText(e, TYPE_RE) && !inHead(e) && same(e)).sort((a, b) => R(b).right - R(a).right)[0];
+    return c ? c.closest("button, [role=button], [role=combobox]") || c : null;
+  };
+  const typeOf = (tg) => { if (!tg) return ""; if (tg.tagName === "SELECT") { const o = tg.options[tg.selectedIndex]; return o ? norm(o.text) : ""; } const m = norm(tg.textContent).match(/^(이름|전화번호)/); return m ? m[1] : ""; };
+  /** 'N명' (검색 칸 아래 가장 가까운 것) */
+  const countOf = (inp) => {
+    const c = $$("*").filter((e) => vis(e) && /^\d+명$/.test(norm(e.textContent)) && ![...e.children].some((x) => /^\d+명$/.test(norm(x.textContent))));
+    if (!c.length) { const m = norm(document.body.innerText).match(/(\d+)명/); return m ? +m[1] : null; }
+    if (inp) { const ir = R(inp); c.sort((a, b) => Math.abs(R(a).top - ir.bottom) - Math.abs(R(b).top - ir.bottom)); }
+    return +norm(c[0].textContent).replace(/\D/g, "");
+  };
+  /** 전화번호 칸: 글자 전체가 번호 모양인 가장 작은 칸 — 뒷번호만 초록으로 따로 칠한 두 조각(010-3732- + 6371)도 한 칸으로 */
+  const phoneEls = (root = document) => $$("*", root).filter((e) => vis(e) && PHONE.test(norm(e.textContent)) && ![...e.children].some((c) => PHONE.test(norm(c.textContent))));
+  /** 목록 줄: 전화번호 칸마다 { name, phone } (오른쪽 고객 카드 · 처음에 저절로 뜨는 첫 손님 카드는 뺌) */
   const rows = () => {
-    const out = [];
-    for (const ph of leafs().filter((e) => PHONE.test(norm(e.textContent)))) {
-      if (ph.closest("[class*=Card], [class*=card], [class*=Detail], [class*=detail]") && byText("등록경로", ph.closest("[class*=Card], [class*=card], [class*=Detail], [class*=detail]")).length) continue; // 오른쪽 카드는 빼고
+    const out = [], cb = cardBox();
+    for (const ph of phoneEls()) {
+      if (cb && cb.contains(ph)) continue; // 오른쪽 고객 카드는 빼고
       let row = ph.parentElement;
-      for (let k = 0; row && k < 4 && !leafs(row).some((e) => e !== ph && /^[가-힣*]{1,8}$/.test(norm(e.textContent))); k++) row = row.parentElement;
+      for (let k = 0; row && k < 4 && !nameEl(row, ph); k++) row = row.parentElement;
       if (!row) continue;
-      const nm = leafs(row).find((e) => e !== ph && /^[가-힣*]{1,8}$/.test(norm(e.textContent)));
-      if (!nm || leafs(row).filter((e) => PHONE.test(norm(e.textContent))).length !== 1) continue;
+      const nm = nameEl(row, ph);
+      if (!nm || phoneEls(row).length !== 1) continue;
       out.push({ name: norm(nm.textContent), phone: norm(ph.textContent), el: row });
     }
     return out;
   };
   /** 오른쪽 고객 카드: '등록경로' · '전화번호' 이름표가 함께 있는 가장 작은 칸 → 목록(다른 번호)이 섞이기 전까지 넓힘 (이름 · [톡톡 대화하기]가 옆 칸에 있어도 잡히게) */
-  const phones = (root) => leafs(root).filter((e) => PHONE.test(norm(e.textContent))).length;
-  const card = () => {
+  const phones = (root) => phoneEls(root).length;
+  function cardBox() {
     const lab = byText("등록경로")[0];
     let box = lab;
     for (let k = 0; box && k < 8 && !byText("전화번호", box).length; k++) box = box.parentElement;
     if (!box || !byText("전화번호", box).length) return null;
     for (let k = 0; k < 5 && box.parentElement && box.parentElement !== document.body && phones(box.parentElement) <= phones(box); k++) box = box.parentElement;
+    return box;
+  }
+  const card = () => {
+    const box = cardBox();
+    if (!box) return null;
     const val = (label) => { const l = byText(label, box)[0]; if (!l) return ""; const v = l.nextElementSibling || (l.parentElement && l.parentElement.nextElementSibling); return v ? txt(v) : ""; };
     const NOT = /^(등록경로|전화번호|이메일|특이사항|정보변경|예약내역|주문내역|고객정보|메모|태그|완료|노쇼|취소|방문|예약|주문|닫기)$/;
-    const okName = (e) => e && /^[가-힣*]{1,8}$/.test(norm(e.textContent)) && !NOT.test(norm(e.textContent));
+    const okName = (e) => e && NAME.test(norm(e.textContent)) && !NOT.test(norm(e.textContent)) && !BADGE.test(norm(e.textContent));
     const head = [...box.querySelectorAll("h1, h2, h3, h4, strong, [class*=name], [class*=Name]")].find((e) => vis(e) && okName(e)) || leafs(box).find(okName);
     return { name: head ? norm(head.textContent) : "", phone: norm(val("전화번호")), path: val("등록경로"), talk: !!byText("톡톡 대화하기", box).length };
   };
@@ -69,9 +103,9 @@ function installTalkSendDriver() {
         url: location.href,
         navCustomers: !!byText("고객").some((e) => e.closest("nav, aside, [class*=nav], [class*=Nav], [class*=menu], [class*=Menu], [class*=gnb], [class*=lnb]")),
         customers: !!inp && byText("예약·주문").length > 0,
-        type: tg ? norm(tg.textContent || tg.value).replace(/[∨⌄▾▼v]$/i, "") : "",
+        type: typeOf(tg),
         q: inp ? inp.value : "",
-        count: (() => { const m = norm(document.body.innerText).match(/(\d+)명/); return m ? +m[1] : null; })(),
+        count: countOf(inp),
         rows: rows().map(({ name, phone }) => ({ name, phone })),
         card: c,
         chat: area ? { input: true, send: !!byText("전송").length, file: $$("input[type=file]").length > 0, imgs: $$("img").length, len: document.body.innerText.length } : null,
@@ -83,25 +117,31 @@ function installTalkSendDriver() {
     tab() { const e = byText("예약·주문")[0]; return { ok: press(clickable(e)) }; },
     /** 검색 칸 앞 선택을 '전화번호'로 (펼침 → 고르기) */
     openType() { const inp = searchInput(), tg = inp && typeToggle(inp); if (!tg) return { ok: false, why: "검색 칸 앞 선택(이름 · 전화번호)을 못 찾음" }; if (tg.tagName === "SELECT") { const o = [...tg.options].find((x) => /전화번호/.test(x.text)); if (o) { tg.value = o.value; tg.dispatchEvent(new Event("change", { bubbles: true })); } return { ok: !!o, select: true }; } return { ok: press(tg) }; },
-    /** 펼친 선택지에서 고르기 — 선택지 모양(li · option · menuitem)을 먼저 · 목록 머리글 '전화번호'는 피함 */
+    /** 펼친 선택지에서 고르기 — 선택 상자 바로 아래에서 가장 가까운 그 글자 (표 머리글 '전화번호'는 멀고 · 머리글 칸은 뺌) */
     pickType(t) {
       const inp = searchInput(), tg = inp && typeToggle(inp);
-      const all = byText(t).filter((x) => !tg || !tg.contains(x));
-      const near = tg && tg.parentElement && tg.parentElement.parentElement;
-      const e = all.find((x) => x.closest("[role=option], [role=menuitem], [role=listbox], li, option")) || all.find((x) => near && near.contains(x));
-      return { ok: press(clickable(e)) };
+      if (!tg) return { ok: false, why: "검색 칸 앞 선택(이름 · 전화번호)을 못 찾음" };
+      const tr = R(tg), re = new RegExp("^" + norm(t) + "$");
+      const c = $$("*").filter((e) => vis(e) && isText(e, re) && !tg.contains(e) && !inHead(e))
+        .map((e) => { const r = R(e); return { e, d: Math.hypot(r.left - tr.left, r.top - tr.bottom), below: r.top >= tr.top + tr.height * 0.5 }; })
+        .filter((x) => x.below && x.d < 320).sort((a, b) => a.d - b.d)[0];
+      if (!c) return { ok: false, why: `펼친 선택에서 '${t}'를 못 찾음` };
+      return { ok: press(clickable(c.e)) };
     },
-    /** 검색: 글을 넣고 Enter · 돋보기 */
+    /** 검색: 글을 넣고 돋보기 (사장님 11/16: 돋보기를 눌러야 찾음) — 돋보기 = 검색 칸과 같은 줄 · 오른쪽 140px 안 맨 오른쪽 단추 (지우기 ⊗ 는 뺌) · 못 찾으면 Enter */
     search(q) {
       const inp = searchInput(); if (!inp) return { ok: false, why: "검색 칸을 못 찾음" };
       inp.focus(); setVal(inp, q);
+      const tg = typeToggle(inp), ir = R(inp), cy = ir.top + ir.height / 2, band = Math.max(ir.height, 24);
+      const clear = (b) => /지우|삭제|clear|reset|delete|remove/i.test([b.getAttribute("aria-label"), b.title, typeof b.className === "string" ? b.className : ""].join(" "));
+      const btn = $$("button, [role=button], a").filter((b) => vis(b) && b !== tg && !(tg && tg.contains(b)) && !clear(b) && (() => { const r = R(b); return Math.abs(r.top + r.height / 2 - cy) < band && r.left >= ir.right - 6 && r.left <= ir.right + 140; })())
+        .sort((a, b) => R(b).right - R(a).right)[0];
+      if (btn && inside(btn)) { btn.click(); return { ok: true, how: "돋보기" }; }
       for (const t of ["keydown", "keypress", "keyup"]) inp.dispatchEvent(new KeyboardEvent(t, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
-      const box = inp.closest("form, div"); const btn = box && $$("button", box).find((b) => vis(b) && b !== typeToggle(inp) && (/검색/.test(b.getAttribute("aria-label") || b.title || b.textContent) || (!norm(b.textContent) && b.querySelector("svg, i, span[class*=search], span[class*=Search]")) ) && !/지우|clear|삭제/i.test(b.getAttribute("aria-label") || b.className));
-      if (btn) press(btn);
-      return { ok: true };
+      return { ok: true, how: "Enter" };
     },
     /** 목록 i 번째 줄 누르기 */
-    openRow(i) { const r = rows()[i]; if (!r) return { ok: false, why: "그 줄이 없음" }; const nm = leafs(r.el).find((e) => /^[가-힣*]{1,8}$/.test(norm(e.textContent))); return { ok: press(clickable(nm) || r.el) }; },
+    openRow(i) { const r = rows()[i]; if (!r) return { ok: false, why: "그 줄이 없음" }; const nm = nameEl(r.el); return { ok: press(clickable(nm) || r.el) }; },
     /** 카드의 [톡톡 대화하기] */
     talk() { const c = byText("톡톡 대화하기")[0]; if (!c) return { ok: false, why: "[톡톡 대화하기]를 못 찾음" }; clickable(c).click(); return { ok: true }; },
     /** 대화창: 글 넣기 · [전송] */
@@ -129,12 +169,22 @@ function asciiCopy(file) {
   return out;
 }
 const digits = (s) => String(s || "").replace(/\D/g, "");
-/** 가려진 이름(유*석 · 남궁*진)과 실제 이름이 같은 모양인가 — '*' 는 아무 글자 하나 · 길이가 같아야 함 */
+const MASK = /[*＊∗●○]/;
+/** 가려진 이름(유*석 · 남궁*진 · 염*)과 실제 이름이 같은 모양인가 — 가린 글자는 아무 글자 하나 · 길이가 같으면 자리마다 · 끝을 가렸으면(염* · 남궁**) 보이는 앞글자가 같으면 */
 function nameLike(shown, real) {
   const s = String(shown || "").replace(/\s+/g, ""), r = String(real || "").replace(/\s+/g, "");
   if (!s || !r) return false;
-  if (!s.includes("*")) return s === r;
-  return s.length === r.length && [...s].every((c, i) => c === "*" || c === r[i]);
+  if (!MASK.test(s)) return s === r;
+  if (s.length === r.length) return [...s].every((c, i) => MASK.test(c) || c === r[i]);
+  const head = s.replace(/[*＊∗●○]+$/, "");
+  return !MASK.test(head) && head.length >= 1 && head.length < r.length && r.startsWith(head);
+}
+/** 가린 번호(***-****-1313 · 010-30**-1313)가 그 번호와 같은 모양인가 — 보이는 숫자는 같은 자리가 같아야 함 · 뒷 4자리는 꼭 같아야 함 */
+function phoneLike(shown, tp) {
+  const s = String(shown || "").replace(/[^\d*＊∗●○]/g, "");
+  if (digits(s).slice(-4) !== tp.slice(-4) || s.length < 4) return false;
+  if (s.length !== tp.length) return true;
+  return [...s].every((c, i) => MASK.test(c) || c === tp[i]);
 }
 /** 목록에서 그 손님 줄 고르기 — { i, how } 또는 { why }
     번호가 다 보이는 줄 중 번호가 같은 줄 → 그 줄 (같은 번호가 여럿이면 같은 사람으로 보고 첫 줄)
@@ -144,10 +194,13 @@ function pickRow(rows, target) {
   if (tp.length < 10) return { why: "전화번호가 없거나 짧음" };
   const full = rows.map((r, i) => ({ r, i })).filter(({ r }) => digits(r.phone) === tp);
   if (full.length) return { i: full[0].i, how: "번호" };
-  const masked = rows.map((r, i) => ({ r, i })).filter(({ r }) => /\*/.test(r.phone) && digits(r.phone).slice(-4) === last4 && nameLike(r.name, target.name));
+  const masked = rows.map((r, i) => ({ r, i })).filter(({ r }) => MASK.test(r.phone) && phoneLike(r.phone, tp) && nameLike(r.name, target.name));
   if (masked.length === 1) return { i: masked[0].i, how: "가린 번호 · 이름" };
   if (masked.length > 1) return { why: `가려진 손님 중 이름 · 뒷번호가 같은 사람이 ${masked.length}명 — 근무자가 확인` };
-  return { why: rows.length ? "네이버 고객에서 그 번호 · 이름을 못 찾음" : "네이버 고객에서 뒷번호로 찾은 사람이 없음" };
+  if (!rows.length) return { why: "네이버 고객에서 뒷번호로 찾은 사람이 없음" };
+  // 왜 못 맞췄는지 보이게 (현장 POS 화면에만): 뒷번호가 같은 줄이 어떻게 보였는지 — 이름 · 번호 모양이 예상과 다르면 여기서 알 수 있음
+  const same = rows.filter((r) => digits(r.phone).slice(-4) === last4);
+  return { why: `네이버 고객에서 그 번호 · 이름을 못 찾음 (목록 ${rows.length}명 · 뒷번호 ${last4} 같은 줄 ${same.length ? same.slice(0, 3).map((r) => `${r.name} ${r.phone}`).join(", ") : "없음"})` };
 }
 /** 고객 카드 확인: 번호가 다 보이면 같은 번호 · 가려졌으면 뒷번호 + 이름 모양 */
 function cardOk(card, target, how) {
@@ -183,7 +236,7 @@ class TalkSend {
     if (s.type !== "전화번호") {
       const o = await this.call("window.__tsend.openType()");
       if (!o.ok) return o;
-      if (!o.select) { await sleep(300); await this.call(`window.__tsend.pickType("전화번호")`); }
+      if (!o.select) { await sleep(400); const pk = await this.call(`window.__tsend.pickType("전화번호")`); if (!pk.ok) return Object.assign({ step: "검색 선택" }, pk); }
       s = await this.until((x) => x.customers && x.type === "전화번호", 6000);
       if (!s) return { ok: false, why: "검색 선택을 '전화번호'로 못 바꿈" };
     }
@@ -201,13 +254,17 @@ class TalkSend {
     if (!q.ok) return Object.assign({ step: "검색" }, q);
     let s = await this.until((x) => x.customers && x.q === last4 && (x.rows.length > 0 || x.count === 0), 10000);
     if (!s) return { ok: false, step: "검색", why: "검색 결과가 안 뜸" };
+    if (s.type !== "전화번호") return { ok: false, step: "검색", why: `검색 선택이 '${s.type || "?"}' — '전화번호'로 찾지 않아 멈춤` };
     s = await this.settle(s); // 앞 검색 목록이 남아 있거나 아직 그리는 중이면 멈출 때까지
     await this.shot("1-검색");
     const pick = pickRow(s.rows, job);
     if (pick.why) return { ok: false, skip: true, step: "맞추기", why: pick.why, rows: s.rows.length };
     step(`목록 ${s.rows.length}명 중 ${pick.how}로 맞춤 → 카드`);
+    // 처음엔 첫 손님 카드가 저절로 떠 있음 (뒷번호가 같아서 헷갈림) → 누른 줄의 이름 · 번호로 카드가 바뀔 때까지 기다림 (2.24 현장 11/16)
+    const row = s.rows[pick.i], flat = (v) => String(v || "").replace(/\s+/g, "");
     await this.call(`window.__tsend.openRow(${pick.i})`);
-    s = await this.until((x) => x.card && (x.card.phone || x.card.name) && (digits(x.card.phone).slice(-4) === last4), 8000);
+    await sleep(700);
+    s = (await this.until((x) => x.card && flat(x.card.phone) === flat(row.phone) && (!x.card.name || flat(x.card.name) === flat(row.name)), 8000)) || (await this.state());
     await this.shot("2-고객카드");
     const ok = cardOk(s && s.card, job, pick.how);
     if (!ok.ok) return { ok: false, skip: true, step: "카드 확인", why: ok.why };
@@ -279,4 +336,4 @@ class TalkSend {
   async waitFor(fn, ms) { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await fn().catch(() => false)) return true; await sleep(250); } return false; }
 }
 
-if (typeof module !== "undefined") module.exports = { TalkSend, TALKSEND_DRIVER_SOURCE, installTalkSendDriver, pickRow, cardOk, nameLike };
+if (typeof module !== "undefined") module.exports = { TalkSend, TALKSEND_DRIVER_SOURCE, installTalkSendDriver, pickRow, cardOk, nameLike, phoneLike };

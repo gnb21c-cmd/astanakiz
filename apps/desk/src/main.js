@@ -3,7 +3,7 @@
    - 아마노 창은 이 프로그램이 열어 두고, 가려진 채로 칸에 입력하고 버튼을 누른다 (화면 좌표가 아니라 페이지 안의 글자로 찾으므로 가려져도 됨)
    - 로그인이 풀렸을 때만 "아마노 화면 보기"로 앞으로 꺼내 근무자가 로그인한다
    - POS "결제하기"는 이미 켜진 POS 창을 앞으로 띄우기만 한다 */
-const { app, BrowserWindow, ipcMain, safeStorage, shell, clipboard } = require("electron");
+const { app, BrowserWindow, ipcMain, safeStorage, shell, clipboard, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const { execFile, spawn } = require("child_process");
@@ -449,19 +449,81 @@ ipcMain.handle("revimg:save", (_e, job) => {
   }
 });
 // 사장님이 고른 안내 그림 (11/16): 바탕화면 '아스타나키즈-재방문안내/보낼사진_D-n.jpg|jpeg|png' → 창에 보여 줄 data URL (손님 정보 없음 · 그 폴더 그 이름만)
+/* 사장님 그림 찾기 (2.24 현장 11/16: 폴더에 '보낼사진_D-8.jpg'로 보이는데 못 찾았음 — 윈도가 확장자를 숨기면 실제 이름은 '보낼사진_D-8.jpg.jpg' · '.jpg.png' 일 수 있음)
+   → 이름을 너그럽게: 대소문자 · 띄어쓰기 · '_' '-' 모양 · 확장자가 겹쳐도 (jpg · jpeg · png · gif · webp) · 한글 조합 방식(NFC/NFD)도 같게 · 그림 종류는 파일 앞부분으로 */
+const IMG_EXT = /\.(jpe?g|png|gif|webp)$/i;
+/* 데스크에서 고른 그림 (사장님 11/16 — "데스크에서 검색 · 첨부": 이름을 맞춰 저장하다 틀릴 일이 없게)
+   재방문 안내 창 [그림 고르기] → 윈도 파일 고르기 창 → 앱 폴더 'rev-images/D-8.jpg|png|gif|webp' 로 복사 (원래 이름은 rev-images/D-8.json) → 미리보기 · 톡톡 그 그림
+   순서: 데스크에서 고른 그림 → 바탕화면 '보낼사진_D-8' → 데스크가 그린 그림 */
+const REV_OWN_DIR = () => path.join(app.getPath("userData"), "rev-images");
+function appImage(left) {
+  try {
+    const f = fs.readdirSync(REV_OWN_DIR()).find((n) => new RegExp(`^D-${left}\\.(jpe?g|png|gif|webp)$`, "i").test(n));
+    if (!f) return null;
+    let meta = {};
+    try { meta = JSON.parse(fs.readFileSync(path.join(REV_OWN_DIR(), `D-${left}.json`), "utf8")) || {}; } catch (e) { /* 이름 없음 */ }
+    return { file: path.join(REV_OWN_DIR(), f), name: String(meta.name || f).slice(0, 80), at: String(meta.at || "").slice(0, 16) };
+  } catch (e) { return null; }
+}
+function ownImage(left) {
+  const a = appImage(left);
+  if (a) return { file: a.file, from: "app", name: a.name, at: a.at, files: [] };
+  let names = [];
+  try { names = fs.readdirSync(REV_DIR()); } catch (e) { return { file: "", files: [] }; }
+  const key = (n) => n.normalize("NFC").replace(/\s+/g, "").toLowerCase();
+  const re = new RegExp(`^보낼사진[_\\-–—]*d[_\\-–—]*${left}(\\(\\d+\\))?(\\.[a-z0-9]{1,5})*$`); // '보낼사진_D-8 (1).jpg' (복사본)도
+  const hit = names.filter((n) => IMG_EXT.test(n) && re.test(key(n))).sort((a, b) => a.length - b.length)[0];
+  return { file: hit ? path.join(REV_DIR(), hit) : "", from: hit ? "desk" : "", name: hit || "", files: names.filter((n) => IMG_EXT.test(n)).slice(0, 8) };
+}
+const imgType = (b) => (b[0] === 0xff && b[1] === 0xd8 ? "jpeg" : b[0] === 0x89 && b[1] === 0x50 ? "png" : b.slice(0, 3).toString() === "GIF" ? "gif" : b.slice(8, 12).toString() === "WEBP" ? "webp" : "");
 ipcMain.handle("revimg:get", (_e, left) => {
   const l = Number(left);
   if (!Number.isInteger(l) || l < 1 || l > 30) return { ok: false, why: "모양이 틀림" };
-  for (const [ext, type] of [["jpg", "jpeg"], ["jpeg", "jpeg"], ["png", "png"]]) {
-    const f = path.join(REV_DIR(), `보낼사진_D-${l}.${ext}`);
-    try {
-      const st = fs.statSync(f);
-      if (!st.isFile()) continue;
-      if (st.size > 8 * 1024 * 1024) return { ok: false, why: "사진이 너무 커요 (8MB 넘음)" };
-      return { ok: true, name: path.basename(f), dataUrl: `data:image/${type};base64,` + fs.readFileSync(f).toString("base64") };
-    } catch (e) { /* 없음 */ }
+  const o = ownImage(l);
+  if (!o.file) return { ok: false, files: o.files.map((n) => n.normalize("NFC")) };
+  try {
+    const st = fs.statSync(o.file);
+    if (st.size > 8 * 1024 * 1024) return { ok: false, why: "사진이 너무 커요 (8MB 넘음)", files: [path.basename(o.file)] };
+    const b = fs.readFileSync(o.file), t = imgType(b);
+    if (!t) return { ok: false, why: "그림 파일이 아니에요", files: [path.basename(o.file)] };
+    return { ok: true, from: o.from, at: o.at || "", name: String(o.name || path.basename(o.file)).normalize("NFC"), dataUrl: `data:image/${t};base64,` + b.toString("base64") };
+  } catch (e) {
+    return { ok: false, why: `못 읽음: ${e.message || e}` };
   }
-  return { ok: false };
+});
+/** [그림 고르기]: 윈도 파일 고르기 창 (처음엔 바탕화면) → 그림이면 앱 폴더에 'D-n.확장자'로 · 원래 이름 · 때 (시험은 DESK_TEST_PICK 파일) */
+ipcMain.handle("revimg:pick", async (_e, left) => {
+  const l = Number(left);
+  if (!Number.isInteger(l) || l < 1 || l > 30) return { ok: false, why: "모양이 틀림" };
+  let file = process.env.DESK_TEST_PICK || "";
+  if (!file) {
+    const r = await dialog.showOpenDialog(deskWin && !deskWin.isDestroyed() ? deskWin : undefined, { title: `재방문 안내 D-${l} 에 보낼 그림 고르기`, defaultPath: app.getPath("desktop"), properties: ["openFile"], filters: [{ name: "그림 (jpg · png · gif · webp)", extensions: ["jpg", "jpeg", "png", "gif", "webp"] }] });
+    if (deskWin && !deskWin.isDestroyed()) deskWin.focus();
+    if (!r || r.canceled || !r.filePaths || !r.filePaths[0]) return { ok: false, canceled: true };
+    file = r.filePaths[0];
+  }
+  try {
+    const st = fs.statSync(file);
+    if (!st.isFile()) return { ok: false, why: "파일이 아니에요" };
+    if (st.size > 8 * 1024 * 1024) return { ok: false, why: "그림이 너무 커요 (8MB 넘음)" };
+    const b = fs.readFileSync(file), t = imgType(b);
+    if (!t) return { ok: false, why: "그림 파일이 아니에요 (jpg · png · gif · webp)" };
+    fs.mkdirSync(REV_OWN_DIR(), { recursive: true });
+    for (const n of fs.readdirSync(REV_OWN_DIR())) if (new RegExp(`^D-${l}\\.`, "i").test(n)) fs.unlinkSync(path.join(REV_OWN_DIR(), n));
+    fs.writeFileSync(path.join(REV_OWN_DIR(), `D-${l}.${t === "jpeg" ? "jpg" : t}`), b);
+    const meta = { name: path.basename(file).normalize("NFC"), at: localNow() };
+    fs.writeFileSync(path.join(REV_OWN_DIR(), `D-${l}.json`), JSON.stringify(meta));
+    return { ok: true, name: meta.name, at: meta.at };
+  } catch (e) {
+    return { ok: false, why: `저장 못 함: ${e.message || e}` };
+  }
+});
+/** [그림 빼기]: 데스크에서 고른 그림을 지움 → 바탕화면 '보낼사진' 또는 데스크 그림 */
+ipcMain.handle("revimg:clear", (_e, left) => {
+  const l = Number(left);
+  if (!Number.isInteger(l) || l < 1 || l > 30) return { ok: false, why: "모양이 틀림" };
+  try { for (const n of fs.readdirSync(REV_OWN_DIR())) if (new RegExp(`^D-${l}\\.`, "i").test(n)) fs.unlinkSync(path.join(REV_OWN_DIR(), n)); } catch (e) { /* 없음 */ }
+  return { ok: true };
 });
 // 글 복사 (재방문 안내 번호 · 문구) — 데스크 창이 포커스를 잃어도 되게 본체 클립보드로
 ipcMain.handle("clip:write", (_e, text) => { const t = String(text || ""); if (!t || t.length > 20000) return false; clipboard.writeText(t); return true; });
@@ -484,10 +546,10 @@ const spUrlOk = (u) => /^https:\/\/([a-z0-9-]+\.)*naver\.com\//i.test(u) || (TAL
 const REV_DIR = () => path.join(app.getPath("desktop"), "아스타나키즈-재방문안내");
 /** 보낼 사진: 사장님이 둔 '보낼사진_D-n' 이 먼저 · 없으면 그날 만든 안내 이미지 */
 function revImageFile(left) {
-  for (const f of [`보낼사진_D-${left}.jpg`, `보낼사진_D-${left}.jpeg`, `보낼사진_D-${left}.png`, `재방문안내_D-${left}_${localToday()}.jpg`]) {
-    const p = path.join(REV_DIR(), f);
-    try { if (fs.statSync(p).isFile()) return p; } catch (e) { /* 다음 */ }
-  }
+  const o = ownImage(left);
+  if (o.file) return o.file;
+  const p = path.join(REV_DIR(), `재방문안내_D-${left}_${localToday()}.jpg`);
+  try { if (fs.statSync(p).isFile()) return p; } catch (e) { /* 없음 */ }
   return "";
 }
 /** 대화창의 사진 칸에 파일 넣기 (파일 고르기 창 없이) */
