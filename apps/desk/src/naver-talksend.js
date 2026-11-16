@@ -57,8 +57,8 @@ function installTalkSendDriver() {
   const typeOf = (tg) => { if (!tg) return ""; if (tg.tagName === "SELECT") { const o = tg.options[tg.selectedIndex]; return o ? norm(o.text) : ""; } const m = norm(tg.textContent).match(/^(이름|전화번호)/); return m ? m[1] : ""; };
   /** 'N명' (검색 칸 아래 가장 가까운 것) */
   const countOf = (inp) => {
-    const c = $$("*").filter((e) => vis(e) && /^\d+명$/.test(norm(e.textContent)) && ![...e.children].some((x) => /^\d+명$/.test(norm(x.textContent))));
-    if (!c.length) { const m = norm(document.body.innerText).match(/(\d+)명/); return m ? +m[1] : null; }
+    const c = $$("*").filter((e) => vis(e) && /^[\d,]+명$/.test(norm(e.textContent)) && ![...e.children].some((x) => /^[\d,]+명$/.test(norm(x.textContent))));
+    if (!c.length) { const m = norm(document.body.innerText).match(/([\d,]+)명/); return m ? +m[1].replace(/\D/g, "") : null; }
     if (inp) { const ir = R(inp); c.sort((a, b) => Math.abs(R(a).top - ir.bottom) - Math.abs(R(b).top - ir.bottom)); }
     return +norm(c[0].textContent).replace(/\D/g, "");
   };
@@ -74,7 +74,7 @@ function installTalkSendDriver() {
       const row = r.closest("[class*=list-row], [class*=ListRow], tr, li");
       const ph = phoneEls(row)[0];
       const nm = [...row.querySelectorAll("[class*=text-value], [class*=name], [class*=Name]")].find((e) => vis(e) && !e.querySelector("input") && NAME.test(norm(e.textContent))) || r.closest("label") || row;
-      return { name: norm(r.title), phone: ph ? norm(ph.textContent) : "", id: String(r.value || ""), el: nm };
+      return { name: norm(r.title), phone: ph ? norm(ph.textContent) : "", id: String(r.value || ""), el: nm, pick: r.closest("label") || r, radio: r };
     });
     const cb = cardBox(), out = [];
     const names = $$("*").filter((e) => vis(e) && (isText(e, NAME) || (!e.children.length && NAME.test(norm(e.textContent)))) && !BADGE.test(norm(own(e) || e.textContent)) && !(cb && cb.contains(e)) && !e.closest("nav, aside") && !inHead(e) && !e.closest("[class*=Index], [class*=index]"));
@@ -128,7 +128,8 @@ function installTalkSendDriver() {
         rows: rows().map(({ name, phone, id }) => ({ name, phone, id: id || "" })),
         phonesSeen: listPhones().length,
         card: c,
-        chat: area ? { input: true, send: !!byText("전송").length, file: $$("input[type=file]").length > 0, imgs: $$("img").length, len: document.body.innerText.length } : null,
+        chat: area ? { input: true, send: !!byText("전송").length, file: $$("input[type=file]").length > 0, imgs: $$("img").length, len: document.body.innerText.length,
+          loading: $$("[class*=message] .loading, ._chatWindow .loading, [class*=message] [class*=loading]").some((e) => vis(e) && e.getBoundingClientRect().height > 0) } : null,
       };
     },
     /** 왼쪽 메뉴 [고객] */
@@ -165,7 +166,37 @@ function installTalkSendDriver() {
       return { ok: true, how: "Enter" };
     },
     /** 목록 i 번째 줄 누르기 */
-    openRow(i) { const r = rows()[i]; if (!r) return { ok: false, why: "그 줄이 없음" }; r.el.scrollIntoView({ block: "center" }); r.el.click(); return { ok: true }; },
+    /** 목록 더 불러오기 — 아래로 내려야 15명씩 더 나오는 목록 (사장님 11/16): 마지막 줄을 보이게 · 목록을 감싼 스크롤 칸 · 창을 맨 아래로 */
+    more() {
+      const rs = rows(); if (!rs.length) return { ok: false, n: 0 };
+      const last = rs[rs.length - 1].el;
+      last.scrollIntoView({ block: "end" });
+      for (let e = last.parentElement; e && e !== document.body && e !== document.documentElement; e = e.parentElement) {
+        const cs = getComputedStyle(e);
+        if (/(auto|scroll)/.test(cs.overflowY) && e.scrollHeight > e.clientHeight + 4) { e.scrollTop = e.scrollHeight; e.dispatchEvent(new Event("scroll")); }
+      }
+      const se = document.scrollingElement || document.documentElement;
+      se.scrollTop = se.scrollHeight; document.dispatchEvent(new Event("scroll", { bubbles: true })); window.dispatchEvent(new Event("scroll"));
+      // 목록 끝 '로딩중' 자리가 보여야 더 부르는 화면도 있어 그 자리까지
+      const ld = $$("[class*=load_area], [class*=LoadArea], [class*=load-more], [class*=loadMore]").pop(); if (ld) ld.scrollIntoView({ block: "end" });
+      last.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: 600 }));
+      return { ok: true, n: rs.length };
+    },
+    /** 목록 i 번째 줄 고르기 — how 0: 고르기 칸(label · 사람이 이름을 누르면 실제로 눌리는 곳) · 1: 고르기 단추(radio) · 2: 그 자리 맨 위 요소에 마우스 누름 · 뗌 · 클릭
+        (실제 화면 11/16: 이름 글자 span 을 눌러도 안 바뀜 — 줄마다 <label class="…list-radio"><input type=radio class=sr-only> 가 받음) */
+    openRow(i, how, id) {
+      const all = rows(), r = (id && all.find((x) => x.id === id)) || all[i]; if (!r) return { ok: false, why: "그 줄이 없음" };
+      r.el.scrollIntoView({ block: "center" });
+      if (how === 1 && r.radio) { r.radio.click(); return { ok: true, how: "고르기 단추" }; }
+      if (how === 2) {
+        const b = R(r.el), x = b.left + Math.min(b.width / 2, 20), y = b.top + b.height / 2;
+        const top = document.elementFromPoint(x, y) || r.pick || r.el;
+        for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) top.dispatchEvent(new (type.startsWith("pointer") ? PointerEvent : MouseEvent)(type, { bubbles: true, cancelable: true, view: window, clientX: x, clientY: y, button: 0 }));
+        return { ok: true, how: "화면 자리" };
+      }
+      const t = r.pick || clickable(r.el) || r.el;
+      t.click(); return { ok: true, how: r.pick ? "고르기 칸" : "이름" };
+    },
     /** 카드의 [톡톡 대화하기] */
     talk() { const c = byText("톡톡 대화하기")[0]; if (!c) return { ok: false, why: "[톡톡 대화하기]를 못 찾음" }; clickable(c).click(); return { ok: true }; },
     /** 대화창: 글 넣기 · [전송] */
@@ -291,6 +322,7 @@ class TalkSend {
     if (s.type !== "전화번호") return { ok: false, step: "검색", why: `검색 선택이 '${s.type || "?"}' — '전화번호'로 찾지 않아 멈춤` };
     s = await this.settle(s); // 앞 검색 목록이 남아 있거나 아직 그리는 중이면 멈출 때까지
     await this.shot("1-검색");
+    s = await this.loadAll(s, step); // 15명 넘게 찾으면 아래로 내려야 나머지가 나옴 (사장님 11/16)
     let pick, card;
     if (!s.rows.length) return { ok: false, skip: true, step: "맞추기", why: `네이버 고객에서 뒷번호 ${last4}로 찾은 사람이 없음`, rows: 0 };
     if (s.rows.some((r) => r.phone)) {
@@ -302,7 +334,7 @@ class TalkSend {
       if (!ok.ok) return { ok: false, skip: true, step: "카드 확인", why: ok.why };
     } else {
       // 앱 창(실제 화면 11/16): 목록에 이름만 → 이름이 같은 줄(가린 이름은 모양이 같은 줄)을 눌러 오른쪽 고객 정보의 전화번호로 확인 (사장님이 손으로 하는 순서)
-      pick = await this.byCard(s.rows, job);
+      pick = await this.byCard(s.rows, job, s.count);
       if (pick.why) return { ok: false, skip: true, step: "맞추기", why: pick.why, rows: s.rows.length };
       card = pick.card;
     }
@@ -319,6 +351,7 @@ class TalkSend {
       const cs = await this.until((x) => x.chat && x.chat.input, 15000, chat.exec);
       await this.shot("3-대화창");
       if (!cs) return { ok: false, step: "대화창", why: "대화창에 글 칸이 안 보임" };
+      if (cs.chat.loading) await this.until((x) => x.chat && !x.chat.loading, 10000, chat.exec);
       const sel = await this.call("window.__tsend.fileSelector()", chat.exec);
       if (dry) return { ok: true, dry: true, step: "확인만", how: pick.how, chat: { input: cs.chat.input, send: cs.chat.send, file: !!sel } };
       const sent = {};
@@ -337,6 +370,7 @@ class TalkSend {
       if (job.image) {
         if (!sel) return { ok: false, step: "사진", why: "대화창의 사진 칸을 못 찾음", sent };
         step("사진 보내기");
+        await sleep(800);
         const before = (await this.state(chat.exec)).chat;
         await chat.setFile(sel, asciiCopy(job.image));
         const after = await this.until((x) => x.chat && (x.chat.imgs > before.imgs || x.chat.len > before.len), 15000, chat.exec);
@@ -354,26 +388,29 @@ class TalkSend {
   async openCard(i, row) {
     const flat = (v) => String(v || "").replace(/\s+/g, "");
     const same = (c) => !!c && (row.id && c.id ? c.id === row.id : flat(c.name) === flat(row.name)) && (!row.phone || flat(c.phone) === flat(row.phone));
-    await this.call(`window.__tsend.openRow(${i})`);
-    await sleep(700);
-    const s = await this.until((x) => same(x.card), 8000);
-    return s ? s.card : null;
+    for (let how = 0; how < 3; how++) {
+      await this.call(`window.__tsend.openRow(${i}, ${how}, ${JSON.stringify(row.id || "")})`);
+      await sleep(500);
+      const s = await this.until((x) => same(x.card), how < 2 ? 3500 : 6000);
+      if (s) return s.card;
+    }
+    return null;
   }
   /** 이름만 있는 목록: 이름이 같은 줄 → 가린 이름 모양이 같은 줄 차례로 눌러 고객 정보 전화번호로 확인
       번호가 다 보이면 같아야 그 사람 · 가려졌으면 뒷번호 + 이름 모양 — 그런 사람이 하나뿐일 때만 (둘 이상이면 건너뜀) */
-  async byCard(rows, job) {
+  async byCard(rows, job, count) {
     const flat = (v) => String(v || "").replace(/\s+/g, ""), tp = digits(job.phone), last4 = tp.slice(-4);
     const idx = rows.map((r, i) => ({ r, i }));
     const exact = idx.filter(({ r }) => flat(r.name) === flat(job.name));
     const masked = idx.filter(({ r }) => flat(r.name) !== flat(job.name) && MASK.test(r.name) && nameLike(r.name, job.name));
     const cands = exact.concat(masked).slice(0, 6);
-    if (!cands.length) return { why: `네이버 고객에서 그 이름을 못 찾음 (뒷번호 ${last4}로 찾은 ${rows.length}명: ${rows.slice(0, 5).map((r) => r.name).join(", ")}${rows.length > 5 ? " …" : ""})` };
+    if (!cands.length) return { why: `네이버 고객에서 그 이름을 못 찾음 (뒷번호 ${last4}로 찾은 ${count != null && count > rows.length ? `${count}명 중 목록에 나온 ${rows.length}명` : `${rows.length}명`}: ${rows.slice(0, 5).map((r) => r.name).join(", ")}${rows.length > 5 ? " …" : ""})` };
     const maybe = [];
-    let last = null;
+    let last = null, stuck = 0;
     for (const c of cands) {
       const card = await this.openCard(c.i, c.r);
       last = c;
-      if (!card) continue;
+      if (!card) { stuck++; continue; }
       const cp = digits(card.phone);
       if (!MASK.test(card.phone) && cp.length >= 10) {
         if (cp === tp) return { i: c.i, how: "이름 · 고객 정보 번호", card };
@@ -387,7 +424,25 @@ class TalkSend {
       return card ? { i: m.i, how: "가린 이름 · 뒷번호", card } : { why: "고객 정보를 다시 열지 못함" };
     }
     if (maybe.length > 1) return { why: `가려진 손님 중 이름 · 뒷번호가 같은 사람이 ${maybe.length}명 — 근무자가 확인` };
-    return { why: `이름이 같은 손님 ${cands.length}명을 눌러 봤는데 고객 정보 번호가 달라요 — 근무자가 확인` };
+    if (stuck === cands.length) return { why: `이름이 같은 손님(${cands.map((c) => c.r.name).join(", ")})을 눌렀는데 오른쪽 고객 정보가 그 손님으로 안 바뀜 — 근무자가 확인` };
+    return { why: `이름이 같은 손님 ${cands.length}명을 눌러 봤는데 고객 정보 번호가 달라요${stuck ? ` (${stuck}명은 고객 정보가 안 바뀜)` : ""} — 근무자가 확인` };
+  }
+  /** 찾은 사람(N명)보다 목록 줄이 적으면 아래로 내려 더 불러옴 — 한 번에 15명씩 나오는 목록 (사장님 11/16) · 안 늘면 한 번 더 · 최대 12번(약 200명)
+      'N명'을 못 읽으면 줄이 10줄 넘을 때 한 번 내려 보고 늘 때만 계속 */
+  async loadAll(s, step) {
+    const more = (x) => (x.count != null ? x.rows.length < x.count : x.rows.length >= 10);
+    for (let k = 0; k < 12 && more(s); k++) {
+      const before = s.rows.length;
+      let n = null;
+      for (let t = 0; t < 2 && !n; t++) {
+        await this.call("window.__tsend.more()");
+        n = await this.until((x) => x.rows.length > before, 5000);
+      }
+      if (!n) break;
+      s = await this.settle(n);
+      if (step) step(`목록 더 불러옴 ${s.rows.length}${s.count != null ? `/${s.count}` : ""}명`);
+    }
+    return s;
   }
   /** 목록이 0.6초 동안 그대로일 때까지 (최대 4번) */
   async settle(s) {

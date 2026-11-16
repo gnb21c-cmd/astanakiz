@@ -22,7 +22,12 @@
   .Contents__wrap { display: flex; gap: 10px; }
   .Contents__list { display: flex; } .Contents__index a { display: block; font-size: 11px; color: #999; }
   .Contents__list-row { display: flex; gap: 12px; padding: 8px; border-bottom: 1px solid #eee; }
+  .Contents__list-content .Contents__list-row { height: 45px; box-sizing: border-box; align-items: center; } /* 실제 줄 높이 (약 46px) */
+  .Contents__list-content .Contents__name { position: relative; }
+  .Contents__list-radio { position: absolute; inset: 0; cursor: pointer; } /* 실제처럼: 이름 칸 위를 고르기 칸이 덮음 */
   .Contents__list-cell { min-width: 90px; } .Contents__list-content .Contents__name { cursor: pointer; }
+  .Contents__root { max-height: calc(100vh - 190px); overflow-y: auto; } /* 목록 · 고객 정보는 이 칸 안에서 내림 (실제처럼) */
+  .Loading__load_area_wrapper { padding: 10px; text-align: center; color: #999; }
   .UserInfo__root { border-left: 1px solid #ddd; padding: 10px 16px; min-width: 340px; }
   .UserInfo__item { display: flex; gap: 10px; }
   .hl { color: #03c75a; font-style: normal; font-weight: 700; }
@@ -42,6 +47,11 @@
     { id: "c8", uid: "9008", name: "톡없음", phone: "010-3700-5555", m: false, talk: false, path: "직접 등록" },
     { id: "c9", uid: "9009", name: "김가람", phone: "010-3999-1313", m: false, talk: true, path: "네이버 예약 (kgr2****)" }, // 동명이인 (번호 다름)
   ];
+  // 뒷번호 7777 손님 41명 — 15명씩 나오므로 맨 끝 '허다온'은 두 번 내려야 보임 (사장님 11/16: ㅎ 이름은 맨 아래)
+  ["강", "고", "김", "나", "문", "박", "서", "송", "안", "오", "유", "윤", "이", "임", "장", "전", "정", "조", "최", "한"].forEach((sn, a) => ["가온", "나래"].forEach((gn, b) => {
+    const i = a * 2 + b; DEF.push({ id: "p" + (i + 1), uid: String(9101 + i), name: sn + gn, phone: `010-4${String(i + 1).padStart(3, "0")}-7777`, m: i % 4 === 1, talk: true, path: "네이버 예약 (fake****)" });
+  }));
+  DEF.push({ id: "p41", uid: "9141", name: "허다온", phone: "010-4041-7777", m: false, talk: true, path: "네이버 예약 (hdo****)" });
   let DATA = DEF;
   try { const d = JSON.parse(localStorage.getItem("mockSpData") || "null"); if (Array.isArray(d)) DATA = d; } catch (e) { DATA = DEF; }
   const maskName = (n) => (n.length <= 2 ? n[0] + "*" : n[0] + "*".repeat(n.length - 2) + n[n.length - 1]);
@@ -53,6 +63,10 @@
   const nav = ["업체정보", "예약", "스마트콜", "마케팅", "리뷰", "고객", "통계", "비즈니스 스쿨"].map((t) => `<a href="#" class="${t === "고객" && !P.get("home") ? "on" : ""}" data-nav="${t}">${t}</a>`).join("");
   let main = "<h2>아스타나키즈</h2><p>업체 홈</p>";
   const c = hits.find((x) => x.id === sel) || hits[0]; // 처음엔 첫 손님 고객 정보가 저절로 (실제처럼)
+  // 목록은 15명씩 (?page=), 아래로 내리면 15명 더 · n = 지금까지 불러온 수 (줄을 골라 화면을 다시 그려도 그대로)
+  const PAGE = Number(P.get("page") || 15);
+  let shown = Math.min(hits.length, Math.max(PAGE, Number(P.get("n") || 0)));
+  const rowHtml = (x) => `<div class="Contents__list-row" data-id="${x.id}"><div class="Contents__list-cell Contents__name"><span class="Contents__text-value">${showName(x)}</span><label class="Contents__list-radio"><input type="radio" name="userListSelect" class="sr-only" title="${showName(x)}" value="${x.uid}" ${c && c.id === x.id ? "checked" : ""}><span class="Contents__label"></span></label></div>${wide ? `<div class="Contents__list-cell Contents__phone">${listPhone(x)}</div>` : ""}</div>`;
   if (!P.get("home")) {
     main = `<div class="content-header-tab-group"><ul class="content-header-tab"><li class="item active"><a class="tab" href="#">예약·주문</a></li><li class="item"><a class="tab" href="#">스마트콜</a></li></ul></div>
       <form class="BookingTextSearch__root" onsubmit="return false"><div class="BookingTextSearch__select-box"><a role="button" class="BookingTextSearch__select" id="stype">${type}</a></div>
@@ -63,7 +77,8 @@
       <div class="Contents__root"><div class="Contents__wrap">
         <div class="Contents__list"><div class="Contents__index"><a href="#">전체</a><a href="#">ㄱ</a><a href="#">ㄴ</a><a href="#">ㄷ</a></div><div>
           <div class="Contents__list-header"><div class="Contents__list-row"><div class="Contents__list-cell Contents__name"><button type="button" class="Contents__btn-sort"><span>이름</span><i></i></button></div>${wide ? `<div class="Contents__list-cell Contents__phone"><span>전화번호</span></div>` : ""}</div></div>
-          <div class="Contents__list-content">${hits.map((x) => `<div class="Contents__list-row" data-id="${x.id}"><div class="Contents__list-cell Contents__name"><span class="Contents__text-value">${showName(x)}</span><label class="Contents__list-radio"><input type="radio" name="userListSelect" class="sr-only" title="${showName(x)}" value="${x.uid}" ${c && c.id === x.id ? "checked" : ""}><span class="Contents__label"></span></label></div>${wide ? `<div class="Contents__list-cell Contents__phone">${listPhone(x)}</div>` : ""}</div>`).join("")}</div>
+          <div class="Contents__list-content">${hits.slice(0, shown).map(rowHtml).join("")}</div>
+          <div class="Loading__load_area_wrapper" id="ld" hidden><span>…</span><span class="sr-only">로딩중</span></div>
         </div></div>
         <div class="Contents__dtail-group-wrap">${c ? `<div class="UserInfo__root"><div class="UserInfo__header"><span class="UserInfo__name">${showName(c)}</span><a href="users/${c.uid}" class="btn" data-tst_click_link="${c.uid}">정보변경</a></div>
           <div class="UserInfo__customer-list"><div class="UserInfo__item"><div class="UserInfo__item-title">등록경로</div><div class="UserInfo__item-dsc">${c.path}</div></div>
@@ -87,11 +102,27 @@
       d.innerHTML = `<a role="button" href="#" data-type="이름">이름</a><a role="button" href="#" data-type="전화번호">전화번호</a>`;
       setTimeout(() => document.body.appendChild(d), 120); return;
     }
-    const o = e.target.closest("[data-type]"); if (o) { e.preventDefault(); setTimeout(() => go({ type: o.dataset.type, q: document.getElementById("sq").value, sel: "" }), 100); return; }
-    if (e.target.closest("#sbtn")) { const v = lateQ; setTimeout(() => go({ q: v, sel: "" }), 150); return; }
-    const row = e.target.closest(".Contents__list-content .Contents__list-row"); if (row) { setTimeout(() => go({ sel: row.dataset.id }), 150); return; }
+    const o = e.target.closest("[data-type]"); if (o) { e.preventDefault(); setTimeout(() => go({ type: o.dataset.type, q: document.getElementById("sq").value, sel: "", n: "" }), 100); return; }
+    if (e.target.closest("#sbtn")) { const v = lateQ; setTimeout(() => go({ q: v, sel: "", n: "" }), 150); return; }
+    // 줄 고르기는 아래 change 로만 (실제 화면: 이름 글자를 프로그램으로 눌러도 안 바뀜)
     if (e.target.closest("#talk") && c) window.open(`talkchat.html?u=${encodeURIComponent(c.id)}&frm=prsv&mode=popup`, "talk_" + c.id, "popup,width=900,height=700");
   });
-  document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.id === "sq") { const v = lateQ; setTimeout(() => go({ q: v, sel: "" }), 150); } });
+  // ?nosel=1: 줄을 골라도 고객 정보가 안 바뀌는 화면 (시험용)
+  document.addEventListener("change", (e) => { const r = e.target.closest("input[name=userListSelect]"); if (r && r.checked && !P.get("nosel")) { const row = r.closest(".Contents__list-row"); setTimeout(() => go({ sel: row.dataset.id, n: shown }), 150); } });
+  document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.id === "sq") { const v = lateQ; setTimeout(() => go({ q: v, sel: "", n: "" }), 150); } });
+  // 아래로 내려 끝에 닿으면 15명 더 (0.4초 · 불러오는 동안 '로딩중')
+  let busy = false;
+  document.addEventListener("scroll", (e) => {
+    if (busy || shown >= hits.length || P.get("nomore")) return; // ?nomore=1: 내려도 더 안 나오는 화면 (시험용)
+    const el = e.target === document ? document.scrollingElement : e.target;
+    if (!el || !el.classList || !(el === document.scrollingElement || el.classList.contains("Contents__root"))) return;
+    if (el.scrollTop + el.clientHeight < el.scrollHeight - 30) return;
+    busy = true; const ld = document.getElementById("ld"); if (ld) ld.hidden = false;
+    setTimeout(() => {
+      document.querySelector(".Contents__list-content").insertAdjacentHTML("beforeend", hits.slice(shown, shown + PAGE).map(rowHtml).join(""));
+      shown = Math.min(hits.length, shown + PAGE);
+      if (ld) ld.hidden = true; busy = false;
+    }, 400);
+  }, true);
 </script>
 </body></html>

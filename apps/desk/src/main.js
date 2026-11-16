@@ -589,7 +589,7 @@ function talkSendRun(req) {
   }
   const me = (talkJob = { running: true, dry, auto: !!(req && req.auto), at: localNow(), total: list.length, step: "", why: "", results: [], imgs: Object.fromEntries(Object.entries(imgs).map(([k, v]) => [k, path.basename(v)])) });
   const stamp = stampNow();
-  let pop = null, first = true;
+  let pop = null, first = true, skipShot = false;
   const ts = new TalkSend((code) => timed(naverWin.webContents.executeJavaScript(code, true), 8000, "네이버 화면이 응답하지 않음"), {
     home: sp,
     go: (u) => naverWin.loadURL(u).catch(() => {}),
@@ -616,6 +616,8 @@ function talkSendRun(req) {
         const r = await serial("naver", () => timed(ts.one(job, dry), 3 * 60000, "한 사람에 3분 넘게 걸림")).catch((e) => ({ ok: false, step: "오류", why: String((e && e.message) || e).slice(0, 200) }));
         first = false;
         me.results.push({ key: x.key, name: x.name, at: localNow().slice(11), ok: !!r.ok, skip: !!r.skip, step: r.step || "", how: r.how || "", why: r.why || "", sent: r.sent || null });
+        // 확인만: 처음 건너뛴 사람 화면도 남김 (왜 못 맞췄는지 — 고객 목록 · 오른쪽 고객 정보)
+        if (dry && r.skip && !skipShot) { skipShot = true; await dumpWin(naverWin, `톡톡보내기-건너뜀-${stamp}`).catch(() => {}); }
         if (!r.ok && !r.skip) { await dumpWin(pop && !pop.isDestroyed() ? pop : naverWin, `톡톡보내기-멈춤-${stamp}`).catch(() => {}); me.why = `${x.name}: ${r.why || r.step}`; }
         if (pop && !pop.isDestroyed()) pop.destroy();
         talkTell("talksend:progress");

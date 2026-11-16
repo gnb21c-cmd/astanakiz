@@ -87,7 +87,7 @@ test("확인만: 메뉴 [고객] → 전화번호로 → 뒷번호 → 맞춤 �
     const u = new URL(page.url());
     assert.strictEqual(u.searchParams.get("type"), "전화번호", "검색 선택이 전화번호");
     assert.strictEqual(u.searchParams.get("q"), "1313", "뒷번호 4자리로 찾음");
-    assert.strictEqual(u.searchParams.get("sel"), "c1");
+    assert.ok(["", "c1"].includes(u.searchParams.get("sel") || ""), "첫 줄(김가람)은 처음부터 고객 정보가 떠 있음");
     assert.strictEqual(browser.contexts()[0].pages().length, 1, "대화창은 닫힘");
   } finally {
     await browser.close();
@@ -463,6 +463,60 @@ test("실제 화면 구조 (11/16 저장본): 목록에 이름만 → 이름이 
     assert.deepStrictEqual([r2.ok, r2.how], [true, "가린 번호 · 이름"], JSON.stringify(r2));
     const r3 = await ts.one({ name: "나단비", phone: "010-3300-2424", image: IMG }, true);
     assert.deepStrictEqual([r3.ok, r3.how], [true, "번호"], JSON.stringify(r3));
+  } finally {
+    await browser.close();
+  }
+});
+
+test("가운데 줄 손님 (2.26 현장 11/16 — 목록 첫 줄 손님만 맞았음): 이름 글자를 눌러도 안 바뀌는 실제 화면 → 고르기 칸을 눌러 고객 정보를 그 손님으로 · 끝내 안 바뀌면 '안 바뀜'으로 건너뜀", async () => {
+  const browser = await launch();
+  try {
+    const { ts, steps, sent, page, pops } = await open(browser);
+    // 가짜 화면도 실제처럼: 이름 글자(span)를 프로그램으로 눌러서는 고객 정보가 안 바뀜
+    await page.goto(SP + "?type=" + encodeURIComponent("전화번호") + "&q=1313");
+    const names = await page.evaluate(() => [...document.querySelectorAll(".Contents__list-content .Contents__text-value")].map((e) => e.textContent));
+    assert.deepStrictEqual(names, ["김가람", "김가람", "유*석", "이하늘", "정*림", "정*림"]);
+    await page.evaluate(() => [...document.querySelectorAll(".Contents__text-value")].find((e) => e.textContent === "이하늘").click());
+    await page.waitForTimeout(500);
+    assert.ok(!new URL(page.url()).searchParams.get("sel"), "이름 글자만 눌러서는 안 바뀜");
+    // 넷째 줄 이하늘
+    await page.goto(SP + "?home=1");
+    const r = await ts.one({ name: "이하늘", phone: "010-3192-1313", image: IMG }, false);
+    assert.deepStrictEqual([r.ok, r.how], [true, "이름 · 고객 정보 번호"], JSON.stringify({ r, steps }));
+    assert.deepStrictEqual((await sent()).map((x) => [x.u, x.kind]), [["c3", "image"]]);
+    assert.match(pops[0], /u=c3/);
+    // 고르기가 끝내 안 먹는 화면(?nosel=1): 번호가 다르다고 하지 않고 '안 바뀜'으로 건너뜀
+    await page.goto(SP + "?home=1&nosel=1");
+    ts.opts.home = SP + "?home=1&nosel=1";
+    const r2 = await ts.one({ name: "이하늘", phone: "010-3192-1313", image: IMG }, true);
+    assert.strictEqual(r2.skip, true, JSON.stringify(r2));
+    assert.match(r2.why, /이하늘\)을 눌렀는데 오른쪽 고객 정보가 그 손님으로 안 바뀜/, r2.why);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("15명 넘게 찾으면 (사장님 11/16): 목록이 15명씩 · 아래로 내려야 15명 더 → 'N명'이 다 나올 때까지 내려서 맨 끝 ㅎ 이름도 찾음 · 끝내 안 나오면 'N명 중 목록에 나온 M명'", async () => {
+  const browser = await launch();
+  try {
+    const { ts, steps, sent, page, pops } = await open(browser);
+    // 가짜 화면: 뒷번호 7777 = 41명 · 처음엔 15명만
+    await page.goto(SP + "?type=" + encodeURIComponent("전화번호") + "&q=7777");
+    const first = await page.evaluate(() => ({ count: document.querySelector(".CommonPagetHeader__number em").textContent, rows: document.querySelectorAll(".Contents__list-content .Contents__list-row").length }));
+    assert.deepStrictEqual(first, { count: "41", rows: 15 });
+    // 맨 끝(41번째) 허다온
+    await page.goto(SP + "?home=1");
+    const r = await ts.one({ name: "허다온", phone: "010-4041-7777", image: IMG }, false);
+    assert.deepStrictEqual([r.ok, r.how], [true, "이름 · 고객 정보 번호"], JSON.stringify({ r, steps }));
+    assert.deepStrictEqual((await sent()).map((x) => [x.u, x.kind]), [["p41", "image"]]);
+    assert.match(pops[0], /u=p41/);
+    assert.ok(steps.includes("허다온: 목록 더 불러옴 30/41명") && steps.includes("허다온: 목록 더 불러옴 41/41명"), steps.join(" / "));
+    // 더 안 나오는 화면: 못 찾았다고 하되 '41명 중 목록에 나온 15명'으로 (다 못 본 것을 알림)
+    await page.goto(SP + "?home=1&nomore=1");
+    ts.opts.home = SP + "?home=1&nomore=1";
+    const r2 = await ts.one({ name: "허다온", phone: "010-4041-7777", image: IMG }, true);
+    assert.strictEqual(r2.skip, true, JSON.stringify(r2));
+    assert.match(r2.why, /그 이름을 못 찾음 \(뒷번호 7777로 찾은 41명 중 목록에 나온 15명:/, r2.why);
   } finally {
     await browser.close();
   }
