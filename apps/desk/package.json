@@ -9,6 +9,9 @@
     "test": "node --test test/*.test.js",
     "dist:win": "electron-builder --win nsis"
   },
+  "dependencies": {
+    "electron-updater": "6.8.11"
+  },
   "devDependencies": {
     "electron": "^38.0.0",
     "electron-builder": "^26.0.0",
@@ -40,10 +43,19 @@
     "nsis": {
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
-      "installerHeaderIcon": "build/icon.ico"
+      "installerHeaderIcon": "build/icon.ico",
+      "artifactName": "astanakiz-desk-setup.${ext}"
     },
     "directories": {
       "buildResources": "build"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "gnb21c-cmd",
+        "repo": "astanakiz",
+        "releaseType": "release"
+      }
+    ]
   }
 }

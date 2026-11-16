@@ -785,6 +785,10 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
 .pos .foot { padding: 12px 16px; display: flex; justify-content: flex-end; gap: 8px; background: #1F2227; }
 .pos .foot button { background: #fff; color: #1F2227; border: 0; border-radius: 8px; padding: 10px 16px; font-weight: 700; }
 
+/* 새 판 저절로 바꾸기 (11/16): 받아 두면 위 가운데 띠 — 몇 초 뒤 바꾸는지 · [지금 바꾸기] [30분 뒤에] */
+.updbar { position: absolute; left: 50%; top: 52px; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center;
+  background: var(--accent-bg); color: var(--fg); border: 1.5px solid var(--accent); border-radius: 12px; padding: 6px 12px; font-size: 13.5px; box-shadow: var(--shadow); max-width: calc(100% - 32px); }
+.updbar b { color: var(--accent); }
 .toast { position: absolute; left: 50%; transform: translateX(-50%); bottom: 14px; background: var(--ink); color: var(--on-ink); padding: 9px 16px; border-radius: 12px; font-weight: 600; z-index: 50; max-width: calc(100% - 32px); box-shadow: var(--shadow); }
 
 /* 반납안내 커튼: 위 가운데 손잡이를 아래로 끌면 화면 전체를 덮는 안내 그림이 내려옴 (열쇠 반납 독려 · 고객정보 가림)
@@ -824,6 +828,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     <button class="now num" id="now" data-act="clock" aria-label="지금 시각">13:50</button>
     </span>
   </header>
+  <div class="updbar" id="updbar" role="status" aria-live="polite" hidden></div>
 
   <div class="cols">
     <!-- V2.0 (사장님 10/21): 시간표 위 메모 상자 — 근무자마다 하나 + 관리자 (숫자 = 아직 완료 안 한 것) -->
@@ -2826,7 +2831,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
             <div class="help">지금 대상: ${(() => { const d = unpaidDue(); return d.length ? d.map((b) => `${esc(b.name)} ${hm(b.slot)} ${b.qty}장`).join(", ") : "없음"; })()}</div>
             <div class="caplog">${unpaidLog.slice(0, 8).map((x) => `<div class="${x.ok ? "" : "bad"}"><span class="num">${esc(x.at)}</span> ${esc(x.name)} ${esc(x.time)} ${x.qty}장 ${x.ok ? "취소함" : `실패: ${esc(x.why || "")}`}</div>`).join("")}</div></div>`;
   /** 기타 아래 '정보' */
-  const infoHtml = () => `<div class="field"><span class="label">정보</span><span class="help">${esc((document.querySelector(".top .tag") || {}).textContent || "체험판")} · 기록은 이 PC 앱 폴더 · 바탕화면 '아스타나키즈-진단'(화면 저장) · '아스타나키즈-이벤트'(이벤트 장부)</span></div>`;
+  const infoHtml = () => updRowHtml() + `<div class="field"><span class="label">정보</span><span class="help">${esc((document.querySelector(".top .tag") || {}).textContent || "체험판")} · 기록은 이 PC 앱 폴더 · 바탕화면 '아스타나키즈-진단'(화면 저장) · '아스타나키즈-이벤트'(이벤트 장부)</span></div>`;
   /** 근무자 등록 (메모장 이름 · 평일/주말 전달) */
   /** 근무자 등록 = 메인 화면 메모 상자 (사장님 10/21: 근무자마다 상자 + 관리자 · 글은 이름 · 별칭 · 성) */
   function staffHtml() {
@@ -5821,6 +5826,10 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     revCopy(btn) { revClip(btn.dataset.v, "번호를"); },
     revText(btn) { revClip(revMsg(Number(btn.dataset.l)), "문구를"); },
     revAll(btn) { const l = Number(btn.dataset.l), t = revTargets(); const nums = t ? t[l].filter((x) => !x.today).map((x) => digits(x.phone)).filter(Boolean) : []; revClip(nums.join(", "), `번호 ${nums.length}개를`); },
+    /** 새 판 저절로 바꾸기 (11/16): [지금 바꾸기] · [30분 뒤에] · 운영 설정 [지금 확인] */
+    updApply() { if (!UPD_API) return; UPD_API.apply().then((r) => { if (r && !r.ok) toast(r.why, 5000); }).catch(() => {}); },
+    updLater() { if (!UPD_API) return; UPD_API.later().then((v) => { updSet(v); toast("30분 뒤에 다시 알려요 — 그 전에 바꾸려면 운영 설정 → 정보 [지금 바꾸기]", 5000); }).catch(() => {}); },
+    updCheck(btn) { if (!UPD_API) return; btn.disabled = true; UPD_API.check().then((v) => { updSet(v); toast(v.state === "latest" ? "최신 판이에요" : v.state === "downloading" ? `새 판 ver.${v.version} 받는 중` : v.state === "ready" ? `새 판 ver.${v.version} 받아 둠` : v.state === "error" ? `확인 못 함: ${v.error}` : "확인했어요", 4000); }).catch(() => {}).finally(() => (btn.disabled = false)); },
     /** 직접 표시한 '보냄'을 한 번에 풂 (톡톡으로 보낸 것은 그대로) */
     revSentClear(btn) {
       const l = Number(btn.dataset.l); let n = 0;
@@ -6712,11 +6721,49 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     toast(`${OFFICE ? "현장 POS" : "사무실 PC"}에서 바꾼 설정을 받았어요`);
   }
   /** 사무실 PC 에서 누른 버튼: 되는 것만 (네이버는 읽기만 · 근무자 일 · 네이버에 넣는 일 · 출력 · 주차는 현장 POS) */
-  const OFFICE_OK = new Set(["time", "refresh", "day", "slot", "openRes", "key", "minimize", "soldList", "soldDay", "soldOpen", "settings", "setTab", "qhelp", "csub", "manual", "manGo", "close", "clock",
+  const OFFICE_OK = new Set(["updApply", "updLater", "updCheck", "time", "refresh", "day", "slot", "openRes", "key", "minimize", "soldList", "soldDay", "soldOpen", "settings", "setTab", "qhelp", "csub", "manual", "manGo", "close", "clock",
     "memoOpen", "memoTab", "memoTo", "memoSend", "memoAck", "memoFin", "memoUnfin", "memoRecall", "memoAdd", "memoDone", "memoUndo", "memoDel",
     "capCell", "addPeak", "delPeak", "evApply", "evOff", "evTpl", "evOpen", "tplGo", "tplRow", "tplSamp", "tplSave", "tplDef", "tplNew", "tplDel", "tplCode",
     "staffAdd", "staffDel", "svPick", "svAdd", "svDel", "svToggle", "liveToggle", "svKeySave", "svKeyDel", "stToggle", "printMode", "drawerPin", "findPorts", "pickPort", "findPrinters", "pickPrinter", "bcFilter",
     "naverShow", "naverHome", "annTest", "annStop", "syncRole", "syncCodeNew", "syncCodeSave", "syncRelaunch", "syncOpen", "syncDemo", "rentOpen"]);
+  /* 새 판 저절로 바꾸기 (사장님 11/16 — 지웠다가 다시 설치하지 않게): 앱이 10분마다 GitHub 최신 판을 확인해 받아 둠 → 위 띠 → 1분 뒤 조용히 설치 · 다시 켬
+     체험판(앱 아님)은 없음 */
+  const UPD_API = window.desk && window.desk.update ? window.desk.update : null;
+  let UPD = null, updTimer = null;
+  const updHm = (ms) => { const t = new Date(ms); return `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`; };
+  function updText(u) {
+    if (!UPD_API) return "설치한 앱에서만 — 새 판이 나오면 저절로 받아서 바꿔요";
+    if (!u || u.state === "off") return "꺼짐 (설치한 앱에서만 켜져요)";
+    const head = `지금 ver.${u.current || "?"} · 10분마다 확인`;
+    const last = u.checkedAt ? ` (마지막 확인 ${updHm(u.checkedAt)})` : "";
+    return ({ idle: `${head} — 켜고 1분 뒤 처음 확인해요`, checking: `${head} — 확인 중…`, latest: `${head} — 최신이에요${last}`, downloading: `${head} — 새 판 ver.${u.version} 받는 중 ${u.percent || 0}%`,
+      ready: `${head} — 새 판 ver.${u.version} 받아 둠${u.wait ? ` · ${u.wait}이라 끝나면 바꿔요` : u.applyAt ? " · 곧 바꿔요" : u.laterUntil ? ` · ${updHm(u.laterUntil)}에 다시 알려요` : ""}`,
+      applying: `새 판 ver.${u.version}으로 바꾸는 중`, error: `${head} — 확인 못 함${last}: ${u.error || ""} (10분 뒤 다시)` })[u.state] || head;
+  }
+  function updRowHtml() {
+    if (!UPD_API) return "";
+    return `<div class="field"><span class="label">업데이트</span><span class="help" id="upd-row">${esc(updText(UPD))}</span>
+      <div class="btns"><button class="btn btn-sm" data-act="updCheck">지금 확인</button>${UPD && UPD.state === "ready" ? ` <button class="btn btn-sm btn-ink" data-act="updApply">지금 바꾸기</button>` : ""}</div></div>`;
+  }
+  function updPaint() {
+    const bar = $("updbar"), u = UPD;
+    const row = $("upd-row"); if (row) row.textContent = updText(u);
+    if (!bar) return;
+    clearInterval(updTimer); updTimer = null;
+    const show = !!u && (u.state === "applying" || (u.state === "ready" && !u.laterUntil));
+    bar.hidden = !show;
+    if (!show) return;
+    if (u.state === "applying") { bar.innerHTML = `<b>새 판 ver.${esc(u.version)}으로 바꾸는 중</b><span>잠깐 꺼졌다가 20초쯤 뒤 다시 켜져요</span>`; return; }
+    const left = () => Math.max(0, Math.ceil((u.applyAt - Date.now()) / 1000));
+    const msg = u.wait ? `${esc(u.wait)}이라 끝나면 바꿔요` : u.applyAt ? `<span class="num" id="upd-left">${left()}</span>초 뒤 바꿔요 (20초쯤 꺼졌다 켜짐)` : "곧 바꿔요";
+    bar.innerHTML = `<b>새 판 ver.${esc(u.version)} 받음</b><span>${msg}</span><button class="btn btn-sm btn-ink" data-act="updApply">지금 바꾸기</button>${u.applyAt ? `<button class="btn btn-sm" data-act="updLater">30분 뒤에</button>` : ""}`;
+    if (u.applyAt) updTimer = setInterval(() => { const e = $("upd-left"); if (e) e.textContent = left(); }, 1000);
+  }
+  function updSet(v) { if (v) { UPD = v; updPaint(); } }
+  if (UPD_API) {
+    UPD_API.onState(updSet);
+    UPD_API.status().then(updSet).catch(() => {});
+  }
   function officeGate(btn) {
     const a = btn.dataset.act;
     if (OFFICE_OK.has(a)) return true;

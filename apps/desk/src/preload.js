@@ -69,6 +69,14 @@ contextBridge.exposeInMainWorld("desk", {
     onProgress: (cb) => ipcRenderer.on("talksend:progress", (_e, v) => cb(v)),
     onDone: (cb) => ipcRenderer.on("talksend:done", (_e, v) => cb(v)),
   },
+  // 새 판 저절로 바꾸기 (11/16): 상태 · [지금 확인] · [지금 바꾸기] · [30분 뒤에] · 바뀔 때마다 onState
+  update: {
+    status: () => ipcRenderer.invoke("update:status"),
+    check: () => ipcRenderer.invoke("update:check"),
+    apply: () => ipcRenderer.invoke("update:apply"),
+    later: () => ipcRenderer.invoke("update:later"),
+    onState: (cb) => ipcRenderer.on("update:state", (_e, v) => cb(v)),
+  },
   clip: (text) => ipcRenderer.invoke("clip:write", text), // 글 복사
   // 네이버 재고 자동 오픈 (사장님 10/20): 매일 오늘 + 30일 · 10:30 / 12:00 / 16:00 / 20:20 · [확인만] dry · [지금 한 번]
   stock: {

@@ -640,6 +640,55 @@ function talkSendRun(req) {
 }
 ipcMain.handle("talksend:run", posOnly((_e, req) => talkSendRun(req)));
 ipcMain.handle("talksend:status", () => talkView());
+/* 새 판 저절로 바꾸기 (사장님 11/16 — 지웠다가 다시 설치하지 않게) · 규칙은 updater.js
+   설치된 앱(app.isPackaged)에서만 · GitHub 공개 저장소 Releases 의 최신 판을 확인 · 받기 · 1분 띠 · 조용히 설치 · 다시 켬
+   시험: DESK_UPDATE_TEST = 가짜 서버 주소(generic) · DESK_UPDATE_CFG = app-update.yml · DESK_UPDATE_OUT = 설치 대신 이 파일에 기록 */
+const { DeskUpdater } = require("./updater");
+let deskUpd = null;
+function updLog(msg) {
+  try {
+    const f = path.join(app.getPath("userData"), "update-log.txt");
+    let old = "";
+    try { old = fs.readFileSync(f, "utf8"); } catch (e) { /* 처음 */ }
+    const lines = (old + `${localNow()} ${String(msg).replace(/\s+/g, " ").slice(0, 300)}\n`).split("\n").filter(Boolean).slice(-300);
+    fs.writeFileSync(f, lines.join("\n") + "\n");
+  } catch (e) {
+    /* 기록 실패는 무시 */
+  }
+}
+function updStart() {
+  const test = process.env.DESK_UPDATE_TEST;
+  if (deskUpd || (!app.isPackaged && !test)) return;
+  let au;
+  try {
+    const eu = require("electron-updater");
+    if (test) {
+      au = new eu.NsisUpdater();
+      au.setFeedURL({ provider: "generic", url: test });
+      au.updateConfigPath = process.env.DESK_UPDATE_CFG;
+      au.forceDevUpdateConfig = true;
+      au.quitAndInstall = (silent, run) => { fs.writeFileSync(process.env.DESK_UPDATE_OUT, JSON.stringify({ silent, run, version: deskUpd.s.version })); };
+    } else {
+      au = eu.autoUpdater;
+      au.setFeedURL({ provider: "github", owner: "gnb21c-cmd", repo: "astanakiz" });
+    }
+  } catch (e) {
+    updLog(`업데이트를 켜지 못함: ${e.message || e}`);
+    return;
+  }
+  au.logger = { info: (m) => updLog(m), warn: (m) => updLog(`주의 ${m}`), error: (m) => updLog(`오류 ${m}`), debug: () => {} };
+  const busy = () => (talkJob && talkJob.running ? "톡톡 보내는 중" : stockJob && stockJob.running ? "재고 자동 오픈 중" : "");
+  const times = test ? { first: Number(process.env.DESK_UPDATE_FIRST || 1000), countdown: Number(process.env.DESK_UPDATE_COUNTDOWN || 60000), busyRetry: 1500 } : {};
+  deskUpd = new DeskUpdater(au, { busy, current: test ? process.env.DESK_UPDATE_CURRENT || app.getVersion() : app.getVersion(), times });
+  deskUpd.on("state", (v) => { if (deskWin && !deskWin.isDestroyed()) deskWin.webContents.send("update:state", v); });
+  deskUpd.on("apply", (v) => updLog(`새 판 ${v} 설치 시작 · 끝나면 다시 켬`));
+  updLog(`업데이트 켬 · 지금 ver.${BUILD} (${app.getVersion()})`);
+  deskUpd.start();
+}
+ipcMain.handle("update:status", () => (deskUpd ? deskUpd.status() : { state: "off", current: BUILD }));
+ipcMain.handle("update:check", () => (deskUpd ? deskUpd.check() : { state: "off", current: BUILD }));
+ipcMain.handle("update:apply", () => (deskUpd ? deskUpd.apply(true) : { ok: false, why: "업데이트가 꺼져 있어요 (설치한 앱에서만)" }));
+ipcMain.handle("update:later", () => (deskUpd ? deskUpd.later() : { state: "off" }));
 ipcMain.handle("talksend:stop", () => { if (talkJob && talkJob.running) talkJob.stopReq = true; return talkView(); });
 /* 네이버 화면 보기에서 스마트플레이스 [고객] 화면까지 들어간 뒤 누르면 그 주소를 톡톡 보내기 시작 화면으로
    - 네이버 창뿐 아니라 [고객]이 새 창으로 열렸어도 · 화면 안 액자(iframe)여도 찾음: 화면 안에 '예약·주문' 탭과 이름/전화번호 검색 칸이 있는 곳
@@ -1851,6 +1900,7 @@ app.whenReady().then(() => {
   if (pos) setTimeout(talkTick, 8000); // 톡톡 상담 목록 (네이버 예약 창이 먼저 뜬 뒤)
   if (pos) setInterval(talkTick, 20 * 1000);
   syncStart();
+  updStart(); // 새 판 저절로 바꾸기 (11/16) — POS · 사무실 PC 모두
 });
 app.on("before-quit", () => {
   app.isQuitting = true;
