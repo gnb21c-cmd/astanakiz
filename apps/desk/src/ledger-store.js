@@ -1,6 +1,6 @@
 /* 재방문 이벤트 참여자 기록 저장 (사장님 10/14 · 10/15) — 기록이 없어져 손님과 다툼이 생기면 안 되니 두 곳에 같이
    (이벤트 진행 + 끝난 뒤 마일리지 = 네이버 완료 − 이벤트 기간 이용완료 에 씀)
-   - 앱 폴더:   %APPDATA%\아스타나키즈 입장 데스크\visit-ledger\시작일.jsonl
+   - 앱 폴더:   %APPDATA%\astanakiz-desk\visit-ledger\시작일.jsonl (앱 폴더 이름은 영문 — productName 이 build 설정 안에만 있어서 · 키즈 포스 11/16 확인)
    - 바탕화면: 바탕화면\아스타나키즈-이벤트\이벤트기록_시작일.jsonl (+ 사람이 여는 이벤트참여자_시작일.csv · 읽어 주세요.txt)
    - 이용완료(네이버 예약 1건)마다 두 곳에 한 줄씩 덧붙임 (통째로 다시 쓰지 않음 → 월 3,000건이 넘어도 가벼움)
    - 읽을 때 두 곳을 예약번호(no)로 합침 → 한쪽에 빠진 줄이 있으면 그쪽 파일을 합친 내용으로 다시 써서 채움
@@ -36,7 +36,7 @@ const README = [
   "- 이벤트기록_시작일.jsonl : 데스크가 읽고 쓰는 기록 (이용완료마다 한 줄 · 고치지 마세요)",
   "- 이벤트참여자_시작일.csv : 엑셀로 여는 정리본 (손님마다 한 줄 · 데스크가 자동으로 다시 씀)",
   "",
-  "앱 폴더(%APPDATA%\\아스타나키즈 입장 데스크\\visit-ledger)에도 같은 기록이 있어서,",
+  "앱 폴더(%APPDATA%\\astanakiz-desk\\visit-ledger)에도 같은 기록이 있어서,",
   "한쪽이 없어져도 데스크를 켜면 다른 쪽으로 다시 채워요.",
   "손님 이름 · 전화번호가 들어 있으니 밖으로 보내지 마세요.",
   "",
@@ -78,7 +78,8 @@ function add(dirs, from, line) {
       ok[k] = false;
     }
   }
-  try { if (ok.desk && !fs.existsSync(F.readme)) fs.writeFileSync(F.readme, "﻿" + README, "utf8"); } catch (e) { /* 안내 글은 없어도 됨 */ }
+  // 안내 글: 없거나 예전 글이면 (11/16 앱 폴더 이름을 고침 — 예전 글은 한글 폴더 이름) 다시 씀
+  try { if (ok.desk) { let old = null; try { old = fs.readFileSync(F.readme, "utf8"); } catch (e) { /* 없음 */ } if (old !== "﻿" + README) fs.writeFileSync(F.readme, "﻿" + README, "utf8"); } } catch (e) { /* 안내 글은 없어도 됨 */ }
   return ok;
 }
 

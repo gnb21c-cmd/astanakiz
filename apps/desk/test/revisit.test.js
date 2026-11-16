@@ -22,7 +22,7 @@ async function setup(ctx, opts = {}) {
   const page = await ctx.newPage();
   await page.clock.install({ time: new Date(opts.time || "2026-10-26T19:58:00") });
   await page.addInitScript((o) => {
-    window.__hv = { add: [], stats: [], send: [], backfill: [], stop: 0, fail: !!o.fail, hist: o.hist || { from: "2026-10-26", to: "2026-10-26", days: 1, naver: 0 } };
+    window.__hv = { add: [], stats: [], send: [], backfill: [], visits: [], stop: 0, fail: !!o.fail, vfail: !!o.vfail, hist: o.hist || { from: "2026-10-26", to: "2026-10-26", days: 1, naver: 0 } };
     const cfg = { build: "1.50", hasSurveyKey: o.key !== false, surveyKeyTail: "ab12", visitEvent: { ver: 2, on: true, from: "2026-10-26", to: "2027-02-28", days: 20, gift: "수제돈까스" } };
     const BK = (no, time, name, phone, done) => ({ no, time, name, phone, qty: 1, qtyText: "1시간 50분 1", product: "1시간 50분", status: "확정", pay: "결제완료", doneCount: done, cancelCount: 0 });
     let job = null;
@@ -40,6 +40,8 @@ async function setup(ctx, opts = {}) {
         stop: async () => { window.__hv.stop++; if (job) job.stop = true; return cp({ ok: true, job }); },
       },
     };
+    // 방문 기록 → 보고 앱 재방문 분석 (11/16) — 앱 본체가 만들어 보냄 (o.visits 일 때만 · 예전 앱 본체에는 없음)
+    if (o.visits) window.desk.history.visits = async (j) => { window.__hv.visits.push(j); return window.__hv.vfail ? { ok: false, code: 403, why: "열쇠나 모양이 틀림 (403)" } : { ok: true, code: 200, people: 812, visits: 2450, days: 180, dropped: 0, size: 40000 }; };
     window.__job = (o2) => { Object.assign(job, o2); if (!job.running) window.__hv.hist = { from: "2026-04-01", to: "2026-10-26", days: 205, naver: 204 }; };
   }, opts);
   await page.addInitScript((s) => { window.__STATS = s; }, STATS);
@@ -159,6 +161,71 @@ test("재방문 간격(체험판): 설정에 줄은 보이고 · 설치한 앱�
     assert.match(await page.textContent("#hv-text"), /체험판/);
     await page.click("#sheet [data-act=hvBackfill]");
     assert.match(await page.textContent("#toast"), /설치한 앱/);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("방문 기록 → 보고 앱 재방문 분석 (사장님 11/16): 20:00 일수 모음 다음 · 실패하면 10분 뒤 따로 다시 · 그날 한 번 · [지금 보내기] · 다 읽은 뒤에도 같이 · 설정 줄", async () => {
+  const browser = await launch();
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+    const { page, errs, hv } = await setup(ctx, { visits: true, vfail: true, hist: { from: "2026-04-01", to: "2026-10-26", days: 205, naver: 204 } });
+    await page.clock.runFor(60 * 1000);
+    assert.strictEqual((await hv()).visits.length, 0, "20:00 전엔 안 보냄");
+    await page.clock.runFor(90 * 1000);
+    let h = await hv();
+    assert.deepStrictEqual([h.send.length, h.visits.length], [1, 1], "일수 모음 다음 방문 기록");
+    assert.match(h.visits[0].at, /^2026-10-26 20:0\d:\d\d$/, "at = 날 시:분:초");
+    assert.deepStrictEqual(Object.keys(h.visits[0]), ["at"], "데스크는 시각만 넘김 (기록은 앱 본체가 만듦)");
+    let cfg = await page.evaluate(() => window.__cfg.revisit);
+    assert.deepStrictEqual([cfg.sentDay, cfg.vSentDay, cfg.vRetry && cfg.vRetry.day], ["2026-10-26", "", "2026-10-26"], "일수 모음은 보냄 · 방문 기록은 실패 → 10분 뒤");
+    assert.deepStrictEqual([cfg.vLast.ok, cfg.vLast.why], [false, "열쇠나 모양이 틀림 (403)"], "실패 까닭 (알림은 곧 지난 기록 읽기 알림으로 바뀜)");
+    await page.clock.runFor(5 * 60 * 1000);
+    h = await hv();
+    assert.deepStrictEqual([h.send.length, h.visits.length], [1, 1], "10분 안에는 안 보냄 · 일수 모음은 다시 안 보냄");
+    await page.evaluate(() => { window.__hv.vfail = false; });
+    await page.clock.runFor(6 * 60 * 1000);
+    h = await hv();
+    assert.deepStrictEqual([h.send.length, h.visits.length], [1, 2], "10분 뒤 방문 기록만 다시");
+    cfg = await page.evaluate(() => window.__cfg.revisit);
+    assert.deepStrictEqual([cfg.vSentDay, cfg.vRetry, cfg.vLast.ok, cfg.vLast.people], ["2026-10-26", null, true, 812]);
+    await page.clock.runFor(30 * 60 * 1000);
+    assert.strictEqual((await hv()).visits.length, 2, "그날은 한 번");
+    // 지난 기록을 다 읽으면 일수 모음과 같이
+    await page.evaluate(() => window.__job({ running: false, day: "2026-10-25", done: 1, total: 1, visits: 12, why: "" }));
+    await page.clock.runFor(2500);
+    h = await hv();
+    assert.deepStrictEqual([h.send.length, h.visits.length], [2, 3], "다 읽은 뒤 둘 다 한 번 더");
+    // 설정 → 기타: 방문 기록 상태 · [지금 보내기]
+    await page.dblclick("#now");
+    await page.click('[data-t="etc"]');
+    assert.match(await page.textContent("#hv-text"), /방문 기록 20:\d\d 보냄 \(손님 812명 · 방문 2450번\)/);
+    await page.click("#sheet [data-act=hvSendNow]");
+    await page.clock.runFor(1000);
+    h = await hv();
+    assert.deepStrictEqual([h.send.length, h.visits.length], [3, 4], "[지금 보내기] = 둘 다");
+    assert.match(await page.textContent("#toast"), /재방문 간격을 보고 앱으로 보냈어요 · 방문 기록도 \(손님 812명 · 방문 2450번\)/);
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("방문 기록: 기록이 아직 없으면(none) 보낸 것으로 (10분마다 다시 안 함) · 예전 앱 본체(visits 없음)면 아무것도 안 함", async () => {
+  const browser = await launch();
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+    const { page, errs, hv } = await setup(ctx, { visits: true });
+    await page.evaluate(() => { window.desk.history.visits = async (j) => { window.__hv.visits.push(j); return { ok: false, none: true, code: 0, why: "방문 기록이 아직 없어요" }; }; });
+    await page.clock.runFor(3 * 60 * 1000);
+    assert.strictEqual((await hv()).visits.length, 1);
+    await page.clock.runFor(25 * 60 * 1000);
+    assert.strictEqual((await hv()).visits.length, 1, "없으면 다시 안 함");
+    const cfg = await page.evaluate(() => window.__cfg.revisit);
+    assert.deepStrictEqual([cfg.vSentDay, cfg.vRetry], ["2026-10-26", null]);
+    assert.ok(!/방문 기록\(재방문 분석\)/.test(await page.textContent("#toast")), "실패 알림 없음");
+    assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();
   }

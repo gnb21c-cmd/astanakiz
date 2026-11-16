@@ -54,6 +54,7 @@ contextBridge.exposeInMainWorld("desk", {
     job: () => ipcRenderer.invoke("history:job"),
     stop: () => ipcRenderer.invoke("history:stop"),
     send: (job) => ipcRenderer.invoke("history:send", job),
+    visits: (job) => ipcRenderer.invoke("history:visits", job), // 방문 기록 → 보고 앱 재방문 분석 (11/16) · 앱 본체가 만들어 보냄
   },
   // 이벤트 입장 수 (사장님 10/21): 매일 20:00 그날 현장 [이벤트 입장] 수를 보고 시스템으로 → { ok, code, why }
   eventStat: { send: (job) => ipcRenderer.invoke("event:send", job) },

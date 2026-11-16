@@ -1377,7 +1377,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
 
   /* 오늘의 열쇠 · 입장 기록은 이 PC에 저장 → 프로그램을 껐다 켜도 · 컴퓨터를 다시 켜도 · 재설치해도 그대로 (현장 10/6)
      - 입장한 예약은 예약 정보까지 통째로 저장 → 다시 켜면 네이버를 불러오기 전에도 열쇠판 · 명단에 바로 나옴
-     - 앱: 저장 폴더(%APPDATA%\아스타나키즈 입장 데스크\desk-state\날짜.json)에 바로 씀 (갑자기 꺼져도 남게) + 브라우저 저장소에도 한 벌
+     - 앱: 저장 폴더(%APPDATA%\astanakiz-desk\desk-state\날짜.json — 앱 폴더 이름은 영문 · 키즈 포스 11/16 확인)에 바로 씀 (갑자기 꺼져도 남게) + 브라우저 저장소에도 한 벌
      - 켜자마자 빈 화면으로 저장본을 덮어쓰지 않게: 저장본을 먼저 읽어 들인 뒤부터 저장 */
   const STATE_KEY = "astanakiz-desk-" + TODAY;
   const SAVE_FIELDS = ["id", "day", "no", "slot", "name", "phone", "qty", "qtyBooked", "qtyCut", "qtySrc", "qtyPicked", "product", "naverProduct", "pay", "cancels", "prevDone", "visitNo", "visitEnd", "proxy", "visitor", "status", "keys", "enteredAt", "outAt", "overPaid", "naverPending", "naverWhy", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut", "naverSlot", "sv", "giftDue", "giftGiven", "plusT"];
@@ -5259,17 +5259,20 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
      - 매일 20:00 (POS 가 켜져 있는 때 · 사장님 10/19) ① 일수 모음(손님 정보 없음)을 같은 보고 열쇠로 클라우드 boards/{열쇠}/deskStats/revisit 에 덮어씀 · 실패하면 10분 뒤 다시
        ② 이어서 지난 방문 기록 읽기 = 4/1 ~ 어제 중 네이버로 아직 안 읽은 날을 네이버 예약현황에서 하루씩 (처음엔 몇 시간 · POS 를 끄면 다음 날 20:00 이어서 · 그 뒤로는 어제 하루만 다시 확인)
        ③ 새로 읽은 날이 있으면 다 읽은 뒤 한 번 더 보냄 · [지난 방문 기록 읽기]로 지금 바로도 (20:00 전엔 한 번 더 눌러야)
+     - 방문 기록 (사장님 11/16 — 보고 앱 '재방문 분석'이 매일 저절로): 일수 모음을 보낸 다음(실패해도) 손님마다 방문한 날 번호만(해시 · 이름 · 전화 없음)
+       boards/{열쇠}/deskVisits/latest 에 · 앱 본체가 만들어 보냄 · 실패하면 10분 뒤 다시 (일수 모음과 따로) · 지금 보내기 · 지난 기록을 다 읽은 뒤에도 같이
      - 과거 = 4/1 ~ 이벤트 전날 · 이벤트 = 방문 이벤트 탭의 시작일 ~ 종료일 */
   const HV_PAST_FROM = "2026-04-01", HV_EVENT_FROM = "2026-10-26";
-  const HV = { sentDay: "", fillDay: "", last: null, retry: null, job: null, jobAuto: false, hist: null }; // last = { at, ok, why, auto } · job = 지난 기록 읽기 진행 (앱 본체) · fillDay = 20:00 저절로 읽기를 시작한 날
+  const HV = { sentDay: "", fillDay: "", last: null, retry: null, job: null, jobAuto: false, hist: null, vSentDay: "", vLast: null, vRetry: null }; // v… = 방문 기록 (재방문 분석 · 11/16) // last = { at, ok, why, auto } · job = 지난 기록 읽기 진행 (앱 본체) · fillDay = 20:00 저절로 읽기를 시작한 날
   const HV_APP = () => APP && !!window.desk.history;
   const hvMd = (d) => (d ? `${+d.slice(5, 7)}/${+d.slice(8, 10)}` : "");
   if (APP && window.desk.config) window.desk.config.get().then((c) => {
     const v = c && c.revisit, day = (x) => (/^\d{4}-\d{2}-\d{2}$/.test(x || "") ? x : "");
-    if (v) Object.assign(HV, { sentDay: day(v.sentDay), fillDay: day(v.fillDay), last: v.last || null, retry: v.retry && day(v.retry.day) ? { day: v.retry.day, m: Number(v.retry.m) || 0 } : null });
+    if (v) Object.assign(HV, { sentDay: day(v.sentDay), fillDay: day(v.fillDay), last: v.last || null, retry: v.retry && day(v.retry.day) ? { day: v.retry.day, m: Number(v.retry.m) || 0 } : null,
+      vSentDay: day(v.vSentDay), vLast: v.vLast || null, vRetry: v.vRetry && day(v.vRetry.day) ? { day: v.vRetry.day, m: Number(v.vRetry.m) || 0 } : null });
   }).catch(() => {});
   if (HV_APP()) window.desk.history.job().then((r) => { if (r && r.ok) { HV.job = r.job; HV.hist = r.history; hvShow(); } }).catch(() => {});
-  const hvSaveCfg = () => { if (APP && window.desk.config) window.desk.config.set({ revisit: { sentDay: HV.sentDay, fillDay: HV.fillDay, last: HV.last, retry: HV.retry } }); };
+  const hvSaveCfg = () => { if (APP && window.desk.config) window.desk.config.set({ revisit: { sentDay: HV.sentDay, fillDay: HV.fillDay, last: HV.last, retry: HV.retry, vSentDay: HV.vSentDay, vLast: HV.vLast, vRetry: HV.vRetry } }); };
   /** 기간: 과거 4/1 ~ 이벤트 전날 · 이벤트 시작일 ~ 종료일 (이벤트를 안 정했으면 10/26 기준 과거만) */
   const hvRanges = () => ({ today: TODAY, paid: HV_PAST_FROM, past: { from: HV_PAST_FROM, to: shiftDay(EV.from || HV_EVENT_FROM, -1) }, event: EV.from ? { from: EV.from, to: EV.to || "" } : null }); // paid: 이날부터 유료 — 신규 · 기존 기준 (사장님 10/31)
   let hvSig = "";
@@ -5306,8 +5309,31 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     HV.last = { at, ok: !!(r && r.ok), why: (r && r.why) || "", auto: why === "auto" };
     if (why === "auto") { if (HV.last.ok) { HV.sentDay = TODAY; HV.retry = null; } else HV.retry = { day: TODAY, m: now + 10 }; }
     hvSaveCfg();
-    if (why === "manual") toast(HV.last.ok ? "재방문 간격을 보고 앱으로 보냈어요" : `재방문 간격을 못 보냈어요: ${HV.last.why}`);
+    const vr = why === "auto" ? null : await hvVisSend(why); // 지금 보내기 · 지난 기록을 다 읽은 뒤에는 방문 기록도 같이 (20:00 은 hvTick 이 이어서)
+    const vt = vr && !vr.none ? (vr.ok ? ` · 방문 기록도 (손님 ${vr.people}명 · 방문 ${vr.visits}번)` : ` · 방문 기록은 못 보냄: ${vr.why}`) : "";
+    if (why === "manual") toast((HV.last.ok ? "재방문 간격을 보고 앱으로 보냈어요" : `재방문 간격을 못 보냈어요: ${HV.last.why}`) + vt, vt ? 5000 : 0);
     else if (!HV.last.ok) toast(`재방문 간격 보내기 실패: ${HV.last.why}${why === "auto" ? " — 10분 뒤 다시" : ""}`);
+    else if (vr && !vr.ok && !vr.none) toast(`방문 기록 보내기 실패: ${vr.why}`);
+    hvShow();
+    return r;
+  }
+  let hvVBusy = false;
+  /** 방문 기록 → 보고 앱 '재방문 분석' (사장님 11/16): 앱 본체가 visit-history.json 으로 만들어 boards/{열쇠}/deskVisits/latest 에 (손님마다 방문한 날 번호만)
+      why: "auto"(20:00 일수 모음 다음 · 보낸 날 남김 · 실패하면 10분 뒤) · "manual" · "backfill" — 기록이 아직 없으면(none) 보낸 것으로 */
+  async function hvVisSend(why) {
+    if (hvVBusy || !HV_APP() || !window.desk.history.visits) return null;
+    if (!svKey.has) return { ok: false, why: "보고 열쇠 없음" };
+    hvVBusy = true;
+    const at = `${TODAY} ${hm(now)}:${String(sec).padStart(2, "0")}`;
+    let r;
+    try { r = await window.desk.history.visits({ at }); } catch (e) { r = { ok: false, why: String((e && e.message) || e) }; }
+    r = r || { ok: false, why: "응답 없음" };
+    hvVBusy = false;
+    const done = !!(r.ok || r.none);
+    HV.vLast = { at: at.slice(0, 16), ok: !!r.ok, none: !!r.none, why: r.why || "", people: r.people || 0, visits: r.visits || 0, dropped: r.dropped || 0, auto: why === "auto" };
+    if (why === "auto") { if (done) { HV.vSentDay = TODAY; HV.vRetry = null; } else HV.vRetry = { day: TODAY, m: now + 10 }; }
+    hvSaveCfg();
+    if (why === "auto" && !done) toast(`방문 기록(재방문 분석) 보내기 실패: ${r.why} — 10분 뒤 다시`);
     hvShow();
     return r;
   }
@@ -5347,6 +5373,11 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     if (now < 20 * 60) return;
     if (HV.retry && HV.retry.day === TODAY) { if (now >= HV.retry.m) { hvSend("auto"); return; } }
     else if (HV.sentDay !== TODAY) { hvSend("auto"); return; }
+    // 방문 기록 (재방문 분석 · 11/16): 일수 모음을 보낸 다음(실패해도) · 실패하면 10분 뒤
+    if (!hvVBusy && window.desk.history.visits) {
+      if (HV.vRetry && HV.vRetry.day === TODAY) { if (now >= HV.vRetry.m) { hvVisSend("auto"); return; } }
+      else if (HV.vSentDay !== TODAY) { hvVisSend("auto"); return; }
+    }
     if (HV.fillDay !== TODAY && !running && !hvPolling) hvAutoFill(); // 보낸 뒤(실패해도) 이어서
   }
   function hvText() {
@@ -5360,9 +5391,11 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     if (!svKey.has) out.push("보고 열쇠를 넣으면 매일 20:00 보내요");
     else if (HV.last) out.push(`마지막 ${HV.last.at.slice(0, 10) === TODAY ? "" : hvMd(HV.last.at.slice(0, 10)) + " "}${HV.last.at.slice(11)} ${HV.last.ok ? "보냄" : `실패 ${HV.last.why}${HV.retry && HV.retry.day === TODAY ? ` — ${hm(HV.retry.m)} 다시` : ""}`}`);
     else out.push("매일 20:00 보내요");
+    const V = HV.vLast;
+    if (svKey.has && V && !V.none) out.push(`방문 기록 ${V.at.slice(0, 10) === TODAY ? "" : hvMd(V.at.slice(0, 10)) + " "}${V.at.slice(11)} ${V.ok ? `보냄 (손님 ${V.people}명 · 방문 ${V.visits}번${V.dropped ? ` · 오래된 ${V.dropped}일 뺌` : ""})` : `실패 ${V.why}${HV.vRetry && HV.vRetry.day === TODAY ? ` — ${hm(HV.vRetry.m)} 다시` : ""}`}`);
     return out.join(" · ");
   }
-  const hvWarn = () => HV_APP() && ((HV.last && !HV.last.ok) || !!(HV.job && HV.job.why));
+  const hvWarn = () => HV_APP() && ((HV.last && !HV.last.ok) || !!(HV.job && HV.job.why) || !!(HV.vLast && !HV.vLast.ok && !HV.vLast.none));
   const hvRow = () => `<div style="display:flex;align-items:center;gap:6px"><b style="flex:none" title="보고 앱 '네이버 판매 수' 맨 위 — 네이버 손님이 다시 오기까지 걸린 일수 (과거 ${hvMd(HV_PAST_FROM)} ~ ${hvMd(shiftDay(EV.from || HV_EVENT_FROM, -1))} · 이벤트 기간 · 지난 30일)">재방문 간격</b>
       ${HV.job && HV.job.running ? `<button class="btn btn-sm" data-act="hvStop">멈춤</button>` : `<button class="btn btn-sm" data-act="hvBackfill" title="${hvMd(HV_PAST_FROM)} ~ 어제 네이버 예약현황에서 날마다 이용완료 손님을 읽어요 (매일 20:00 저절로 · 지금 바로 읽을 때 · 멈췄다 다시 누르면 이어서)">지난 방문 기록 읽기</button>`}<button class="btn btn-sm" data-act="hvSendNow">지금 보내기</button>
       <span class="help ${hvWarn() ? "evwarn" : ""}" id="hv-text" title="${esc(hvText())}">${esc(hvText())}</span></div>`;

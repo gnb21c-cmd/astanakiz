@@ -66,3 +66,13 @@ test("바탕화면 정리본(엑셀): 한글이 깨지지 않게 BOM", () => {
   assert.match(b.toString("utf8"), /홍길동/);
   assert.strictEqual(path.basename(F.csv), "이벤트참여자_2026-11-01.csv");
 });
+
+test("바탕화면 안내 글: 앱 폴더 이름은 %APPDATA%\\astanakiz-desk (11/16 키즈 포스 확인) · 예전 글(한글 폴더 이름)이면 다시 씀", () => {
+  const d = tmp(), F = L.files(d, "2026-11-01");
+  L.add(d, "2026-11-01", line("N1", "2026-11-01 13:55", 8));
+  assert.match(L.README, /%APPDATA%\\astanakiz-desk\\visit-ledger/);
+  assert.ok(!/아스타나키즈 입장 데스크/.test(L.README));
+  fs.writeFileSync(F.readme, "﻿예전 글 — 앱 폴더(%APPDATA%\\아스타나키즈 입장 데스크\\visit-ledger)", "utf8");
+  L.add(d, "2026-11-01", line("N2", "2026-11-02 13:55", 9));
+  assert.strictEqual(fs.readFileSync(F.readme, "utf8"), "﻿" + L.README, "예전 글은 새 글로");
+});

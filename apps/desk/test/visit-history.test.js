@@ -123,3 +123,46 @@ test("하루 기록의 완료 n: 네이버로 읽으면 바꿔 넣음 · 데스�
   H.setDay(g, "2026-10-26", ["x"], "desk", { x: [1, 1, "2026-10-26"] }); // 데스크만
   assert.deepStrictEqual(H.backfillDays(g, "2026-10-25", "2026-10-29"), ["2026-10-29", "2026-10-26", "2026-10-25", "2026-10-28"]);
 });
+
+test("보고 앱 재방문 분석으로 보낼 방문 기록 (사장님 11/16): 보고 저장소 deskVisitsFrom 과 같은 모양 · 손님마다 날 번호만 · 카드 4칸 · 모르면 빈 칸 · 이상한 칸은 버림", () => {
+  const A = "aaaa1111bbbb2222", B = "cccc3333dddd4444", C = "eeee5555ffff6666";
+  const h = { v: 1, days: {
+    "2026-05-07": { src: "naver", k: [A, B], c: { [A]: [3, 1, "2026-05-07"], [B]: [0, 2, "2026-05-09"] } },
+    "2026-05-08": { src: "naver", k: [] },
+    "2026-05-21": { src: "desk", k: [A, C, "x", A], c: { [A]: [4, 1, "2026-05-21"], [C]: ["깨짐", 1, "2026-05-21"] } },
+    "2026-06-07": { src: "naver", k: [A, B], c: { [B]: [2, 1, "어제"] } },
+    "어떤날": { k: [A] },
+  } };
+  // 보고 저장소 packages/core/src/revisitStudy.ts deskVisitsFrom(h, at, 그대로) 결과 (feature/revisit-auto · 11/16 에 돌려 얻음)
+  const want = '{"type":"astanakiz-visits","v":1,"at":"2026-06-07 20:00:00","from":"2026-05-07","days":[0,1,14,31],"p":[[[0,14,31],[0,3,1,0,14,4,1,14,14,4,1,14]],[[0,31],[0,0,2,2,31,2,1,31]],[[14],[]]]}';
+  const r = H.deskVisits(h, "2026-06-07 20:00:00", { shuffle: (xs) => xs });
+  assert.strictEqual(r.json, want);
+  assert.deepStrictEqual([r.from, r.days, r.dropped, r.people, r.visits, r.size], ["2026-05-07", 4, 0, 3, 6, want.length]);
+  assert.ok(!/aaaa|cccc|eeee/.test(r.json), "해시가 없음");
+  assert.strictEqual(H.deskVisits({ v: 1, days: {} }, "x"), null, "기록이 없으면 null");
+});
+
+test("방문 기록: 보낼 때마다 손님 순서를 섞음 (같은 칸 = 같은 손님이 아님) · 900,000자를 넘으면 오래된 날부터 빼고 보냄 · 최근 날은 그대로", () => {
+  const days = {};
+  for (let i = 0; i < 60; i++) {
+    const d = H.shiftDay("2026-09-01", i);
+    days[d] = { src: "naver", k: Array.from({ length: 40 }, (_, j) => H.hashKey("s", `0101234${String((i * 7 + j) % 300).padStart(4, "0")}`)).sort(), c: {} };
+    for (const k of days[d].k) days[d].c[k] = [i % 5, 1, d];
+  }
+  const h = { v: 1, days };
+  const a = H.deskVisits(h, "2026-10-30 20:00:00"), b = H.deskVisits(h, "2026-10-30 20:00:00");
+  assert.strictEqual(a.size, b.size);
+  assert.notStrictEqual(a.json, b.json, "순서가 다름");
+  const rows = (x) => JSON.parse(x.json).p.map((r) => JSON.stringify(r)).sort();
+  assert.deepStrictEqual(rows(a), rows(b), "섞어도 손님 칸은 같음");
+  assert.ok(!/[0-9a-f]{16}/.test(a.json), "해시가 없음");
+  // 크기 넘침 → 오래된 날부터 뺌
+  const max = Math.floor(a.size * 0.6);
+  const t = H.deskVisits(h, "2026-10-30 20:00:00", { max });
+  const x = JSON.parse(t.json);
+  assert.ok(t.size < max && t.dropped > 0, `${t.size} / ${max} · 뺀 날 ${t.dropped}`);
+  assert.strictEqual(x.from, H.shiftDay("2026-09-01", t.dropped), "남은 첫 날 = 뺀 날 다음");
+  assert.strictEqual(x.days[x.days.length - 1], H.dayDiff(x.from, "2026-10-30"), "최근 날(10/30)은 그대로");
+  assert.strictEqual(t.days, 60 - t.dropped);
+  assert.strictEqual(H.VISITS_MAX, 900000);
+});

@@ -1129,6 +1129,7 @@ ipcMain.handle("live:send", (_e, job) => liveSend(String((job && job.json) || ""
 //      손님마다 카드 '완료 n' · 그날 건수 · 읽은 날도 남김 (신규 · 기존 · 사장님 10/31) — 예전 판에서 읽어 완료 n 이 없는 날은 안 읽은 날을 다 읽은 뒤 다시
 //      하루를 못 읽으면 그날은 두고 다음 날로 (3일 이어 못 읽으면 멈춤 — 로그인 풀림 등)
 //   ③ 매일 20:00 데스크가 일수 모음(손님 정보 없음 · astanakiz-revisit)을 같은 보고 열쇠로 boards/{열쇠}/deskStats/revisit 에 덮어씀 (history:send)
+//   ④ 이어서 방문 기록(재방문 분석 · 사장님 11/16)을 boards/{열쇠}/deskVisits/latest 에 덮어씀 (history:visits · 손님마다 방문한 날 번호만 — visit-history.js deskVisits)
 const visitHistory = require("./visit-history");
 let visitHist = null;
 const histDir = () => app.getPath("userData");
@@ -1226,6 +1227,19 @@ ipcMain.handle("rental:send", async (_e, job) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return { ok: false, code: 0, why: "모양이 틀림" };
   if (json.length >= 10000) return { ok: false, code: 0, why: "글이 너무 길어요" };
   return boardPatch(`deskStats/rental-${day}`, json, job && job.at, "deskStats (rental-날짜)");
+});
+// 재방문 분석 (사장님 11/16): 보고 앱이 다음 날 아침 분석을 저절로 다시 계산하게 방문 기록을 boards/{열쇠}/deskVisits/latest 에
+//   json = astanakiz-visits (손님 해시 · 번호 · 이름 · 전화 · 비밀값 없이 손님마다 방문한 날 번호만 · 순서 섞음 · 900,000자 미만 — 넘으면 오래된 날부터 뺌) · at
+//   현장 POS 만 (방문 기록이 있는 곳) · 기록이 없으면 none
+ipcMain.handle("history:visits", async (_e, job) => {
+  if (RUN_ROLE === "office") return { ok: false, code: 0, why: "사무실 PC 는 보내지 않아요" };
+  const at = String((job && job.at) || "");
+  if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/.test(at)) return { ok: false, code: 0, why: "모양이 틀림" };
+  let v;
+  try { v = visitHistory.deskVisits(histGet(), at); } catch (e) { return { ok: false, code: 0, why: `방문 기록을 못 만듦: ${e.message || e}` }; }
+  if (!v) return { ok: false, none: true, code: 0, why: "방문 기록이 아직 없어요" };
+  const r = await boardPatch("deskVisits/latest", v.json, at, "deskVisits");
+  return Object.assign(r, { people: v.people, visits: v.visits, days: v.days, dropped: v.dropped, size: v.size });
 });
 ipcMain.handle("history:send", async (_e, job) => {
   const json = String((job && job.json) || "");

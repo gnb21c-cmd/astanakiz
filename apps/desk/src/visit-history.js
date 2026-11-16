@@ -153,4 +153,52 @@ function stats(h, opts) {
   return out;
 }
 
-module.exports = { FILE, load, save, setDay, backfillDays, stats, hashKey, shiftDay, dayDiff };
+/* ── 보고 앱 '재방문 분석'으로 보낼 방문 기록 (사장님 11/16 — 매일 저절로 다시 계산되게) ──
+   보고 저장소 packages/core/src/revisitStudy.ts deskVisitsFrom 과 같은 모양 · 같은 셈 (docs/KIDS_REVISIT.md '매일 자동 — 통합데스크가 보낼 것')
+   { type: "astanakiz-visits", v: 1, at, from: 날 번호 0(기록 첫 날), days: [기록이 있는(읽은) 날 번호 …],
+     p: [ [[방문 날 번호 …], [카드 날 번호, 완료 n, 그날 건수, 읽은 날 번호, (다음 카드) …]], … ] }  — 손님 하나 = p 한 칸
+   - 손님 해시 · 번호 · 이름 · 전화 · 비밀값(visitSalt) 없이 손님마다 날 번호만 · 보낼 때마다 손님 순서를 무작위로 섞음
+   - 카드('완료 n')를 모르는 손님은 카드 칸이 빈 배열
+   - max(900,000자)를 넘으면 오래된 날부터 빼고 다시 만듦 (방문 2만 7천 번 ≈ 45만 자) */
+const VISITS_TYPE = "astanakiz-visits";
+const VISITS_MAX = 900000;
+const HASH = /^[\w:-]{6,80}$/;
+function shuffleRandom(xs) {
+  const a = [...xs];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function visitsOf(h, ds, at, shuffle) {
+  const from = ds[0], num = (d) => dayDiff(from, d), per = new Map();
+  for (const d of ds) {
+    const e = h.days[d], n = num(d);
+    for (const k of e.k) {
+      if (typeof k !== "string" || !HASH.test(k)) continue;
+      let r = per.get(k);
+      if (!r) per.set(k, (r = { v: [], c: [] }));
+      if (!r.v.includes(n)) r.v.push(n);
+      const c = e.c && e.c[k];
+      if (Array.isArray(c) && Number.isInteger(c[0]) && c[0] >= 0) r.c.push(n, c[0], Number.isInteger(c[1]) && c[1] > 0 ? c[1] : 1, typeof c[2] === "string" && isDay(c[2]) ? num(c[2]) : n);
+    }
+  }
+  return { type: VISITS_TYPE, v: 1, at, from, days: ds.map(num), p: shuffle([...per.values()].map((r) => [r.v, r.c])) };
+}
+/** 기록 → { json, from, days(보낸 날 수), dropped(뺀 오래된 날 수), people, visits, size } · 기록이 없으면 null */
+function deskVisits(h, at, { max = VISITS_MAX, shuffle = shuffleRandom } = {}) {
+  let ds = Object.keys((h && h.days) || {}).filter((d) => isDay(d) && h.days[d] && Array.isArray(h.days[d].k)).sort();
+  const all = ds.length;
+  if (!all) return null;
+  for (;;) {
+    const x = visitsOf(h, ds, String(at || ""), shuffle);
+    const json = JSON.stringify(x);
+    if (json.length < max) return { json, from: x.from, days: ds.length, dropped: all - ds.length, people: x.p.length, visits: x.p.reduce((n, r) => n + r[0].length, 0), size: json.length };
+    if (ds.length <= 1) return null; // 하루치도 너무 큼 (그럴 일 없음)
+    // 넘친 만큼 오래된 날부터 (조금 넉넉히) 빼고 다시
+    ds = ds.slice(Math.min(ds.length - 1, Math.max(1, Math.ceil(ds.length * (1 - (max * 0.97) / json.length)))));
+  }
+}
+
+module.exports = { FILE, load, save, setDay, backfillDays, stats, hashKey, shiftDay, dayDiff, deskVisits, VISITS_TYPE, VISITS_MAX };
