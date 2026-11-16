@@ -165,12 +165,12 @@ test("멈춤: 대화창이 안 열리면(새 창 없음) 거기서 멈추고 다
 const DESK = "file://" + path.join(__dirname, "..", "..", "..", "prototype", "desk.html");
 const line = (k, name, day, n, st, due, no) => JSON.stringify({ k, name, phone: k, n, base: 3, no, at: `${day} 11:00`, day, st, due });
 const LEDGER = [
-  line("01011110001", "가손님", "2026-10-31", 4, "안내", "2026-11-20", "a1"), // D-5
+  line("01011110001", "가손님", "2026-11-03", 4, "안내", "2026-11-23", "a1"), // D-8
   line("01011110002", "나손님", "2026-10-27", 4, "안내", "2026-11-16", "b1"),
-  line("01011110002", "나손님", "2026-10-29", 5, "성공", "2026-11-18", "b2"), // D-3
-  line("01011110003", "다손님", "2026-10-31", 4, "안내", "2026-11-20", "c1"),
+  line("01011110002", "나손님", "2026-11-03", 5, "성공", "2026-11-23", "b2"), // D-8
+  line("01011110003", "다손님", "2026-11-03", 4, "안내", "2026-11-23", "c1"),
   line("01011110003", "다손님", "2026-11-15", 5, "성공", "2026-11-30", "c2"), // 오늘 옴 → 안 보냄
-  line("01011110006", "바손님", "2026-10-27", 4, "안내", "2026-11-20", "f1"), // D-5
+  line("01011110006", "바손님", "2026-10-27", 4, "안내", "2026-11-23", "f1"), // D-8 (영수증 기한)
 ].join("\n") + "\n";
 async function openDesk(browser, optout = "무료수신거부 080-000-0000") {
   const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
@@ -219,26 +219,26 @@ test("데스크: 확인만 해 보기 → 진행 → 줄마다 맞춘 방법 · 
     const r1 = await page.evaluate(() => window.__runs[0]);
     assert.strictEqual(r1.dry, true);
     assert.deepStrictEqual(r1.list, [
-      { key: "5|01011110001", name: "가손님", phone: "01011110001", left: 5 },
-      { key: "5|01011110006", name: "바손님", phone: "01011110006", left: 5 },
-      { key: "3|01011110002", name: "나손님", phone: "01011110002", left: 3 },
-    ], "오늘 온 다손님은 빼고 · D-5 → D-3");
-    assert.match(r1.text[5], /^\(광고\) 아스타나키즈[\s\S]*5일[\s\S]*무료수신거부 080-000-0000$/);
-    assert.match(r1.text[3], /^\(광고\)[\s\S]*3일/);
-    assert.deepStrictEqual(await page.evaluate(() => window.__saves), ["재방문안내_D-5_2026-11-15.jpg", "재방문안내_D-3_2026-11-15.jpg"], "그날 안내 이미지를 먼저 바탕화면 폴더에");
+      { key: "8|01011110001", name: "가손님", phone: "01011110001", left: 8 },
+      { key: "8|01011110002", name: "나손님", phone: "01011110002", left: 8 },
+      { key: "8|01011110006", name: "바손님", phone: "01011110006", left: 8 },
+    ], "오늘 온 다손님은 빼고 · 기한 8일 남은 사람");
+    assert.match(r1.text[8], /^\(광고\) 아스타나키즈\n고객님 아직 7일 남았습니다\. 7일 안에 방문하셔서 수제돈까스 받아가세요\.[\s\S]*무료수신거부 080-000-0000$/);
+    assert.deepStrictEqual(Object.keys(r1.text), ["8"]);
+    assert.deepStrictEqual(await page.evaluate(() => window.__saves), ["재방문안내_D-8_2026-11-15.jpg"], "그날 안내 이미지를 먼저 바탕화면 폴더에");
     assert.match(await bar(), /네이버 톡톡 확인 중 0\/3 멈추기/);
     const job = (o) => Object.assign({ running: false, dry: true, at: "2026-11-15 10:00", total: 3, step: "", why: "", end: "2026-11-15 10:02", results: [] }, o);
-    await page.evaluate((j) => window.__cb.progress({ ok: true, job: j }), job({ running: true, step: "가손님: 뒷번호 0001 검색", end: undefined, results: [{ key: "5|01011110001", name: "가손님", at: "10:01", ok: true, skip: false, step: "확인만", how: "번호", why: "" }] }));
+    await page.evaluate((j) => window.__cb.progress({ ok: true, job: j }), job({ running: true, step: "가손님: 뒷번호 0001 검색", end: undefined, results: [{ key: "8|01011110001", name: "가손님", at: "10:01", ok: true, skip: false, step: "확인만", how: "번호", why: "" }] }));
     assert.match(await bar(), /확인 중 1\/3 가손님: 뒷번호 0001 검색/);
     await page.evaluate((j) => window.__cb.done({ ok: true, job: j }), job({ results: [
-      { key: "5|01011110001", name: "가손님", at: "10:01", ok: true, skip: false, step: "확인만", how: "번호", why: "" },
-      { key: "5|01011110006", name: "바손님", at: "10:01", ok: false, skip: true, step: "맞추기", how: "", why: "가려진 손님 중 이름 · 뒷번호가 같은 사람이 2명 — 근무자가 확인" },
-      { key: "3|01011110002", name: "나손님", at: "10:02", ok: true, skip: false, step: "확인만", how: "가린 번호 · 이름", why: "" },
+      { key: "8|01011110001", name: "가손님", at: "10:01", ok: true, skip: false, step: "확인만", how: "번호", why: "" },
+      { key: "8|01011110006", name: "바손님", at: "10:01", ok: false, skip: true, step: "맞추기", how: "", why: "가려진 손님 중 이름 · 뒷번호가 같은 사람이 2명 — 근무자가 확인" },
+      { key: "8|01011110002", name: "나손님", at: "10:02", ok: true, skip: false, step: "확인만", how: "가린 번호 · 이름", why: "" },
     ] }));
     let rows = await rowsOf(page);
     assert.match(rows[0], /가손님 .* 보냄 \| 톡톡 확인 ✓ 번호로 맞춤 \(안 보냄\)$/);
-    assert.match(rows[1], /바손님 .* 보냄 \| 톡톡 확인: 가려진 손님 중 이름 · 뒷번호가 같은 사람이 2명/);
-    assert.match(rows[3], /나손님 .* 보냄 \| 톡톡 확인 ✓ 가린 번호 · 이름으로 맞춤/);
+    assert.match(rows[2], /바손님 .* 보냄 \| 톡톡 확인: 가려진 손님 중 이름 · 뒷번호가 같은 사람이 2명/);
+    assert.match(rows[1], /나손님 .* 보냄 \| 톡톡 확인 ✓ 가린 번호 · 이름으로 맞춤/);
     assert.match(await bar(), /톡톡으로 보내기 3명 지난번: 확인만 2명 · 건너뜀 1명 \(10:02\)/, "확인만은 '보냄'으로 안 바꿈");
     // 보내기: 한 번 누르면 묻기만
     await page.click("#rt-bar [data-act=rtRun]:not([data-dry])");
@@ -248,43 +248,43 @@ test("데스크: 확인만 해 보기 → 진행 → 줄마다 맞춘 방법 · 
     await page.waitForFunction(() => window.__runs.length === 2);
     assert.strictEqual(await page.evaluate(() => window.__runs[1].dry), false);
     await page.evaluate((j) => window.__cb.done({ ok: true, job: j }), job({ dry: false, at: "2026-11-15 10:05", end: "2026-11-15 10:07", why: "나손님: 사진이 대화창에 안 보임", results: [
-      { key: "5|01011110001", name: "가손님", at: "10:05", ok: true, skip: false, step: "보냄", how: "번호", why: "", sent: { text: true, image: true } },
-      { key: "5|01011110006", name: "바손님", at: "10:06", ok: false, skip: true, step: "맞추기", how: "", why: "가려진 손님 중 이름 · 뒷번호가 같은 사람이 2명 — 근무자가 확인" },
-      { key: "3|01011110002", name: "나손님", at: "10:07", ok: false, skip: false, step: "사진", how: "", why: "사진이 대화창에 안 보임", sent: { text: true } },
+      { key: "8|01011110001", name: "가손님", at: "10:05", ok: true, skip: false, step: "보냄", how: "번호", why: "", sent: { text: true, image: true } },
+      { key: "8|01011110006", name: "바손님", at: "10:06", ok: false, skip: true, step: "맞추기", how: "", why: "가려진 손님 중 이름 · 뒷번호가 같은 사람이 2명 — 근무자가 확인" },
+      { key: "8|01011110002", name: "나손님", at: "10:07", ok: false, skip: false, step: "사진", how: "", why: "사진이 대화창에 안 보임", sent: { text: true } },
     ] }));
     rows = await rowsOf(page);
     assert.match(rows[0], /가손님 .* 보냄 톡톡 10:05$/, "보낸 사람 = 보냄 톡톡 hh:mm");
-    assert.match(rows[1], /바손님 .* \| 보냄 \| 톡톡 건너뜀: 가려진 손님 중 .* — 번호 복사로 직접$/);
-    assert.match(rows[3], /나손님 .* \| 보냄 \| 톡톡 글만 보냄 — 사진은 직접 \(사진이 대화창에 안 보임\)$/);
+    assert.match(rows[2], /바손님 .* \| 보냄 \| 톡톡 건너뜀: 가려진 손님 중 .* — 번호 복사로 직접$/);
+    assert.match(rows[1], /나손님 .* \| 보냄 \| 톡톡 글만 보냄 — 사진은 직접 \(사진이 대화창에 안 보임\)$/);
     assert.match(await bar(), /톡톡으로 보내기 2명 지난번: 보냄 1명 · 건너뜀 1명 · 멈춤: 나손님: 사진이 대화창에 안 보임 \(10:07\)/);
     assert.strictEqual((await page.textContent("#rev-btn")).trim(), "재방문 안내2", "남은 사람 2");
     // 다시 그려도(같은 결과가 또 와도) 근무자가 푼 '보냄'은 되살리지 않음
     await page.click("#sheet .rvrow >> nth=0 >> [data-act=revSentT]");
-    await page.evaluate((j) => window.__cb.progress({ ok: true, job: j }), job({ dry: false, at: "2026-11-15 10:05", end: "2026-11-15 10:07", results: [{ key: "5|01011110001", name: "가손님", at: "10:05", ok: true, skip: false, step: "보냄", how: "번호", why: "" }] }));
+    await page.evaluate((j) => window.__cb.progress({ ok: true, job: j }), job({ dry: false, at: "2026-11-15 10:05", end: "2026-11-15 10:07", results: [{ key: "8|01011110001", name: "가손님", at: "10:05", ok: true, skip: false, step: "보냄", how: "번호", why: "" }] }));
     assert.match((await rowsOf(page))[0], /\| 보냄$/);
     // 운영 설정 → 재방문 이벤트: 톡톡 자동알림 기록 (그날 대상 · 사람마다 결과 · 이름 + 뒷번호 4자리)
     await page.click("#sheet [data-act=close]");
     await page.dblclick("#now");
     await page.click("[data-t=event]");
     const sum = await page.$eval(".rtlogs details summary", (e) => e.textContent.replace(/\s+/g, " ").trim());
-    assert.match(sum, /대상 4명 \(D-5 3 · D-3 1\) 성공 1 · 글만 1 · 건너뜀 1 · 보낸 때 직접 10:05/, "보낸 때 = 시작 시각");
+    assert.match(sum, /대상 4명 \(D-8 4\) 성공 1 · 글만 1 · 건너뜀 1 · 보낸 때 직접 10:05/, "보낸 때 = 시작 시각");
     const logRows = await page.$$eval(".rtlogs .rtlrow", (e) => e.map((r) => [...r.children].map((c) => c.textContent.trim()).filter(Boolean).join(" | ")));
     assert.deepStrictEqual(logRows, [
-      "가손님 | 뒷번호 0001 | D-5 | 성공 10:05",
-      "바손님 | 뒷번호 0006 | D-5 | 건너뜀 10:06 | 가려진 손님 중 이름 · 뒷번호가 같은 사람이 2명 — 근무자가 확인",
-      "다손님 | 뒷번호 0003 | D-5 | 오늘 방문",
-      "나손님 | 뒷번호 0002 | D-3 | 글만 10:07 | 사진이 대화창에 안 보임",
+      "가손님 | 뒷번호 0001 | D-8 | 성공 10:05",
+      "나손님 | 뒷번호 0002 | D-8 | 글만 10:07 | 사진이 대화창에 안 보임",
+      "바손님 | 뒷번호 0006 | D-8 | 건너뜀 10:06 | 가려진 손님 중 이름 · 뒷번호가 같은 사람이 2명 — 근무자가 확인",
+      "다손님 | 뒷번호 0003 | D-8 | 오늘 방문",
     ], "근무자가 '보냄'을 풀어도 톡톡 성공은 그대로");
     const raw = await page.evaluate(() => localStorage.getItem("astanakiz-revtalklog"));
     assert.ok(!/0101111000\d/.test(raw), "전화번호 전체는 안 남김");
     // 근무자가 바손님에게 문자로 보내고 '보냄' → 기록은 '직접' (톡톡 건너뜀 까닭은 남김)
     await page.click("#sheet [data-act=close]");
     await page.click("#rev-btn");
-    await page.click("#sheet .rvrow >> nth=1 >> [data-act=revSentT]");
+    await page.click("#sheet .rvrow >> nth=2 >> [data-act=revSentT]");
     await page.click("#sheet [data-act=close]");
     await page.dblclick("#now");
     await page.click("[data-t=event]");
-    assert.match((await page.$$eval(".rtlogs .rtlrow", (e) => e.map((r) => [...r.children].map((c) => c.textContent.trim()).join(" "))))[1], /바손님 뒷번호 0006 D-5 직접 10:0\d 톡톡 건너뜀: 가려진 손님/);
+    assert.match((await page.$$eval(".rtlogs .rtlrow", (e) => e.map((r) => [...r.children].map((c) => c.textContent.trim()).join(" "))))[2], /바손님 뒷번호 0006 D-8 직접 10:0\d 톡톡 건너뜀: 가려진 손님/);
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();
@@ -343,11 +343,11 @@ test("매일 자동으로 보내기: 켜 두면 정한 시각(11:00) 뒤 한 번
     await page.clock.runFor(62000); // 11:00
     await page.waitForFunction(() => window.__runs.length === 1);
     const r = await page.evaluate(() => window.__runs[0]);
-    assert.deepStrictEqual([r.dry, r.auto, r.list.map((x) => x.name)], [false, true, ["가손님", "바손님", "나손님"]]);
+    assert.deepStrictEqual([r.dry, r.auto, r.list.map((x) => x.name)], [false, true, ["가손님", "나손님", "바손님"]]);
     await page.evaluate(() => window.__cb.done({ ok: true, job: { running: false, dry: false, auto: true, at: "2026-11-15 11:00", end: "2026-11-15 11:02", total: 3, step: "", why: "", results: [
-      { key: "5|01011110001", name: "가손님", at: "11:01", ok: true, skip: false, step: "보냄", how: "번호", why: "", sent: { text: true, image: true } },
-      { key: "5|01011110006", name: "바손님", at: "11:01", ok: true, skip: false, step: "보냄", how: "가린 번호 · 이름", why: "", sent: { text: true, image: true } },
-      { key: "3|01011110002", name: "나손님", at: "11:02", ok: false, skip: true, step: "맞추기", how: "", why: "네이버 고객에서 뒷번호로 찾은 사람이 없음" },
+      { key: "8|01011110001", name: "가손님", at: "11:01", ok: true, skip: false, step: "보냄", how: "번호", why: "", sent: { text: true, image: true } },
+      { key: "8|01011110006", name: "바손님", at: "11:01", ok: true, skip: false, step: "보냄", how: "가린 번호 · 이름", why: "", sent: { text: true, image: true } },
+      { key: "8|01011110002", name: "나손님", at: "11:02", ok: false, skip: true, step: "맞추기", how: "", why: "네이버 고객에서 뒷번호로 찾은 사람이 없음" },
     ] } }));
     await page.clock.runFor(10 * 60000);
     assert.strictEqual(await page.evaluate(() => window.__runs.length), 1, "그날 한 번만 (건너뛴 사람이 남아도)");
@@ -355,8 +355,8 @@ test("매일 자동으로 보내기: 켜 두면 정한 시각(11:00) 뒤 한 번
     await page.dblclick("#now");
     await page.click("[data-t=event]");
     assert.match(await page.textContent("#rt-auto"), /매일 자동으로 보내기 켜짐[\s\S]*매일 11:00 뒤 한 번/);
-    assert.match(await page.$eval(".rtlogs details summary", (e) => e.textContent.replace(/\s+/g, " ")), /대상 4명 \(D-5 3 · D-3 1\) 성공 2 · 건너뜀 1 · 보낸 때 자동 11:00/);
-    assert.match((await page.$$eval(".rtlogs .rtlrow", (e) => e.map((r) => [...r.children].map((c) => c.textContent.trim()).join(" "))))[0], /가손님 뒷번호 0001 D-5 성공 11:01 \(자동\)/);
+    assert.match(await page.$eval(".rtlogs details summary", (e) => e.textContent.replace(/\s+/g, " ")), /대상 4명 \(D-8 4\) 성공 2 · 건너뜀 1 · 보낸 때 자동 11:00/);
+    assert.match((await page.$$eval(".rtlogs .rtlrow", (e) => e.map((r) => [...r.children].map((c) => c.textContent.trim()).join(" "))))[0], /가손님 뒷번호 0001 D-8 성공 11:01 \(자동\)/);
     // 끄기 → 저장
     await page.click("[data-act=rtAutoToggle]");
     assert.deepStrictEqual(await page.evaluate(() => window.desk.config.get().then((c) => c.revTalkAuto)), { on: false, at: "11:00" });

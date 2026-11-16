@@ -59,7 +59,7 @@ contextBridge.exposeInMainWorld("desk", {
   eventStat: { send: (job) => ipcRenderer.invoke("event:send", job) },
   rental: { send: (job) => ipcRenderer.invoke("rental:send", job) }, // 대관 → 보고 앱 (11/10)
   capWatch: { add: (rec) => ipcRenderer.invoke("capwatch:add", rec) }, // 수량 관찰 기록 (11/13)
-  revImg: { save: (job) => ipcRenderer.invoke("revimg:save", job) }, // 재방문 안내 이미지 (11/15)
+  revImg: { save: (job) => ipcRenderer.invoke("revimg:save", job), get: (left) => ipcRenderer.invoke("revimg:get", left) }, // 재방문 안내 이미지 (11/15) · 사장님 그림 '보낼사진_D-n' (11/16)
   // 재방문 안내 → 네이버 톡톡 보내기 (11/16): run({ dry, list:[{key, name, phone, left}], text:{5, 3} }) · 진행은 onProgress · 끝은 onDone
   talkSend: {
     run: (req) => ipcRenderer.invoke("talksend:run", req),

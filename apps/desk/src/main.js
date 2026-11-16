@@ -448,6 +448,21 @@ ipcMain.handle("revimg:save", (_e, job) => {
     return { ok: false, why: `파일을 못 씀: ${err.message || err}` };
   }
 });
+// 사장님이 고른 안내 그림 (11/16): 바탕화면 '아스타나키즈-재방문안내/보낼사진_D-n.jpg|jpeg|png' → 창에 보여 줄 data URL (손님 정보 없음 · 그 폴더 그 이름만)
+ipcMain.handle("revimg:get", (_e, left) => {
+  const l = Number(left);
+  if (!Number.isInteger(l) || l < 1 || l > 30) return { ok: false, why: "모양이 틀림" };
+  for (const [ext, type] of [["jpg", "jpeg"], ["jpeg", "jpeg"], ["png", "png"]]) {
+    const f = path.join(REV_DIR(), `보낼사진_D-${l}.${ext}`);
+    try {
+      const st = fs.statSync(f);
+      if (!st.isFile()) continue;
+      if (st.size > 8 * 1024 * 1024) return { ok: false, why: "사진이 너무 커요 (8MB 넘음)" };
+      return { ok: true, name: path.basename(f), dataUrl: `data:image/${type};base64,` + fs.readFileSync(f).toString("base64") };
+    } catch (e) { /* 없음 */ }
+  }
+  return { ok: false };
+});
 // 글 복사 (재방문 안내 번호 · 문구) — 데스크 창이 포커스를 잃어도 되게 본체 클립보드로
 ipcMain.handle("clip:write", (_e, text) => { const t = String(text || ""); if (!t || t.length > 20000) return false; clipboard.writeText(t); return true; });
 /* 재방문 안내 → 네이버 톡톡 보내기 (사장님 11/16 화면 사진 순서 · naver-talksend.js)
@@ -500,10 +515,10 @@ function talkSendRun(req) {
   if (!spUrlOk(sp)) return { ok: false, why: "스마트플레이스 '고객' 화면 주소가 없어요 — 운영 설정 → 네이버: 네이버 화면 보기에서 스마트플레이스 [고객] 화면까지 들어간 뒤 [지금 화면을 톡톡 보내기 시작 화면으로]" };
   const dry = !!(req && req.dry);
   const list = (req && Array.isArray(req.list) ? req.list : []).slice(0, 60).map((x) => ({ key: String((x && x.key) || "").slice(0, 80), name: String((x && x.name) || "").trim().slice(0, 20), phone: String((x && x.phone) || "").replace(/\D/g, ""), left: Number(x && x.left) }))
-    .filter((x) => x.key && x.name && /^01\d{8,9}$/.test(x.phone) && [5, 3].includes(x.left));
+    .filter((x) => x.key && x.name && /^01\d{8,9}$/.test(x.phone) && Number.isInteger(x.left) && x.left >= 1 && x.left <= 30);
   if (!list.length) return { ok: false, why: "보낼 사람이 없어요" };
   const text = {};
-  for (const l of [5, 3]) { const t = String((req.text && req.text[l]) || "").slice(0, 1000); text[l] = /^\(광고\)/.test(t.trim()) ? t.trim() : ""; }
+  for (const l of new Set(list.map((x) => x.left))) { const t = String((req.text && req.text[l]) || "").slice(0, 1000); text[l] = /^\(광고\)/.test(t.trim()) ? t.trim() : ""; }
   const imgs = {};
   for (const l of new Set(list.map((x) => x.left))) {
     imgs[l] = revImageFile(l);
