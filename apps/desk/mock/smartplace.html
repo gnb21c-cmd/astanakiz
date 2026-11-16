@@ -1,7 +1,9 @@
 <!doctype html>
-<!-- 가짜 스마트플레이스 '고객' 화면 (사장님 화면 사진 11/16 모양 · 가짜 손님만)
-     왼쪽 메뉴 [고객] → 위 '예약·주문' 탭 → 검색 칸 앞 선택(이름 ∨ / 전화번호) → 목록(이름 · 전화번호 — 어떤 손님은 '유*석' · '***-****-1313' 처럼 가려짐)
-     → 줄을 누르면 오른쪽 고객 카드(등록경로 · 전화번호 · 이메일 · 특이사항 · [톡톡 대화하기]) → 새 창(팝업)으로 톡톡 대화창 (talkchat.html)
+<!-- 가짜 스마트플레이스 '고객' 화면 — 실제 화면 저장본(11/16 · partner.booking.naver.com/bizes/…/users)과 같은 구조 · 손님은 모두 지어낸 이름 · 번호
+     왼쪽 메뉴 [고객] → 위 '예약·주문' 탭 → <form class="BookingTextSearch__root">: 선택 상자 <a role=button>(이름/전화번호 · 누르면 펼침 목록이 따로 그려짐) · <input type=search> · 지우기 · 돋보기(속 글자 '검색')
+     → '<em>N</em>명' → 목록: 줄마다 이름 + 고르기 단추(radio title=이름 value=고객번호) — 앱 창처럼 좁으면 전화번호 칸이 아예 없음 (?wide=1 이면 번호 칸 · 뒷번호는 초록으로 따로)
+     → 오른쪽 고객 정보(UserInfo): 이름 · [정보변경](data-tst_click_link=고객번호) · 등록경로 · 전화번호(tel 링크) · 이메일 · 특이사항 · [톡톡 대화하기](아이콘 + 글자) → 새 창(팝업) talkchat.html
+     처음엔 첫 손님 고객 정보가 저절로 · 넣자마자 돋보기를 누르면 예전 값으로 찾음(React 처럼 · ?late=0 이면 바로)
      ?home=1 = 처음 화면(메뉴만) · 시험: localStorage mockSpData = 손님 목록을 바꿈 -->
 <html lang="ko"><head><meta charset="utf-8"><title>스마트플레이스</title>
 <style>
@@ -11,76 +13,85 @@
   nav a { display: block; color: #ddd; padding: 8px 14px; text-decoration: none; }
   nav a.on { color: #fff; font-weight: 700; }
   main { padding: 14px 20px; }
-  .Tab__tab { display: inline-block; padding: 6px 12px; cursor: pointer; } .Tab__on { border-bottom: 2px solid #000; font-weight: 700; }
-  .Search__box { display: flex; gap: 6px; align-items: center; border: 1px solid #888; border-radius: 6px; padding: 4px 8px; width: 380px; margin: 10px 0; position: relative; }
-  .Search__type { border: 0; background: none; cursor: pointer; }
-  .Search__options { position: absolute; top: 34px; left: 0; background: #fff; border: 1px solid #ccc; }
-  .Search__options li { list-style: none; padding: 6px 14px; cursor: pointer; }
-  .Customer__body { display: grid; grid-template-columns: 240px 1fr; gap: 10px; }
-  .CustomerList__row { display: flex; gap: 12px; padding: 8px; border-bottom: 1px solid #eee; cursor: pointer; }
+  .content-header-tab { list-style: none; display: flex; gap: 20px; padding: 0; } .content-header-tab .active a { font-weight: 700; border-bottom: 2px solid #000; }
+  .BookingTextSearch__root { display: flex; gap: 6px; align-items: center; border: 1px solid #888; border-radius: 6px; padding: 4px 8px; width: 420px; margin: 10px 0; }
+  .BookingTextSearch__select { cursor: pointer; padding-right: 14px; }
+  .BookingTextSearch__input-search { flex: 1; border: 0; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .Layer__list { position: absolute; background: #fff; border: 1px solid #ccc; display: grid; }
+  .Contents__wrap { display: flex; gap: 10px; }
+  .Contents__list { display: flex; } .Contents__index a { display: block; font-size: 11px; color: #999; }
+  .Contents__list-row { display: flex; gap: 12px; padding: 8px; border-bottom: 1px solid #eee; }
+  .Contents__list-cell { min-width: 90px; } .Contents__list-content .Contents__name { cursor: pointer; }
+  .UserInfo__root { border-left: 1px solid #ddd; padding: 10px 16px; min-width: 340px; }
+  .UserInfo__item { display: flex; gap: 10px; }
   .hl { color: #03c75a; font-style: normal; font-weight: 700; }
-  .InfoPanel__root { border-left: 1px solid #ddd; padding: 10px 16px; }
-  .InfoPanel__item { display: flex; gap: 10px; }
 </style></head><body>
 <script>
   const P = new URLSearchParams(location.search);
   const go = (o) => { const q = new URLSearchParams(Object.assign(Object.fromEntries(P), o)); location.href = location.pathname + "?" + q; };
-  // 가짜 손님 — m: 가려 보임(이름 · 번호) · talk: 톡톡 대화하기 단추가 있음
+  // 가짜 손님 — m: 가려 보임(이름 · 번호, 목록 · 고객 정보 모두) · talk: 톡톡 대화하기 단추가 있음 · uid: 고객번호
   const DEF = [
-    { id: "c1", name: "김가람", phone: "010-3000-1313", m: false, talk: true, path: "네이버 예약 (kgr****)" },
-    { id: "c2", name: "유민석", phone: "010-3100-1313", m: true, talk: true, path: "네이버 예약 (ymsk****)" },
-    { id: "c3", name: "이하늘", phone: "010-3192-1313", m: false, talk: true, path: "네이버 예약 (hnl****)" },
-    { id: "c4", name: "정수림", phone: "010-3400-1313", m: true, talk: true, path: "네이버 예약 (jsr****)" },
-    { id: "c5", name: "정아림", phone: "010-3500-1313", m: true, talk: true, path: "네이버 예약 (jar****)" },
-    { id: "c6", name: "나단비", phone: "010-3300-2424", m: false, talk: true, path: "네이버 예약 (ndb****)" },
-    { id: "c7", name: "나보비", phone: "010-3600-2424", m: true, talk: true, path: "네이버 예약 (nbb****)" },
-    { id: "c8", name: "톡없음", phone: "010-3700-5555", m: false, talk: false, path: "직접 등록" },
+    { id: "c1", uid: "9001", name: "김가람", phone: "010-3000-1313", m: false, talk: true, path: "네이버 예약 (kgr****)" },
+    { id: "c2", uid: "9002", name: "유민석", phone: "010-3100-1313", m: true, talk: true, path: "네이버 예약 (ymsk****)" },
+    { id: "c3", uid: "9003", name: "이하늘", phone: "010-3192-1313", m: false, talk: true, path: "네이버 예약 (hnl****)" },
+    { id: "c4", uid: "9004", name: "정수림", phone: "010-3400-1313", m: true, talk: true, path: "네이버 예약 (jsr****)" },
+    { id: "c5", uid: "9005", name: "정아림", phone: "010-3500-1313", m: true, talk: true, path: "네이버 예약 (jar****)" },
+    { id: "c6", uid: "9006", name: "나단비", phone: "010-3300-2424", m: false, talk: true, path: "네이버 예약 (ndb****)" },
+    { id: "c7", uid: "9007", name: "나보비", phone: "010-3600-2424", m: true, talk: true, path: "네이버 예약 (nbb****)" },
+    { id: "c8", uid: "9008", name: "톡없음", phone: "010-3700-5555", m: false, talk: false, path: "직접 등록" },
+    { id: "c9", uid: "9009", name: "김가람", phone: "010-3999-1313", m: false, talk: true, path: "네이버 예약 (kgr2****)" }, // 동명이인 (번호 다름)
   ];
   let DATA = DEF;
   try { const d = JSON.parse(localStorage.getItem("mockSpData") || "null"); if (Array.isArray(d)) DATA = d; } catch (e) { DATA = DEF; }
   const maskName = (n) => (n.length <= 2 ? n[0] + "*" : n[0] + "*".repeat(n.length - 2) + n[n.length - 1]);
   const showName = (c) => (c.m ? maskName(c.name) : c.name);
   const showPhone = (c) => (c.m ? "***-****-" + c.phone.slice(-4) : c.phone);
-  const listPhone = (c) => { const p = showPhone(c); return type === "전화번호" && q ? `${p.slice(0, -4)}<em class="hl">${p.slice(-4)}</em>` : p; }; // 찾은 뒷번호는 초록으로 따로 (실제처럼)
-  const type = P.get("type") || "이름", q = P.get("q") || "", sel = P.get("sel") || "";
-  const hits = !q ? [] : DATA.filter((c) => (type === "전화번호" ? c.phone.replace(/\D/g, "").endsWith(q.replace(/\D/g, "")) : showName(c).includes(q) || c.name === q));
+  const type = P.get("type") || "이름", q = P.get("q") || "", sel = P.get("sel") || "", wide = !!P.get("wide");
+  const listPhone = (c) => { const p = showPhone(c); return type === "전화번호" && q ? `${p.slice(0, -4)}<em class="hl">${p.slice(-4)}</em>` : p; };
+  const hits = !q ? [] : DATA.filter((c) => (type === "전화번호" ? c.phone.replace(/\D/g, "").endsWith(q.replace(/\D/g, "")) : showName(c).includes(q) || c.name === q)).sort((a, b) => showName(a).localeCompare(showName(b), "ko"));
   const nav = ["업체정보", "예약", "스마트콜", "마케팅", "리뷰", "고객", "통계", "비즈니스 스쿨"].map((t) => `<a href="#" class="${t === "고객" && !P.get("home") ? "on" : ""}" data-nav="${t}">${t}</a>`).join("");
   let main = "<h2>아스타나키즈</h2><p>업체 홈</p>";
+  const c = hits.find((x) => x.id === sel) || hits[0]; // 처음엔 첫 손님 고객 정보가 저절로 (실제처럼)
   if (!P.get("home")) {
-    const c = hits.find((x) => x.id === sel) || (P.get("nofirst") ? null : hits[0]); // 실제처럼 처음엔 첫 손님 카드가 저절로
-    main = `<div><span class="Tab__tab Tab__on">예약·주문</span><span class="Tab__tab">스마트콜</span></div>
-      <div class="Search__box"><button type="button" class="Search__type" id="stype"><span>${type}</span><svg width="8" height="8" aria-hidden="true"></svg></button>
-        <input type="text" class="Search__input" id="sq" value="${q}" placeholder="이름 또는 전화번호를 입력하세요"><button type="button" class="Search__clear" aria-label="지우기">×</button><button type="button" class="Search__btn" aria-label="검색"><svg width="12" height="12"></svg></button></div>
-      <p><span class="Count"><strong>${hits.length}</strong>명</span> <a href="#">고객 개인정보보호에 대해 알아보세요!</a></p>
-      <div class="Customer__body"><div class="CustomerList__root"><div class="Index"><span>전체</span> <span>ㄱ</span> <span>ㄴ</span> <span>ㄷ</span></div><div class="CustomerList__head"><button type="button" class="sort">이름↑</button> <button type="button" class="sort">전화번호</button></div>
-        ${P.get("split") ? `<div style="display:flex"><div class="ColName">${hits.map((x) => `<div class="CustomerList__row" data-id="${x.id}" style="height:36px"><span>${showName(x)}</span></div>`).join("")}</div><div class="ColPhone">${hits.map((x) => `<div style="height:36px;padding:8px"><span>${listPhone(x)}</span></div>`).join("")}</div></div>`
-          : hits.map((x) => `<div class="CustomerList__row" data-id="${x.id}"><span class="CustomerList__name">${showName(x)}</span><span class="CustomerList__phone">${listPhone(x)}</span></div>`).join("")}</div>
-        <div class="InfoPanel__root">${c ? `<h3 class="InfoPanel__title">${showName(c)}</h3><button type="button">정보변경</button>
-          <div class="InfoPanel__item"><span>등록경로</span><span>${c.path}</span></div>
-          <div class="InfoPanel__item"><span>전화번호</span><span>${showPhone(c)}</span></div>
-          <div class="InfoPanel__item"><span>이메일</span><span>${c.m ? "" : "fake@example.com"}</span></div>
-          <div class="InfoPanel__item"><span>특이사항</span><span></span></div>
-          ${c.talk ? `<button type="button" class="InfoPanel__talk" id="talk"><svg width="12" height="12" aria-hidden="true"></svg>톡톡 대화하기</button>` : ""}
-          <h4>예약내역</h4><p>총 예약 1</p>` : ""}</div></div>`;
+    main = `<div class="content-header-tab-group"><ul class="content-header-tab"><li class="item active"><a class="tab" href="#">예약·주문</a></li><li class="item"><a class="tab" href="#">스마트콜</a></li></ul></div>
+      <form class="BookingTextSearch__root" onsubmit="return false"><div class="BookingTextSearch__select-box"><a role="button" class="BookingTextSearch__select" id="stype">${type}</a></div>
+        <input type="search" class="BookingTextSearch__input-search" id="sq" placeholder="입력후 검색하세요" value="${q}">
+        <button type="button" class="BookingTextSearch__btn-clear"><svg width="12" height="12" aria-hidden="true"></svg><span class="sr-only">검색어 삭제</span></button>
+        <button type="button" class="BookingTextSearch__btn-search" id="sbtn"><i class="fn fn-search" aria-hidden="true"></i><span class="sr-only">검색</span></button></form>
+      <div class="CommonPagetHeader__user-count"><span class="CommonPagetHeader__number"><em class="text-success">${hits.length}</em>명</span> <a href="#">고객 개인정보보호에 대해 알아보세요!</a></div>
+      <div class="Contents__root"><div class="Contents__wrap">
+        <div class="Contents__list"><div class="Contents__index"><a href="#">전체</a><a href="#">ㄱ</a><a href="#">ㄴ</a><a href="#">ㄷ</a></div><div>
+          <div class="Contents__list-header"><div class="Contents__list-row"><div class="Contents__list-cell Contents__name"><button type="button" class="Contents__btn-sort"><span>이름</span><i></i></button></div>${wide ? `<div class="Contents__list-cell Contents__phone"><span>전화번호</span></div>` : ""}</div></div>
+          <div class="Contents__list-content">${hits.map((x) => `<div class="Contents__list-row" data-id="${x.id}"><div class="Contents__list-cell Contents__name"><span class="Contents__text-value">${showName(x)}</span><label class="Contents__list-radio"><input type="radio" name="userListSelect" class="sr-only" title="${showName(x)}" value="${x.uid}" ${c && c.id === x.id ? "checked" : ""}><span class="Contents__label"></span></label></div>${wide ? `<div class="Contents__list-cell Contents__phone">${listPhone(x)}</div>` : ""}</div>`).join("")}</div>
+        </div></div>
+        <div class="Contents__dtail-group-wrap">${c ? `<div class="UserInfo__root"><div class="UserInfo__header"><span class="UserInfo__name">${showName(c)}</span><a href="users/${c.uid}" class="btn" data-tst_click_link="${c.uid}">정보변경</a></div>
+          <div class="UserInfo__customer-list"><div class="UserInfo__item"><div class="UserInfo__item-title">등록경로</div><div class="UserInfo__item-dsc">${c.path}</div></div>
+          <div class="UserInfo__item"><div class="UserInfo__item-title">전화번호</div><a href="tel:${showPhone(c)}" class="text-gray-dark">${showPhone(c)}</a></div>
+          <div class="UserInfo__item"><div class="UserInfo__item-title">이메일</div><div class="UserInfo__item-dsc">${c.m ? "" : "fake@example.com"}</div></div>
+          <div class="UserInfo__item"><div class="UserInfo__item-title">특이사항</div><div class="UserInfo__item-dsc"></div></div></div>
+          ${c.talk ? `<div class="row-flx UserInfo__customers-talktalk"><button type="button" class="btn btn-lg btn-default" id="talk"><i class="fn fn-talktalk-fill" aria-hidden="true"></i>톡톡 대화하기</button></div>` : ""}</div>` : ""}</div>
+      </div></div>`;
   }
   document.body.innerHTML = `<div class="wrap"><nav><b>아스타나키즈</b>${nav}</nav><main>${main}</main></div>`;
+  // 넣자마자 돋보기를 누르면 예전 값으로 찾음 (React 처럼 · ?late=0 이면 바로)
+  let lateQ = q;
+  const late = P.get("late") !== "0";
+  document.addEventListener("input", (e) => { if (e.target.id === "sq") { const v = e.target.value; if (late) setTimeout(() => { lateQ = v; }, 250); else lateQ = v; } });
   document.addEventListener("click", (e) => {
     const n = e.target.closest("[data-nav]"); if (n) { e.preventDefault(); if (n.dataset.nav === "고객") setTimeout(() => go({ home: "", q: "", sel: "" }), 150); return; }
-    if (e.target.closest("#stype")) { // 펼친 목록은 화면 맨 끝에 따로 그림 (실제처럼)
+    if (e.target.closest("#stype")) { // 펼친 목록은 화면 맨 끝에 따로 그림
       const old = document.getElementById("sopts"); if (old) { old.remove(); return; }
       const r = document.getElementById("stype").getBoundingClientRect(), d = document.createElement("div");
-      d.id = "sopts"; d.className = "Layer__list"; d.style.cssText = `position:absolute;left:${r.left + scrollX}px;top:${r.bottom + scrollY + 4}px;background:#fff;border:1px solid #ccc;display:grid`;
-      d.innerHTML = `<button type="button" data-type="이름">이름</button><button type="button" data-type="전화번호">전화번호</button>`;
+      d.id = "sopts"; d.className = "Layer__list"; d.style.cssText = `left:${r.left + scrollX}px;top:${r.bottom + scrollY + 4}px`;
+      d.innerHTML = `<a role="button" href="#" data-type="이름">이름</a><a role="button" href="#" data-type="전화번호">전화번호</a>`;
       setTimeout(() => document.body.appendChild(d), 120); return;
     }
-    const o = e.target.closest("[data-type]"); if (o) { setTimeout(() => go({ type: o.dataset.type, q: document.getElementById("sq").value, sel: "" }), 100); return; }
-    if (e.target.closest(".Search__btn")) { const v = P.get("late") ? lateQ : document.getElementById("sq").value; setTimeout(() => go({ q: v, sel: "" }), 150); return; }
-    const r = e.target.closest(".CustomerList__row"); if (r) { setTimeout(() => go({ sel: r.dataset.id }), 150); return; }
-    if (e.target.closest("#talk")) { const c = DATA.find((x) => x.id === (sel || (hits[0] || {}).id)); window.open(`talkchat.html?u=${encodeURIComponent(c.id)}&frm=prsv&mode=popup`, "talk_" + c.id, "popup,width=900,height=700"); }
+    const o = e.target.closest("[data-type]"); if (o) { e.preventDefault(); setTimeout(() => go({ type: o.dataset.type, q: document.getElementById("sq").value, sel: "" }), 100); return; }
+    if (e.target.closest("#sbtn")) { const v = lateQ; setTimeout(() => go({ q: v, sel: "" }), 150); return; }
+    const row = e.target.closest(".Contents__list-content .Contents__list-row"); if (row) { setTimeout(() => go({ sel: row.dataset.id }), 150); return; }
+    if (e.target.closest("#talk") && c) window.open(`talkchat.html?u=${encodeURIComponent(c.id)}&frm=prsv&mode=popup`, "talk_" + c.id, "popup,width=900,height=700");
   });
-  // ?late=1: 화면이 입력을 조금 늦게 받음 (넣자마자 돋보기를 누르면 예전 값으로 찾음 — React 처럼)
-  let lateQ = q;
-  document.addEventListener("input", (e) => { if (e.target.id === "sq") { const v = e.target.value; setTimeout(() => { lateQ = v; }, 250); } });
-  document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.id === "sq") setTimeout(() => go({ q: e.target.value, sel: "" }), 150); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.id === "sq") { const v = lateQ; setTimeout(() => go({ q: v, sel: "" }), 150); } });
 </script>
 </body></html>

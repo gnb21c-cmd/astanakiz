@@ -4940,7 +4940,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   };
   function rtRowNote(id) {
     const r = revTalk[id]; if (!r) return "";
-    const t = r.dry ? (r.ok ? `톡톡 확인 ✓ ${r.how === "번호" ? "번호로 맞춤" : "가린 번호 · 이름으로 맞춤"} (안 보냄)` : `톡톡 확인: ${r.why || "못 함"}`)
+    const t = r.dry ? (r.ok ? `톡톡 확인 ✓ ${ro(r.how || "번호")} 맞춤 (안 보냄)` : `톡톡 확인: ${r.why || "못 함"}`)
       : r.ok ? "" : r.sent && r.sent.text ? `톡톡 글만 보냄 — 사진은 직접 (${r.why || ""})` : `톡톡 ${r.skip ? "건너뜀" : "못 보냄"}: ${r.why || ""} — 번호 복사로 직접`;
     return t ? `<span class="rvtalk ${r.ok ? "" : "evwarn"}">${esc(t)}</span>` : "";
   }

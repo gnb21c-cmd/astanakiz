@@ -80,7 +80,7 @@ test("확인만: 메뉴 [고객] → 전화번호로 → 뒷번호 → 맞춤 �
   try {
     const { page, ts, steps, pops, sent } = await open(browser);
     const r = await ts.one({ name: "김가람", phone: "010-3000-1313", text: TEXT, image: IMG }, true);
-    assert.deepStrictEqual(r, { ok: true, dry: true, step: "확인만", how: "번호", chat: { input: true, send: true, file: true } }, JSON.stringify({ r, steps }));
+    assert.deepStrictEqual(r, { ok: true, dry: true, step: "확인만", how: "이름 · 고객 정보 번호", chat: { input: true, send: true, file: true } }, JSON.stringify({ r, steps }));
     assert.strictEqual(pops.length, 1);
     assert.match(pops[0], /talkchat\.html\?u=c1&frm=prsv&mode=popup/, "김가람 대화창");
     assert.deepStrictEqual(await sent(), [], "확인만은 안 보냄");
@@ -99,9 +99,9 @@ test("보내기: 글([전송]) → 사진(파일 고르기 창 없이 사진 칸
   try {
     const { ts, steps, sent } = await open(browser);
     const r = await ts.one({ name: "김가람", phone: "010-3000-1313", text: TEXT, image: IMG }, false);
-    assert.deepStrictEqual(r, { ok: true, step: "보냄", how: "번호", sent: { text: true, image: true } }, JSON.stringify({ r, steps }));
+    assert.deepStrictEqual(r, { ok: true, step: "보냄", how: "이름 · 고객 정보 번호", sent: { text: true, image: true } }, JSON.stringify({ r, steps }));
     const r2 = await ts.one({ name: "유민석", phone: "010-3100-1313", text: TEXT, image: IMG }, false);
-    assert.deepStrictEqual(r2, { ok: true, step: "보냄", how: "가린 번호 · 이름", sent: { text: true, image: true } }, JSON.stringify({ r2, steps }));
+    assert.deepStrictEqual(r2, { ok: true, step: "보냄", how: "가린 이름 · 뒷번호", sent: { text: true, image: true } }, JSON.stringify({ r2, steps }));
     const s = (await sent()).map(({ u, kind, text, file }) => [u, kind, kind === "text" ? text : file]);
     assert.deepStrictEqual(s, [
       ["c1", "text", TEXT.replace(/\s+$/, "")],
@@ -133,7 +133,7 @@ test("여러 사람: 같은 이름 모양이 둘 · 톡톡 단추 없음 · 네�
     assert.match(brief[0][3], /이름 · 뒷번호가 같은 사람이 2명/);
     assert.match(brief[1][3], /톡톡 대화하기\]가 없는/);
     assert.match(brief[2][3], /찾은 사람이 없음/);
-    assert.deepStrictEqual([brief[3][3], brief[4][3]], ["번호", "가린 번호 · 이름"]);
+    assert.deepStrictEqual([brief[3][3], brief[4][3]], ["이름 · 고객 정보 번호", "가린 이름 · 뒷번호"]);
     assert.deepStrictEqual((await sent()).map((x) => [x.u, x.kind]), [["c6", "image"], ["c7", "image"]], "나단비 · 나보비에게 사진만 (글 없으면 사진만)");
   } finally {
     await browser.close();
@@ -450,15 +450,19 @@ test("안내 그림을 데스크에서 고르기 (사장님 11/16): [그림 고�
   }
 });
 
-test("2.25 현장 (11/16): 이름 칸 · 번호 칸이 따로 그려져도 화면 위치로 짝지음 · 넣자마자 돋보기를 누르면 빈 칸으로 찾는 화면 → 넣고 기다렸다가 누름", async () => {
+test("실제 화면 구조 (11/16 저장본): 목록에 이름만 → 이름이 같은 줄을 눌러 고객 정보 번호로 확인 · 동명이인은 번호가 같은 사람 · 넓은 화면(목록에 번호)도", async () => {
   const browser = await launch();
   try {
-    const { ts, steps, sent } = await open(browser, "&split=1&late=1");
-    const r = await ts.one({ name: "유민석", phone: "010-3100-1313", text: TEXT, image: IMG }, false);
-    assert.deepStrictEqual(r, { ok: true, step: "보냄", how: "가린 번호 · 이름", sent: { text: true, image: true } }, JSON.stringify({ r, steps }));
-    const r2 = await ts.one({ name: "나단비", phone: "010-3300-2424", image: IMG }, true);
-    assert.strictEqual(r2.ok, true, JSON.stringify(r2));
-    assert.deepStrictEqual((await sent()).map((x) => [x.u, x.kind]), [["c2", "text"], ["c2", "image"]]);
+    const { ts, steps, sent, page } = await open(browser);
+    const r = await ts.one({ name: "김가람", phone: "010-3999-1313", image: IMG }, false); // 동명이인: 첫 김가람(010-3000-…)은 번호가 달라 넘어감
+    assert.deepStrictEqual([r.ok, r.how], [true, "이름 · 고객 정보 번호"], JSON.stringify({ r, steps }));
+    assert.deepStrictEqual((await sent()).map((x) => [x.u, x.kind]), [["c9", "image"]]);
+    await page.goto(SP + "?home=1&wide=1");
+    ts.opts.home = SP + "?home=1&wide=1";
+    const r2 = await ts.one({ name: "유민석", phone: "010-3100-1313", image: IMG }, true);
+    assert.deepStrictEqual([r2.ok, r2.how], [true, "가린 번호 · 이름"], JSON.stringify(r2));
+    const r3 = await ts.one({ name: "나단비", phone: "010-3300-2424", image: IMG }, true);
+    assert.deepStrictEqual([r3.ok, r3.how], [true, "번호"], JSON.stringify(r3));
   } finally {
     await browser.close();
   }
