@@ -1,7 +1,7 @@
 /* 재방문 안내 (사장님 11/15 · 11/16 바꿈): 재방문 이벤트 손님 중 돈까스 기한이 8일 남은 사람 (손님께는 하루 줄여 '7일') — 어제 마감 기준
    - 아직 안 받은 사람 · 받고 다시 기한이 도는 사람 모두 · 기한 = 마지막 방문 + 20일(그날 영수증 기한이 더 늦으면 그것) · 이벤트 종료일까지
    - 오늘 이미 온 사람은 '오늘 방문 — 안 보내도 돼요' · 열쇠판 위 [재방문 안내 n] (n = 아직 '보냄'을 안 누른 사람)
-   - 안내 이미지(그날 기한 · 640×960 JPG) · 문구((광고) · 수신거부) · 번호 복사 · 보냄 (그날 이 PC 에) */
+   - 안내 이미지(그날 기한 · 640×960 JPG) · 문구((광고) · 수신거부 없음 — 사장님 11/17 · 맨 아래 한 줄은 적었을 때만) · 번호 복사 · 보냄 (그날 이 PC 에) */
 const test = require("node:test");
 const assert = require("node:assert");
 const path = require("path");
@@ -61,8 +61,8 @@ test("재방문 안내 (사장님 11/16): 기한 8일 남은 손님에게 한 �
       "바손님 | 010-1111-0006 | 방문 1번 · 아직 안 받음 · 마지막 10/27 | 번호 복사 | 직접 보냄 표시",
       "다손님 | 010-1111-0003 | 방문 1번 · 아직 안 받음 · 마지막 11/3 | 오늘 방문 — 안 보내도 돼요",
     ]);
-    assert.match(sheet, /무료 수신거부 방법/, "수신거부 안내가 없으면 알림");
-    assert.strictEqual(await page.textContent("#rev-msg-8"), "(광고) 아스타나키즈\n고객님 아직 7일 남았습니다. 7일 안에 방문하셔서 수제돈까스 받아가세요.\n네이버에서 '아스타나키즈' 예약하고 오세요.");
+    assert.ok(!/수신거부|광고/.test(sheet), "(광고) · 수신거부 알림 없음 (사장님 11/17)");
+    assert.strictEqual(await page.textContent("#rev-msg-8"), "아스타나키즈\n고객님 아직 7일 남았습니다. 7일 안에 방문하셔서 수제돈까스 받아가세요.\n네이버에서 '아스타나키즈' 예약하고 오세요.");
     // 안내 이미지: 홍보 사진이 들어간 JPG · MMS 크기 안
     await page.waitForFunction(() => /^data:image\/jpeg/.test(document.getElementById("rev-img-8").src));
     const size = await page.evaluate(async () => { const u = await window.__deskTest.rev.image(8); const i = new Image(); i.src = u; await i.decode(); return { w: i.width, h: i.height, kb: Math.round((u.length * 3) / 4 / 1024) }; });
@@ -75,7 +75,7 @@ test("재방문 안내 (사장님 11/16): 기한 8일 남은 손님에게 한 �
     await page.click('#sheet [data-act=revCopy] >> nth=0');
     await page.waitForFunction(() => /번호를 복사/.test(document.getElementById("toast").textContent)); // 복사는 비동기 (체험판은 브라우저 · 앱은 본체 클립보드)
     await page.click("#sheet [data-act=close]");
-    // 수신거부 안내 (운영 설정 → 재방문 이벤트) → 문구 맨 아래
+    // 맨 아래 한 줄 (선택 · 운영 설정 → 재방문 이벤트 '재방문 안내 문자') → 적으면 문구 맨 아래
     await page.dblclick("#now");
     await page.click("[data-t=event]");
     await page.fill("#ev-optout", "무료수신거부 080-000-0000");

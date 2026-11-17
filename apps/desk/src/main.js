@@ -529,7 +529,7 @@ ipcMain.handle("revimg:clear", (_e, left) => {
 ipcMain.handle("clip:write", (_e, text) => { const t = String(text || ""); if (!t || t.length > 20000) return false; clipboard.writeText(t); return true; });
 /* 재방문 안내 → 네이버 톡톡 보내기 (사장님 11/16 화면 사진 순서 · naver-talksend.js)
    예약 읽는 네이버 창(같은 로그인)에서 스마트플레이스 '고객' → 전화번호 뒷번호 4자리 → 손님 맞추기 → 고객 카드 확인 → [톡톡 대화하기] 새 창(숨김)
-   → 글(맨 앞 (광고) · 맨 아래 수신거부) [전송] → 사진: 파일 고르기 창 없이 대화창의 사진 칸에 바로 넣음 (Chrome 개발 도구 명령 DOM.setFileInputFiles)
+   → 글 [전송] → 사진: 파일 고르기 창 없이 대화창의 사진 칸에 바로 넣음 (Chrome 개발 도구 명령 DOM.setFileInputFiles)
    - 사진 = 바탕화면 '아스타나키즈-재방문안내' 폴더: '보낼사진_D-5.jpg'(사장님이 둔 사진)가 있으면 그것 · 없으면 그날 만든 '재방문안내_D-5_날짜.jpg'
      (화면이 보낸 경로는 안 받음 — 그 폴더 안 정해진 이름만)
    - 현장 POS 만 · 08~21시 · 재고 오픈 중이면 안 함 · 맞는 손님이 하나로 안 정해지면 건너뜀 · 화면이 이상하면 거기서 멈춤
@@ -580,12 +580,12 @@ function talkSendRun(req) {
     .filter((x) => x.key && x.name && /^01\d{8,9}$/.test(x.phone) && Number.isInteger(x.left) && x.left >= 1 && x.left <= 30);
   if (!list.length) return { ok: false, why: "보낼 사람이 없어요" };
   const text = {};
-  for (const l of new Set(list.map((x) => x.left))) { const t = String((req.text && req.text[l]) || "").slice(0, 1000); text[l] = /^\(광고\)/.test(t.trim()) ? t.trim() : ""; }
+  for (const l of new Set(list.map((x) => x.left))) { const t = String((req.text && req.text[l]) || "").slice(0, 1000); text[l] = t.trim(); } // (광고) · 수신거부는 안 붙임 (사장님 11/17 — 예약 때 수신 동의)
   const imgs = {};
   for (const l of new Set(list.map((x) => x.left))) {
     imgs[l] = revImageFile(l);
     if (!imgs[l]) return { ok: false, why: `D-${l} 안내 이미지가 없어요 — [이미지 저장]을 먼저` };
-    if (!dry && !text[l]) return { ok: false, why: `D-${l} 문구가 없어요 (맨 앞 '(광고)')` };
+    if (!dry && !text[l]) return { ok: false, why: `D-${l} 문구가 없어요` };
   }
   const me = (talkJob = { running: true, dry, auto: !!(req && req.auto), at: localNow(), total: list.length, step: "", why: "", results: [], imgs: Object.fromEntries(Object.entries(imgs).map(([k, v]) => [k, path.basename(v)])) });
   const stamp = stampNow();

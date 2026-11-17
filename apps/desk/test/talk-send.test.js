@@ -223,7 +223,7 @@ test("데스크: 확인만 해 보기 → 진행 → 줄마다 맞춘 방법 · 
       { key: "8|01011110002", name: "나손님", phone: "01011110002", left: 8 },
       { key: "8|01011110006", name: "바손님", phone: "01011110006", left: 8 },
     ], "오늘 온 다손님은 빼고 · 기한 8일 남은 사람");
-    assert.match(r1.text[8], /^\(광고\) 아스타나키즈\n고객님 아직 7일 남았습니다\. 7일 안에 방문하셔서 수제돈까스 받아가세요\.[\s\S]*무료수신거부 080-000-0000$/);
+    assert.match(r1.text[8], /^아스타나키즈\n고객님 아직 7일 남았습니다\. 7일 안에 방문하셔서 수제돈까스 받아가세요\.[\s\S]*무료수신거부 080-000-0000$/, "맨 앞 (광고) 없음 · 맨 아래 한 줄은 적었을 때만 (11/17)");
     assert.deepStrictEqual(Object.keys(r1.text), ["8"]);
     assert.deepStrictEqual(await page.evaluate(() => window.__saves), ["재방문안내_D-8_2026-11-15.jpg"], "그날 안내 이미지를 먼저 바탕화면 폴더에");
     assert.match(await bar(), /네이버 톡톡 확인 중 0\/3 멈추기/);
@@ -291,24 +291,20 @@ test("데스크: 확인만 해 보기 → 진행 → 줄마다 맞춘 방법 · 
   }
 });
 
-test("데스크: 수신거부 안내가 없으면 [톡톡으로 보내기]는 막힘 (확인만은 됨) · 체험판(앱 아님)은 안내만", async () => {
+test("데스크: 수신거부 안내가 없어도 [톡톡으로 보내기]가 눌림 · 글 맨 앞 (광고) · 맨 아래 수신거부 없음 (사장님 11/17 — 예약 때 수신 동의) · 체험판(앱 아님)은 안내만", async () => {
   const browser = await launch();
   try {
     const { page } = await openDesk(browser, "");
     await page.click("#rev-btn");
-    assert.strictEqual(await page.$eval("#rt-bar [data-act=rtRun]:not([data-dry])", (b) => b.disabled), true);
+    assert.strictEqual(await page.$eval("#rt-bar [data-act=rtRun]:not([data-dry])", (b) => b.disabled), false, "수신거부 안내 없이도 눌림");
     assert.strictEqual(await page.$eval("#rt-bar [data-act=rtRun][data-dry]", (b) => b.disabled), false);
-    // 막힌 까닭이 막대에 보이고 (11/17 — 왜 안 눌리는지 몰랐음) · [수신거부 안내 넣기] → 운영 설정 '재방문 안내 문자' 칸
-    assert.match(await page.$eval("#rt-bar", (e) => e.textContent), /수신거부 안내가 없어 보낼 수 없어요/);
-    assert.match(await page.$eval("#rt-bar [data-act=rtRun]:not([data-dry])", (b) => b.title), /운영 설정 → 재방문 이벤트/);
-    await page.click("#rt-bar [data-act=rtOptout]");
-    await page.waitForTimeout(200);
-    assert.strictEqual(await page.evaluate(() => document.activeElement && document.activeElement.id), "ev-optout");
-    await page.fill("#ev-optout", "무료수신거부 080-000-0000");
-    await page.keyboard.press("Escape");
-    await page.click("#rev-btn");
-    assert.strictEqual(await page.$eval("#rt-bar [data-act=rtRun]:not([data-dry])", (b) => b.disabled), false, "넣으면 눌림");
-    assert.ok(!/수신거부 안내가 없어/.test(await page.$eval("#rt-bar", (e) => e.textContent)));
+    assert.ok(!/수신거부|광고/.test(await page.textContent("#sheet")), "빨간 띠 · 막대 안내에 (광고) · 수신거부 없음");
+    await page.click("#rt-bar [data-act=rtRun]:not([data-dry])");
+    await page.click("#rt-bar [data-act=rtRun]:not([data-dry])"); // 한 번 더 눌러야 보냄
+    await page.waitForFunction(() => window.__runs.length === 1);
+    const run = await page.evaluate(() => window.__runs[0]);
+    assert.strictEqual(run.dry, false);
+    assert.strictEqual(run.text[8], "아스타나키즈\n고객님 아직 7일 남았습니다. 7일 안에 방문하셔서 수제돈까스 받아가세요.\n네이버에서 '아스타나키즈' 예약하고 오세요.", "맨 앞 (광고) · 맨 아래 수신거부 없음");
     const p2 = await browser.newPage({ viewport: { width: 1024, height: 768 } });
     await p2.addInitScript((led) => {
       window.__today = "2026-11-15";
@@ -405,25 +401,21 @@ test("기준이 바뀐 날(5일 · 3일 → 8일): 아침에 적힌 5일 · 3일
     const errs = [];
     page.on("pageerror", (e) => errs.push(e.message));
     await page.goto(DESK);
-    await page.clock.runFor(3 * 60000); // 11:01 — 수신거부 안내가 없어 기다림
-    assert.strictEqual(await page.evaluate(() => window.__runs.length), 0, "수신거부 안내가 없으면 안 보냄");
+    await page.clock.runFor(3 * 60000); // 11:01 — 수신거부 안내가 없어도 보냄 (사장님 11/17)
+    await page.waitForFunction(() => window.__runs.length === 1);
+    const run = await page.evaluate(() => window.__runs[0]);
+    assert.deepStrictEqual([run.auto, run.list.map((x) => [x.name, x.left])], [true, [["가손님", 8], ["나손님", 8], ["바손님", 8]]], "8일 남은 사람만");
+    assert.strictEqual(run.text[8], "아스타나키즈\n고객님 아직 7일 남았습니다. 7일 안에 방문하셔서 수제돈까스 받아가세요.\n네이버에서 '아스타나키즈' 예약하고 오세요.", "(광고) · 수신거부 없음");
     await page.dblclick("#now");
     await page.click("[data-t=event]");
     assert.match(await page.textContent("#rt-auto"), /기한 8일 남은 손님\(손님께는 '7일'\) 중 아직 안 보낸 사람에게/);
     assert.ok(!/D-5 · D-3/.test(await page.textContent("#rt-auto")));
-    assert.match(await page.textContent("#rt-auto"), /수신거부 안내가 있어야 보내요/);
+    assert.ok(!/수신거부/.test(await page.textContent("#rt-auto")), "자동 보내기에 수신거부 조건 없음");
     const sum = await page.$eval(".rtlogs details summary", (e) => e.textContent.replace(/\s+/g, " "));
     assert.match(sum, /대상 5명 \(D-8 4\) 성공 1 /, "5일 · 3일 '안 보냄' · '오늘 방문' 줄은 빠지고 보낸 줄(옛손님나)은 남음");
     const names = await page.$$eval(".rtlogs .rtlrow b", (e) => e.map((x) => x.textContent));
     assert.ok(names.includes("옛손님나") && !names.includes("옛손님가") && !names.includes("옛손님다"), names.join());
-    // 수신거부 안내를 넣으면 그날 안에 한 번
-    await page.fill("#ev-optout", "무료수신거부 080-000-0000");
     await page.click("#sheet [data-act=close]");
-    await page.clock.runFor(3000);
-    await page.waitForFunction(() => window.__runs.length === 1);
-    const run = await page.evaluate(() => window.__runs[0]);
-    assert.deepStrictEqual([run.auto, run.list.map((x) => [x.name, x.left])], [true, [["가손님", 8], ["나손님", 8], ["바손님", 8]]], "8일 남은 사람만");
-    assert.match(run.text[8], /고객님 아직 7일 남았습니다\. 7일 안에 방문하셔서 수제돈까스 받아가세요\.[\s\S]*무료수신거부 080-000-0000$/);
     await page.clock.runFor(60000);
     assert.strictEqual(await page.evaluate(() => window.__runs.length), 1, "그날 한 번만");
     assert.deepStrictEqual(errs, []);
