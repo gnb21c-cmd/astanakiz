@@ -60,6 +60,7 @@ test("재방문 이벤트: 시작일 ~ 종료일 · 켜는 순간부터 마일�
     assert.match(await page.textContent("#sheet .evstate"), /꺼짐/);
     assert.deepStrictEqual([await page.inputValue("#ev-days"), await page.inputValue("#ev-gift")], ["20", "수제돈까스"], "기본 20일 · 수제돈까스");
     assert.match(await page.textContent("#ev-dates"), /10월 5일에 오면 → 10월 25일\(포함\)까지 다시 오면 수제돈까스 · 그날부터 다시 20일/);
+    assert.match(await page.textContent("#ev-dates"), /재방문 안내 톡톡은 10월 18일 \('7일 남았습니다'\)/, "마지막 날 25일을 오늘 포함 8일 앞둔 18일 (사장님 11/17)");
     await setPeriod(page, "2026-10-04", "2026-10-31");
     assert.match(await page.textContent("#toast"), /오늘이나 앞날/, "지난 날은 시작일로 못 정함");
     await setPeriod(page, "2026-10-05", "");

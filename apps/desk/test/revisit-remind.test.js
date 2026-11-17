@@ -17,14 +17,14 @@ const launch = () => chromium.launch(process.env.CHROME ? { executablePath: proc
 // 장부 줄 (가짜 손님 · 시작일 10/26)
 const line = (k, name, day, n, st, due, no) => JSON.stringify({ k, name, phone: k, n, base: 3, no, at: `${day} 11:00`, day, st, due });
 const LEDGER = [
-  line("01011110001", "가손님", "2026-11-03", 4, "안내", "2026-11-23", "a1"), // D-8 · 아직
-  line("01011110002", "나손님", "2026-10-27", 4, "안내", "2026-11-16", "b1"),
-  line("01011110002", "나손님", "2026-11-03", 5, "성공", "2026-11-23", "b2"), // D-8 · 1번 받음
-  line("01011110003", "다손님", "2026-11-03", 4, "안내", "2026-11-23", "c1"),
+  line("01011110001", "가손님", "2026-11-02", 4, "안내", "2026-11-22", "a1"), // D-8 · 아직
+  line("01011110002", "나손님", "2026-10-26", 4, "안내", "2026-11-15", "b1"),
+  line("01011110002", "나손님", "2026-11-02", 5, "성공", "2026-11-22", "b2"), // D-8 · 1번 받음
+  line("01011110003", "다손님", "2026-11-02", 4, "안내", "2026-11-22", "c1"),
   line("01011110003", "다손님", "2026-11-15", 5, "성공", "2026-11-30", "c2"), // D-8 이었지만 오늘 옴
   line("01011110004", "라손님", "2026-11-12", 4, "안내", "2026-11-30", "d1"), // 11/30 까지 15일 → 아님
   line("01011110005", "마손님", "2026-10-26", 4, "안내", "2026-11-15", "e1"), // 오늘이 기한 → 아님
-  line("01011110006", "바손님", "2026-10-27", 4, "안내", "2026-11-23", "f1"), // 영수증 기한(11/22)이 20일보다 늦음 → D-8
+  line("01011110006", "바손님", "2026-10-27", 4, "안내", "2026-11-22", "f1"), // 영수증 기한(11/22)이 20일(11/16)보다 늦음 → D-8
   line("01011110007", "사손님", "2026-10-31", 4, "안내", "2026-11-20", "g1"), // 5일 남음 → 이제 아님 (예전 D-5)
   line("01011110008", "아손님", "2026-10-29", 4, "성공", "2026-11-18", "h1"), // 3일 남음 → 이제 아님 (예전 D-3)
 ].join("\n") + "\n";
@@ -46,20 +46,20 @@ test("재방문 안내 (사장님 11/16): 기한 8일 남은 손님에게 한 �
     await page.waitForFunction(() => window.__deskTest && document.getElementById("rev-btn") && !document.getElementById("rev-btn").hidden, null, { timeout: 15000 }); // 바쁜 컴퓨터에서도 다 그려진 뒤
     const t = await page.evaluate(() => { const r = window.__deskTest.rev.targets(); return Object.fromEntries(Object.entries(r).map(([l, v]) => [l, v.map((x) => [x.name, x.due, x.ok, x.today])])); });
     assert.deepStrictEqual(t, {
-      8: [["가손님", "2026-11-23", 0, false], ["나손님", "2026-11-23", 1, false], ["바손님", "2026-11-23", 0, false], ["다손님", "2026-11-23", 0, true]],
+      8: [["가손님", "2026-11-22", 0, false], ["나손님", "2026-11-22", 1, false], ["바손님", "2026-11-22", 0, false], ["다손님", "2026-11-22", 0, true]],
     }, "8일 남은 사람만 (5일 · 3일 남은 사손님 · 아손님은 이제 아님)");
     assert.strictEqual(await page.getAttribute("#rev-btn", "hidden"), null);
     assert.strictEqual((await page.textContent("#rev-btn")).trim(), "재방문 안내3", "보낼 사람 3 (오늘 온 사람 빼고)");
     await page.click("#rev-btn");
     const sheet = (await page.textContent("#sheet")).replace(/\s+/g, " ");
-    assert.match(sheet, /D-8 · 기한 11월 23일\(월\) · 손님께는 '7일' 3명 · 보냄 0/);
+    assert.match(sheet, /D-8 · 기한 11월 22일\(일\) · 손님께는 '7일' 3명 · 보냄 0/);
     assert.match(sheet, /기한이 8일 남은 사람이에요 .* 하루 줄여 '7일'로 알려요/);
     const rows = await page.$$eval("#sheet .rvrow", (e) => e.map((r) => [...r.children].map((c) => c.textContent.trim()).filter(Boolean).join(" | ")));
     assert.deepStrictEqual(rows, [
-      "가손님 | 010-1111-0001 | 방문 1번 · 아직 안 받음 · 마지막 11/3 | 번호 복사 | 직접 보냄 표시",
-      "나손님 | 010-1111-0002 | 방문 2번 · 수제돈까스 1번 받음 · 마지막 11/3 | 번호 복사 | 직접 보냄 표시",
+      "가손님 | 010-1111-0001 | 방문 1번 · 아직 안 받음 · 마지막 11/2 | 번호 복사 | 직접 보냄 표시",
+      "나손님 | 010-1111-0002 | 방문 2번 · 수제돈까스 1번 받음 · 마지막 11/2 | 번호 복사 | 직접 보냄 표시",
       "바손님 | 010-1111-0006 | 방문 1번 · 아직 안 받음 · 마지막 10/27 | 번호 복사 | 직접 보냄 표시",
-      "다손님 | 010-1111-0003 | 방문 1번 · 아직 안 받음 · 마지막 11/3 | 오늘 방문 — 안 보내도 돼요",
+      "다손님 | 010-1111-0003 | 방문 1번 · 아직 안 받음 · 마지막 11/2 | 오늘 방문 — 안 보내도 돼요",
     ]);
     assert.ok(!/수신거부|광고/.test(sheet), "(광고) · 수신거부 알림 없음 (사장님 11/17)");
     assert.strictEqual(await page.textContent("#rev-msg-8"), "아스타나키즈\n고객님 아직 7일 남았습니다. 7일 안에 방문하셔서 수제돈까스 받아가세요.\n네이버에서 '아스타나키즈' 예약하고 오세요.");
@@ -70,7 +70,7 @@ test("재방문 안내 (사장님 11/16): 기한 8일 남은 손님에게 한 �
     assert.ok(size.kb < 300, `MMS 300KB 안: ${size.kb}KB`);
     // 보냄 → 단추 숫자 줄어듦 · 다시 열어도 그대로
     await page.click('#sheet [data-act=revSentT][data-id="8|01011110001"]');
-    assert.match((await page.textContent("#sheet")).replace(/\s+/g, " "), /D-8 · 기한 11월 23일\(월\) · 손님께는 '7일' 3명 · 보냄 1/);
+    assert.match((await page.textContent("#sheet")).replace(/\s+/g, " "), /D-8 · 기한 11월 22일\(일\) · 손님께는 '7일' 3명 · 보냄 1/);
     assert.strictEqual((await page.textContent("#rev-btn")).trim(), "재방문 안내2");
     await page.click('#sheet [data-act=revCopy] >> nth=0');
     await page.waitForFunction(() => /번호를 복사/.test(document.getElementById("toast").textContent)); // 복사는 비동기 (체험판은 브라우저 · 앱은 본체 클립보드)
@@ -100,6 +100,45 @@ test("재방문 안내: 이벤트가 꺼져 있거나 대상이 없으면 단추
     await page.goto(DESK);
     await page.waitForTimeout(300);
     assert.strictEqual(await page.isHidden("#rev-btn"), true);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("날짜 셈 (사장님 11/17): 1일 방문 → 2일부터 세어 21일이 마지막 날 · 21일까지 오면 성공 · 22일은 아님 · 톡톡은 21일을 오늘 포함 8일 앞둔 14일에 · 손님께는 15일 기준 '7일'", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    // 12월 1일 방문 한 사람 · 이벤트는 2027-02-28 까지
+    const led = [line("01022220001", "일일손님", "2026-12-01", 4, "안내", "2026-12-21", "z1")].join("\n") + "\n";
+    const at = async (today) => {
+      await page.addInitScript(([led2, t]) => {
+        window.__today = t;
+        localStorage.setItem("astanakiz-visitevent", JSON.stringify({ ver: 2, on: true, from: "2026-10-26", to: "2027-02-28", days: 20, gift: "수제돈까스" }));
+        localStorage.setItem("astanakiz-visitlog-2026-10-26", led2);
+      }, [led, today]);
+      await page.goto(DESK);
+      await page.waitForTimeout(300);
+      return page.evaluate(() => { const t = window.__deskTest.rev.targets(); return Object.fromEntries(Object.entries(t || {}).map(([l, v]) => [l, v.map((x) => [x.name, x.due])])); });
+    };
+    // 마지막 날 · 성공 판정 (영수증 · 장부와 같은 셈)
+    await at("2026-12-13");
+    const r = await page.evaluate(() => ({
+      due: window.__deskTest.rev.due("2026-12-01"),
+      on21: window.__deskTest.rev.rule({ day: "2026-12-01", due: "2026-12-21" }, "2026-12-21").st,
+      on22: window.__deskTest.rev.rule({ day: "2026-12-01", due: "2026-12-21" }, "2026-12-22").st,
+      on2: window.__deskTest.rev.rule({ day: "2026-12-01", due: "2026-12-21" }, "2026-12-02").st,
+    }));
+    assert.deepStrictEqual(r, { due: "2026-12-21", on21: "성공", on22: "안내", on2: "성공" }, "1일 방문 → 21일이 마지막 날 (2일부터 20일)");
+    // 보내는 날: 13일은 아님 · 14일 · 15일은 아님
+    assert.deepStrictEqual(await at("2026-12-13"), { 8: [] }, "13일 (오늘 포함 9일)에는 안 보냄");
+    assert.deepStrictEqual(await at("2026-12-14"), { 8: [["일일손님", "2026-12-21"]] }, "14일 (14 ~ 21 = 8일)에 보냄");
+    const say = await page.evaluate(() => ({ say: window.__deskTest.rev.say(8), due: window.__deskTest.rev.dueOf(8), msg: window.__deskTest.rev.msg(8) }));
+    assert.deepStrictEqual([say.say, say.due], [7, "2026-12-21"], "15일 기준 7일 (15 ~ 21) · 기한 21일");
+    assert.match(say.msg, /고객님 아직 7일 남았습니다\. 7일 안에 방문하셔서 수제돈까스 받아가세요\./);
+    await page.click("#rev-btn");
+    assert.match((await page.textContent("#sheet")).replace(/\s+/g, " "), /D-8 · 기한 12월 21일\(월\) · 손님께는 '7일' 1명/);
+    assert.deepStrictEqual(await at("2026-12-15"), { 8: [] }, "15일에는 안 보냄 (하루 한 번 · 14일)");
   } finally {
     await browser.close();
   }
