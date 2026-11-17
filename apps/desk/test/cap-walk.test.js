@@ -102,7 +102,9 @@ test("예약이 잘 차는 시간 (4 · 5): 현장 1명마다 그 손님이 있�
     // 14:00 이 시작하기 전에 현장 3명 모두 반납 → 다음 조절 때 14:00 다시 10
     await T(([a, b]) => { window.__deskTest.returnKeys(a, [21]); window.__deskTest.returnKeys(b, [22, 23]); window.__deskTest.setNow(780); }, [wid, wid2]);
     assert.deepStrictEqual(await plan(), { 840: [7, 10, ""] }, "자리가 나 10 으로");
-    await T(() => window.__deskTest.capRun(true));
+    // 반납도 다음 분에 바로 (인기 시간 빈자리는 3~5분이면 팔림 · 사장님 11/17)
+    assert.strictEqual(await T(() => window.__deskTest.capWalkDue()), true, "현장 반납 → 다음 분에 바로 조절");
+    await T(() => { window.__deskTest.setNow(781); window.__deskTest.capTick(); });
     await desk.waitForFunction(() => window.__deskTest.capLog.filter((x) => x.t === "14:00").length >= 2, null, { timeout: 60000 });
     assert.strictEqual(await capAt("14:00"), 10, "네이버 14:00 다시 10");
     p = await pj();

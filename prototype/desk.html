@@ -2332,7 +2332,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   }
   const capTry = { day: shiftDay(TODAY, 7), time: "10:00", n: 11 }; // 한 칸 시험 (기본: 다음 주 같은 요일 10:00)
   let capBusy = false, capLastAt = null, capMark = null, capFails = 0, capPauseUntil = -1;
-  let capWalkDue = false; // 현장을 팔았음 → 다음 분에 바로 조절 (사장님 11/17 · 10분을 기다리는 사이 네이버가 그 자리를 먼저 팔지 않게)
+  let capWalkDue = false; // 현장을 팔았거나 현장 손님이 반납함 → 다음 분에 바로 조절 (사장님 11/17 · 인기 시간 빈자리는 성수기 주말 · 휴일 3~5분 · 비수기 10분 안에 팔림 — 10분을 기다리면 늦음)
   const capWalkSold = () => { if (capToday()) capWalkDue = true; };
   const capLog = (() => { try { return JSON.parse(localStorage.getItem("astanakiz-caplog-" + TODAY)) || []; } catch (e) { return []; } })();
   function capNote(x) { capLog.unshift(Object.assign({ at: hm(now) }, x)); capLog.length = Math.min(capLog.length, 60); try { localStorage.setItem("astanakiz-caplog-" + TODAY, JSON.stringify(capLog)); } catch (e) { /* 저장 못 해도 동작 */ } }
@@ -5563,6 +5563,8 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   function returnKeys(h, ks) {
     // 예정 시간보다 일찍 반납 → 열쇠 여분이 생김 → 묶어 둔 타임을 다시 조절 (사장님 10/24)
     if (!h.svc && ks.some((k) => { const m = useOf(h, k); return m != null && now < h.slot + m; })) capUnlock(`${ks.join(", ")}번 열쇠 일찍 반납`);
+    // 현장 손님 반납 → 줄여 둔 네이버를 다음 분에 바로 돌려놓음 (사장님 11/17: 성수기 주말 · 휴일에 인기 시간 빈자리는 3~5분 · 비수기 주말 · 휴일은 10분 안에 팔림)
+    if (h.walk && Object.keys(capState.trims || {}).length) capWalkSold();
     noteKeys(h);
     h.keys = h.keys.filter((k) => !ks.includes(k));
     if (!h.keys.length) h.outAt = now;
