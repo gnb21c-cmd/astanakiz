@@ -298,6 +298,17 @@ test("데스크: 수신거부 안내가 없으면 [톡톡으로 보내기]는 �
     await page.click("#rev-btn");
     assert.strictEqual(await page.$eval("#rt-bar [data-act=rtRun]:not([data-dry])", (b) => b.disabled), true);
     assert.strictEqual(await page.$eval("#rt-bar [data-act=rtRun][data-dry]", (b) => b.disabled), false);
+    // 막힌 까닭이 막대에 보이고 (11/17 — 왜 안 눌리는지 몰랐음) · [수신거부 안내 넣기] → 운영 설정 '재방문 안내 문자' 칸
+    assert.match(await page.$eval("#rt-bar", (e) => e.textContent), /수신거부 안내가 없어 보낼 수 없어요/);
+    assert.match(await page.$eval("#rt-bar [data-act=rtRun]:not([data-dry])", (b) => b.title), /운영 설정 → 재방문 이벤트/);
+    await page.click("#rt-bar [data-act=rtOptout]");
+    await page.waitForTimeout(200);
+    assert.strictEqual(await page.evaluate(() => document.activeElement && document.activeElement.id), "ev-optout");
+    await page.fill("#ev-optout", "무료수신거부 080-000-0000");
+    await page.keyboard.press("Escape");
+    await page.click("#rev-btn");
+    assert.strictEqual(await page.$eval("#rt-bar [data-act=rtRun]:not([data-dry])", (b) => b.disabled), false, "넣으면 눌림");
+    assert.ok(!/수신거부 안내가 없어/.test(await page.$eval("#rt-bar", (e) => e.textContent)));
     const p2 = await browser.newPage({ viewport: { width: 1024, height: 768 } });
     await p2.addInitScript((led) => {
       window.__today = "2026-11-15";
