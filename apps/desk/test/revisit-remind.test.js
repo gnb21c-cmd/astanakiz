@@ -81,6 +81,9 @@ test("재방문 안내 (사장님 11/16): 기한 8일 남은 손님에게 한 �
     await page.fill("#ev-optout", "무료수신거부 080-000-0000");
     await page.click("#sheet [data-act=close]");
     assert.match(await page.evaluate(() => window.__deskTest.rev.msg(8)), /\n무료수신거부 080-000-0000$/);
+    // 다시 열기 전에 '보냄'이 저장소에 들어갔는지 (바쁠 때 쓰기가 늦을 수 있어 5초까지)
+    const saved = await page.waitForFunction(() => /8\|01011110001/.test(localStorage.getItem("astanakiz-revsent-2026-11-15") || ""), null, { timeout: 5000 }).then(() => true, () => false);
+    assert.ok(saved, "보냄을 누르면 그날 저장소에 남음 (다시 열기 전)");
     await page.reload();
     await page.waitForTimeout(300);
     const ok2 = await page.waitForFunction(() => document.getElementById("rev-btn").textContent.trim() === "재방문 안내2", null, { timeout: 15000 }).then(() => true, () => false); // 보냄은 그날 이 PC 에 남음 (다시 연 직후 화면이 다 그려질 때까지)

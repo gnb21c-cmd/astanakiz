@@ -66,7 +66,12 @@ async function open(browser, extra = "") {
     },
     onStep: (t) => steps.push(t),
   });
-  const sent = () => page.evaluate(() => JSON.parse(localStorage.getItem("mockTalkSent") || "[]"));
+  /** 가짜 대화창(새 창)이 남긴 보낸 기록 — 창끼리 저장소가 이어지는 데 조금 걸릴 수 있어(전체 시험처럼 바쁠 때) min 개가 될 때까지 5초 기다림 */
+  const sent = async (min = 0) => {
+    let s = [];
+    for (let i = 0; i < 50; i++) { s = await page.evaluate(() => JSON.parse(localStorage.getItem("mockTalkSent") || "[]")); if (s.length >= min) break; await new Promise((r) => setTimeout(r, 100)); }
+    return s;
+  };
   return { ctx, page, ts, steps, pops, sent };
 }
 const IMG = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "tsend-")), "재방문안내_D-5_2026-11-16.jpg");
@@ -102,7 +107,7 @@ test("보내기: 글([전송]) → 사진(파일 고르기 창 없이 사진 칸
     assert.deepStrictEqual(r, { ok: true, step: "보냄", how: "이름 · 고객 정보 번호", sent: { text: true, image: true } }, JSON.stringify({ r, steps }));
     const r2 = await ts.one({ name: "유민석", phone: "010-3100-1313", text: TEXT, image: IMG }, false);
     assert.deepStrictEqual(r2, { ok: true, step: "보냄", how: "가린 이름 · 뒷번호", sent: { text: true, image: true } }, JSON.stringify({ r2, steps }));
-    const s = (await sent()).map(({ u, kind, text, file }) => [u, kind, kind === "text" ? text : file]);
+    const s = (await sent(4)).map(({ u, kind, text, file }) => [u, kind, kind === "text" ? text : file]);
     assert.deepStrictEqual(s, [
       ["c1", "text", TEXT.replace(/\s+$/, "")],
       ["c1", "image", SENT_NAME],
@@ -134,7 +139,7 @@ test("여러 사람: 같은 이름 모양이 둘 · 톡톡 단추 없음 · 네�
     assert.match(brief[1][3], /톡톡 대화하기\]가 없는/);
     assert.match(brief[2][3], /찾은 사람이 없음/);
     assert.deepStrictEqual([brief[3][3], brief[4][3]], ["이름 · 고객 정보 번호", "가린 이름 · 뒷번호"]);
-    assert.deepStrictEqual((await sent()).map((x) => [x.u, x.kind]), [["c6", "image"], ["c7", "image"]], "나단비 · 나보비에게 사진만 (글 없으면 사진만)");
+    assert.deepStrictEqual((await sent(2)).map((x) => [x.u, x.kind]), [["c6", "image"], ["c7", "image"]], "나단비 · 나보비에게 사진만 (글 없으면 사진만)");
   } finally {
     await browser.close();
   }
@@ -459,7 +464,7 @@ test("실제 화면 구조 (11/16 저장본): 목록에 이름만 → 이름이 
     const { ts, steps, sent, page } = await open(browser);
     const r = await ts.one({ name: "김가람", phone: "010-3999-1313", image: IMG }, false); // 동명이인: 첫 김가람(010-3000-…)은 번호가 달라 넘어감
     assert.deepStrictEqual([r.ok, r.how], [true, "이름 · 고객 정보 번호"], JSON.stringify({ r, steps }));
-    assert.deepStrictEqual((await sent()).map((x) => [x.u, x.kind]), [["c9", "image"]]);
+    assert.deepStrictEqual((await sent(1)).map((x) => [x.u, x.kind]), [["c9", "image"]]);
     await page.goto(SP + "?home=1&wide=1");
     ts.opts.home = SP + "?home=1&wide=1";
     const r2 = await ts.one({ name: "유민석", phone: "010-3100-1313", image: IMG }, true);
@@ -486,7 +491,7 @@ test("가운데 줄 손님 (2.26 현장 11/16 — 목록 첫 줄 손님만 맞�
     await page.goto(SP + "?home=1");
     const r = await ts.one({ name: "이하늘", phone: "010-3192-1313", image: IMG }, false);
     assert.deepStrictEqual([r.ok, r.how], [true, "이름 · 고객 정보 번호"], JSON.stringify({ r, steps }));
-    assert.deepStrictEqual((await sent()).map((x) => [x.u, x.kind]), [["c3", "image"]]);
+    assert.deepStrictEqual((await sent(1)).map((x) => [x.u, x.kind]), [["c3", "image"]]);
     assert.match(pops[0], /u=c3/);
     // 고르기가 끝내 안 먹는 화면(?nosel=1): 번호가 다르다고 하지 않고 '안 바뀜'으로 건너뜀
     await page.goto(SP + "?home=1&nosel=1");
@@ -511,7 +516,7 @@ test("15명 넘게 찾으면 (사장님 11/16): 목록이 15명씩 · 아래로 
     await page.goto(SP + "?home=1");
     const r = await ts.one({ name: "허다온", phone: "010-4041-7777", image: IMG }, false);
     assert.deepStrictEqual([r.ok, r.how], [true, "이름 · 고객 정보 번호"], JSON.stringify({ r, steps }));
-    assert.deepStrictEqual((await sent()).map((x) => [x.u, x.kind]), [["p41", "image"]]);
+    assert.deepStrictEqual((await sent(1)).map((x) => [x.u, x.kind]), [["p41", "image"]]);
     assert.match(pops[0], /u=p41/);
     assert.ok(steps.includes("허다온: 목록 더 불러옴 30/41명") && steps.includes("허다온: 목록 더 불러옴 41/41명"), steps.join(" / "));
     // 더 안 나오는 화면: 못 찾았다고 하되 '41명 중 목록에 나온 15명'으로 (다 못 본 것을 알림)
