@@ -3041,7 +3041,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
                 <span class="help" id="ev-usehelp">${esc(useHelp())}</span>
                 <div class="btns"><button class="btn btn-sm btn-ink" data-act="evApply">${EV.on ? "기간 · 기한 적용" : "적용 (켜기)"}</button>${EV.on ? `<button class="btn btn-sm" data-act="evOff">끄기</button>` : ""}</div>
                 <span class="help longhelp" data-q="이벤트 기간 동안">기간 동안 입장권에 마일리지 대신 이벤트 안내 (마일리지 멈춤) · 끝나면 기간 동안 이용완료한 수를 네이버 완료에서 빼고 이어서 셈 (기간에 안 온 손님은 그대로)</span></div>
-              <div class="field"><span class="label">재방문 안내 문자 <span class="help">기한 5일 · 3일 남은 손님 (열쇠판 위 [재방문 안내])</span></span>
+              <div class="field"><span class="label">재방문 안내 문자 <span class="help">기한 ${REV_LEFT.join("일 · ")}일 남은 손님 · 손님께는 '${REV_LEFT.map(revSay).join("일 · ")}일 남았어요' (열쇠판 위 [재방문 안내])</span></span>
                 <input id="ev-optout" class="cfg" maxlength="60" placeholder="예: 무료수신거부 080-000-0000" value="${esc(EV.optout || "")}" autocomplete="off" aria-label="수신거부 안내 (문자 맨 아래)">
                 <span class="help">광고 문자 맨 아래에 붙는 <b>무료 수신거부 방법</b> — 문자 맨 앞 '(광고)'는 데스크가 붙여요</span></div>
               <div class="field"><span class="label">재방문 안내 톡톡 <span class="help">네이버 스마트플레이스 고객 → 톡톡 대화창 (시작 화면은 API 연결 설정 → 네이버)</span></span>
@@ -4818,7 +4818,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   const REV_TALK = () => "astanakiz-revtalk-" + TODAY;
   let revTalk = (() => { try { return JSON.parse(localStorage.getItem(REV_TALK())) || {}; } catch (e) { return {}; } })();
   const revTalkSave = () => { try { localStorage.setItem(REV_TALK(), JSON.stringify(revTalk)); } catch (e) { /* 저장 못 해도 화면은 동작 */ } };
-  /** 톡톡으로 보낼 사람: 오늘 안 온 · 아직 '보냄'이 아닌 · 휴대폰 번호가 있는 사람 (D-5 · D-3 차례) */
+  /** 톡톡으로 보낼 사람: 오늘 안 온 · 아직 '보냄'이 아닌 · 휴대폰 번호가 있는 사람 (REV_LEFT 차례 · 지금 D-8) */
   function rtList(all) {
     const t = revTargets(); if (!t) return [];
     return REV_LEFT.flatMap((l) => t[l].filter((x) => !x.today && (all || !revSent[`${l}|${x.k}`]) && /^01\d{8,9}$/.test(digits(x.phone))).map((x) => ({ key: `${l}|${x.k}`, name: x.name, phone: digits(x.phone), left: l })));
@@ -4913,7 +4913,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     }).join("");
   }
   /* 매일 자동으로 보내기 (기본 꺼짐 — 처음에는 [확인만 해 보기] · 직접 보내기로 결과를 본 뒤 켬)
-     켜면 매일 정한 시각(기본 11:00, 08~21시) 뒤 한 번: D-5 · D-3 중 아직 안 보낸 사람에게 · 앱이 꺼져 있었으면 켜진 뒤 그날 안에 · 그날 한 번만 */
+     켜면 매일 정한 시각(기본 11:00, 08~21시) 뒤 한 번: 기한 8일 남은 손님(REV_LEFT) 중 아직 안 보낸 사람에게 · 앱이 꺼져 있었으면 켜진 뒤 그날 안에 · 그날 한 번만 */
   RT.auto = { on: false, at: "11:00" };
   if (RT_APP() && window.desk.config) window.desk.config.get().then((c) => { const v = c && c.revTalkAuto; if (v) RT.auto = { on: !!v.on, at: /^\d{2}:\d{2}$/.test(v.at || "") ? v.at : "11:00" }; }).catch(() => {});
   function rtTick() {
