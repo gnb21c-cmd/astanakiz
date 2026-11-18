@@ -785,7 +785,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
 .pos .foot { padding: 12px 16px; display: flex; justify-content: flex-end; gap: 8px; background: #1F2227; }
 .pos .foot button { background: #fff; color: #1F2227; border: 0; border-radius: 8px; padding: 10px 16px; font-weight: 700; }
 
-/* 새 판 저절로 바꾸기 (11/16): 받아 두면 위 가운데 띠 — 몇 초 뒤 바꾸는지 · [지금 바꾸기] [30분 뒤에] */
+/* 새 판 바꾸기 ("업뎃해" 한 판만 · 고친 내용만 · 11/16 · 11/18): 받아 두면 위 가운데 띠 — 몇 초 뒤 바꾸는지 · [지금 바꾸기] [30분 뒤에] */
 .updbar { position: absolute; left: 50%; top: 52px; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center;
   background: var(--accent-bg); color: var(--fg); border: 1.5px solid var(--accent); border-radius: 12px; padding: 6px 12px; font-size: 13.5px; box-shadow: var(--shadow); max-width: calc(100% - 32px); }
 .updbar b { color: var(--accent); }
@@ -5895,7 +5895,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     revCopy(btn) { revClip(btn.dataset.v, "번호를"); },
     revText(btn) { revClip(revMsg(Number(btn.dataset.l)), "문구를"); },
     revAll(btn) { const l = Number(btn.dataset.l), t = revTargets(); const nums = t ? t[l].filter((x) => !x.today).map((x) => digits(x.phone)).filter(Boolean) : []; revClip(nums.join(", "), `번호 ${nums.length}개를`); },
-    /** 새 판 저절로 바꾸기 (11/16): [지금 바꾸기] · [30분 뒤에] · 운영 설정 [지금 확인] */
+    /** 새 판 바꾸기 (11/16 · 11/18 고친 내용만): [지금 바꾸기] · [30분 뒤에] · 운영 설정 [지금 확인] */
     updApply() { if (!UPD_API) return; UPD_API.apply().then((r) => { if (r && !r.ok) toast(r.why, 5000); }).catch(() => {}); },
     updLater() { if (!UPD_API) return; UPD_API.later().then((v) => { updSet(v); toast("30분 뒤에 다시 알려요 — 그 전에 바꾸려면 운영 설정 → 정보 [지금 바꾸기]", 5000); }).catch(() => {}); },
     updCheck(btn) { if (!UPD_API) return; btn.disabled = true; UPD_API.check().then((v) => { updSet(v); toast(v.state === "latest" ? "최신 판이에요" : v.state === "downloading" ? `새 판 ver.${v.version} 받는 중` : v.state === "ready" ? `새 판 ver.${v.version} 받아 둠` : v.state === "error" ? `확인 못 함: ${v.error}` : "확인했어요", 4000); }).catch(() => {}).finally(() => (btn.disabled = false)); },
@@ -6795,15 +6795,15 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     "capCell", "addPeak", "delPeak", "evApply", "evOff", "evTpl", "evOpen", "tplGo", "tplRow", "tplSamp", "tplSave", "tplDef", "tplNew", "tplDel", "tplCode",
     "staffAdd", "staffDel", "svPick", "svAdd", "svDel", "svToggle", "liveToggle", "svKeySave", "svKeyDel", "stToggle", "printMode", "drawerPin", "findPorts", "pickPort", "findPrinters", "pickPrinter", "bcFilter",
     "naverShow", "naverHome", "annTest", "annStop", "syncRole", "syncCodeNew", "syncCodeSave", "syncRelaunch", "syncOpen", "syncDemo", "rentOpen"]);
-  /* 새 판 저절로 바꾸기 (사장님 11/16 — 지웠다가 다시 설치하지 않게): 앱이 10분마다 GitHub 최신 판을 확인해 받아 둠 → 위 띠 → 1분 뒤 조용히 설치 · 다시 켬
+  /* 새 판 바꾸기 (사장님 11/16 · 11/18 — "업뎃해" 한 판만 · 지웠다가 다시 설치하지 않게): 앱이 10분마다 GitHub 최신 판을 보기만 하다가 새 판이면 고친 내용만 받아 둠 → 위 띠 → 1분 뒤 데스크만 다시 켬
      체험판(앱 아님)은 없음 */
   const UPD_API = window.desk && window.desk.update ? window.desk.update : null;
   let UPD = null, updTimer = null;
   const updHm = (ms) => { const t = new Date(ms); return `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`; };
   function updText(u) {
-    if (!UPD_API) return "설치한 앱에서만 — 새 판이 나오면 저절로 받아서 바꿔요";
+    if (!UPD_API) return "설치한 앱에서만 — '업뎃해' 한 새 판만 고친 내용으로 바꿔요 (다시 설치 안 함)";
     if (!u || u.state === "off") return "꺼짐 (설치한 앱에서만 켜져요)";
-    const head = `지금 ver.${u.current || "?"} · 10분마다 확인`;
+    const head = `지금 ver.${u.current || "?"} · 10분마다 새 판 확인 (보기만)${u.note ? ` · ${u.note}` : ""}`;
     const last = u.checkedAt ? ` (마지막 확인 ${updHm(u.checkedAt)})` : "";
     return ({ idle: `${head} — 켜고 1분 뒤 처음 확인해요`, checking: `${head} — 확인 중…`, latest: `${head} — 최신이에요${last}`, downloading: `${head} — 새 판 ver.${u.version} 받는 중 ${u.percent || 0}%`,
       ready: `${head} — 새 판 ver.${u.version} 받아 둠${u.wait ? ` · ${u.wait}이라 끝나면 바꿔요` : u.applyAt ? " · 곧 바꿔요" : u.laterUntil ? ` · ${updHm(u.laterUntil)}에 다시 알려요` : ""}`,
@@ -6822,9 +6822,9 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     const show = !!u && (u.state === "applying" || (u.state === "ready" && !u.laterUntil));
     bar.hidden = !show;
     if (!show) return;
-    if (u.state === "applying") { bar.innerHTML = `<b>새 판 ver.${esc(u.version)}으로 바꾸는 중</b><span>잠깐 꺼졌다가 20초쯤 뒤 다시 켜져요</span>`; return; }
+    if (u.state === "applying") { bar.innerHTML = `<b>새 판 ver.${esc(u.version)}으로 바꾸는 중</b><span>데스크만 몇 초 다시 켜져요 (설치 없음)</span>`; return; }
     const left = () => Math.max(0, Math.ceil((u.applyAt - Date.now()) / 1000));
-    const msg = u.wait ? `${esc(u.wait)}이라 끝나면 바꿔요` : u.applyAt ? `<span class="num" id="upd-left">${left()}</span>초 뒤 바꿔요 (20초쯤 꺼졌다 켜짐)` : "곧 바꿔요";
+    const msg = u.wait ? `${esc(u.wait)}이라 끝나면 바꿔요` : u.applyAt ? `<span class="num" id="upd-left">${left()}</span>초 뒤 바꿔요 (데스크만 몇 초 다시 켜짐)` : "곧 바꿔요";
     bar.innerHTML = `<b>새 판 ver.${esc(u.version)} 받음</b><span>${msg}</span><button class="btn btn-sm btn-ink" data-act="updApply">지금 바꾸기</button>${u.applyAt ? `<button class="btn btn-sm" data-act="updLater">30분 뒤에</button>` : ""}`;
     if (u.applyAt) updTimer = setInterval(() => { const e = $("upd-left"); if (e) e.textContent = left(); }, 1000);
   }

@@ -1,4 +1,5 @@
-/* 새 판 저절로 바꾸기 (사장님 11/16) — updater.js 규칙: 확인 · 받기 · 1분 띠 · 조용히 설치 · 30분 뒤에 · 하는 일이 있으면 미룸 · 오류 */
+/* 새 판 바꾸기 (사장님 11/16 · 11/18 고친 내용만) — updater.js 규칙: 확인 · 받기 · 1분 띠 · 바꾸기(데스크만 다시 켬) · 30분 뒤에 · 하는 일이 있으면 미룸 · 오류
+   받기 · 풀기 · 앞 판으로는 test/patch.test.js */
 const test = require("node:test");
 const assert = require("node:assert");
 const EventEmitter = require("events");
@@ -25,7 +26,7 @@ function clock() {
     },
   };
 }
-/** 가짜 electron-updater: 확인하면 정해 둔 대로 (최신 · 새 판 → 받는 중 → 받음 · 오류) */
+/** 가짜 PatchUpdater: 확인하면 정해 둔 대로 (최신 · 새 판 → 받는 중 → 받음 · 오류) */
 function fakeAu(plan) {
   const au = new EventEmitter();
   au.checks = 0; au.installs = [];
@@ -43,10 +44,9 @@ function fakeAu(plan) {
   return au;
 }
 
-test("켜고 1분 뒤 처음 확인 · 그 뒤 10분마다 · 최신이면 띠 없음 · 설정(뒤에서 받기 · 끌 때 설치 · 통째로)", async () => {
+test("켜고 1분 뒤 처음 확인 · 그 뒤 10분마다 (보기만) · 최신이면 띠 없음 · 아무것도 안 바꿈", async () => {
   const c = clock(), au = fakeAu(() => null);
   const u = new DeskUpdater(au, { now: c.now, tm: c.tm, current: "2.27.0" }).start();
-  assert.deepStrictEqual([au.autoDownload, au.autoInstallOnAppQuit, au.disableDifferentialDownload, au.allowDowngrade, au.allowPrerelease, au.disableWebInstaller], [true, true, true, false, false, true]);
   assert.strictEqual(u.status().current, "2.27", "화면에는 2.27 모양");
   await c.go(UPDATE_TIMES.first - 1);
   assert.strictEqual(au.checks, 0);
@@ -58,7 +58,7 @@ test("켜고 1분 뒤 처음 확인 · 그 뒤 10분마다 · 최신이면 띠 �
   assert.strictEqual(au.installs.length, 0);
 });
 
-test("새 판 → 뒤에서 받음 → 받으면 1분 띠(남은 초) → 1분 뒤 조용히 설치 · 다시 켬 (quitAndInstall(true, true))", async () => {
+test("새 판 → 뒤에서 받음 → 받으면 1분 띠(남은 초) → 1분 뒤 바꾸기 (데스크만 다시 켬 · quitAndInstall)", async () => {
   const c = clock();
   let next = null;
   const au = fakeAu(() => next);
@@ -78,7 +78,7 @@ test("새 판 → 뒤에서 받음 → 받으면 1분 띠(남은 초) → 1분 �
   assert.strictEqual(u.status().left, 30, "남은 초가 줄어듦");
   assert.strictEqual(au.installs.length, 0, "1분 전에는 안 바꿈");
   await c.go(30e3);
-  assert.deepStrictEqual(au.installs, [[true, true]], "조용히 설치 · 끝나면 다시 켬");
+  assert.deepStrictEqual(au.installs, [[true, true]], "1분 뒤 바꾸기");
   assert.strictEqual(u.status().state, "applying");
   assert.strictEqual(applied, "2.28");
   // 바꾸는 중에는 확인 결과로 상태가 흔들리지 않음 · 다시 확인 안 함
@@ -87,7 +87,7 @@ test("새 판 → 뒤에서 받음 → 받으면 1분 띠(남은 초) → 1분 �
   assert.strictEqual(au.checks, n);
 });
 
-test("[30분 뒤에] → 띠가 사라졌다가 30분 뒤 다시 1분 띠 → 설치 · [지금 바꾸기]는 바로", async () => {
+test("[30분 뒤에] → 띠가 사라졌다가 30분 뒤 다시 1분 띠 → 바꾸기 · [지금 바꾸기]는 바로", async () => {
   const c = clock(), au = fakeAu(() => "2.28.0");
   const u = new DeskUpdater(au, { now: c.now, tm: c.tm, current: "2.27.0" });
   await u.check();
@@ -110,7 +110,7 @@ test("[30분 뒤에] → 띠가 사라졌다가 30분 뒤 다시 1분 띠 → �
   assert.match(new DeskUpdater(fakeAu(() => null)).apply(true).why, /받아 둔 새 판이 없어요/);
 });
 
-test("톡톡 보내기 · 재고 오픈 중이면 미룸 (2분마다 다시 봄) → 끝나면 1분 띠 → 설치 · 그동안 [지금 바꾸기]는 까닭", async () => {
+test("톡톡 보내기 · 재고 오픈 중이면 미룸 (2분마다 다시 봄) → 끝나면 1분 띠 → 바꾸기 · 그동안 [지금 바꾸기]는 까닭", async () => {
   const c = clock(), au = fakeAu(() => "2.28.0");
   let busy = "톡톡 보내는 중";
   const u = new DeskUpdater(au, { now: c.now, tm: c.tm, busy: () => busy });
@@ -134,7 +134,7 @@ test("톡톡 보내기 · 재고 오픈 중이면 미룸 (2분마다 다시 봄)
   assert.strictEqual(au.installs.length, 1);
 });
 
-test("받아 둔 뒤 다시 확인해도 띠가 안 사라짐 · 인터넷이 끊기면 '확인 못 함'과 까닭 → 10분 뒤 다시 · 설치 시작 실패는 받아 둔 채로", async () => {
+test("받아 둔 뒤 다시 확인해도 띠가 안 사라짐 · 인터넷이 끊기면 '확인 못 함'과 까닭 → 10분 뒤 다시 · 바꾸기 시작 실패는 받아 둔 채로", async () => {
   const c = clock();
   let plan = "error";
   const au = fakeAu(() => plan);
@@ -153,7 +153,7 @@ test("받아 둔 뒤 다시 확인해도 띠가 안 사라짐 · 인터넷이 �
   plan = "error";
   await u.check();
   assert.strictEqual(u.status().state, "ready");
-  // 설치 시작 실패
+  // 바꾸기 시작 실패
   const au2 = fakeAu(() => "2.28.0");
   au2.quitAndInstall = () => { throw new Error("spawn EACCES"); };
   const u2 = new DeskUpdater(au2, { now: c.now, tm: c.tm });

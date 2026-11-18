@@ -67,8 +67,10 @@ function saveSettings() {
   fs.writeFileSync(SETTINGS_FILE(), JSON.stringify(settings, null, 2));
 }
 
+// 켤 때 고른 판 (boot.js · 사장님 11/18): 받아 둔 고친 내용(앱 폴더 patch\<판>)이면 그 화면 · 아니면 설치한 판
+const BOOT = global.__deskBoot || { root: "", dir: "", build: "", bundled: "", shell: "", why: "" };
 const DESK_HTML = () =>
-  app.isPackaged ? path.join(process.resourcesPath, "desk.html") : path.join(__dirname, "..", "..", "..", "prototype", "desk.html");
+  BOOT.root ? path.join(BOOT.root, "desk.html") : app.isPackaged ? path.join(process.resourcesPath, "desk.html") : path.join(__dirname, "..", "..", "..", "prototype", "desk.html");
 
 /* 아마노 창 만들기. 할인등록 화면으로 자동 이동 · 로그인이 풀리면 저장된 아이디로 자동 로그인
    front = 근무자가 검색 · 선택하는 창(맨 뒤에 보임), back = 할인 등록만 뒤에서 하는 창(숨김, 근무자가 다음 차를 바로 검색할 수 있게 · 현장 10/6) */
@@ -173,6 +175,11 @@ function createDesk() {
   //   Windows 에서 숨은 창(네이버 · 아마노 · 톡톡)이 잠깐 앞에 왔다 가거나 deskWin.focus() 만 하면 창은 앞인데 글 칸에 키가 안 가는 일이 있음
   deskWin.on("focus", () => { if (deskWin && !deskWin.isDestroyed() && !deskWin.webContents.isFocused()) deskWin.webContents.focus(); });
   deskWin.loadFile(DESK_HTML());
+  // 고른 판이 화면까지 켜짐 → '켜 본 횟수' 0 (3번 연속 못 켜지면 boot.js 가 앞 판으로 · 11/18)
+  deskWin.webContents.once("did-finish-load", () => {
+    if (!BOOT.root) return;
+    try { require("./patch").markOk(BOOT.dir, BOOT.build); } catch (e) { updLog(`켜짐 표시 못 함: ${e.message || e}`); }
+  });
   // 데스크 창을 닫으면 프로그램 전체(뒤의 아마노 · 네이버 창 포함)를 끝냄
   deskWin.on("closed", () => {
     deskWin = null;
@@ -640,9 +647,10 @@ function talkSendRun(req) {
 }
 ipcMain.handle("talksend:run", posOnly((_e, req) => talkSendRun(req)));
 ipcMain.handle("talksend:status", () => talkView());
-/* 새 판 저절로 바꾸기 (사장님 11/16 — 지웠다가 다시 설치하지 않게) · 규칙은 updater.js
-   설치된 앱(app.isPackaged)에서만 · GitHub 공개 저장소 Releases 의 최신 판을 확인 · 받기 · 1분 띠 · 조용히 설치 · 다시 켬
-   시험: DESK_UPDATE_TEST = 가짜 서버 주소(generic) · DESK_UPDATE_CFG = app-update.yml · DESK_UPDATE_OUT = 설치 대신 이 파일에 기록 */
+/* 새 판 바꾸기 — "업뎃해" 하실 때만 · 고친 내용만 (사장님 11/18) · 규칙은 updater.js(1분 띠 · 하는 일 기다림) + patch.js(받기 · 풀기 · 앞 판으로)
+   예전(ver.2.27 ~ 2.29)은 설치 파일 전체로 지웠다가 다시 설치 → 11/17 저녁 바탕화면 아이콘이 없어져 다음 날 데스크를 못 켬 → 이제 설치 프로그램은 안 씀
+   설치한 앱(app.isPackaged)에서만 · 10분마다 GitHub Releases 최신 판의 desk-patch.json 만 봄 (보기만) → 새 판이면 고친 파일 묶음을 받아 풀어 두고 1분 띠 → 데스크만 다시 켬
+   시험: DESK_PATCH_TEST = 가짜 서버 주소 (desk-patch.json · 묶음) · DESK_PATCH_OUT = 다시 켜는 대신 이 파일에 기록 */
 const { DeskUpdater } = require("./updater");
 let deskUpd = null;
 function updLog(msg) {
@@ -656,34 +664,95 @@ function updLog(msg) {
     /* 기록 실패는 무시 */
   }
 }
-function updStart() {
-  const test = process.env.DESK_UPDATE_TEST;
-  if (deskUpd || (!app.isPackaged && !test)) return;
-  let au;
+/** 글 받기 (GitHub 이 옮겨 주는 주소도 따라감) · onPct = 받은 % */
+async function fetchText(url, onPct) {
+  const { net } = require("electron");
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), onPct ? 5 * 60e3 : 60e3);
   try {
-    const eu = require("electron-updater");
-    if (test) {
-      au = new eu.NsisUpdater();
-      au.setFeedURL({ provider: "generic", url: test });
-      au.updateConfigPath = process.env.DESK_UPDATE_CFG;
-      au.forceDevUpdateConfig = true;
-      au.quitAndInstall = (silent, run) => { fs.writeFileSync(process.env.DESK_UPDATE_OUT, JSON.stringify({ silent, run, version: deskUpd.s.version })); };
-    } else {
-      au = eu.autoUpdater;
-      au.setFeedURL({ provider: "github", owner: "gnb21c-cmd", repo: "astanakiz" });
+    const res = await net.fetch(url, { headers: { "Cache-Control": "no-cache" }, signal: ac.signal });
+    if (!res.ok) throw new Error(`받지 못함 (${res.status}) ${url.replace(/^https?:\/\//, "").slice(0, 90)}`);
+    const total = Number(res.headers.get("content-length")) || 0;
+    if (!onPct || !res.body) return await res.text();
+    const reader = res.body.getReader();
+    const chunks = [];
+    let got = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(Buffer.from(value));
+      got += value.length;
+      if (total) onPct(Math.min(99, Math.floor((got * 100) / total)));
     }
-  } catch (e) {
-    updLog(`업데이트를 켜지 못함: ${e.message || e}`);
+    return Buffer.concat(chunks).toString("utf8");
+  } finally {
+    clearTimeout(t);
+  }
+}
+/** 데스크만 다시 켬 (설치 없음 · 몇 초) — 끄는 중 무엇이 막아도 8초 뒤에는 끝냄 */
+function relaunchDesk(build) {
+  updLog(`새 판 ver.${build} 적용 — 데스크만 다시 켬 (설치 없음)`);
+  if (process.env.DESK_PATCH_OUT) {
+    fs.writeFileSync(process.env.DESK_PATCH_OUT, JSON.stringify({ build, from: BUILD }));
+    setTimeout(() => app.exit(0), 300);
     return;
   }
-  au.logger = { info: (m) => updLog(m), warn: (m) => updLog(`주의 ${m}`), error: (m) => updLog(`오류 ${m}`), debug: () => {} };
+  app.relaunch();
+  app.quit();
+  setTimeout(() => app.exit(0), 8000);
+}
+function updStart() {
+  const test = process.env.DESK_PATCH_TEST;
+  if (deskUpd || (!app.isPackaged && !test)) return;
+  const patch = require("./patch");
+  if (!BOOT.shell || !BOOT.dir) {
+    updLog(`새 판 확인을 켜지 못함: 껍데기 정보가 없음 (ver.${BUILD})`);
+    return;
+  }
+  const au = new patch.PatchUpdater({
+    dir: BOOT.dir,
+    current: BUILD,
+    shell: BOOT.shell,
+    fetchText,
+    onApply: relaunchDesk,
+    log: updLog,
+    ...(test ? { infoUrl: test + "desk-patch.json", fileUrl: (info) => test + info.files } : {}),
+  });
   const busy = () => (talkJob && talkJob.running ? "톡톡 보내는 중" : stockJob && stockJob.running ? "재고 자동 오픈 중" : "");
-  const times = test ? { first: Number(process.env.DESK_UPDATE_FIRST || 1000), countdown: Number(process.env.DESK_UPDATE_COUNTDOWN || 60000), busyRetry: 1500 } : {};
-  deskUpd = new DeskUpdater(au, { busy, current: test ? process.env.DESK_UPDATE_CURRENT || app.getVersion() : app.getVersion(), times });
+  const times = test ? { first: Number(process.env.DESK_PATCH_FIRST || 1000), countdown: Number(process.env.DESK_PATCH_COUNTDOWN || 60000), busyRetry: 1500 } : {};
+  deskUpd = new DeskUpdater(au, { busy, current: BUILD, times });
   deskUpd.on("state", (v) => { if (deskWin && !deskWin.isDestroyed()) deskWin.webContents.send("update:state", v); });
-  deskUpd.on("apply", (v) => updLog(`새 판 ${v} 설치 시작 · 끝나면 다시 켬`));
-  updLog(`업데이트 켬 · 지금 ver.${BUILD} (${app.getVersion()})`);
+  deskUpd.on("apply", (v) => updLog(`새 판 ${v} 적용 시작`));
+  au.on("error", (e) => updLog(`확인 못 함: ${(e && e.message) || e}`));
+  if (BOOT.why) deskUpd.set({ note: BOOT.why });
+  updLog(`새 판 확인 켬 (고친 내용만 · 설치 없음) · 지금 ver.${BUILD}${BOOT.root ? " (받아 둔 판)" : " (설치한 판)"} · 설치한 판 ver.${BOOT.bundled} · 껍데기 ${BOOT.shell}${BOOT.why ? ` · ${BOOT.why}` : ""}`);
   deskUpd.start();
+}
+/* 바탕화면 아이콘 지키기 (사장님 11/18): 켤 때마다 없으면 다시 만듦 — 설치한 앱(Windows)에서만
+   11/17 저녁 아이콘이 없어져 다음 날 아침 아무도 데스크를 못 켰음 (설치 프로그램은 업데이트 때 아이콘을 새로 만들지 않음) */
+function ensureDesktopIcon() {
+  if (process.platform !== "win32" || !app.isPackaged) return;
+  try {
+    const lnk = path.join(app.getPath("desktop"), "아스타나키즈 입장 데스크.lnk");
+    if (fs.existsSync(lnk)) return;
+    const ok = shell.writeShortcutLink(lnk, "create", { target: process.execPath, cwd: path.dirname(process.execPath), icon: process.execPath, iconIndex: 0, appUserModelId: "kr.astanakiz.desk", description: "아스타나키즈 입장 데스크" });
+    updLog(ok ? "바탕화면 아이콘이 없어 다시 만듦" : "바탕화면 아이콘을 다시 만들지 못함");
+  } catch (e) {
+    updLog(`바탕화면 아이콘 확인 못 함: ${e.message || e}`);
+  }
+}
+/* 현장 POS 는 컴퓨터를 켜면 데스크도 저절로 켜짐 (사장님 11/18 — 직원이 아이콘을 찾지 않아도) · 사무실 PC 는 켜지 않음 */
+function autoStart(pos) {
+  if (process.platform !== "win32" || !app.isPackaged) return;
+  try {
+    const now = app.getLoginItemSettings().openAtLogin;
+    if (now !== pos) {
+      app.setLoginItemSettings({ openAtLogin: pos, path: process.execPath });
+      updLog(pos ? "컴퓨터를 켜면 데스크도 켜지게 함 (현장 POS)" : "컴퓨터를 켜도 데스크는 안 켜지게 함 (사무실 PC)");
+    }
+  } catch (e) {
+    updLog(`저절로 켜기 설정 못 함: ${e.message || e}`);
+  }
 }
 ipcMain.handle("update:status", () => (deskUpd ? deskUpd.status() : { state: "off", current: BUILD }));
 ipcMain.handle("update:check", () => (deskUpd ? deskUpd.check() : { state: "off", current: BUILD }));
@@ -1914,7 +1983,9 @@ app.whenReady().then(() => {
   if (pos) setTimeout(talkTick, 8000); // 톡톡 상담 목록 (네이버 예약 창이 먼저 뜬 뒤)
   if (pos) setInterval(talkTick, 20 * 1000);
   syncStart();
-  updStart(); // 새 판 저절로 바꾸기 (11/16) — POS · 사무실 PC 모두
+  updStart(); // 새 판 바꾸기 — "업뎃해" 한 판만 · 고친 내용만 (11/18) — POS · 사무실 PC 모두
+  ensureDesktopIcon(); // 바탕화면 아이콘이 없으면 다시 (11/18)
+  autoStart(pos); // 현장 POS 는 컴퓨터를 켜면 데스크도 (11/18)
 });
 app.on("before-quit", () => {
   app.isQuitting = true;

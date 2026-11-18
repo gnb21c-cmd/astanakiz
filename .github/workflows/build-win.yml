@@ -5,7 +5,9 @@
 #   (ver.1.0 ~ 1.55 = 실행 번호 − 16)
 #   (현장 시험판은 ver.0.1 ~ 0.9) · 화면 맨 위 "네이버 · 아마노 · POS 연결 ver.1.X" 로 새 설치본인지 확인
 # 아마노 · 네이버 주소 · 아이디 · 비밀번호는 넣지 않음 (POS PC 앱 설정에서 입력)
-# 새 판 저절로 바꾸기 (사장님 11/16): 버전별 기록(v2.X · '최신' 표시)에 latest.yml 도 올림 → POS · 사무실 앱이 10분마다 보고 스스로 받아 바꿈 (ver.2.27 부터)
+# 새 판 바꾸기 (사장님 11/18 — "업뎃해" 하실 때만 · 고친 내용만): 버전별 기록(v2.X · '최신' 표시)에 desk-patch.json(안내) · desk-patch-files.json(고친 파일 묶음)을 올림
+#   → 앱(ver.2.30 부터)이 10분마다 안내만 보고 새 판이면 묶음을 받아 데스크만 다시 켬 (설치 프로그램 안 씀 · 바탕화면 아이콘 안 건드림)
+#   latest.yml 도 계속 올림: 아직 ver.2.27 ~ 2.29 인 앱은 이것으로 한 번 설치해 새 방식(2.30 이상)이 됨
 name: 설치 파일 만들기
 on:
   push:
@@ -39,6 +41,9 @@ jobs:
           echo "{\"build\":\"$v\",\"sha\":\"$(git log -1 --format=%h)\"}" > apps/desk/src/build.json
           if [ "$(echo "$v" | tr -cd . | wc -c)" -ge 2 ]; then sv="$v"; else sv="$v.0"; fi
           cd apps/desk && npm pkg set version=$sv
+      - name: 껍데기 이름 적기 (고친 내용만 바꿀 수 있는 판인지 · src/shell.json)
+        working-directory: apps/desk
+        run: node scripts/make-patch.js shell
       - name: 설치 파일 만들기
         working-directory: apps/desk
         env:
@@ -60,6 +65,12 @@ jobs:
           grep -q "path: astanakiz-desk-setup.exe" "$y" || { echo "latest.yml 의 설치 파일 이름이 다름"; cat "$y"; exit 1; }
           cp "$y" latest.yml
           upd="latest.yml"
+          # 고친 내용 묶음 (11/18): 안내의 판이 이번 판과 같아야 함
+          node apps/desk/scripts/make-patch.js bundle patch-out "v$v"
+          grep -q "\"build\": \"$v\"" patch-out/desk-patch.json || { echo "desk-patch.json 판이 다름"; cat patch-out/desk-patch.json; exit 1; }
+          test -s patch-out/desk-patch-files.json || { echo "desk-patch-files.json 이 없음"; exit 1; }
+          cp patch-out/desk-patch.json patch-out/desk-patch-files.json .
+          upd="$upd desk-patch.json desk-patch-files.json"
           [ -f apps/desk/dist/astanakiz-desk-setup.exe.blockmap ] && cp apps/desk/dist/astanakiz-desk-setup.exe.blockmap . && upd="$upd astanakiz-desk-setup.exe.blockmap"
           [ -f docs/manual/staff-manual.pdf ] && cp docs/manual/staff-manual.pdf astanakiz-staff-manual.pdf && files="$files astanakiz-staff-manual.pdf"
           notes="POS PC 설치용 — 받아서 더블클릭 → 설치. 직원 메뉴얼 PDF 같이 있음. 커밋 $(git log -1 --format=%h)"

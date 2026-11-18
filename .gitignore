@@ -1,3 +1,4 @@
 node_modules/
 dist/
 apps/desk/src/build.json
+apps/desk/src/shell.json

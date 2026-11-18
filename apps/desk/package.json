@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "아스타나키즈 입장 데스크 (POS PC 설치용)",
-  "main": "src/main.js",
+  "main": "src/boot.js",
   "scripts": {
     "start": "electron .",
     "test": "node --test test/*.test.js",

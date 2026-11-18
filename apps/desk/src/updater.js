@@ -1,9 +1,10 @@
-/* 새 판 저절로 바꾸기 (사장님 11/16 — 설치 파일을 따로 받아 지웠다가 다시 설치하지 않게: "업데이트 해" 하면 POS 프로그램이 스스로)
-   - GitHub Releases 최신 판(v2.X)의 latest.yml 을 켜고 1분 뒤 · 그 뒤 10분마다 확인 → 새 판이면 뒤에서 받음 (설치 파일 약 100MB)
-   - 다 받으면 데스크 위 띠: '새 판 ver.X — 1분 뒤 바꿔요 [지금 바꾸기] [30분 뒤에]' → 아무도 안 누르면 1분 뒤 조용히 설치하고 다시 켬 (20초쯤)
-   - 톡톡 보내기 · 재고 자동 오픈처럼 하는 일이 있으면 끝날 때까지 미룸 (2분마다 다시 봄) · 근무자가 프로그램을 끄면 끌 때 설치
+/* 새 판 바꾸기 규칙 — "업뎃해" 하실 때만 · 고친 내용만 (사장님 11/16 · 11/18)
+   - 새 판은 사장님이 "업뎃해" 하실 때만 나감 → 앱은 켜고 1분 뒤 · 그 뒤 10분마다 '나왔나' 보기만 함 (보기만으로는 아무것도 안 바뀜)
+   - 새 판이면 고친 내용 묶음을 뒤에서 받음 (patch.js · 약 2MB) — 예전(ver.2.27 ~ 2.29)처럼 설치 파일로 지웠다가 다시 설치하지 않음
+   - 다 받으면 데스크 위 띠: '새 판 ver.X — 1분 뒤 바꿔요 [지금 바꾸기] [30분 뒤에]' → 아무도 안 누르면 1분 뒤 데스크만 다시 켬 (몇 초)
+   - 톡톡 보내기 · 재고 자동 오픈처럼 하는 일이 있으면 끝날 때까지 미룸 (2분마다 다시 봄) · 근무자가 프로그램을 끄면 다음에 켤 때 새 판
    - 받는 곳은 공개 저장소 Releases 뿐 · 아무것도 보내지 않음 · 손님 정보 · 설정(사용자 폴더)은 그대로
-   au = electron-updater 의 autoUpdater (같은 모양의 가짜도 됨 — 시험) */
+   au = patch.js 의 PatchUpdater (electron-updater 의 autoUpdater 와 같은 모양 · 가짜도 됨 — 시험) */
 "use strict";
 const EventEmitter = require("events");
 
@@ -25,12 +26,6 @@ class DeskUpdater extends EventEmitter {
     this.s = { state: "idle", current: short(current), version: "", percent: 0, checkedAt: 0, readyAt: 0, applyAt: 0, laterUntil: 0, wait: "", error: "" };
     this.timer = null;
     this.applyTimer = null;
-    au.autoDownload = true; // 새 판이 있으면 바로 뒤에서 받음
-    au.autoInstallOnAppQuit = true; // 근무자가 프로그램을 끄면 끌 때 설치
-    au.disableDifferentialDownload = true; // 늘 통째로 (설치 파일 이름이 판마다 같아서)
-    au.allowDowngrade = false;
-    au.allowPrerelease = false;
-    au.disableWebInstaller = true; // 설치 파일을 통째로 받음 (웹 설치기 안 씀)
     const keep = (st) => (this.s.state === "ready" || this.s.state === "applying" ? this.s.state : st); // 받아 둔 뒤에는 확인 결과로 띠가 사라지지 않게
     au.on("checking-for-update", () => this.set({ state: keep("checking"), error: "" }));
     au.on("update-not-available", () => this.set({ state: keep("latest"), checkedAt: this.now() }));
@@ -71,7 +66,7 @@ class DeskUpdater extends EventEmitter {
     }
     return this.status();
   }
-  /** 다 받으면: 1분 띠 → 설치 · 하는 일이 있으면 끝날 때까지 (2분마다 다시 봄) */
+  /** 다 받으면: 1분 띠 → 바꾸기 · 하는 일이 있으면 끝날 때까지 (2분마다 다시 봄) */
   arm(ms = this.t.countdown) {
     this.tm.clearTimeout(this.applyTimer);
     const b = this.busy();
@@ -104,10 +99,10 @@ class DeskUpdater extends EventEmitter {
     this.set({ state: "applying", applyAt: 0 });
     this.emit("apply", this.s.version);
     try {
-      this.au.quitAndInstall(true, true); // 조용히 설치 · 끝나면 다시 켬
+      this.au.quitAndInstall(true, true); // 데스크만 다시 켬 (patch.js · 설치 없음)
     } catch (e) {
       this.set({ state: "ready", error: errText(e) });
-      return { ok: false, why: `설치를 시작하지 못함: ${errText(e)}` };
+      return { ok: false, why: `바꾸기를 시작하지 못함: ${errText(e)}` };
     }
     return { ok: true };
   }
