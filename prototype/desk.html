@@ -1336,13 +1336,17 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
         if (day === TODAY && p >= 1 && p <= o) { Object.assign(b, { qty: p, qtyBooked: o, qtyCut: o - p, qtyAsk: null, qtyPicked: true }); cut -= o - p; }
         else { Object.assign(b, { qty: o, qtyBooked: o, qtyCut: 0, qtyAsk: b.qtyAskRaw, qtyPicked: false }); open.push(b); }
       }
+      // 근무자가 하나라도 고른 뒤에만 나머지를 셈으로 (사장님 11/19 — 고른 것 없이 '하나 남으면 그 카드 것'으로 줄이니
+      //   칸 숫자가 잠깐 어긋난 때(방금 한 예약 · 이용완료 처리 중) 2장 카드가 새로고침마다 1장(부분취소) ↔ 2장으로 오락가락했음)
+      const picked = g.some((b) => b.qtyPicked);
       if (cut <= 0) for (const b of open) Object.assign(b, { qtyAsk: null }); // 고른 것으로 다 맞음 → 나머지는 취소 없음
-      else if (open.length === 1 && orig(open[0]) - cut >= 1) Object.assign(open[0], { qty: orig(open[0]) - cut, qtyCut: cut, qtyAsk: null }); // 하나 남음 → 나머지 취소 장수가 그 손님 것
+      else if (picked && open.length === 1 && orig(open[0]) - cut >= 1) Object.assign(open[0], { qty: orig(open[0]) - cut, qtyCut: cut, qtyAsk: null }); // 고르고 하나 남음 → 나머지 취소 장수가 그 손님 것
       for (const b of g) if (!b.qtyCut && !b.qtyAsk) b.qtyBooked = null;
     }
   }
   /** 카드 수량 옆 글 */
-  const qtyNote = (b) => (b.qtyAsk ? ` <span class="qask" title="네이버 시간 칸 ${b.qtyAsk.n}장 · 카드 합 ${b.qtyAsk.sum}장 — ${b.qtyAsk.cut}장 부분취소가 누구 것인지 몰라요 (입장 창에서 골라 주세요)">부분취소 확인</span>`
+  // 카드에는 확인된 부분취소만 (사장님 11/19 — 칸 숫자가 잠깐 어긋난 것을 '부분취소 확인'으로 띄우면 근무자가 헷갈림 · 입장 창에서만 고를 수 있게)
+  const qtyNote = (b) => (b.qtyAsk ? ""
     : b.qtyCut ? ` <span class="qcut">부분취소 ${b.qtyCut}장 · 처음 ${b.qtyBooked}장</span>` : "");
   // 네이버에 아직 이용완료를 못 누른 예약(연속예약의 뒤 예약 · '네이버 없이 등록')을 차례로 처리, 실패하면 2분마다 다시
   let flushing = false;
@@ -2593,7 +2597,8 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       // 설문조사 (사장님 10/14): 대상 손님은 번호를 먼저 눌러야 열쇠를 고름
       const sv = canEnter ? svFor(b) : null, svLock = !!sv && sheet.sv == null;
       // 부분취소 (11/11): 같은 시간 예약 중 누구 것인지 모르는 카드가 있으면 그 장수를 먼저 고름 (열쇠 수가 달라지니)
-      const qAsk = canEnter ? party.concat([b]).find((x) => x.qtyAsk) : null, qLock = !!qAsk;
+      // 칸 숫자가 카드 합보다 적은데 예약 상세로 확인을 못 함 → 막지 않음 (사장님 11/19 — 대개 칸 숫자가 늦게 따라온 것) · 손님이 환불했다고 할 때만 고름
+      const qAsk = canEnter ? party.concat([b]).find((x) => x.qtyAsk) : null, qLock = false;
       if (b.status === "확정") {
         let btns = "";
         for (let k = 1; k <= RULES.keys; k++) {
@@ -2609,7 +2614,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       const oddN = oddNext(b);
       const oddNote = partyNote + (oddN.length ? `<div class="banner warn"><b>⚠ 연속이용 아님</b> — ${oddN.map((o) => `${hm(o.other.slot)} 예약과 ${o.gap > 0 ? `${o.gap}분 비어요` : `${-o.gap}분 겹쳐요`}`).join(", ")}. 연속이용은 2시간 이내 간격 예약만이에요. 이 예약은 따로 1시간 50분 — 끝나면 나갔다가 다음 예약 시간에 다시 입장하도록 안내해 주세요 (중간에 열쇠가 모자랄 수 있어요)</div>` : "");
       const qOpts = (x) => { const o = x.qtyBooked || x.qty, lo = Math.max(1, o - x.qtyAsk.cut); return Array.from({ length: o - lo + 1 }, (_, i) => lo + i); };
-      const qNote = qAsk ? `<div class="banner warn"><b>⚠ 부분취소 확인</b> — ${hm(qAsk.slot)} 네이버 칸은 ${qAsk.qtyAsk.n}장인데 예약 카드 합은 ${qAsk.qtyAsk.sum}장이에요 (${qAsk.qtyAsk.cut}장 부분취소). 네이버 카드는 처음 수량이 그대로라 누구 것인지 몰라요 — ${qAsk === b ? "이 손님" : `${esc(qAsk.name)}님(같은 시간 예약)`} 실제 장수를 골라 주세요 (손님께 확인 · 네이버 예약 상세의 취소 내역)
+      const qNote = qAsk ? `<div class="banner qhint"><b>예약 수량 그대로 열쇠를 주세요</b> (지금 ${need}개) — ${hm(qAsk.slot)} 네이버 칸 숫자가 예약 카드 합보다 ${qAsk.qtyAsk.cut}장 적은데, 대개 방금 들어온 예약이 칸 숫자에 늦게 들어가서예요. 손님이 일부를 취소(환불)했다고 할 때만 ${qAsk === b ? "이 손님" : `${esc(qAsk.name)}님(같은 시간 예약)`} 실제 장수를 고르세요
           <span class="qpick">${qOpts(qAsk).map((k) => `<button class="btn btn-sm num" data-act="qtyPick" data-id="${qAsk.id}" data-n="${k}">${k}장</button>`).join("")}</span></div>`
         : b.qtyCut ? `<div class="banner"><b>부분취소</b> — 처음 ${b.qtyBooked}장 중 ${b.qtyCut}장 취소 · <b>남은 ${b.qty}장</b>만 입장 (${b.qtyPicked ? "근무자가 고름" : b.qtySrc === "detail" ? "네이버 예약 상세의 환불정보로 맞춤" : "네이버 시간 칸 숫자로 맞춤"})</div>` : "";
       const note = qNote + oddNote + chainNote + (b.status !== "확정" ? "" : b.day !== TODAY ? `<div class="banner warn">이용일(${b.day.slice(5).replace("-", "/")})에 입장 처리할 수 있어요</div>`

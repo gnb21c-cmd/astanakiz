@@ -102,17 +102,17 @@ test("부분취소: 카드 · 명단 수량은 남은 장수 · 열쇠도 남은
   }
 });
 
-test("부분취소: 예약 상세를 못 열면 '부분취소 확인' → 근무자가 실제 장수를 고름 (고르기 전 열쇠 못 고름) · 하나를 고르면 나머지는 셈으로 · 다시 켜도 그대로", async () => {
+test("부분취소: 예약 상세를 못 열면 줄이지 않음 (카드에 글 없음 · 열쇠도 안 막음 · 11/19) · 손님이 환불했다고 하면 입장 창에서 고름 · 하나를 고르면 나머지는 셈으로 · 다시 켜도 그대로", async () => {
   const browser = await launch();
   try {
     const { desk, errs } = await open(browser, "&nodetail=1");
     await desk.click('.slot[data-s="750"]');
-    assert.deepStrictEqual(await qtyRows(desk), { "두장손님나": "4인 입장권 2 부분취소 확인", "세장손님나": "4인 입장권 3 부분취소 확인" });
+    assert.deepStrictEqual(await qtyRows(desk), { "두장손님나": "4인 입장권 2", "세장손님나": "4인 입장권 3" }, "확인 못 한 부분취소는 카드에 안 띄움 (근무자 헷갈림 · 11/19)");
     await desk.click('.res:has-text("두장손님나")');
     const sheet = (await desk.textContent("#sheet")).replace(/\s+/g, " ");
-    assert.match(sheet, /⚠ 부분취소 확인 — 12:30 네이버 칸은 4장인데 예약 카드 합은 5장이에요 \(1장 부분취소\)\. .*이 손님 실제 장수를 골라 주세요/);
+    assert.match(sheet, /예약 수량 그대로 열쇠를 주세요 \(지금 2개\) — 12:30 네이버 칸 숫자가 예약 카드 합보다 1장 적은데, 대개 방금 들어온 예약이 칸 숫자에 늦게 들어가서예요\. 손님이 일부를 취소\(환불\)했다고 할 때만 이 손님 실제 장수를 고르세요/);
     assert.deepStrictEqual(await desk.$$eval("#sheet [data-act=qtyPick]", (e) => e.map((x) => x.textContent)), ["1장", "2장"]);
-    assert.strictEqual(await desk.$$eval(".kpick button:not([disabled])", (e) => e.length), 0, "장수를 고르기 전에는 열쇠를 못 고름");
+    assert.ok((await desk.$$eval(".kpick button:not([disabled])", (e) => e.length)) > 0, "열쇠를 막지 않음 (예전엔 고르기 전 못 고름)");
     await desk.click('#sheet [data-act=qtyPick][data-n="2"]'); // 이 손님은 취소 없음 → 1장 취소는 세장손님나 것
     assert.match(await desk.textContent("#toast"), /두장손님나님 2장으로 맞춤/);
     assert.match(await desk.textContent("#sheet .field .label"), /예약 수량 2개만큼/);
@@ -120,9 +120,9 @@ test("부분취소: 예약 상세를 못 열면 '부분취소 확인' → 근무
     assert.deepStrictEqual(await qtyRows(desk), { "두장손님나": "4인 입장권 2", "세장손님나": "4인 입장권 2 부분취소 1장 · 처음 3장" });
     assert.strictEqual((await desk.textContent("#res-sub")).trim(), "2명 · 수량 4");
     assert.deepStrictEqual(await desk.evaluate(() => window.__deskTest.qtyPicks()), { 1375200103: 2 });
-    // 11:00 은 여러 장 산 카드가 하나라 그대로 맞춤 (상세를 못 열어도)
+    // 11:00 은 여러 장 산 카드가 하나여도 칸 숫자만으로는 안 줄임 (11/19 — 예전엔 그 카드 것으로 줄였음) · 상세를 열면 그때 맞춤
     await desk.click('.slot[data-s="660"]');
-    assert.match((await qtyRows(desk))["부분취소가"], /1 부분취소 4장 · 처음 5장/);
+    assert.strictEqual((await qtyRows(desk))["부분취소가"], "4인 입장권 5");
     // 다시 불러와도 고른 것 그대로 (오늘 저장 파일 pq)
     await desk.click("[data-act=refresh]");
     await desk.waitForFunction(() => /불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 60000 });
@@ -140,7 +140,7 @@ test("부분취소: 예약 상세를 처음에 못 열어도 다음 불러오기
   try {
     const { desk, errs, np } = await open(browser, "", () => localStorage.setItem("mockNoDetail", "1"));
     await desk.click('.slot[data-s="750"]');
-    assert.deepStrictEqual(await qtyRows(desk), { "두장손님나": "4인 입장권 2 부분취소 확인", "세장손님나": "4인 입장권 3 부분취소 확인" });
+    assert.deepStrictEqual(await qtyRows(desk), { "두장손님나": "4인 입장권 2", "세장손님나": "4인 입장권 3" });
     await np.evaluate(() => localStorage.removeItem("mockNoDetail")); // 네이버 상세가 다시 열림
     await desk.click("[data-act=refresh]"); // 자동 불러오기와 같은 길 (칸 숫자는 그대로여도 못 맞춘 칸은 다시 읽음)
     await desk.waitForFunction(() => /불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 60000 });
@@ -176,6 +176,38 @@ test("칸 숫자가 늦게 따라옴 (사장님 11/19): 같은 손님 같은 시
     const st = await desk.$$eval(".res", (e) => e.map((x) => x.innerText.replace(/\s+/g, " ")));
     assert.ok(st.every((t) => /이용완료/.test(t)), "두 예약 모두 이용완료");
     assert.ok(st.some((t) => new RegExp(`같은 시간 예약 — \\d\\d:\\d\\d 첫 카드와 함께 입장 \\(열쇠 ${free.slice(0, 3).join(", ")}번\\)`).test(t)), "1장 카드: '연속예약'이 아니라 같은 시간 첫 카드와 함께 · 열쇠 번호");
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("칸 숫자가 잠깐 어긋나고 예약 상세도 못 엶 (사장님 11/19 16:00 — 새로고침마다 1장(부분취소) ↔ 2장 오락가락): 줄이지 않음 · 열쇠 3개 · 한 번 확인한 부분취소는 상세를 못 열어도 그대로", async () => {
+  const browser = await launch();
+  try {
+    const { desk, errs, np } = await open(browser, "&late=1", () => localStorage.setItem("mockNoDetail", "1"));
+    await desk.click('.slot[data-s="990"]');
+    const rows = () => desk.$$eval(".res", (e) => e.map((x) => [...x.querySelectorAll("dt")].find((d) => d.textContent === "수량").nextElementSibling.textContent.replace(/\s+/g, " ").trim()));
+    assert.deepStrictEqual(await rows(), ["4인 입장권 2", "4인 입장권 1"], "예전(2.31): '4인 입장권 1 부분취소 1장 · 처음 2장' (데스크가 '하나 남으면 그 카드 것'으로 줄였음)");
+    // 다시 불러와도 그대로 (오락가락 없음)
+    const reload = async (only) => { await desk.evaluate(() => { document.getElementById("refresh-at").textContent = ""; }); await desk.click(only ? `.slot[data-s="${only}"]` : "[data-act=refresh]"); if (!only) await desk.waitForFunction(() => /불러옴/.test(document.getElementById("refresh-at").textContent), null, { timeout: 60000 }); else await desk.waitForTimeout(4000); };
+    await reload();
+    await desk.click('.slot[data-s="990"]');
+    assert.deepStrictEqual(await rows(), ["4인 입장권 2", "4인 입장권 1"]);
+    await desk.click(".res >> nth=0");
+    assert.match(await desk.textContent("#sheet .field .label"), /같은 시간 예약 합계 3개만큼/);
+    assert.ok((await desk.$$eval(".kpick button:not([disabled])", (e) => e.length)) > 0, "열쇠를 막지 않음");
+    assert.match((await desk.textContent("#sheet")).replace(/\s+/g, " "), /예약 수량 그대로 열쇠를 주세요 \(지금 3개\)/);
+    await desk.click("#sheet [data-act=close]");
+    // 진짜 부분취소(11:00 5장 중 4장)는 상세를 한 번 읽으면 기억 → 그 뒤 상세를 못 열어도 1장 그대로
+    await np.evaluate(() => localStorage.removeItem("mockNoDetail"));
+    await reload();
+    await desk.click('.slot[data-s="660"]');
+    assert.strictEqual((await qtyRows(desk))["부분취소가"], "4인 입장권 1 부분취소 4장 · 처음 5장");
+    await np.evaluate(() => localStorage.setItem("mockNoDetail", "1"));
+    await reload(660); // 그 시간 칸만 다시 (카드를 새로 읽음)
+    await desk.click('.slot[data-s="660"]');
+    assert.strictEqual((await qtyRows(desk))["부분취소가"], "4인 입장권 1 부분취소 4장 · 처음 5장", "기억한 환불 장수 그대로");
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();

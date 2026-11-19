@@ -46,6 +46,12 @@ function partialFix(cards, n, kind) {
   for (const c of multi) out.set(c.no, { ask: { n, sum: sum + (n - rest), cut } });
   return out;
 }
+/** 상세로 아는 환불을 빼고도 카드 합이 칸 숫자보다 많은 장수 (0 이면 맞음) */
+function partialSurplus(cards, n, kind) {
+  const same = cards.filter((c) => { const k = kindOf(String(c.status || "").trim()); return !k || k === kind; });
+  const q = (c) => Number(c.qty) || 1;
+  return same.reduce((a, c) => a + q(c) - (Number.isInteger(c.refund) && c.refund >= 0 && c.refund < q(c) ? c.refund : 0), 0) - n;
+}
 
 /** 네이버 예약관리 주소(https://partner.booking.naver.com/bizes/653244/...)에서 목록·현황 주소 만들기 */
 function naverUrls(anyUrl) {
@@ -68,6 +74,7 @@ class NaverSync {
     this.onStep = opts.onStep || (() => {});
     this.onSnap = opts.onSnap || null; // 진단: 네이버 화면 저장 (이용완료 누른 뒤 · 안 됐을 때) // 진행 단계를 데스크에 알림 (현장에서 어디서 막히는지 보려고)
     this.days = new Map(); // 날짜 → Map("상품|시각|확정/이용완료" → { count, cards }) — 칸 숫자가 그대로면 다시 안 엶
+    this.refunds = new Map(); // 예약번호 → 예약 상세에서 읽은 환불 장수 (사장님 11/19 — 새로고침 때 상세를 못 열어도 오락가락하지 않게 · 칸이 또 어긋나면 다시 엶)
   }
   call(expr) {
     return this.exec(`(() => { (${NAVER_DRIVER_SOURCE})(); return ${expr}; })()`);
@@ -289,9 +296,13 @@ class NaverSync {
           warn.push(`${s.time} ${kind}`);
           continue; // 못 읽은 칸은 기억하지 않음 (다음에 다시)
         }
-        // 부분취소인데 누구 것인지 모르면(여러 장 산 카드가 둘 이상) 그 카드들의 상세를 열어 환불정보를 읽음 (최대 4장 · 못 읽으면 데스크가 근무자에게 물음)
-        const asks = [...partialFix(r.cards, n, kind).entries()].filter(([, f]) => f.ask).map(([no]) => no).slice(0, 4);
+        // 칸 숫자가 카드 합보다 적으면 여러 장 산 카드의 상세를 열어 환불정보를 읽음 (최대 4장 · 칸 숫자만으로는 안 줄임 · 못 읽으면 줄이지 않고 다음에 다시)
+        for (const x of r.cards) if (x.refund == null && this.refunds.has(x.no)) x.refund = this.refunds.get(x.no); // 전에 읽은 환불 장수
+        let asks = [...partialFix(r.cards, n, kind).entries()].filter(([, f]) => f.ask).map(([no]) => no);
+        if (!asks.length && partialSurplus(r.cards, n, kind) > 0) asks = r.cards.filter((x) => this.refunds.has(x.no) && (Number(x.qty) || 1) >= 2).map((x) => x.no); // 기억한 것으로도 안 맞음(그 뒤 또 취소 등) → 다시 엶
+        asks = asks.slice(0, 4);
         if (asks.length) await this.readRefunds(s.product, s.time, kind, r.cards, asks);
+        for (const x of r.cards) if (Number.isInteger(x.refund) && x.refund >= 0) this.refunds.set(x.no, x.refund);
         // 네이버 블랙리스트 (11/16): 특이사항은 예약 상세에만 → 앞에 읽은 것은 이어받고, 아직 모르는 블랙리스트 카드만 상세를 열어 봄 (칸마다 4장 · 한 예약 세 번까지)
         if (c) for (const x of r.cards) { const p = c.cards.find((y) => y.no === x.no); if (x.note == null && p && p.note != null) x.note = p.note; }
         const blk = r.cards.filter((x) => x.black && x.note == null && (this.noteTries.get(x.no) || 0) < 3).map((x) => x.no).slice(0, 4);
@@ -595,4 +606,4 @@ class NaverSync {
   }
 }
 
-module.exports = { NaverSync, isKidsTicket, isBaseTicket, naverUrls, partialFix };
+module.exports = { NaverSync, isKidsTicket, isBaseTicket, naverUrls, partialFix, partialSurplus };

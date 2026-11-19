@@ -84,6 +84,8 @@ test("재방문 안내 (사장님 11/16): 기한 8일 남은 손님에게 한 �
     // 다시 열기 전에 '보냄'이 저장소에 들어갔는지 (바쁠 때 쓰기가 늦을 수 있어 5초까지)
     const saved = await page.waitForFunction(() => /8\|01011110001/.test(localStorage.getItem("astanakiz-revsent-2026-11-15") || ""), null, { timeout: 5000 }).then(() => true, () => false);
     assert.ok(saved, "보냄을 누르면 그날 저장소에 남음 (다시 열기 전)");
+    // Chromium 은 저장소에 쓴 것을 조금 뒤에 넘김 → 바쁠 때 바로 다시 열면 쓰기가 사라짐 (11/19 전체 시험에서 두 번 · 진단: 다시 연 뒤 revsent 키가 없음)
+    await page.waitForTimeout(1500);
     await page.reload();
     await page.waitForTimeout(300);
     const ok2 = await page.waitForFunction(() => document.getElementById("rev-btn").textContent.trim() === "재방문 안내2", null, { timeout: 15000 }).then(() => true, () => false); // 보냄은 그날 이 PC 에 남음 (다시 연 직후 화면이 다 그려질 때까지)
