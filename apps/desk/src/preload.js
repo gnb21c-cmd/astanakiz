@@ -104,6 +104,7 @@ contextBridge.exposeInMainWorld("desk", {
     csv: (from, text) => ipcRenderer.send("ledger:csv", from, text), // 바탕화면 엑셀 정리본
     dirs: () => ipcRenderer.sendSync("ledger:dirs"),
     open: () => ipcRenderer.invoke("ledger:open"), // 바탕화면 폴더 열기
+    onSynced: (cb) => ipcRenderer.on("ledger:synced", (_e, v) => cb(v)), // 사무실 PC: 현장 POS 에서 재방문 장부를 받음 (11/19)
   },
   print: {
     list: () => ipcRenderer.invoke("print:list"),

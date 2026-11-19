@@ -215,3 +215,60 @@ test("우편함 오류 (규칙 없음 403 · 인터넷): 상태에 이유 · 다
   assert.strictEqual(off.sync.status().ok, true);
   assert.strictEqual(off.st.settings.liveOn, false, "다시 되면 밀린 설정이 감");
 });
+
+test("재방문 장부 (사장님 11/19): 현장 → 사무실 — 사무실이 열려 있고 지문이 다를 때만 실음 · 받으면 다시 안 실음 · 장부가 바뀌면 다시 · 사무실이 꺼져 있으면 안 실음 · 너무 길면 지난 이벤트부터 덜어냄", async () => {
+  const clock = mkClock(Date.parse("2026-11-19T10:00:00+09:00")), mb = mailbox();
+  const pos = pc("pos", mb, clock), off = pc("office", mb, clock);
+  const line = (k, n, day) => JSON.stringify({ k, n, no: `${k}-${n}`, name: "가손님", phone: k, day, st: "안내" }) + "\n";
+  let L = { h: "h1", cur: "2026-10-26", events: { "2026-10-26": line("01011110001", 3, "2026-11-01") } };
+  pos.sync.local.ledger = () => L;
+  const got = []; let have = "";
+  off.sync.local.ledgerHave = () => have;
+  off.sync.local.applyLedger = (x) => { got.push(x); have = x.h; };
+  const posDoc = () => { const env = JSON.parse(mb.docs.pos.json); return S.unseal(S.deriveKey("ABCD-EFGH-JKLM-NPQR", BOARD), env.box, `pos|${env.build}`); };
+  await run(clock, [pos, off], 20);
+  assert.deepStrictEqual(got.map((x) => [x.h, x.cur, Object.keys(x.events), x.cut]), [["h1", "2026-10-26", ["2026-10-26"], false]], "사무실이 받음");
+  assert.match(got[0].events["2026-10-26"], /01011110001/);
+  await run(clock, [pos, off], 90);
+  assert.strictEqual(got.length, 1, "받은 뒤엔 다시 안 실음");
+  assert.strictEqual(posDoc().lh, "h1");
+  assert.strictEqual(posDoc().led, undefined, "현장 문서에 장부 없음 (지문만)");
+  // 장부가 바뀜 (현장에서 한 줄 더) → 1분 안에 다시
+  L = { h: "h2", cur: "2026-10-26", events: { "2026-10-26": L.events["2026-10-26"] + line("01022220002", 1, "2026-11-19") } };
+  await run(clock, [pos, off], 70);
+  assert.deepStrictEqual(got.map((x) => x.h), ["h1", "h2"]);
+  // 사무실이 꺼짐 (3분 넘게 소식 없음) → 장부가 바뀌어도 안 실음
+  await run(clock, [pos], 200);
+  L = { h: "h3", cur: "2026-10-26", events: { "2026-10-26": L.events["2026-10-26"] + line("01033330003", 1, "2026-11-19") } };
+  await run(clock, [pos], 120);
+  assert.strictEqual(posDoc().led, undefined, "사무실이 꺼져 있으면 실지 않음");
+  // 사무실을 다시 켜면 받음
+  await run(clock, [pos, off], 90);
+  assert.deepStrictEqual(got.map((x) => x.h), ["h1", "h2", "h3"]);
+  // 너무 김 (압축이 안 되는 지난 이벤트 장부 약 93만 자 → 잠근 문서가 한도를 넘음) → 지난 이벤트를 빼고 지금 이벤트만
+  const big = require("crypto").randomBytes(700000).toString("base64");
+  L = { h: "h4", cur: "2026-10-26", events: { "2026-09-01": big, "2026-10-26": L.events["2026-10-26"] } };
+  await run(clock, [pos, off], 90);
+  const last = got[got.length - 1];
+  assert.deepStrictEqual([last.h, Object.keys(last.events), last.cut], ["h4", ["2026-10-26"], true], "지난 이벤트를 덜어냄");
+  assert.ok(mb.docs.pos.json.length < S.MAX_DOC, "문서 길이 한도 안");
+  assert.match(pos.sync.status().ledger, /오래된 것은 빼고/);
+  // 덜어내는 차례: 지난 이벤트 → 지금 이벤트의 오래된 줄부터 반씩
+  assert.deepStrictEqual(S.trimLedger({ a: "1\n", b: "x\ny\nz\nw\n" }, "b", 0), { b: "x\ny\nz\nw\n" });
+  assert.deepStrictEqual(S.trimLedger({ b: "x\ny\nz\nw\n" }, "b", 1), { b: "z\nw\n" });
+  assert.strictEqual(S.trimLedger({ b: "x\n" }, "b", 2), null);
+});
+
+test("재방문 장부: 버전이 다르면 싣지 않음 (사무실이 못 풂)", async () => {
+  const clock = mkClock(Date.parse("2026-11-19T10:00:00+09:00")), mb = mailbox();
+  const pos = pc("pos", mb, clock), off = pc("office", mb, clock, { build: "2.19" });
+  pos.sync.local.ledger = () => ({ h: "h1", cur: "2026-10-26", events: { "2026-10-26": "{}\n" } });
+  const got = [];
+  off.sync.local.ledgerHave = () => "";
+  off.sync.local.applyLedger = (x) => got.push(x);
+  await run(clock, [pos, off], 30);
+  const env = JSON.parse(mb.docs.pos.json);
+  const p = S.unseal(S.deriveKey("ABCD-EFGH-JKLM-NPQR", BOARD), env.box, `pos|${env.build}`);
+  assert.strictEqual(p.led, undefined);
+  assert.deepStrictEqual(got, []);
+});

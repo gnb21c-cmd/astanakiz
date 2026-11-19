@@ -1708,7 +1708,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       if (evEarly(b)) return `<span class="help">이벤트 켜기 전 입장</span>`;
       if (evOut(b)) return `<span class="help bcmile">이벤트 제외 (BC)</span>`; // 투아웃 = 마일리지 · 이벤트 모두 아님 (사장님 11/05)
       const ev = evOf(b);
-      if (!ev) return `<span class="help">이용완료 횟수 확인 중</span>`;
+      if (!ev) return `<span class="help">${OFFICE && evLog().missing ? "재방문 기록 받는 중 (현장 POS 에서)" : "이용완료 횟수 확인 중"}</span>`;
       const tip = esc(evLabel(ev));
       if (ev.st === "성공") return `<span class="evcoupon" title="${tip}">이벤트 도전 성공</span>`;
       return `${first && !ev.same ? firstTag : ""}<span class="evstart" title="${tip}">${ev.same ? "오늘 이미 방문" : "이벤트 도전 시작"}</span>`;
@@ -4019,6 +4019,8 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c && c.visitEvent) { evLoadCfg(c.visitEvent); renderAll(); } }).catch(() => {});
   else try { evLoadCfg(JSON.parse(localStorage.getItem("astanakiz-visitevent"))); } catch (e) { /* 없음 */ }
   const evFile = () => APP && window.desk.ledger;
+  // 사무실 PC: 현장 POS 에서 장부를 새로 받으면 다시 읽어 카드에 (11/19)
+  if (evFile() && window.desk.ledger.onSynced) window.desk.ledger.onSynced(() => { evL.clear(); renderAll(); });
   /* 장부 (메모리) — 시작일마다 { from, people: 전화번호 → { name, phone, base, last, visits: [{ at, day, n, no, st, due }] }, nos: 적은 예약번호, count } */
   const evL = new Map();
   function evLog(from = EV.from) {
@@ -4027,6 +4029,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     evL.set(from, L);
     let t = null;
     try { t = from ? (evFile() ? window.desk.ledger.load(from) : localStorage.getItem(EV_LS + from)) : null; } catch (e) { t = null; }
+    if (OFFICE && evFile() && from && t === null) L.missing = true; // 사무실 PC: 현장 POS 장부를 아직 한 번도 못 받음 (11/19)
     for (const line of String(t || "").split("\n")) {
       if (!line.trim()) continue;
       try { evPut(L, JSON.parse(line)); } catch (e) { /* 반쯤 쓴 줄(갑자기 꺼짐)은 건너뜀 */ }
@@ -4130,7 +4133,8 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       이벤트는 **방문한 날** 기준 (사장님 10/15): 그날 몇 장 · 몇 건(나눠 한 예약 · 연속예약 · 입장 뒤 추가 예약 · 다시 등록)이든 그날 방문은 한 번
       → 오늘 이미 기록이 있으면 '오늘 이미 방문'(기한 그대로 · 사은품 없음) · 성공은 오늘 뒤 날짜에 다시 올 때만 (네이버 완료 순번은 안 봄) */
   function evOf(b) {
-    if (OFFICE) return null; // 사무실 PC: 이벤트 장부는 현장 POS 에만
+    // 사무실 PC 도 현장 POS 에서 받은 장부로 같게 판정 (사장님 11/19 — "재방문 정보도 보여야지" · 예전 11/06 ~ 11/19 는 사무실에서 안 함 → '이용완료 횟수 확인 중'만 보였음)
+    if (OFFICE && evLog().missing) return null; // 아직 못 받았으면 판정하지 않음 ('재방문 기록 받는 중')
     if (!evFrozen(b) || evOut(b)) return null; // BC 투아웃 이상은 이벤트 대상 아님 (사장님 11/05)
     const n = b.status === "완료" ? b.visitNo : b.prevDone == null ? null : b.prevDone + 1;
     if (!n) return null;

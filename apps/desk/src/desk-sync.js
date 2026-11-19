@@ -9,6 +9,8 @@
    - 설정(SHARED 키): 키마다 마지막으로 바꾼 때(t)가 늦은 쪽이 이김
    - 근무자 메모장: 메모 · 전달마다 마지막으로 바꾼 때(u) · 지운 것(gone) · 근무자 목록(su)
    - 현장 POS → 사무실: 지금 화면(snap — 사무실 PC 가 열려 있을 때만) · 명령 결과(acks)
+   - 현장 POS → 사무실: 재방문 장부(led · 사장님 11/19 — 사무실 카드에도 '이벤트 도전 시작 · 성공') — 사무실이 열려 있고 사무실이 가진 장부 지문(lh)이 다를 때만 · 1분에 한 번까지
+     (우편함 규칙상 문서는 pos · office 둘뿐 → 따로 문서를 두지 않고 현장 문서에 같이 · 문서가 너무 길면 지난 이벤트 장부부터 덜어냄)
    - 사무실 → 현장 POS: 명령(cmds — 수량 조절 등, 현장 POS 가 네이버에 넣음) · 10분 넘게 늦은 명령은 안 함 · 같은 명령은 한 번만
    이 파일은 Electron 없이 시험할 수 있게 우편함 읽기 · 쓰기(io)를 밖에서 받음 */
 const crypto = require("crypto");
@@ -22,7 +24,17 @@ const ALPHA = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"; // 헷갈리는 0 · 1 · I ·
 const CODE_LEN = 16;
 const CMD_TTL = 10 * 60 * 1000; // 명령은 10분 안에 닿아야 함
 const PEER_IDLE = 150 * 1000; // 반대편 소식이 2분 30초 넘게 없으면 꺼진 것으로
-const T = { activePull: 4000, idlePull: 15000, beat: 60000, minPush: 3000, officePush: 1000 };
+const T = { activePull: 4000, idlePull: 15000, beat: 60000, minPush: 3000, officePush: 1000, ledgerGap: 60000 };
+const MAX_DOC = 880000; // 우편함 한 문서 900,000자 미만 (보고 시스템 규칙) — 넘으면 장부를 덜어냄
+
+/** 재방문 장부 덜어내기 (문서가 너무 길 때): 지난 이벤트 → 지금 이벤트의 오래된 줄부터 반씩 · events = { 시작일: 장부 글 } · cur = 지금 이벤트 시작일 */
+function trimLedger(events, cur, step) {
+  const ks = Object.keys(events || {});
+  if (step === 0 && ks.some((k) => k !== cur)) return { [cur]: events[cur] || "" };
+  const lines = String((events || {})[cur] || "").split("\n").filter(Boolean);
+  if (lines.length < 2) return null;
+  return { [cur]: lines.slice(Math.floor(lines.length / 2)).join("\n") + "\n" };
+}
 
 /** 연결 코드 새로 만들기 "ABCD-EFGH-JKLM-NPQR" */
 function newCode() {
@@ -156,9 +168,10 @@ class DeskSync {
     this.dirty = true; this.lastPut = 0; this.lastPutTry = 0; this.lastGet = 0;
     this.snap = null; this.snapDirty = false;
     this.cmds = []; // 사무실: 보낸 명령 (결과를 받을 때까지)
+    this.ledgerAt = 0; // 현장: 장부를 마지막으로 실어 보낸 때 · peer.lh = 사무실이 가진 장부 지문
     this.acks = []; // 현장: 명령 결과 (15분)
-    this.peer = { n: -1, build: "", at: "", seen: 0, changed: 0, gotN: -1 };
-    this.st = { ok: null, why: "", putWhy: "", getWhy: "", same: null, codeOk: null };
+    this.peer = { n: -1, build: "", at: "", seen: 0, changed: 0, gotN: -1, lh: "" };
+    this.st = { ok: null, why: "", putWhy: "", getWhy: "", same: null, codeOk: null, ledger: "" };
   }
   get role() { return this.cfg.role; }
   /** 연결 코드 · 보고 열쇠로 잠금 열쇠 (바뀌었을 때만 다시 — scrypt 는 느림) */
@@ -193,12 +206,25 @@ class DeskSync {
     });
   }
   emitStatus() { if (this.on.status) this.on.status(this.status()); }
+  /** 현장: 지금 장부 { h(지문), cur(지금 이벤트 시작일), events: { 시작일: 글 } } 또는 null — main.js 가 몇 분마다 새로 셈 */
+  ledgerNow() { return this.role === "pos" && this.local.ledger ? this.local.ledger() : null; }
+  /** 현장: 이번에 장부를 실어 보낼까 — 사무실이 열려 있고 · 사무실 지문이 다르고 · 1분에 한 번까지 */
+  ledgerDue() {
+    const L = this.ledgerNow();
+    return !!(L && L.h && this.st.same === true && this.peerActive() && this.peer.lh !== L.h && this.now() - this.ledgerAt >= T.ledgerGap); // 같은 버전일 때만 (다르면 사무실이 못 풂)
+  }
   /** 내 문서 내용 */
   payload() {
     const s = this.local.settings(), meta = this.local.meta(), m = this.local.memo();
     const p = { n: this.n, at: stamp(this.now()), build: this.cfg.build, set: packSettings(s, meta), memo: m.memo, mm: m.mm };
-    if (this.role === "pos") { p.acks = this.acks; p.snap = this.peerActive() ? this.snap : null; p.seen = this.peer.gotN; }
-    else { p.cmds = this.cmds.filter((c) => this.now() - c.t < CMD_TTL); p.open = true; }
+    if (this.role === "pos") {
+      p.acks = this.acks; p.snap = this.peerActive() ? this.snap : null; p.seen = this.peer.gotN;
+      const L = this.ledgerNow();
+      if (L && L.h) { p.lh = L.h; if (this.ledgerDue()) { p.led = L.events; p.lcur = L.cur; } }
+    } else {
+      p.cmds = this.cmds.filter((c) => this.now() - c.t < CMD_TTL); p.open = true;
+      p.lh = this.local.ledgerHave ? String(this.local.ledgerHave() || "") : ""; // 내가 가진 장부 지문 → 현장이 다르면 실어 보냄
+    }
     return p;
   }
   /** 쓸 때인가: 바뀐 것이 있으면 (현장은 3초 · 사무실은 1초 간격) · 사무실은 1분마다 '열려 있음' · 현장은 사무실이 열려 있으면 1분마다 */
@@ -207,6 +233,7 @@ class DeskSync {
     if (t - this.lastPutTry < gap) return false;
     if (this.dirty) return true;
     if (this.role === "pos" && this.snapDirty && this.peerActive()) return true;
+    if (this.role === "pos" && this.ledgerDue()) return true;
     if (this.role === "office" || this.peerActive()) return t - this.lastPut >= T.beat;
     return false;
   }
@@ -215,7 +242,15 @@ class DeskSync {
     this.lastPutTry = this.now();
     this.n++;
     const p = this.payload(), aad = `${this.role}|${this.cfg.build}`;
-    const json = JSON.stringify({ type: "astanakiz-sync", v: 1, role: this.role, build: this.cfg.build, n: this.n, at: p.at, box: seal(this.key, p, aad) });
+    const env = () => JSON.stringify({ type: "astanakiz-sync", v: 1, role: this.role, build: this.cfg.build, n: this.n, at: p.at, box: seal(this.key, p, aad) });
+    let json = env();
+    // 장부를 실어 너무 길면 덜어냄 (지난 이벤트 → 오래된 줄부터) · 그래도 길면 장부 없이
+    for (let step = 0; p.led && json.length >= MAX_DOC; step++) {
+      const t = trimLedger(p.led, p.lcur, step);
+      if (t) { p.led = t; p.lcut = true; } else { delete p.led; delete p.lcur; delete p.lcut; this.st.ledger = "장부가 너무 길어 사무실로 못 보냈어요"; }
+      json = env();
+    }
+    if (p.led) { this.ledgerAt = this.now(); this.st.ledger = p.lcut ? "장부가 길어 오래된 것은 빼고 보냈어요" : ""; }
     const wasDirty = this.dirty, wasSnap = this.snapDirty;
     this.dirty = false; this.snapDirty = false;
     const r = await this.io.put(this.role, json, p.at);
@@ -268,6 +303,7 @@ class DeskSync {
       if (!same(m.memo, p.memo)) this.dirty = true;
     }
     if (pos) {
+      this.peer.lh = typeof p.lh === "string" ? p.lh : ""; // 사무실이 가진 장부 지문
       const done = new Set(this.local.done());
       for (const c of Array.isArray(p.cmds) ? p.cmds : []) {
         if (!c || !/^[0-9a-f]{12}$/.test(c.id) || done.has(c.id)) continue;
@@ -279,6 +315,13 @@ class DeskSync {
       if (p.open) this.snapDirty = this.snapDirty || (fresh && !!this.snap);
     } else {
       if (p.snap && this.on.snap) this.on.snap(p.snap, env.at);
+      // 재방문 장부 (11/19): 현장이 실어 보낸 것 → 이 PC 에 두고 화면을 다시 · 받았다고 바로 알림(내 지문)
+      const have = this.local.ledgerHave ? String(this.local.ledgerHave() || "") : "";
+      if (p.led && typeof p.led === "object" && typeof p.lh === "string" && p.lh && p.lh !== have && this.local.applyLedger) {
+        this.local.applyLedger({ h: p.lh, cur: String(p.lcur || ""), events: p.led, cut: !!p.lcut, at: env.at });
+        this.dirty = true;
+        if (this.on.ledger) this.on.ledger(p.lh);
+      }
       for (const a of Array.isArray(p.acks) ? p.acks : []) {
         const i = this.cmds.findIndex((c) => c.id === a.id);
         if (i < 0) continue;
@@ -303,4 +346,4 @@ class DeskSync {
   }
 }
 
-module.exports = { SHARED, ROLES, T, CMD_TTL, PEER_IDLE, newCode, normCode, fmtCode, deriveKey, seal, unseal, stampSettings, pickSettings, settingsAhead, packSettings, stampMemo, mergeMemo, DeskSync, stamp, atMs };
+module.exports = { SHARED, ROLES, T, CMD_TTL, PEER_IDLE, MAX_DOC, trimLedger, newCode, normCode, fmtCode, deriveKey, seal, unseal, stampSettings, pickSettings, settingsAhead, packSettings, stampMemo, mergeMemo, DeskSync, stamp, atMs };

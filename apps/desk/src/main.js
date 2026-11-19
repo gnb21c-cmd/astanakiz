@@ -1098,21 +1098,58 @@ ipcMain.on("state:save", (_e, day, json) => {
 const ledgerStore = require("./ledger-store");
 const { comTurn, partsBytes, partsPause, comTimeouts, PORT_WAIT_MS } = require("./com-queue");
 const ledgerDirs = () => ({ app: path.join(app.getPath("userData"), "visit-ledger"), desk: path.join(app.getPath("desktop"), ledgerStore.DESK_FOLDER) });
+/* 재방문 장부 함께 보기 (사장님 11/19 — "재방문 정보도 보여야지 · 가려야 하는 내용이 아니야"): 현장 POS → 사무실 PC
+   현장: 몇 분마다 · 장부에 한 줄 적은 뒤 장부(지금 이벤트 + 지난 이벤트)를 모아 지문(h)을 셈 → desk-sync 가 사무실이 열려 있고 지문이 다를 때 실어 보냄 (연결 코드로 잠김)
+   사무실: 받은 장부를 앱 폴더 office-ledger.json 에 두고 ledger:load 로 줌 (읽기만 — 사무실은 장부에 쓰지 않고 바탕화면 정리본도 안 만듦) */
+let ledgerShare = null; // 현장: { h, cur, events }
+let officeLedger = null; // 사무실: { h, cur, events, cut, at }
+const OFFICE_LEDGER = () => path.join(app.getPath("userData"), "office-ledger.json");
+const isDayStr = (d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d || ""));
+function ledgerShareNow() {
+  if (RUN_ROLE !== "pos") return;
+  try {
+    const ev = settings.visitEvent || {};
+    const cur = isDayStr(ev.from) ? ev.from : "";
+    const froms = [...new Set([cur, ...(Array.isArray(ev.past) ? ev.past.map((x) => x && x.from) : [])])].filter((f) => isDayStr(f) && f <= localToday());
+    if (!froms.length) { ledgerShare = null; return; }
+    const events = {};
+    for (const f of froms.sort()) events[f] = ledgerStore.load(ledgerDirs(), f).text || "";
+    const h = require("crypto").createHash("sha1").update(JSON.stringify(events)).digest("hex").slice(0, 16);
+    if (!ledgerShare || ledgerShare.h !== h) ledgerShare = { h, cur: cur || froms[froms.length - 1], events };
+  } catch (e) {
+    /* 다음에 다시 */
+  }
+}
+let ledgerShareT = null;
+const ledgerShareSoon = () => { if (RUN_ROLE !== "pos") return; clearTimeout(ledgerShareT); ledgerShareT = setTimeout(ledgerShareNow, 15000); };
+function officeLedgerLoad() {
+  try { const o = JSON.parse(fs.readFileSync(OFFICE_LEDGER(), "utf8")); if (o && o.h && o.events && typeof o.events === "object") officeLedger = o; } catch (e) { /* 아직 없음 */ }
+}
+function officeLedgerApply(L) {
+  const events = {};
+  for (const [f, t] of Object.entries(L.events || {})) if (isDayStr(f) && typeof t === "string") events[f] = t;
+  officeLedger = { h: String(L.h), cur: isDayStr(L.cur) ? L.cur : "", events, cut: !!L.cut, at: String(L.at || "") };
+  try { fs.writeFileSync(OFFICE_LEDGER(), JSON.stringify(officeLedger)); } catch (e) { /* 다음에 다시 받음 */ }
+  toDesk("ledger:synced", { h: officeLedger.h, at: officeLedger.at, cut: officeLedger.cut });
+}
 ipcMain.on("ledger:load", (e, from) => {
   try {
+    if (RUN_ROLE === "office") { e.returnValue = officeLedger ? officeLedger.events[from] || "" : null; return; } // 사무실: 현장에서 받은 장부 (11/19) · 아직 한 번도 못 받았으면 null
     e.returnValue = ledgerStore.load(ledgerDirs(), from).text;
   } catch (err) {
     e.returnValue = null;
   }
 });
 ipcMain.on("ledger:add", (e, from, line) => {
+  if (RUN_ROLE === "office") { e.returnValue = { app: false, desk: false }; return; } // 사무실은 장부에 쓰지 않음
   try {
     e.returnValue = ledgerStore.add(ledgerDirs(), from, line);
+    ledgerShareSoon(); // 사무실로 (15초 뒤 모아서)
   } catch (err) {
     e.returnValue = { app: false, desk: false };
   }
 });
-ipcMain.on("ledger:csv", (_e, from, text) => { ledgerStore.csv(ledgerDirs(), from, text); });
+ipcMain.on("ledger:csv", (_e, from, text) => { if (RUN_ROLE !== "office") ledgerStore.csv(ledgerDirs(), from, text); });
 ipcMain.on("ledger:dirs", (e) => { e.returnValue = ledgerDirs(); });
 ipcMain.handle("ledger:open", async () => {
   const d = ledgerDirs().desk;
@@ -1597,6 +1634,9 @@ function syncStart() {
     applyMemo: (m) => { const c = staffMemo.clean(m.memo); staffMemo.save(histDir(), c); syncSt.mm = m.mm; syncSave(); toDesk("sync:memo", c); },
     done: () => syncSt.done,
     markDone: (id) => { syncSt.done = syncSt.done.concat([id]).slice(-300); syncSave(); },
+    ledger: () => ledgerShare, // 현장: 재방문 장부 (11/19)
+    ledgerHave: () => (officeLedger ? officeLedger.h : ""), // 사무실: 가진 장부 지문
+    applyLedger: (L) => officeLedgerApply(L),
   };
   const on = {
     snap: (snap, at) => toDesk("sync:snap", { snap, at }),
@@ -1606,6 +1646,8 @@ function syncStart() {
   };
   syncEngine = new deskSync.DeskSync({ role: RUN_ROLE, build: BUILD, board: surveyKey, code: syncCode }, io, local, on);
   setInterval(() => { syncEngine.tick().catch(() => {}); }, 1000);
+  if (RUN_ROLE === "office") officeLedgerLoad(); // 지난번에 받은 장부 (켜자마자 카드에)
+  if (RUN_ROLE === "pos") { ledgerShareNow(); setInterval(ledgerShareNow, 3 * 60 * 1000); } // 재방문 장부 → 사무실 (3분마다 · 적은 뒤 15초)
 }
 ipcMain.on("sync:role", (e) => { e.returnValue = RUN_ROLE; });
 ipcMain.handle("sync:get", () => {
