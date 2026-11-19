@@ -18,17 +18,21 @@ const NAVER = "file://" + path.join(__dirname, "..", "mock", "naver.html");
 const DESK = "file://" + path.join(__dirname, "..", "..", "..", "prototype", "desk.html");
 const launch = () => chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
 
-test("partialFix: 칸 숫자 − 카드 합 = 부분취소 장수 · 여러 장 산 카드가 하나면 그 카드 · 둘 이상이면 물음 · 상세 환불정보가 먼저", () => {
+test("partialFix: 칸 숫자 − 카드 합 = 부분취소 장수 · 예약 상세 환불정보를 읽은 카드만 줄임 · 모르는 여러 장 카드는 물음(앱이 상세를 열어 봄) — 칸 숫자만으로는 안 줄임 (11/19)", () => {
   const c = (no, qty, status = "확정", refund) => ({ no, qty, status, refund });
   const fix = (cards, n, kind = "확정") => Object.fromEntries(partialFix(cards, n, kind));
-  assert.deepStrictEqual(fix([c("a", 5), c("b", 1)], 2), { a: { qty: 1, booked: 5, cut: 4, src: "cell" } }, "5장 + 1장인데 칸 2 → 5장 카드가 4장 취소");
+  assert.deepStrictEqual(fix([c("a", 5), c("b", 1)], 2), { a: { ask: { n: 2, sum: 6, cut: 4 } } }, "5장 + 1장인데 칸 2 → 5장 카드가 모름 (상세를 열어 봄 · 예전엔 칸 숫자만으로 4장 취소)");
+  assert.deepStrictEqual(fix([c("a", 5, "확정", 4), c("b", 1)], 2), { a: { qty: 1, booked: 5, cut: 4, src: "detail" } }, "상세 환불정보로 4장 취소");
+  // 사장님 11/19: 같은 손님이 같은 시간 2장 + 1장 · 1장은 방금 예약해 칸 숫자에 아직 없음(칸 2) → 예전엔 2장 카드를 1장으로 줄여 열쇠 2개 · 두 예약 함께 이용완료
+  assert.deepStrictEqual(fix([c("a", 2), c("b", 1)], 2), { a: { ask: { n: 2, sum: 3, cut: 1 } } }, "칸이 늦게 따라옴 — 칸 숫자만으로는 안 줄임");
+  assert.deepStrictEqual(fix([c("a", 2, "확정", 0), c("b", 1)], 2), {}, "상세에 환불이 없으면 그대로 (2장 + 1장 = 열쇠 3개)");
   assert.deepStrictEqual(fix([c("a", 2), c("b", 1)], 3), {}, "맞으면 그대로");
   assert.deepStrictEqual(fix([c("a", 2)], 3), {}, "카드를 덜 읽었으면(합 < 칸) 손대지 않음");
   assert.deepStrictEqual(fix([c("a", 2), c("b", 3)], 4), { a: { ask: { n: 4, sum: 5, cut: 1 } }, b: { ask: { n: 4, sum: 5, cut: 1 } } }, "여러 장 산 카드가 둘 → 누구 것인지 모름");
   assert.deepStrictEqual(fix([c("a", 2, "확정", 0), c("b", 3, "확정", 1)], 4), { b: { qty: 2, booked: 3, cut: 1, src: "detail" } }, "상세 환불정보를 읽은 카드는 그대로");
-  assert.deepStrictEqual(fix([c("a", 2, "확정", 0), c("b", 3)], 4), { b: { qty: 2, booked: 3, cut: 1, src: "cell" } }, "하나를 상세로 알면 나머지는 칸 숫자로");
+  assert.deepStrictEqual(fix([c("a", 2, "확정", 0), c("b", 3)], 4), { b: { ask: { n: 4, sum: 5, cut: 1 } } }, "하나를 상세로 알아도 나머지는 칸 숫자만으로 안 줄임 (상세를 열어 봄)");
   assert.deepStrictEqual(fix([c("a", 4, "확정", 2)], 2), { a: { qty: 2, booked: 4, cut: 2, src: "detail" } }, "칸에 1건 = 예약 상세 (환불내역 X1 두 건)");
-  assert.deepStrictEqual(fix([c("a", 4, "이용완료"), c("x", 3, "신청")], 2, "이용완료"), { a: { qty: 2, booked: 4, cut: 2, src: "cell" } }, "다른 상태 카드는 셈에서 뺌");
+  assert.deepStrictEqual(fix([c("a", 4, "이용완료"), c("x", 3, "신청")], 2, "이용완료"), { a: { ask: { n: 2, sum: 4, cut: 2 } } }, "다른 상태 카드는 셈에서 뺌");
 });
 
 /** 가짜 네이버(?partial=1) → 앱 본체 NaverSync → 데스크 */
@@ -74,7 +78,7 @@ test("부분취소: 카드 · 명단 수량은 남은 장수 · 열쇠도 남은
     assert.deepStrictEqual(await qtyRows(desk), { "부분취소가": "4인 입장권 1 부분취소 4장 · 처음 5장", "한장손님가": "4인 입장권 1" });
     // 입장: 열쇠 1개만 누르면 됨 (예전엔 5개를 눌러야 등록)
     await desk.click('.res:has-text("부분취소가")');
-    assert.match((await desk.textContent("#sheet")).replace(/\s+/g, " "), /부분취소 — 처음 5장 중 4장 취소 · 남은 1장만 입장 \(네이버 시간 칸 숫자로 맞춤\)/);
+    assert.match((await desk.textContent("#sheet")).replace(/\s+/g, " "), /부분취소 — 처음 5장 중 4장 취소 · 남은 1장만 입장 \(네이버 예약 상세의 환불정보로 맞춤\)/, "칸 숫자만으로는 안 줄이고 상세를 열어 봄 (11/19)");
     assert.match(await desk.textContent("#sheet .field .label"), /예약 수량 1개만큼/);
     await desk.click(".kpick button:not([disabled]) >> nth=0");
     assert.strictEqual(await desk.isEnabled("#enter-done"), true, "열쇠 1개로 입장 등록");
@@ -143,6 +147,35 @@ test("부분취소: 예약 상세를 처음에 못 열어도 다음 불러오기
     await desk.click('.slot[data-s="750"]');
     assert.deepStrictEqual(await qtyRows(desk), { "두장손님나": "4인 입장권 2", "세장손님나": "4인 입장권 2 부분취소 1장 · 처음 3장" });
     assert.deepStrictEqual(await desk.evaluate(() => window.__deskTest.qtyPicks()), {}, "근무자가 고른 것 없음");
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("칸 숫자가 늦게 따라옴 (사장님 11/19): 같은 손님 같은 시간 2장 + 1장 · 1장은 방금 예약해 칸 숫자 2 → 예약 상세를 열어 환불 없음 → 2장 그대로 · 열쇠 3개 · 두 예약 함께 이용완료 · 더 누르면 창 안 빨간 경고", async () => {
+  // 실제(11/19 12:00): 칸 숫자만 보고 2장 카드를 '1장 부분취소'로 줄여 → 입장 창이 열쇠 2개만 받음(9번 안 눌림) → 그래도 두 예약 모두 이용완료 → 9번을 서비스 키로 줬음
+  const browser = await launch();
+  try {
+    const { desk, errs } = await open(browser, "&late=1");
+    assert.deepStrictEqual(await cells(desk, 990), ["0", "2", "8"], "네이버 칸 확정 2 · 잔여 8 (방금 한 1장 예약이 칸에 아직 없음)");
+    await desk.click('.slot[data-s="990"]');
+    const rows = () => desk.$$eval(".res", (e) => e.map((x) => [...x.querySelectorAll("dt")].find((d) => d.textContent === "수량").nextElementSibling.textContent.replace(/\s+/g, " ").trim()));
+    assert.deepStrictEqual(await rows(), ["4인 입장권 2", "4인 입장권 1"], "2장 카드를 줄이지 않음 (예전: '4인 입장권 1 부분취소 1장 · 처음 2장')");
+    await desk.click(".res >> nth=0");
+    const sheet = () => desk.textContent("#sheet").then((t) => t.replace(/\s+/g, " "));
+    assert.match(await sheet(), /같은 시간 예약 2건 \(2장 \+ 1장\)/);
+    assert.match(await desk.textContent("#sheet .field .label"), /같은 시간 예약 합계 3개만큼/);
+    const free = await desk.$$eval(".kpick button:not([disabled])", (e) => e.slice(0, 4).map((x) => Number(x.dataset.k)));
+    for (const k of free.slice(0, 3)) await desk.click(`.kpick [data-k="${k}"]`);
+    // 하나 더 누르면 안 눌리고 창 안에 남는 빨간 경고 (사라지는 알림만으로는 놓침)
+    await desk.click(`.kpick [data-k="${free[3]}"]`);
+    assert.match(await desk.textContent("#sheet .keyover"), new RegExp(`${free[3]}번은 안 눌렸어요 — 이 입장은 열쇠 3개까지예요 \\(같은 시간 예약 2장 \\+ 1장\\) · 고른 열쇠 ${free.slice(0, 3).join(", ")}번`));
+    await desk.click("#enter-done");
+    await desk.waitForFunction(() => window.__deskTest.holders().some((h) => h.name === "늦은칸가" && h.keys.length === 3), null, { timeout: 10000 });
+    const st = await desk.$$eval(".res", (e) => e.map((x) => x.innerText.replace(/\s+/g, " ")));
+    assert.ok(st.every((t) => /이용완료/.test(t)), "두 예약 모두 이용완료");
+    assert.ok(st.some((t) => new RegExp(`같은 시간 예약 — \\d\\d:\\d\\d 첫 카드와 함께 입장 \\(열쇠 ${free.slice(0, 3).join(", ")}번\\)`).test(t)), "1장 카드: '연속예약'이 아니라 같은 시간 첫 카드와 함께 · 열쇠 번호");
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();

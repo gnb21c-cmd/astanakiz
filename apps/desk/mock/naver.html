@@ -72,6 +72,10 @@
       { no: "1375200103", name: "두장손님나", phone: "010-8100-1003", time: "12:30", product: 0, qty: 2, status: "확정", done: 1, cancel: 0 },
       { no: "1375200104", name: "세장손님나", phone: "010-8100-1004", time: "12:30", product: 0, qty: 3, cut: 1, status: "확정", done: 4, cancel: 0 },
       { no: "1375200105", name: "완료부분다", phone: "010-8100-1005", time: "13:00", product: 0, qty: 4, cut: 2, status: "완료", done: 6, cancel: 0 },
+    ] : []).concat(P.get("late") ? [
+      // 칸 숫자가 늦게 따라옴 (사장님 11/19 — 실제: 같은 손님이 같은 시간 2장 + 1장 · 1장은 방금 예약해 칸 숫자에 아직 없음 → 2장 카드를 '1장 부분취소'로 잘못 줄였음) · late = 칸 숫자에 안 셈 (지어낸 손님)
+      { no: "1378500101", name: "늦은칸가", phone: "010-8400-4001", time: "16:30", product: 0, qty: 2, status: "확정", done: 2, cancel: 0 },
+      { no: "1378500102", name: "늦은칸가", phone: "010-8400-4001", time: "16:30", product: 0, qty: 1, status: "확정", done: 2, cancel: 0, late: true },
     ] : []).concat(P.get("black") ? [
       // 네이버 블랙리스트 (사장님 11/16): 이름 옆 빨간 '블랙리스트' · 예약 상세의 '특이사항' (지어낸 손님)
       { no: "1377400101", name: "차가온", phone: "010-8300-3001", time: "15:00", product: 0, qty: 1, status: "확정", done: 3, cancel: 1, black: true, memo: "* 10/1 - 30분 늦게 나오심, 패널티 안 내고 가심. 예약자와 오신 분이 다름" },
@@ -135,8 +139,8 @@
     const cell = (p, t) => {
       if (!has(p, t)) return `<div class="Calendar__week-cell__ntFou Calendar__week-rest__4uV-Y"><div class="Calendar__week-cell-inner__tqaOB"></div></div>`;
       const bs = list.filter((b) => b.product === p && b.time === t && b.status !== "취소");
-      const conf = bs.filter((b) => b.status === "확정").reduce((a, b) => a + left(b), 0);
-      const done = bs.filter((b) => b.status === "완료").reduce((a, b) => a + left(b), 0);
+      const conf = bs.filter((b) => b.status === "확정" && !b.late).reduce((a, b) => a + left(b), 0); // late = 방금 한 예약이 칸 숫자에 아직 없음 (11/19)
+      const done = bs.filter((b) => b.status === "완료" && !b.late).reduce((a, b) => a + left(b), 0);
       const [ap, hm] = ampm(t);
       return `<div class="Calendar__week-cell__ntFou" title="예약 등록"><div class="Calendar__week-cell-inner__tqaOB Calendar__clickable__lL1Wp" data-p="${p}" data-t="${t}">
         <span class="btn btn-xs calendar-btn btn-trans">${P.get("compact") ? "" : `<span class="text">${ap}</span>`}<span class="time">${hm}</span></span>
@@ -167,7 +171,7 @@
       const shown0 = P.get("nocards") ? [] : bs.filter((b) => b.status === sel.s);
       const shown = sel.d ? shown0.filter((b) => b.no === sel.d) : shown0; // 목록 카드의 손님 칸을 누르면 그 예약 상세 (부분취소 11/11)
       // 결제/환불정보 (실제 화면 11/11): 부분취소 건마다 환불내역 "[평일할인]4인 입장권(12,000X1)"
-      const payHtml = (b) => P.get("partial") ? `<h3>결제/환불정보</h3><dl><dt>결제상태</dt><dd>결제완료</dd><dt>원결제금액</dt><dd>${(12000 * b.qty).toLocaleString()}원</dd></dl>${b.cut ? `<h3>환불정보</h3><dl><dt>환불내역 합계</dt><dd>${(12000 * b.cut).toLocaleString()}원</dd></dl>${Array.from({ length: b.cut }, (_, i) => `<p>2026. 10. 4.(일) 오후 3:0${i} 취소완료</p><dl><dt>결제상태</dt><dd>환불완료</dd><dt>환불내역</dt><dd>[평일할인]4인 입장권(12,000X1)</dd><dt>환불금액</dt><dd>12,000원 (100%)</dd></dl>`).join("")}` : ""}` : "";
+      const payHtml = (b) => P.get("partial") || P.get("late") ? `<h3>결제/환불정보</h3><dl><dt>결제상태</dt><dd>결제완료</dd><dt>원결제금액</dt><dd>${(12000 * b.qty).toLocaleString()}원</dd></dl>${b.cut ? `<h3>환불정보</h3><dl><dt>환불내역 합계</dt><dd>${(12000 * b.cut).toLocaleString()}원</dd></dl>${Array.from({ length: b.cut }, (_, i) => `<p>2026. 10. 4.(일) 오후 3:0${i} 취소완료</p><dl><dt>결제상태</dt><dd>환불완료</dd><dt>환불내역</dt><dd>[평일할인]4인 입장권(12,000X1)</dd><dt>환불금액</dt><dd>12,000원 (100%)</dd></dl>`).join("")}` : ""}` : "";
       // 실제처럼: 그 상태 예약이 1건이면 목록 대신 '예약 상세정보'가 바로 뜸 (처음 온 손님은 '신규예약')
       if (shown.length === 1) {
         const b = shown[0]; const [ap, hm] = ampm(b.time);

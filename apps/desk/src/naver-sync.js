@@ -27,6 +27,8 @@ const isBaseTicket = (name) => /입장권/.test(name) && !/단체/.test(name);
    - 예약 상세정보를 읽은 카드(칸에 예약이 1건 · 또는 상세를 열어 봄)는 '환불정보'의 환불내역 장수(refund)가 정확한 답 → 그것을 먼저 (src "detail")
      나머지 카드만 칸 숫자로 맞춤 (src "cell") */
 const kindOf = (st) => (/^(이용)?완료$/.test(st) ? "이용완료" : st === "확정" ? "확정" : st ? "기타" : "");
+/** 부분취소 맞추기: 칸 숫자(남은 장수) n 과 카드 합을 견줌 → Map(예약번호 → { qty, booked, cut, src: "detail" } 또는 { ask })
+    예약 상세의 환불정보(refund)를 읽은 카드만 줄임 · 모르는 여러 장 카드는 ask (앱이 상세를 열어 봄 → 그래도 모르면 근무자가 고름) */
 function partialFix(cards, n, kind) {
   const out = new Map();
   const same = cards.filter((c) => { const k = kindOf(String(c.status || "").trim()); return !k || k === kind; });
@@ -37,9 +39,11 @@ function partialFix(cards, n, kind) {
   const open = same.filter((c) => !known(c));
   const sum = open.reduce((a, c) => a + q(c), 0), cut = sum - rest;
   if (!(n > 0) || cut <= 0) return out;
+  // 칸 숫자만으로는 줄이지 않음 (사장님 11/19): 같은 손님이 방금 1장을 더 예약하면 칸 숫자가 늦게 따라와(칸 2 · 카드 2장 + 1장)
+  //   2장 카드를 '1장 부분취소'로 잘못 줄여 열쇠 2개만 받고 두 예약을 함께 이용완료했음 → 여러 장 산 카드는 모두 '모름'(ask)
+  //   → 앱이 예약 상세의 환불정보를 열어 봄(loadDay) · 환불이 있으면 그만큼(detail) · 없으면(0) 그대로 · 못 열면 근무자가 입장 창에서 고름
   const multi = open.filter((c) => q(c) >= 2);
-  if (multi.length === 1 && q(multi[0]) - cut >= 1) out.set(multi[0].no, { qty: q(multi[0]) - cut, booked: q(multi[0]), cut, src: "cell" });
-  else for (const c of multi) out.set(c.no, { ask: { n, sum: sum + (n - rest), cut } });
+  for (const c of multi) out.set(c.no, { ask: { n, sum: sum + (n - rest), cut } });
   return out;
 }
 

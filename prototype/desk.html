@@ -769,6 +769,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
 .keypad button.fn { font-size: 15px; }
 .banner { border-radius: 9px; padding: 7px 10px; font-size: 13px; background: var(--naver-bg); }
 .banner.warn { background: var(--warn-bg); }
+.banner.keyover { border: 2px solid var(--red); } /* 입장 창: 받을 수 있는 열쇠보다 더 누름 (11/19) */
 .banner b { font-weight: 700; }
 .stack-btns { display: grid; gap: 6px; }
 .stack-btns .btn { min-height: 50px; font-size: 16px; border-radius: 12px; }
@@ -1722,6 +1723,13 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     return (first ? firstTag : "") + (done ? `<b>${nums}번째 예약완료</b>${gift}${sub ? ` <span class="help">(네이버 ${b.visitNo} − 이벤트 ${sub})</span>` : ""}`
       : `완료 ${b.prevDone - sub}${c} → <b>${nums}번 완료 예정</b>${last > n ? ` · 함께 ${last - n + 1}건` : ""}${gift}${P.sep ? ` <span class="help">(오늘 앞 예약 ${P.sep}건 포함)</span>` : ""}${sub ? ` <span class="help">(네이버 완료 ${b.prevDone} − 이벤트 ${sub})</span>` : ""}`);
   }
+  /** 입장 창: 받을 수 있는 열쇠보다 더 누름 → 창 안 빨간 경고 (사장님 11/19 — 9번이 안 눌린 것을 몰랐음) */
+  function keyOverHtml(b, party, need) {
+    if (sheet.over == null) return "";
+    const g = party.length > 1 ? party : [b];
+    const cut = g.reduce((a, x) => a + (x.qtyCut || 0), 0);
+    return `<div class="banner warn keyover"><b>${sheet.over}번은 안 눌렸어요</b> — 이 입장은 열쇠 <b class="num">${need}개</b>까지예요 (${g.length > 1 ? `같은 시간 예약 ${g.map((x) => `${x.qty}장`).join(" + ")}` : `예약 ${b.qty}장`}${cut ? ` · 부분취소 ${cut}장 빠짐` : ""}) · 고른 열쇠 <b class="num">${sheet.keys.join(", ") || "없음"}</b>번<br>손님이 더 많으면 입장 뒤 현장입장으로 더 팔아 주세요${cut ? " · 부분취소가 아니면 손님께 확인하고 관리자에게 알려 주세요" : ""}</div>`;
+  }
   /** 이 카드(대표)에서 입장하면 함께 이용완료되는 미입장 예약 — 입장 처리(doEnter)와 같은 순서: 같은 시간 나눈 예약 → 연속예약 뒤 타임 (사람이 늘면 거기서 끊음) */
   function entryGroup(b) {
     const out = partyOpen(b).slice(), ch = chainOf(b);
@@ -1788,7 +1796,11 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
         else act = `<span class="go">눌러서 입장 · 열쇠 지급 ›</span>${now < b.slot - RULES.earlyMinutes ? `<span class="help num">안내 ${hm(b.slot - RULES.earlyMinutes)} · 일찍 입장 가능</span>` : ""}`;
       } else if (b.keys.length) act = `<span class="kchips">${b.keys.map((k) => `<span class="kchip num">${k}</span>`).join("")}</span><span class="help num">${hm(b.enteredAt)} 입장</span>`;
       else if (b.outAt != null) act = `<span class="help num">${hm(b.enteredAt)} 입장 · ${hm(b.outAt)} 퇴장</span>`;
-      else if (b.chainHead) act = `<span class="help num">연속예약 — ${hm(b.enteredAt)} 첫 예약으로 입장</span>`;
+      else if (b.chainHead) {
+        // 같은 시간 나눠 한 예약은 '연속예약'이 아니라 첫 카드와 함께 입장 · 열쇠는 첫 카드에 (사장님 11/19 — 헷갈렸음)
+        const hd = (bookings[b.day] || []).find((x) => x.id === b.chainHead);
+        act = hd && hd.slot === b.slot ? `<span class="help num">같은 시간 예약 — ${hm(b.enteredAt)} 첫 카드와 함께 입장${hd.keys.length ? ` (열쇠 ${hd.keys.join(", ")}번)` : ""}</span>` : `<span class="help num">연속예약 — ${hm(b.enteredAt)} 첫 예약으로 입장</span>`;
+      }
       if (b.giftDue) act += b.giftGiven ? `<span class="help num">${RULES.giftName} ${b.giftGiven} 전달</span>` : `<span class="npend">${b.giftDue}번째 ${RULES.giftName} 전달 전 — 손님께 연락해 전달 (열쇠 창 [사은권 전달함])</span>`;
       if (b.naverPending) act += `<span class="npend">${b.naverBusy ? "네이버 이용완료 처리 중…" : `네이버 이용완료 대기${b.naverWhy ? ` — ${esc(b.naverWhy)}` : ""} (자동으로 다시)`}</span>`;
       return `<article class="res ${b.status === "완료" ? "done" : ""}${bcHit(b, 2) ? " bc2" : bcHit(b, 1) ? " bc1" : ""}" data-act="openRes" data-id="${b.id}" tabindex="0" role="button" aria-label="${esc(b.name)} 예약 열기">
@@ -2588,7 +2600,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
           const used = !!holderOf(k), on = sheet.keys.includes(k);
           btns += `<button type="button" class="num ${on ? "on" : ""}" data-act="pickKey" data-k="${k}" ${used || !canEnter || svLock || qLock ? "disabled" : ""} aria-pressed="${on}" aria-label="${k}번${used ? " 지급됨" : ""}">${k}</button>`;
         }
-        pickHtml = `<div class="field"><span class="label">지급할 열쇠 <span class="help num">${svLock ? `<b class="svwarn">설문 번호를 먼저 눌러 주세요</b> · ` : ""}${party.length > 1 ? "같은 시간 예약 합계" : "예약 수량"} ${need}개만큼 누르세요 · ${sheet.keys.length}/${need} · 흐린 번호는 이미 지급됨</span></span><div class="kpick">${btns}</div></div>`;
+        pickHtml = `<div class="field"><span class="label">지급할 열쇠 <span class="help num">${svLock ? `<b class="svwarn">설문 번호를 먼저 눌러 주세요</b> · ` : ""}${party.length > 1 ? "같은 시간 예약 합계" : "예약 수량"} ${need}개만큼 누르세요 · ${sheet.keys.length}/${need} · 흐린 번호는 이미 지급됨</span></span><div class="kpick">${btns}</div></div>${keyOverHtml(b, party, need)}`;
       }
       const chainNote = ch.length < 2 ? "" : ci > 0 ? `<div class="banner warn">연속예약 ${ci + 1}/${ch.length} — 첫 예약(${hm(ch[0].slot)}) 카드에서 입장 처리하면 이 예약도 함께 이용완료돼요</div>`
         : `<div class="banner"><b>★${ch.length}타임 연속예약</b> (${ch.map((x) => `${hm(x.slot)} ${x.qty}장`).join(" · ")}) — 입장하면 ${ch.length}건 모두 이용완료 · 열쇠 ${b.qty}개: ${keyPlan(ch, b.qty)}</div>`;
@@ -5653,10 +5665,15 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     pickKey(btn) {
       const k = Number(btn.dataset.k), b = findB(sheet.id), need = partyNeed(b);
       if (svFor(b) && sheet.sv == null) { toast("설문 번호를 먼저 눌러 주세요"); return; }
+      sheet.over = null;
       if (sheet.keys.includes(k)) sheet.keys = sheet.keys.filter((x) => x !== k);
       else if (sheet.keys.length < need) sheet.keys.push(k);
       else if (need === 1) sheet.keys = [k];
-      else { toast(`수량 ${need}개를 이미 골랐어요. 고른 번호를 다시 눌러 빼 주세요`); return; }
+      else {
+        // 사장님 11/19: 7 · 8 · 9 를 눌렀는데 9 가 안 눌린 것을 모르고 [입장] — 사라지는 알림만으로는 놓침 → 창 안에 남김
+        sheet.over = k;
+        toast(`수량 ${need}개를 이미 골랐어요 — ${k}번은 안 눌렸어요`);
+      }
       renderSheet();
     },
     key(btn) {
