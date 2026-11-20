@@ -175,7 +175,7 @@ test("칸 숫자가 늦게 따라옴 (사장님 11/19): 같은 손님 같은 시
     await desk.waitForFunction(() => window.__deskTest.holders().some((h) => h.name === "늦은칸가" && h.keys.length === 3), null, { timeout: 10000 });
     const st = await desk.$$eval(".res", (e) => e.map((x) => x.innerText.replace(/\s+/g, " ")));
     assert.ok(st.every((t) => /이용완료/.test(t)), "두 예약 모두 이용완료");
-    assert.ok(st.some((t) => new RegExp(`같은 시간 예약 — \\d\\d:\\d\\d 첫 카드와 함께 입장 \\(열쇠 ${free.slice(0, 3).join(", ")}번\\)`).test(t)), "1장 카드: '연속예약'이 아니라 같은 시간 첫 카드와 함께 · 열쇠 번호");
+    assert.ok(st.some((t) => new RegExp(`같은 시간 예약 — \\d\\d:\\d\\d 함께 입장 \\(열쇠 ${free.slice(0, 3).join(", ")}번\\)`).test(t)), "1장 카드: '연속예약'이 아니라 같은 시간 예약과 함께 · 열쇠 번호");
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();

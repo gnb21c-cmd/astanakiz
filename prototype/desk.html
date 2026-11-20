@@ -1445,13 +1445,16 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
      간격이 2시간이 아니게 이어 잡은 예약(11:30 · 14:00 등)은 '시간 어긋남'으로 따로 표시 — 근무자가 시간 조정 · 나갔다 다시 입장을 안내
      방문 횟수(마일리지)는 네이버와 같이 예약 건수로 셈 — 연속예약도 예약마다 1회 */
   const CHAIN_STEP = RULES.useMinutes + 10; // 120분
-  const samePerson = (b) => (bookings[b.day] || []).filter((x) => x.name === b.name && digits(x.phone) === digits(b.phone) && x.phone).sort((x, y) => x.slot - y.slot);
+  const nameKey = (s) => String(s || "").normalize("NFC").replace(/\s+/g, ""); // 이름 견주기: 띄어쓰기 · 한글 저장 방식(휴대폰마다 NFC/NFD) 차이 무시 (11/20)
+  const samePerson = (b) => (bookings[b.day] || []).filter((x) => nameKey(x.name) === nameKey(b.name) && digits(x.phone) === digits(b.phone) && x.phone).sort((x, y) => x.slot - y.slot);
   /** 이 예약 전 네이버 '완료' 수 — 같은 사람이 오늘 이미 따로 입장(이용완료)했는데 네이버를 다시 불러오기 전이면 '완료 n'이 옛 숫자 → 그만큼 올림 (10/15) */
   const doneSoFar = (b) => { let m = b.prevDone; if (m == null) return m; for (const x of samePerson(b)) if (x !== b && x.status === "완료") { const e = x.visitEnd || x.visitNo; if (e != null && e > m) m = e; } return m; };
   const liftDone = (x) => { if (x.status === "완료") return; const m = doneSoFar(x); if (m != null && m > x.prevDone) x.prevDone = m; };
   /* 같은 사람(이름 + 전화번호)이 같은 시간에 예약을 나눠 한 것 (1장 + 1장 등) → 한 번에 입장 · 네이버도 모두 이용완료 (사용자 지시 10/7)
      첫 카드(예약번호 순) = 대표, 열쇠는 합친 장수만큼 대표에게 */
-  const partyOf = (b) => (b && b.phone ? samePerson(b).filter((x) => x.slot === b.slot).sort((x, y) => String(x.no || x.id).localeCompare(String(y.no || y.id))) : [b]);
+  /* 같은 시간 묶음 (사장님 11/20 — "동일인/동일 전화번호로 확인된 1/N … N/N 이면 어느 카드든 눌러 수량만큼 열쇠를"): 같은 시간 + 같은 전화번호면 이름이 달라도 묶음
+     예전: 이름 · 전화가 둘 다 같아야 묶고 · 예약번호가 빠른 첫 카드에서만 합계 열쇠 → 이름이 조금 달라 안 묶이면 카드마다 1개 · 현장은 서비스 키로 처리했음 */
+  const partyOf = (b) => (b && digits(b.phone) ? (bookings[b.day] || []).filter((x) => x.slot === b.slot && digits(x.phone) === digits(b.phone)).sort((x, y) => String(x.no || x.id).localeCompare(String(y.no || y.id))) : [b]);
   const slotQty = (b) => partyOf(b).reduce((a, x) => a + x.qty, 0);
   /** 입장할 때 같이 처리할 같은 시간 예약 (아직 입장 전인 것) · 대표 = 그중 첫 번째 */
   const partyOpen = (b) => partyOf(b).filter((x) => x.status === "확정");
@@ -1793,17 +1796,18 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       const chainTag = oddTag + (ch.length < 2 ? "" : ci === 0 ? `<div class="chain">★${ch.length}타임 연속예약 <span class="num">${ch.map((x) => hm(x.slot)).join(" · ")}</span></div>` : `<div class="chain sub num">연속예약 ${ci + 1}/${ch.length} · 첫 예약 ${hm(ch[0].slot)}</div>`);
       const pty = partyOf(b), ptyOpen = partyOpen(b);
       const partyTag = pty.length > 1 ? `<div class="chain">같은 시간 예약 ${pty.indexOf(b) + 1}/${pty.length} · 함께 입장</div>` : "";
-      if (b.status === "확정" && ptyOpen.indexOf(b) > 0) act = `<span class="help num">같은 시간 첫 카드에서 함께 입장 처리</span>`;
-      else if (b.status === "확정" && ci > 0) act = `<span class="help num">첫 예약(${hm(ch[0].slot)})에서 함께 입장 처리</span>`;
+      // 같은 시간 묶음은 어느 카드에서든 입장 (사장님 11/20 — 예전엔 첫 카드에서만 · 둘째 카드는 "같은 시간 첫 카드에서 함께 입장 처리")
+      const pHead = ptyOpen[0] || b, pCh = ptyOpen.length > 1 ? chainOf(pHead) : ch, pCi = pCh.indexOf(pHead);
+      if (b.status === "확정" && (ptyOpen.length > 1 ? pCi > 0 : ci > 0)) act = `<span class="help num">첫 예약(${hm((ptyOpen.length > 1 ? pCh : ch)[0].slot)})에서 함께 입장 처리</span>`;
       else if (b.status === "확정") {
         if (!isToday) act = `<span class="help">이용일에 입장 처리</span>`;
-        else act = `<span class="go">눌러서 입장 · 열쇠 지급 ›</span>${now < b.slot - RULES.earlyMinutes ? `<span class="help num">안내 ${hm(b.slot - RULES.earlyMinutes)} · 일찍 입장 가능</span>` : ""}`;
+        else act = `<span class="go">눌러서 입장 · 열쇠 지급 ›</span>${ptyOpen.length > 1 ? `<span class="help num">같은 시간 ${ptyOpen.length}건 함께 · 열쇠 ${partyNeed(b)}개</span>` : ""}${now < b.slot - RULES.earlyMinutes ? `<span class="help num">안내 ${hm(b.slot - RULES.earlyMinutes)} · 일찍 입장 가능</span>` : ""}`;
       } else if (b.keys.length) act = `<span class="kchips">${b.keys.map((k) => `<span class="kchip num">${k}</span>`).join("")}</span><span class="help num">${hm(b.enteredAt)} 입장</span>`;
       else if (b.outAt != null) act = `<span class="help num">${hm(b.enteredAt)} 입장 · ${hm(b.outAt)} 퇴장</span>`;
       else if (b.chainHead) {
-        // 같은 시간 나눠 한 예약은 '연속예약'이 아니라 첫 카드와 함께 입장 · 열쇠는 첫 카드에 (사장님 11/19 — 헷갈렸음)
+        // 같은 시간 나눠 한 예약은 '연속예약'이 아니라 함께 입장 · 열쇠는 누른 카드에 (사장님 11/19 — 헷갈렸음 · 11/20 어느 카드든)
         const hd = (bookings[b.day] || []).find((x) => x.id === b.chainHead);
-        act = hd && hd.slot === b.slot ? `<span class="help num">같은 시간 예약 — ${hm(b.enteredAt)} 첫 카드와 함께 입장${hd.keys.length ? ` (열쇠 ${hd.keys.join(", ")}번)` : ""}</span>` : `<span class="help num">연속예약 — ${hm(b.enteredAt)} 첫 예약으로 입장</span>`;
+        act = hd && hd.slot === b.slot ? `<span class="help num">같은 시간 예약 — ${hm(b.enteredAt)} 함께 입장${hd.keys.length ? ` (열쇠 ${hd.keys.join(", ")}번)` : ""}</span>` : `<span class="help num">연속예약 — ${hm(b.enteredAt)} 첫 예약으로 입장</span>`;
       }
       if (b.giftDue) act += b.giftGiven ? `<span class="help num">${RULES.giftName} ${b.giftGiven} 전달</span>` : `<span class="npend">${b.giftDue}번째 ${RULES.giftName} 전달 전 — 손님께 연락해 전달 (열쇠 창 [사은권 전달함])</span>`;
       if (b.naverPending) act += `<span class="npend">${b.naverBusy ? "네이버 이용완료 처리 중…" : `네이버 이용완료 대기${b.naverWhy ? ` — ${esc(b.naverWhy)}` : ""} (자동으로 다시)`}</span>`;
@@ -2591,12 +2595,12 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     if (sheet.mode === "rev") { el.innerHTML = revHtml(); setTimeout(revFill, 0); return; }
     if (sheet.mode === "enter") {
       const b = findB(sheet.id);
-      const ch = chainOf(b), ci = ch.indexOf(b);
-      const m = ch.length > 1 ? chainMinutes(ch) : bookMinutes(b);
       // 예약 당일이면 언제든 입장 (5분 전은 손님 안내 기준일 뿐, 근무자가 현장 상황을 보고 더 일찍 들여보낼 수 있음)
-      // 연속예약의 두 번째부터는 첫 예약에서 함께 처리
-      const party = partyOpen(b), pi = party.indexOf(b), need = partyNeed(b);
-      const canEnter = b.status === "확정" && b.day === TODAY && ci <= 0 && pi <= 0;
+      // 같은 시간 묶음은 어느 카드에서든 합계 열쇠로 함께 (11/20) · 연속예약의 두 번째부터는 첫 예약에서 함께 처리 (묶음 첫 카드 기준)
+      const party = partyOpen(b), pi = party.indexOf(b), need = partyNeed(b), head = party[0] || b;
+      const ch = chainOf(head), ci = ch.indexOf(head);
+      const m = ch.length > 1 ? chainMinutes(ch) : bookMinutes(b);
+      const canEnter = b.status === "확정" && b.day === TODAY && ci <= 0;
       const early = canEnter && now < b.slot - RULES.earlyMinutes;
       let pickHtml = "";
       // 설문조사 (사장님 10/14): 대상 손님은 번호를 먼저 눌러야 열쇠를 고름
@@ -2614,8 +2618,8 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       }
       const chainNote = ch.length < 2 ? "" : ci > 0 ? `<div class="banner warn">연속예약 ${ci + 1}/${ch.length} — 첫 예약(${hm(ch[0].slot)}) 카드에서 입장 처리하면 이 예약도 함께 이용완료돼요</div>`
         : `<div class="banner"><b>★${ch.length}타임 연속예약</b> (${ch.map((x) => `${hm(x.slot)} ${x.qty}장`).join(" · ")}) — 입장하면 ${ch.length}건 모두 이용완료 · 열쇠 ${b.qty}개: ${keyPlan(ch, b.qty)}</div>`;
-      const partyNote = party.length < 2 || b.status !== "확정" ? "" : pi > 0 ? `<div class="banner warn">같은 시간 예약 ${pi + 1}/${party.length} — 첫 카드(예약번호 ${esc(party[0].no || "")})에서 입장 처리하면 이 예약도 함께 이용완료돼요</div>`
-        : `<div class="banner"><b>같은 시간 예약 ${party.length}건</b> (${party.map((x) => `${x.qty}장`).join(" + ")}) — 같은 손님이 나눠 예약했어요. 한 번에 입장 · 열쇠 ${need}개 · 네이버 ${party.length}건 모두 이용완료</div>`;
+      const pNames = [...new Set(party.map((x) => String(x.name || "").trim()))];
+      const partyNote = party.length < 2 || b.status !== "확정" ? "" : `<div class="banner"><b>같은 시간 예약 ${party.length}건</b> (${party.map((x) => `${x.qty}장`).join(" + ")}) — 같은 손님이 나눠 예약했어요${pNames.length > 1 ? ` (이름 ${pNames.map(esc).join(" · ")} · 전화번호 같음)` : ""}. 이 카드에서 한 번에 입장 · 열쇠 ${need}개 · 네이버 ${party.length}건 모두 이용완료</div>`;
       const oddN = oddNext(b);
       const oddNote = partyNote + (oddN.length ? `<div class="banner warn"><b>⚠ 연속이용 아님</b> — ${oddN.map((o) => `${hm(o.other.slot)} 예약과 ${o.gap > 0 ? `${o.gap}분 비어요` : `${-o.gap}분 겹쳐요`}`).join(", ")}. 연속이용은 2시간 이내 간격 예약만이에요. 이 예약은 따로 1시간 50분 — 끝나면 나갔다가 다음 예약 시간에 다시 입장하도록 안내해 주세요 (중간에 열쇠가 모자랄 수 있어요)</div>` : "");
       const qOpts = (x) => { const o = x.qtyBooked || x.qty, lo = Math.max(1, o - x.qtyAsk.cut); return Array.from({ length: o - lo + 1 }, (_, i) => lo + i); };
@@ -5699,13 +5703,13 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     async doEnter(btn) {
       const b = findB(sheet.id);
       const party = partyOpen(b), need = partyNeed(b);
-      if (sheet.keys.length !== need || sheet.busy || party.indexOf(b) > 0) return;
+      if (sheet.keys.length !== need || sheet.busy) return; // 같은 시간 묶음은 어느 카드에서든 (11/20)
       if (svFor(b) && sheet.sv == null) { toast("설문 번호를 먼저 눌러 주세요"); return; }
       if (svFor(b)) b.sv = sheet.sv; // 설문 답 (번호 · 제외 = 0)
       if (sheet.keys.some((k) => holderOf(k))) { toast("그 사이 다른 손님이 쓴 열쇠가 있어요. 다시 골라 주세요."); sheet.keys = []; renderSheet(); return; }
       // 열쇠는 바로 등록하고 네이버 이용완료는 뒤에서 (naverFlush) — 근무자가 기다리지 않음
       if (APP) b.naverPending = true;
-      const ch = chainOf(b);
+      const head = party[0] || b, ch = chainOf(head); // 연속예약은 묶음 첫 카드 기준 (어느 카드에서 입장해도 · 11/20)
       for (const x of [b, ...party, ...ch]) liftDone(x); // 오늘 이미 따로 입장한 만큼 (네이버를 다시 불러오기 전)
       Object.assign(b, { status: "완료", keys: sheet.keys.slice(), enteredAt: now, visitNo: b.prevDone == null ? null : b.prevDone + 1 });
       const moveSlot = (x) => { const nsl = (naverSlots[x.day] || {})[x.slot]; if (nsl) { nsl.conf = Math.max(0, nsl.conf - x.qty); nsl.done += x.qty; } }; // 다음 불러오기 전까지 칸 숫자도 확정 → 완료
@@ -5718,7 +5722,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
         doneNow++;
         moveSlot(x);
       }
-      if (ch.length > 1 && ch[0] === b) {
+      if (ch.length > 1 && ch[0] === head) {
         // 연속예약: 열쇠 이용시간을 묶음 전체로, 나머지 예약도 이용완료 (네이버는 뒤에서 차례로 · 실패하면 자동으로 다시)
         const ms = chainKeyMinutes(ch, need);
         b.keyUse = Object.fromEntries(b.keys.map((k, i) => [k, ms[i]]));
