@@ -16,7 +16,7 @@
 
 ## 흐름
 1. 통합데스크(키즈 POS, 1.44 ~)가 **1분마다 · 바뀌면 5초 안에** 지금 현황 글(`astanakiz-live`)을 만들어
-   클라우드 `boards/{보고 열쇠}/deskLive/now` 에 **덮어씀** (설문 보고함과 같은 열쇠 · 같은 방식, 로그인 · API 키 없음)
+   클라우드 `boards/{보고 열쇠}/deskLive/now` 에 **덮어씀** (보고 열쇠 · 예전 설문 보고함과 같은 방식, 로그인 · API 키 없음)
    - 같은 내용이면 1분마다만 (폰이 "n초 전 기준"을 알게), 실패하면 30초 뒤 다시
    - 운영 설정 → 기타 → 보고 앱 '보고 열쇠' 밑 **[폰 실시간 현황 켜짐/꺼짐]** · '마지막: 14:05:12 보냄 / 실패 …'
 2. 보고 앱 '키즈 실시간' 화면이 **열 때 · 아래로 당겼다 놓을 때 · [새로고침]** 마다 `deskLive/now` 를 다시 읽음
@@ -45,7 +45,7 @@
 ### ② 읽기
 - SDK: `getDoc(doc(db, "boards", 열쇠, "deskLive", "now"))` → `JSON.parse(data.json)`
 - REST(같은 것): `GET https://firestore.googleapis.com/v1/projects/astana-report/databases/(default)/documents/boards/{열쇠}/deskLive/now` → `fields.json.stringValue`
-- 문서가 없으면(규칙 전 · 통합데스크가 아직 안 보냄) "통합데스크 현황이 아직 없어요 — 키즈 POS 통합데스크 운영 설정 → 설문조사의 보고 열쇠 · 폰 실시간 현황을 확인해 주세요"
+- 문서가 없으면(규칙 전 · 통합데스크가 아직 안 보냄) "통합데스크 현황이 아직 없어요 — 키즈 POS 통합데스크 운영 설정 → 설문조사의 보고 열쇠 · 폰 실시간 현황을 확인해 주세요" (보고 앱 글 그대로 — 데스크 화면은 지금 운영 설정 → **기타 → 보고 앱**, 설문조사는 11/20 뺌)
 
 ### ③ 화면 (`prototype/live-phone.html` 그대로)
 - 첫 화면 '입장권 판매' 칸 → 누르면 `view = { name: "kidsLive" }` (지금은 누를 수 없는 칸)

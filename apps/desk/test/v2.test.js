@@ -373,7 +373,7 @@ test("현장 [이벤트 입장] (사장님 10/21): 운영 설정 → 기타 이�
   }
 });
 
-test("현장 [결제 완료 · 열쇠 등록]은 ③ POS에 다녀와야 눌림 · [POS로 이동] 초록(판매 가능) · 빨강(판매 불가 → 안 넘어감) · 이벤트 입장은 전화번호 · 설문만 · 결제 뒤 수를 바꾸면 다시 POS (사장님 10/21)", async () => {
+test("현장 [결제 완료 · 열쇠 등록]은 ③ POS에 다녀와야 눌림 · [POS로 이동] 초록(판매 가능) · 빨강(판매 불가 → 안 넘어감) · 이벤트 입장은 전화번호만 · 결제 뒤 수를 바꾸면 다시 POS (사장님 10/21)", async () => {
   const browser = await launch();
   try {
     const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
@@ -592,7 +592,7 @@ test("[입장권 다시 출력](앱): 프린터로 그 손님 입장권을 다�
   }
 });
 
-test("이벤트 입장 수(앱): 매일 20:00 보고 시스템으로 한 번 (설문을 안 해도) · 이름별 · 숫자가 바뀌면 다시 · 실패하면 10분 뒤 · 손님 정보 없음", async () => {
+test("이벤트 입장 수(앱): 매일 20:00 보고 시스템으로 한 번 · 이름별 · 숫자가 바뀌면 다시 · 실패하면 10분 뒤 · 손님 정보 없음", async () => {
   const browser = await launch();
   try {
     const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });

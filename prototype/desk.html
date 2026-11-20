@@ -369,34 +369,9 @@ body.office #sheet .btn-ink:not([data-act^="sync"]):not([data-act^="memo"]):not(
 .seg2 button.on { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
 .chk { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
 .field .chk input { width: 20px; height: 20px; min-height: 0; padding: 0; flex: none; }
-/* 설문조사 (10/14) */
-.svgrid { display: grid; grid-template-columns: minmax(0, 1fr) 236px; gap: 12px; align-items: start; }
-.svbox { border: 2px solid var(--line); border-radius: 12px; padding: 10px; display: grid; gap: 8px; }
-.svbox.need, .svwalk.need { border-color: var(--red); }
-.svbox.ok { border-color: var(--ok); }
-.svq { font-size: 13px; font-weight: 700; line-height: 1.35; }
-.svbtns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.svbtns.row { display: flex; flex-wrap: wrap; gap: 5px; }
-.svb { min-height: 44px; border: 1.5px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--fg); display: grid; place-items: center; padding: 2px 4px; line-height: 1.1; }
-.svb b { font-size: 20px; }
-.svb small { font-size: 10.5px; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.svb.on { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
-.svb.on small { color: var(--on-ink); }
-.svb.skip { font-weight: 700; font-size: 14px; }
-.svbtns.row .svb { min-width: 44px; min-height: 38px; }
-.svwalk { flex: 1; display: flex; align-items: center; gap: 10px; margin: 0 8px 0 14px; padding: 4px 8px; border: 2px solid var(--line); border-radius: 10px; }
-.svwalk.ok { border-color: var(--ok); }
-.svwalk .svq { flex: 1; font-size: 12.5px; }
-.svwarn { color: var(--red); }
-.svtargets { display: flex; flex-wrap: wrap; gap: 6px 16px; }
 #hv-row, #hv-row > div { min-width: 0; } /* 긴 글이 설정 창을 넓히지 않게 (창 · 칸은 grid) */
 #hv-text { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* 재방문 간격 한 줄 (다 보려면 마우스를 올림) */
-.svopts { display: grid; gap: 4px; max-height: 260px; overflow: auto; }
-.svopt { display: flex; align-items: center; gap: 8px; }
-.svopt > b { min-width: 22px; text-align: center; font-size: 16px; }
-.field .svopt input.svlabel { flex: 1; min-height: 34px !important; font-size: 14px !important; padding: 4px 8px; }
-.svopt .svpm { min-width: 34px; min-height: 30px; padding: 0 8px; font-size: 18px; font-weight: 800; line-height: 1; flex: none; }
-.svopt .svplus { color: var(--accent); border-color: var(--accent); }
+/* 켜짐 · 꺼짐 스위치 (설정 곳곳) */
 .svswitch { margin-left: auto; flex: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 999px; padding: 4px 14px 4px 4px; min-height: 38px; font-size: 14px; cursor: pointer; }
 .svswitch .knob { width: 46px; height: 28px; border-radius: 14px; background: var(--line); position: relative; flex: none; transition: background 0.15s; }
 .svswitch .knob::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); transition: left 0.15s; }
@@ -404,12 +379,9 @@ body.office #sheet .btn-ink:not([data-act^="sync"]):not([data-act^="memo"]):not(
 .svswitch.on .knob { background: var(--ok); }
 .svswitch.on .knob::after { left: 21px; }
 .field input.svkey { width: 260px; min-height: 32px !important; font-size: 13px !important; padding: 4px 8px; letter-spacing: 0; }
-.svopt .svpm-sp { width: 34px; flex: none; }
-.svopt .svcnt { min-width: 150px; flex: none; }
-.svopt .svdel, .svopt .svdel-sp { width: 34px; flex: none; }
 /* 방문 이벤트 (10/14) */
 .evstart { font-weight: 700; color: var(--fg); }
-.firstv { display: inline-block; font-weight: 800; color: #2b2100; background: var(--yellow); border-radius: 5px; padding: 0 7px; } /* 첫 방문 = 노랑 네모 (설문할 신규 손님 · 사장님 10/27) */ /* 이벤트 기간 카드: 처음 온 손님 (사장님 10/16 흰 글씨) */
+.firstv { display: inline-block; font-weight: 800; color: #2b2100; background: var(--yellow); border-radius: 5px; padding: 0 7px; } /* 첫 방문 = 노랑 네모 (네이버 완료 0 손님 · 사장님 10/27) */ /* 이벤트 기간 카드: 처음 온 손님 (사장님 10/16 흰 글씨) */
 .evcoupon { display: inline-block; font-weight: 700; color: #1b1b1b; background: var(--ochre); border-radius: 5px; padding: 0 7px; } /* 기한 안에 다시 온 손님 = 옅은 황토색 네모 · 검은 글씨 */
 .evtag { display: inline-block; font-size: 11px; font-weight: 700; color: var(--on-ink); background: var(--accent); border-radius: 5px; padding: 0 6px; margin-left: 2px; }
 .evstate { font-size: 13.5px; }
@@ -1177,7 +1149,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
      - 열쇠 창 [서비스 키]: 그 손님에게 빈 열쇠 하나를 더 줌 → of = 그때 손님 정보를 복사해 둠 (이름 · 전화 · 열쇠 · 예약번호)
        → 원래 손님이 먼저 반납 · 퇴장해도 서비스 키에는 연결 정보가 그대로 남음 (사장님 10/16)
      - 현장입장 창 [서비스 키]: 임직원 등 예약 없이 쓸 때 (staff · 이름이나 전화번호로 사용자 표시)
-     - 반납 시각 · 색 · 반납 · 퇴장 · 일괄 반납은 다른 열쇠와 같음. 다른 점: 판매 아님(입장권 · POS 결제 · 설문 없음) · 초과요금 없음
+     - 반납 시각 · 색 · 반납 · 퇴장 · 일괄 반납은 다른 열쇠와 같음. 다른 점: 판매 아님(입장권 · POS 결제 없음) · 초과요금 없음
      - 열쇠는 나가 있으므로 빈 열쇠 · 현장 판매 가능 열쇠에서는 빠짐 · 네이버/현장 인원(시간표 · 판매수 · 수량 자동조절 좌석)에는 안 셈 */
   const svcKeys = [];
   const extIgnored = new Set(); // 추가 예약을 '그대로 두기'로 한 예약번호 — 다시 묻지 않음 (네이버 이용완료도 안 함)
@@ -1191,7 +1163,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   const walkSlot = (m) => Math.floor(m / 30) * 30;
   /* 현장 이벤트 입장 (사장님 10/21): 현장입장 창 아래 왼쪽 [{이름} 이벤트 입장] — POS 결제 없이 들어오는 이벤트 · 쿠폰 손님
      - 이름은 운영 설정 → 기타 '현장 이벤트 이름' (예: 한가위 → [한가위 이벤트 입장]) · 비우면 [이벤트 입장]
-     - 열쇠 · 입장권(구분 = '한가위 이벤트') · 설문 · 인원 · 좌석(수량 자동조절)은 현장 손님과 같음
+     - 열쇠 · 입장권(구분 = '한가위 이벤트') · 인원 · 좌석(수량 자동조절)은 현장 손님과 같음
      - 결제가 없어 총 판매수 · 보고의 현장 구매(입장료)에는 안 셈 → 입장권 목록 · 폰 실시간(walk.event)에 따로 · 저장 파일 w 의 ev = 그때 이벤트 이름 */
   const WEV = { name: "" };
   const isEv = (h) => typeof (h && h.ev) === "string";
@@ -1385,11 +1357,10 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
      - 앱: 저장 폴더(%APPDATA%\astanakiz-desk\desk-state\날짜.json — 앱 폴더 이름은 영문 · 키즈 포스 11/16 확인)에 바로 씀 (갑자기 꺼져도 남게) + 브라우저 저장소에도 한 벌
      - 켜자마자 빈 화면으로 저장본을 덮어쓰지 않게: 저장본을 먼저 읽어 들인 뒤부터 저장 */
   const STATE_KEY = "astanakiz-desk-" + TODAY;
-  const SAVE_FIELDS = ["id", "day", "no", "slot", "name", "phone", "qty", "qtyBooked", "qtyCut", "qtySrc", "qtyPicked", "product", "naverProduct", "pay", "cancels", "prevDone", "visitNo", "visitEnd", "proxy", "visitor", "status", "keys", "enteredAt", "outAt", "overPaid", "naverPending", "naverWhy", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut", "naverSlot", "sv", "giftDue", "giftGiven", "plusT"];
+  const SAVE_FIELDS = ["id", "day", "no", "slot", "name", "phone", "qty", "qtyBooked", "qtyCut", "qtySrc", "qtyPicked", "product", "naverProduct", "pay", "cancels", "prevDone", "visitNo", "visitEnd", "proxy", "visitor", "status", "keys", "enteredAt", "outAt", "overPaid", "naverPending", "naverWhy", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut", "naverSlot", "giftDue", "giftGiven", "plusT"];
   let stateReady = !APP; // 저장본을 읽기 전에는 저장하지 않음
   let qtyPicks = {}; // 부분취소 (사장님 11/11): 누구 것인지 모를 때 근무자가 고른 실제 장수 { 예약번호: 장수 } — 오늘 저장 파일(pq)
   let rentals = []; // 대관 (사장님 11/10): 오늘 적은 단체 이름 · 입금일 [{ id, name, paidOn, at }] — 오늘 저장 파일(r) · 보고 앱 '키즈대관'
-  let svExtra = {}; // 설문: 오늘 근무자가 [+]로 직접 더한 수 { 번호: 건수 } — 예약 없이 이벤트로 들어온 손님 등 (사장님 10/15 · 따로 기록은 없음)
   let pendingSaved = []; // 예전 형식(예약번호만 있는) 저장본 — 네이버에서 그 예약을 불러오면 합침
   /* 열쇠 기록: 그 손님이 받은 열쇠 번호는 반납해도 남김(keysTaken) — 다음날 아침 없는 열쇠를 마지막에 누가 썼는지 찾아 연락 (사장님 10/8)
      일괄 반납으로 돌려받은 열쇠는 bulkOut (하나씩 확인하지 않은 열쇠) */
@@ -1399,7 +1370,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     for (const h of (bookings[TODAY] || []).concat(walkins, svcKeys)) noteKeys(h);
     if (!APP || !stateReady) return;
     const b = (bookings[TODAY] || []).filter((x) => x.enteredAt != null).map((x) => Object.fromEntries(SAVE_FIELDS.filter((k) => x[k] !== undefined).map((k) => [k, x[k]])));
-    const json = JSON.stringify({ v: 2, b: b.concat(pendingSaved.filter((p) => !b.some((x) => x.no === p.no))), w: walkins, x: [...testOut], ig: [...extIgnored], mv: [...moved], g: golden, sa: svExtra, s: svcKeys, r: rentals, pq: qtyPicks, seq, posSeq });
+    const json = JSON.stringify({ v: 2, b: b.concat(pendingSaved.filter((p) => !b.some((x) => x.no === p.no))), w: walkins, x: [...testOut], ig: [...extIgnored], mv: [...moved], g: golden, s: svcKeys, r: rentals, pq: qtyPicks, seq, posSeq });
     try { if (window.desk.state) window.desk.state.save(TODAY, json); } catch (e) { /* 파일 저장 실패 */ }
     try { localStorage.setItem(STATE_KEY, json); } catch (e) { /* 저장 못 해도 화면은 동작 */ }
   }
@@ -1421,7 +1392,6 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       for (const no of st.ig || []) extIgnored.add(no);
       for (const [no, s] of st.mv || []) moved.set(no, s);
       if (st.g) golden = st.g;
-      if (st.sa && typeof st.sa === "object") svExtra = st.sa;
       if (Array.isArray(st.r)) rentals = st.r.filter((x) => x && typeof x.name === "string" && x.name);
       if (st.pq && typeof st.pq === "object") qtyPicks = st.pq;
       const full = (st.b || []).filter((x) => x.name && x.slot != null);
@@ -1701,7 +1671,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     if (b.status === "완료" ? !b.visitNo : b.prevDone == null) return `<span class="help">이용완료 횟수 확인 중</span>`;
     const c = b.cancels ? ` · 취소 ${b.cancels}` : "", done = b.status === "완료";
     if (!done) liftDone(b); // 같은 사람이 오늘 이미 따로 입장했으면 '완료 n'을 그만큼 (네이버를 다시 불러오면 같아짐)
-    // 첫 방문 (사장님 10/27): 네이버 완료 0 손님 — 설문 '신규고객'과 같은 기준 · 카드 · 예약자 창에서 설문할 손님이 바로 보이게
+    // 첫 방문 (사장님 10/27): 네이버 완료 0 손님 — 카드 · 예약자 창에서 처음 온 손님이 바로 보이게
     const first = done ? b.visitNo === 1 : b.prevDone === 0, firstTag = `<span class="firstv">첫 방문</span> · `;
     /* 재방문 이벤트 기간 (사장님 10/16): 카드에는 네이버 이용완료 횟수 · 마일리지 · 사은권을 안 보임 (장부에는 이름 · 전화 · 완료 수를 계속 셈)
        이름 맞춤 (사장님 10/27): 첫 방문 손님 = "첫 방문 · 이벤트 도전 시작" · 이벤트 기간에 처음 온(또는 기한이 지나 다시 시작) 손님 = "이벤트 도전 시작"
@@ -1955,11 +1925,11 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   /** 그날 저장 파일 { b: 입장한 예약, w: 현장입장, x: 통계에서 뺀 예약번호 } — 오늘은 화면의 것, 지난날은 파일에서 한 번만 읽음
       저장 파일은 지우지 않음 (입장권 목록에서 2주 전까지 보고 찾음) */
   function dayFile(day) {
-    if (day === TODAY) return { b: [], w: walkins, x: testOut, sa: svExtra, s: svcKeys };
+    if (day === TODAY) return { b: [], w: walkins, x: testOut, s: svcKeys };
     if (!dayFiles[day]) {
       let f = {};
       try { const t = APP && window.desk.state ? window.desk.state.load(day) : null; if (t) f = JSON.parse(t); } catch (e) { f = {}; }
-      dayFiles[day] = { b: f.b || [], w: f.w || [], x: new Set(f.x || []), sa: f.sa && typeof f.sa === "object" ? f.sa : {}, s: Array.isArray(f.s) ? f.s : [] };
+      dayFiles[day] = { b: f.b || [], w: f.w || [], x: new Set(f.x || []), s: Array.isArray(f.s) ? f.s : [] };
     }
     return dayFiles[day];
   }
@@ -2603,8 +2573,6 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       const canEnter = b.status === "확정" && b.day === TODAY && ci <= 0;
       const early = canEnter && now < b.slot - RULES.earlyMinutes;
       let pickHtml = "";
-      // 설문조사 (사장님 10/14): 대상 손님은 번호를 먼저 눌러야 열쇠를 고름
-      const sv = canEnter ? svFor(b) : null, svLock = !!sv && sheet.sv == null;
       // 부분취소 (11/11): 같은 시간 예약 중 누구 것인지 모르는 카드가 있으면 그 장수를 먼저 고름 (열쇠 수가 달라지니)
       // 칸 숫자가 카드 합보다 적은데 예약 상세로 확인을 못 함 → 막지 않음 (사장님 11/19 — 대개 칸 숫자가 늦게 따라온 것) · 손님이 환불했다고 할 때만 고름
       const qAsk = canEnter ? party.concat([b]).find((x) => x.qtyAsk) : null, qLock = false;
@@ -2612,9 +2580,9 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
         let btns = "";
         for (let k = 1; k <= RULES.keys; k++) {
           const used = !!holderOf(k), on = sheet.keys.includes(k);
-          btns += `<button type="button" class="num ${on ? "on" : ""}" data-act="pickKey" data-k="${k}" ${used || !canEnter || svLock || qLock ? "disabled" : ""} aria-pressed="${on}" aria-label="${k}번${used ? " 지급됨" : ""}">${k}</button>`;
+          btns += `<button type="button" class="num ${on ? "on" : ""}" data-act="pickKey" data-k="${k}" ${used || !canEnter || qLock ? "disabled" : ""} aria-pressed="${on}" aria-label="${k}번${used ? " 지급됨" : ""}">${k}</button>`;
         }
-        pickHtml = `<div class="field"><span class="label">지급할 열쇠 <span class="help num">${svLock ? `<b class="svwarn">설문 번호를 먼저 눌러 주세요</b> · ` : ""}${party.length > 1 ? "같은 시간 예약 합계" : "예약 수량"} ${need}개만큼 누르세요 · ${sheet.keys.length}/${need} · 흐린 번호는 이미 지급됨</span></span><div class="kpick">${btns}</div></div>${keyOverHtml(b, party, need)}`;
+        pickHtml = `<div class="field"><span class="label">지급할 열쇠 <span class="help num">${party.length > 1 ? "같은 시간 예약 합계" : "예약 수량"} ${need}개만큼 누르세요 · ${sheet.keys.length}/${need} · 흐린 번호는 이미 지급됨</span></span><div class="kpick">${btns}</div></div>${keyOverHtml(b, party, need)}`;
       }
       const chainNote = ch.length < 2 ? "" : ci > 0 ? `<div class="banner warn">연속예약 ${ci + 1}/${ch.length} — 첫 예약(${hm(ch[0].slot)}) 카드에서 입장 처리하면 이 예약도 함께 이용완료돼요</div>`
         : `<div class="banner"><b>★${ch.length}타임 연속예약</b> (${ch.map((x) => `${hm(x.slot)} ${x.qty}장`).join(" · ")}) — 입장하면 ${ch.length}건 모두 이용완료 · 열쇠 ${b.qty}개: ${keyPlan(ch, b.qty)}</div>`;
@@ -2630,7 +2598,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
         : early ? `<div class="banner">예약 ${hm(b.slot)}보다 일찍 입장 — 근무자 판단으로 가능해요 (손님 안내 기준은 ${hm(b.slot - RULES.earlyMinutes)}). ${m == null ? "" : `이용시간은 예약 시간부터라 일찍 온 만큼 더 놀 수 있어요 (반납 ${hm(b.slot + m)})`}</div>` : "");
       el.innerHTML = `
         <h3 id="sheet-title">네이버 예약자 <button class="x" data-act="close" aria-label="닫기">×</button></h3>${bcAskHtml()}
-        <div class="${sv ? "svgrid" : ""}"><dl class="facts">
+        <div><dl class="facts">
           <dt>예약자</dt><dd style="font-size:18px">${nameHtml(b)}${isShort(b) ? ` ${shortBadge(b)}` : ""} <span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span>${b.black ? `<span class="nblk" title="네이버 예약 카드에 '블랙리스트' 표시 — 처음 한 번 BC 원아웃 · 특이사항을 메모로">네이버 블랙리스트</span>` : ""}${noteChecks(b)}</dd>
           <dt>${evActive() && evIn(b.day) ? "이벤트" : "이용완료"}</dt><dd class="num visits big">${visitText(b)}</dd>
           <dt>전화번호</dt><dd class="num">${fmtPhone(b.phone)}</dd>${visitorRow(b)}
@@ -2639,11 +2607,11 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
           <dt>수량</dt><dd>${b.product} ${qtyNum(b.qty)}${qtyNote(b)}</dd>
           <dt>결제상태</dt><dd>${b.pay}</dd>${noteRow(b)}
           ${b.status === "완료" ? `<dt>열쇠</dt><dd>${b.keys.length ? `<div class="bigkeys">${b.keys.map((k) => `<span class="bigkey num">${k}</span>`).join("")}</div>` : b.outAt != null ? `<span class="num">${b.enteredAt != null ? hm(b.enteredAt) + " 입장 · " : ""}${hm(b.outAt)} 퇴장 (반납함)</span>` : "-"}</dd>` : ""}
-        </dl>${sv ? `<div class="svbox ${svLock ? "need" : "ok"}">${svButtons(sv)}</div>` : ""}</div>
+        </dl></div>
         ${bc3Html(b)}${note}${pickHtml}
         <div class="sheet-foot">${b.status === "확정"
           ? `${sheet.naverErr ? `<div class="banner warn" style="flex-basis:100%">네이버 이용완료 실패: ${esc(sheet.naverErr)}</div><button class="btn" data-act="doEnter" data-skip-naver="1">네이버 없이 열쇠만 등록</button>` : ""}
-             <button class="btn" data-act="close">닫기</button><button class="btn btn-ink" id="enter-done" data-act="doEnter" ${canEnter && sheet.keys.length === need && !sheet.busy && !svLock && !qLock ? "" : "disabled"}>${sheet.busy ? "네이버 이용완료 중…" : sheet.naverErr ? "다시 시도" : "등록 완료"}</button>`
+             <button class="btn" data-act="close">닫기</button><button class="btn btn-ink" id="enter-done" data-act="doEnter" ${canEnter && sheet.keys.length === need && !sheet.busy && !qLock ? "" : "disabled"}>${sheet.busy ? "네이버 이용완료 중…" : sheet.naverErr ? "다시 시도" : "등록 완료"}</button>`
           : `<button class="btn btn-ink" data-act="close" data-autofocus>닫기</button>`}</div>`;
       return;
     }
@@ -2663,7 +2631,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       const tag = (i) => `<span class="wn ${done[i] ? "done" : i === cur ? "now" : ""}">${i + 1}</span>`;
       // 왼쪽 아래 [서비스 키] (사장님 10/16): 임직원 등 예약 없이 쓸 때 — 누르면 판매 단계 없이 사용자만 적는 창으로
       const svcBox = `<div class="svcwalk"><button class="btn ${sheet.svc ? "btn-ink" : ""}" data-act="svcWalk" aria-pressed="${!!sheet.svc}">${sheet.svc ? "← 판매로 돌아가기" : "서비스 키 (판매 아님)"}</button>
-        <span class="help">${sheet.svc ? "판매 · 결제 · 입장권 · 설문 없이 열쇠만 등록" : "임직원 등 예약 없이 쓸 때 — 쓰는 사람만 적고 열쇠 등록 · 총 판매수 · 인원에 안 셈"}</span></div>`;
+        <span class="help">${sheet.svc ? "판매 · 결제 · 입장권 없이 열쇠만 등록" : "임직원 등 예약 없이 쓸 때 — 쓰는 사람만 적고 열쇠 등록 · 총 판매수 · 인원에 안 셈"}</span></div>`;
       const slotRow = `<div class="wrow"><span class="wn"></span> <span class="wl">입장 타임</span>
               <button class="btn btn-sm" data-act="wslot" data-d="-30" aria-label="앞 타임" ${ws <= SLOTS[0] ? "disabled" : ""}>◀</button>
               <b class="num wtime">${hm(ws)} 입장</b>
@@ -2681,7 +2649,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
           <div class="wleft"><ol class="wguide">
             ${sstep(0, `쓸 <b>열쇠 수</b>를 맞춰요 (빈 열쇠가 이어서 붙어요) · 입장 타임은 ◀ ▶`)}
             ${sstep(1, `열쇠를 누가 가져가는지 <b>이름</b>(임직원 등)이나 <b>전화번호</b>를 적어요 — 미반납 때 찾을 수 있게`)}
-            ${sstep(2, `<b>[서비스 키 등록]</b> → 결제 · 입장권 · 설문 없음. 총 판매수 · 네이버/현장 인원에 안 들어가요. 반납은 다른 열쇠와 같아요`)}
+            ${sstep(2, `<b>[서비스 키 등록]</b> → 결제 · 입장권 없음. 총 판매수 · 네이버/현장 인원에 안 들어가요. 반납은 다른 열쇠와 같아요`)}
           </ol>${svcBox}</div>
           <div class="wmain">
             ${st.over ? `<div class="banner warn">열쇠가 빠듯해요 — 예약 손님이 오실 자리까지 쓰게 돼요. 확인하고 주세요</div>` : ""}
@@ -2701,9 +2669,8 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
         </div>`;
         return;
       }
-      const sv = svForWalk(), svLock = !!sv && sheet.sv == null; // 설문조사: 현장구매자도 대상이면 번호(또는 제외)를 눌러야 등록
       el.innerHTML = `
-        <h3 id="sheet-title">현장입장 ${sv ? `<span class="svwalk ${svLock ? "need" : "ok"}">${svButtons(sv, "row")}</span>` : ""}<button class="x" data-act="close" aria-label="닫기">×</button></h3>
+        <h3 id="sheet-title">현장입장 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
         <div class="walkgrid">
           <div class="wleft"><ol class="wguide">
             ${step(0, `<b>판매 가능한지</b> 오른쪽 맨 위 색을 봐요. <span class="g">초록 = 판매 가능</span> · <span class="r">빨강 = 지금은 판매 불가</span> (예약 손님 자리를 남겨 둔 계산)`)}
@@ -2726,7 +2693,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
                 <input id="w-phone" inputmode="numeric" autocomplete="off" value="${esc(walkFmt(sheet.phone))}" placeholder="010-0000-0000" data-autofocus></div>
               ${keypad}
             </div>
-            ${svLock ? `<div class="help svwarn">위 설문 번호(신규가 아니면 [제외])를 먼저 눌러 주세요</div>` : ""}<div class="wdones"><button class="btn wevent" id="w-event" data-act="walkEvent" title="POS 결제 없이 들어오는 이벤트 · 쿠폰 손님 — 판매 가능(초록 · 빨강)과 상관없이 전화번호 · 설문만 · 열쇠 · 입장권 · 인원은 현장과 같고 총 판매수에는 안 셈" ${!st.phoneOk || svLock ? "disabled" : ""}>${esc(wevLabel())}</button><button class="btn btn-ink wdone" id="w-done" data-act="walkDone" title="③ [POS로 이동]에서 결제하고 돌아와야 눌려요" ${st.over || !st.phoneOk || (st.flex && !sheet.flexOk) || svLock || !paid ? "disabled" : ""}>${tag(4)} 결제 완료 · 열쇠 등록</button></div>
+            <div class="wdones"><button class="btn wevent" id="w-event" data-act="walkEvent" title="POS 결제 없이 들어오는 이벤트 · 쿠폰 손님 — 판매 가능(초록 · 빨강)과 상관없이 전화번호만 · 열쇠 · 입장권 · 인원은 현장과 같고 총 판매수에는 안 셈" ${!st.phoneOk ? "disabled" : ""}>${esc(wevLabel())}</button><button class="btn btn-ink wdone" id="w-done" data-act="walkDone" title="③ [POS로 이동]에서 결제하고 돌아와야 눌려요" ${st.over || !st.phoneOk || (st.flex && !sheet.flexOk) || !paid ? "disabled" : ""}>${tag(4)} 결제 완료 · 열쇠 등록</button></div>
           </div>
         </div>`;
       return;
@@ -2870,7 +2837,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     if (k === "staff") return `${MEMO.staff.length}명 + 관리자`;
     if (k === "api") return REAL ? "" : "체험판";
     if (k === "naver") { const n = (RULES.capAuto.on ? 1 : 0) + (ST.view && ST.view.cfg && ST.view.cfg.on ? 1 : 0); return n ? `켜짐 ${n}` : "꺼짐"; }
-    if (k === "etc") return [WEV.name ? `${WEV.name} 이벤트` : "", SV.on ? "설문 켜짐" : ""].filter(Boolean).join(" · ");
+    if (k === "etc") return WEV.name ? `${WEV.name} 이벤트` : "";
     if (k === "sync") return syncBadge();
     if (k === "announce") return !ANN.on ? "꺼짐" : !SYN ? "음성 없음" : annKo().length ? `켜짐${ANN.auto ? " · 자동" : ""}${ANN.golden ? " · 골든벨" : ""}` : "한국어 음성 없음";
     if (k === "cust") { if (!custList) { custLoad(); return ""; } const n = custList.filter((x) => x.bc).length; return n ? `BC ${n}명` : "BC · 마일리지 SKIP"; }
@@ -3154,28 +3121,14 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
             <div class="caplog">${bcLog.length ? bcLog.slice(0, 20).map((x) => `<div class="${x.ok ? "" : "bad"}"><span class="num">${esc(String(x.at).slice(11))}</span> ${esc(x.name)} ${x.day && x.day !== TODAY ? `${+x.day.slice(5, 7)}/${+x.day.slice(8)} ` : ""}${esc(x.time)} ${x.qty}장 ${x.ok ? `<b>전액 취소</b>${x.auto ? "" : " (다시 취소)"}` : `실패: ${esc(x.why || "")}`}</div>`).join("") : `<span class="help">없음</span>`}</div></div>` };
       }
       if (tab === "etc") {
-        const c = svCounts(), st = !SV.on ? `<b>꺼짐</b> — 설문 없이 바로 입장` : !SV.from || !SV.to ? "기간을 정하면 시작해요" : svOn() ? `<b class="on">진행 중</b> — ${krDate(SV.from)} ~ ${krDate(SV.to)}` : TODAY < SV.from ? `${krDate(SV.from)}부터 시작해요` : TODAY > SV.to ? `끝났어요 (${krDate(SV.to)}까지)` : "대상을 하나 이상 골라 주세요";
-        const L = SV.last;
         const html = `
           <div class="setcard plain stack"><b>현장 이벤트 입장</b>
             <div class="field"><label for="wev-name">현장 이벤트 이름 <span class="help">현장입장 창 아래 왼쪽 버튼 — 결제 없이 들어오는 이벤트 · 쿠폰 손님 (열쇠 · 입장권 · 인원은 현장과 같고 총 판매수에는 안 셈)</span></label>
               <div class="btns" style="align-items:center"><input id="wev-name" class="cfg" maxlength="10" value="${esc(WEV.name)}" placeholder="예: 한가위" style="max-width:200px" aria-label="현장 이벤트 이름"><span class="help">버튼: <b id="wev-preview">[${esc(wevLabel())}]</b> · 비우면 [이벤트 입장]</span></div>
               <span class="help">입장권: 프린트물 설정 → 이벤트 묶음 <b id="wev-form">'${esc(pname("evw"))}'</b> 조각 양식 — (재)공통양식의 {${esc(codeOf(pname("evw")))}} 자리에 (${PRINT.forms.enter.ev ? "<b>쓰는 중</b>" : "비어 있음"}) <button class="btn btn-sm" data-act="tplGo" data-k="evw">양식 고치기 ›</button></span></div></div>
-          <div class="setcard plain stack"><b>설문조사</b>
-          <div class="field"><span class="label">설문 기간 <span class="help">신규 손님에게 '아스타나키즈를 어떻게 알게 되었는지' — 현장 안내문의 번호를 근무자가 누름 (번호를 눌러야 열쇠 등록)</span></span>
-            <div class="btns" style="align-items:center"><input type="date" id="sv-from" class="date-in" value="${esc(SV.from)}"> <span>~</span> <input type="date" id="sv-to" class="date-in" value="${esc(SV.to)}"> <span class="evstate">${st}</span>
-              <button type="button" class="svswitch ${SV.on ? "on" : ""}" role="switch" aria-checked="${SV.on}" data-act="svToggle" title="끄면 예약자 · 현장입장 창에 설문 없이 바로 입장"><span class="knob"></span><b>설문조사 ${SV.on ? "켜짐" : "꺼짐"}</b></button></div></div>
-          <div class="field"><span class="label">대상 <span class="help">대상 손님은 설문 번호를 눌러야 열쇠를 고르고 등록해요</span></span>
-            <div class="svtargets"><label class="chk"><input type="checkbox" id="sv-new" ${SV.naverNew || SV.all ? "checked" : ""} ${SV.all ? "disabled" : ""}> 신규고객 <span class="help">(네이버 완료 0)</span></label>
-            <label class="chk"><input type="checkbox" id="sv-walk" ${SV.walkin || SV.all ? "checked" : ""} ${SV.all ? "disabled" : ""}> 현장구매자 <span class="help">(신규가 아니면 [제외])</span></label>
-            <label class="chk"><input type="checkbox" id="sv-all" ${SV.all ? "checked" : ""}> 전체고객 <span class="help">(모두 — 기존 손님은 [제외])</span></label></div></div>
-          <div class="field"><span class="label">선택지 <span class="help">현장 안내문의 번호와 같게 · 오늘 / 기간 누적</span></span>
-            <div class="svopts">${SV.opts.map((o, i) => `<div class="svopt"><b class="num">${i + 1}</b><input class="cfg svlabel" data-i="${i}" value="${esc(o)}" placeholder="${i + 1}번 내용 (예: 네이버 검색)" aria-label="${i + 1}번 선택지">${svExtra[i + 1] > 0 ? `<button class="btn btn-sm svpm" data-act="svMinus" data-n="${i + 1}" aria-label="${i + 1}번 직접 더한 것 1건 빼기" title="잘못 누른 [+] 되돌리기">−</button>` : `<span class="svpm-sp"></span>`}<button class="btn btn-sm svpm svplus" data-act="svPlus" data-n="${i + 1}" ${svOn() ? "" : "disabled"} aria-label="${i + 1}번 확인된 1건 더하기" title="예약 없이 들어온 손님 등 — 확인된 1건 더하기">+</button><span class="help num svcnt">오늘 ${(c.cnt[i + 1] || {}).today || 0}${svExtra[i + 1] > 0 ? ` (직접 +${svExtra[i + 1]})` : ""} · 누적 <b>${(c.cnt[i + 1] || {}).total || 0}</b></span>${i === SV.opts.length - 1 && SV.opts.length > 1 ? `<button class="btn btn-sm svdel" data-act="svDel" aria-label="${i + 1}번 지우기">×</button>` : `<span class="svdel-sp"></span>`}</div>`).join("")}</div>
-            <div class="btns" style="align-items:center"><button class="btn btn-sm" data-act="svAdd">+ 선택지 추가</button><span class="help num">응답 오늘 ${c.ans.today} · 누적 <b>${c.ans.total}</b> · 제외 오늘 ${c.ex.today} · 누적 ${c.ex.total}</span></div></div></div>
-          <div class="setcard plain stack"><b>보고 앱 <span class="help">설문 · 폰 실시간 현황 · 재방문 간격 · 이벤트 입장 수 — 같은 보고 열쇠</span></b>
-          <div class="field"><label class="chk"><input type="checkbox" id="sv-send" ${SV.send ? "checked" : ""}> <b>보고앱에 보내기</b> <span class="help">매일 20:00 번호별 오늘 · 누적 수를 파일로 남기고 보고 열쇠가 있으면 클라우드 보고함에도 (뒤에 바뀌면 다시)</span></label>
-            <div class="btns" style="align-items:center"><label class="help" for="sv-key">보고 열쇠</label><input id="sv-key" class="cfg svkey" type="password" autocomplete="off" spellcheck="false" maxlength="64" placeholder="${svKey.has ? `저장됨 (끝 ••${esc(svKey.tail)}) — 바꾸려면 새로 넣기` : "보고 앱 주소 …/b/{열쇠}/ 의 열쇠 (16~64자)"}" aria-label="보고 열쇠"><button class="btn btn-sm" data-act="svKeySave">열쇠 저장</button>${svKey.has ? `<button class="btn btn-sm" data-act="svKeyDel">지우기</button>` : ""}<button class="btn btn-sm" data-act="svSendNow">지금 보내기</button></div>
-            <span class="help ${L && (!L.ok || (L.inbox && !L.inbox.ok)) ? "evwarn" : ""}">${L ? `마지막: ${esc(L.at)} ${L.auto ? "자동" : "직접"} · ${L.ok ? "파일로 남김" : `파일 실패 ${esc(L.why || "")}`} · ${L.inbox ? (L.inbox.ok ? "보고함에 보냄" : `보고함 실패 ${esc(L.inbox.why || "")}${SV.retry && SV.retry.day === TODAY ? ` — ${hm(SV.retry.m)} 다시` : ""}`) : "보고 열쇠 없음 (파일만)"}` : svKey.has ? "보고 열쇠 있음 — 보고 파일을 쓸 때마다 보고함에도 보냄" : "보고 열쇠를 넣으면 보고 시스템 클라우드 '설문 보고함'에도 보내요 (보고 앱에 바로 보임)"}</span></div>
+          <div class="setcard plain stack"><b>보고 앱 <span class="help">폰 실시간 현황 · 재방문 간격 · 이벤트 입장 수 · 방문 기록 · 두 PC 연결 — 같은 보고 열쇠</span></b>
+          <div class="field"><div class="btns" style="align-items:center"><label class="help" for="sv-key">보고 열쇠</label><input id="sv-key" class="cfg svkey" type="password" autocomplete="off" spellcheck="false" maxlength="64" placeholder="${svKey.has ? `저장됨 (끝 ••${esc(svKey.tail)}) — 바꾸려면 새로 넣기` : "보고 앱 주소 …/b/{열쇠}/ 의 열쇠 (16~64자)"}" aria-label="보고 열쇠"><button class="btn btn-sm" data-act="svKeySave">열쇠 저장</button>${svKey.has ? `<button class="btn btn-sm" data-act="svKeyDel">지우기</button>` : ""}</div>
+            <span class="help">${svKey.has ? "보고 열쇠 있음 — 이 PC 에만 암호화해 저장 (화면에는 끝 4자리만)" : "보고 열쇠를 넣으면 폰 실시간 현황 · 재방문 간격 · 이벤트 입장 수를 보고 앱에 보내요"}</span></div>
           <div class="field"><div class="btns" style="align-items:center"><button type="button" class="svswitch ${LIVE.on ? "on" : ""}" role="switch" aria-checked="${LIVE.on}" data-act="liveToggle" title="같은 보고 열쇠로 1분마다 · 바뀌면 바로"><span class="knob"></span><b>폰 실시간 현황 ${LIVE.on ? "켜짐" : "꺼짐"}</b></button>
             <span class="help">보고 앱 '입장권 판매' → 네이버 · 열쇠 · 입장료 (1분마다)</span> <span class="help ${LIVE.last && !LIVE.last.ok ? "evwarn" : ""}" id="live-last">${esc(liveText())}</span></div></div>
           <div class="field" id="hv-row">${hvRow()}</div>
@@ -4274,28 +4227,10 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     return Object.assign({}, SAMPLE_NAVER, evVals(ev, true), { _사은권: false, 날짜: TODAY, 시각: hm(now) });
   };
 
-  // ── 설문조사 (사장님 10/14) ───────────────────────
-  /* 신규 손님에게 '아스타나키즈를 어떻게 알게 되었는지' (현장 안내문의 1~n 번호) — 근무자가 손님이 말한 번호를 누름
-     - 대상: 신규고객(네이버 '완료 0' 예약자) · 현장구매자 · 전체고객(네이버 · 현장 모두) — 운영 설정 → 기타 → 설문조사
-     - 대상 손님은 번호를 눌러야 열쇠를 고르고 등록할 수 있음 (필수 단계). 신규가 아닌 현장구매자 · 전체고객의 기존 손님은 [제외]
-     - 답(번호, 제외 = 0)은 그 예약 · 현장입장 기록(sv)에 붙어 날짜별 저장 파일에 남음 → 설문 기간 누적 = 저장 파일을 더함
-     - 보고앱에 보내기를 켜면 기간 동안 매일 20:00 에 번호별 오늘 · 누적 수를 보냄 (파일로 남기고 · 보고앱 주소가 있으면 그 주소로) */
-  const SV0 = { on: true, from: "", to: "", send: false, naverNew: true, walkin: false, all: false, opts: ["", "", "", "", ""], sentDay: "", sentSig: "", last: null, retry: null };
-  const SV = JSON.parse(JSON.stringify(SV0));
-  function svSaveCfg() {
-    const v = JSON.parse(JSON.stringify(SV));
-    if (APP && window.desk.config) window.desk.config.set({ survey: v });
-    else try { localStorage.setItem("astanakiz-survey", JSON.stringify(v)); } catch (e) { /* 저장 못 해도 동작 */ }
-  }
-  function svLoadCfg(v) {
-    if (!v) return;
-    const day = (x) => (/^\d{4}-\d{2}-\d{2}$/.test(x || "") ? x : "");
-    Object.assign(SV, { on: v.on !== false, from: day(v.from), to: day(v.to), send: !!v.send, naverNew: v.naverNew !== false, walkin: !!v.walkin, all: !!v.all, sentDay: day(v.sentDay), sentSig: String(v.sentSig || ""), last: v.last || null, retry: v.retry && day(v.retry.day) ? { day: v.retry.day, m: Number(v.retry.m) || 0 } : null });
-    if (Array.isArray(v.opts) && v.opts.length) SV.opts = v.opts.slice(0, 20).map((o) => String(o || ""));
-  }
-  let svKey = { has: false, tail: "" }; // 설문 보고함 '보고 열쇠' — 앱은 이 PC 에 암호화 저장(있는지 · 끝 4자리만 앎) · 체험판은 화면에만
-  if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c) svKey = { has: !!c.hasSurveyKey, tail: String(c.surveyKeyTail || "") }; if (c && c.survey) { svLoadCfg(c.survey); renderAll(); } }).catch(() => {});
-  else try { svLoadCfg(JSON.parse(localStorage.getItem("astanakiz-survey"))); } catch (e) { /* 없음 */ }
+  // 보고 열쇠 (보고 앱 주소 …/b/{열쇠}/ · 10/15) — 폰 실시간 현황 · 재방문 간격 · 이벤트 입장 수 · 방문 기록 · 두 PC 연결이 같이 씀
+  //   앱은 이 PC 에 암호화 저장(있는지 · 끝 4자리만 앎) · 체험판은 화면에만 · 설문조사는 11/20 뺌 (사장님 — 다시 할 때 다시 넣음)
+  let svKey = { has: false, tail: "" };
+  if (APP && window.desk.config) window.desk.config.get().then((c) => { if (c) svKey = { has: !!c.hasSurveyKey, tail: String(c.surveyKeyTail || "") }; }).catch(() => {});
 
   // ── 폰 실시간 현황 (사장님 10/16) ─────────────────────
   /* 총괄 관리자가 출근 전에도 보고 앱(입장권 판매 총 수량 → 세부 화면)에서 지금 키즈를 봄 — 폰을 아래로 당기거나 열 때마다 최신 현황을 읽음
@@ -4364,88 +4299,11 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     window.desk.live.send({ json: JSON.stringify(snap), at: snap.at }).then(done, (e) => done({ ok: false, why: String(e) }));
   }
   const liveText = () => (!svKey.has ? "보고 열쇠를 넣으면 보내요" : !LIVE.on ? "꺼짐" : !APP ? "체험판: 보내지 않아요 (설치한 앱에서 1분마다)" : LIVE.last ? `마지막: ${LIVE.last.at} ${LIVE.last.ok ? "보냄" : `실패 ${LIVE.last.why} — 30초 뒤 다시`}` : "곧 보내요");
-  /** 설문 진행 중: 스위치 켬(사장님 10/16) · 기간 안 · 대상 · 선택지 — 끄면 예약자 · 현장입장 창에 설문 없이 예전처럼 바로 입장 */
-  const svOn = () => !!(SV.on && SV.from && SV.to && SV.from <= TODAY && TODAY <= SV.to && (SV.all || SV.naverNew || SV.walkin) && SV.opts.length);
-  const SV_Q_NEW = "신규고객께 아스타나키즈를 어떻게 알게 되었는지 물어봐주세요";
-  const SV_Q = "고객께 아스타나키즈를 어떻게 알게 되었는지 물어봐주세요";
-  /** 이 예약 손님이 설문 대상인가 → { isNew, skip(제외 버튼) } 또는 null */
-  function svFor(b) {
-    if (!svOn() || !b || b.status !== "확정" || b.day !== TODAY) return null;
-    const isNew = b.prevDone === 0;
-    if (SV.all || (SV.naverNew && isNew)) return { isNew, skip: !isNew };
-    return null;
-  }
-  /** 현장입장이 설문 대상인가 (신규가 아니면 제외) */
-  const svForWalk = () => (svOn() && (SV.all || SV.walkin) ? { isNew: true, skip: true } : null); // 같은 문구로 묻고, 신규가 아니면 [제외]
-  /** 설문 번호 버튼 (예약자 창 오른쪽 · 현장입장 창 위) */
-  function svButtons(sv, cls) {
-    const pick = sheet.sv;
-    return `<div class="svq">${sv.isNew ? SV_Q_NEW : SV_Q}</div>
-      <div class="svbtns ${cls || ""}">${SV.opts.map((o, i) => `<button type="button" class="svb ${pick === i + 1 ? "on" : ""}" data-act="svPick" data-n="${i + 1}" aria-pressed="${pick === i + 1}" title="${esc(o)}"><b class="num">${i + 1}</b>${o ? `<small>${esc(o)}</small>` : ""}</button>`).join("")}${sv.skip ? `<button type="button" class="svb skip ${pick === 0 ? "on" : ""}" data-act="svPick" data-n="0" aria-pressed="${pick === 0}">제외</button>` : ""}</div>`;
-  }
-  /** 설문 기간 누적 · 오늘: 번호별 · 제외 · 응답 (저장 파일 + 오늘 화면) */
-  function svCounts() {
-    const cnt = {}, ex = { today: 0, total: 0 }, ans = { today: 0, total: 0 };
-    const add = (sv, today) => {
-      if (sv == null) return;
-      const o = sv === 0 ? ex : (cnt[sv] = cnt[sv] || { today: 0, total: 0 });
-      o.total++; if (today) o.today++;
-      if (sv !== 0) { ans.total++; if (today) ans.today++; }
-    };
-    if (SV.from && SV.to) {
-      const end = SV.to < TODAY ? SV.to : TODAY;
-      for (let d = SV.from, i = 0; d <= end && i < 400; d = shiftDay(d, 1), i++) {
-        const today = d === TODAY, f = dayFile(d);
-        if (today) { for (const b of bookings[TODAY] || []) if (b.enteredAt != null) add(b.sv, true); for (const w of walkins) add(w.sv, true); }
-        else { for (const b of f.b) add(b.sv, false); for (const w of f.w) add(w.sv, false); }
-        for (const [no, n] of Object.entries(f.sa || {})) for (let k = 0; k < Math.min(999, Number(n) || 0); k++) add(Number(no), today); // [+] 직접 더한 수
-      }
-    }
-    return { cnt, ex, ans };
-  }
-  /** 보고앱에 보낼 내용 (보고 시스템이 받아 보고 화면에 — 형식은 docs/SHARE.md) */
-  function svPayload() {
-    const c = svCounts();
-    return { type: "astanakiz-survey", v: 1, day: TODAY, sentAt: `${TODAY} ${hm(now)}`, question: "아스타나키즈를 어떻게 알게 되었나요", period: { from: SV.from, to: SV.to },
-      targets: { naverNew: SV.naverNew, walkin: SV.walkin, all: SV.all },
-      options: SV.opts.map((label, i) => ({ no: i + 1, label, today: (c.cnt[i + 1] || {}).today || 0, total: (c.cnt[i + 1] || {}).total || 0 })),
-      excluded: c.ex, answered: c.ans };
-  }
-  let svBusy = false;
-  async function svSend(manual) {
-    if (svBusy) return;
-    svBusy = true;
-    const p = svPayload();
-    let r;
-    if (!APP || !window.desk.survey) r = { ok: true, demo: true, inbox: svKey.has ? { ok: true, code: 200, demo: true } : null };
-    else r = await window.desk.survey.send({ json: JSON.stringify(p), at: `${TODAY} ${hm(now)}` }).catch((e) => ({ ok: false, why: String(e) }));
-    svBusy = false;
-    const prev = SV.last, again = !manual && SV.sentDay === TODAY; // 20:00 뒤 다시 씀 · 10분 뒤 다시 보냄 (바뀐 게 없으면 알림 없이)
-    const ib = r && r.inbox ? { ok: !!r.inbox.ok, code: r.inbox.code || 0, why: r.inbox.why || "" } : null;
-    SV.sentDay = TODAY; SV.sentSig = svSig(p); SV.last = { at: `${TODAY} ${hm(now)}`, ok: !!(r && r.ok), why: (r && r.why) || "", auto: !manual, inbox: ib };
-    // 보고함에 못 보냈으면 10분 뒤 다시 (그날 보낼 때까지 · 파일은 그대로)
-    SV.retry = ib && !ib.ok ? { day: TODAY, m: now + 10 } : null;
-    svSaveCfg();
-    const same = again && prev && prev.ok === SV.last.ok && !!(prev.inbox && prev.inbox.ok) === !!(ib && ib.ok);
-    if (!same) toast(r && r.demo ? `체험판: 설문 누적(응답 ${p.answered.total} · 제외 ${p.excluded.total})을 보고 파일로 남기는 흉내${ib ? " · 보고함에도 보내는 흉내" : ""}`
-      : `${r && r.ok ? "설문 누적을 보고 파일로 남겼어요" : `설문 보고 파일을 못 썼어요: ${(r && r.why) || "응답 없음"}`}${ib ? (ib.ok ? " · 보고함에 보냄 (보고 앱에 바로 보여요)" : ` · 보고함 실패: ${ib.why} — 10분 뒤 다시`) : " · 보고 열쇠가 없어 보고함에는 안 보냄"}`);
-    if (sheet.mode === "settings" && sheet.tab === "etc") renderSheet();
-  }
-  /** 보낸 숫자 (바뀌었는지 보려고) */
-  const svSig = (p) => JSON.stringify([p.options.map((o) => [o.label, o.today, o.total]), p.excluded, p.answered]);
-  /** 매일 20:00 (설문 기간 · 보내기 켬 · 그날 아직 안 보냄) — 보낸 뒤 숫자가 바뀌면(늦게 온 손님 · [+]) 10초 안에 그날 파일을 다시 씀 (보고 시스템이 22:45까지 30분마다 가져감) */
-  function svTick() {
-    if (svBusy || !svOn()) return;
-    if (SV.retry && SV.retry.day === TODAY && now >= SV.retry.m && svKey.has) { svSend(false); return; } // 보고함 실패 → 10분 뒤 다시
-    if (!SV.send || now < 20 * 60) return;
-    if (SV.sentDay !== TODAY) svSend(false);
-    else if (sec % 10 === 0 && svSig(svPayload()) !== SV.sentSig) svSend(false);
-  }
 
   // ── 이벤트 입장 수 → 보고 앱 (사장님 10/21) ─────────────────────
   /* 예전: 보고 자료가 POS 의 0원 이벤트 상품(예: '[평일] 한가위 무제한 쿠폰') 판매 수량으로 '이벤트 무료입장'을 셈
      → 이제 현장 [이벤트 입장]은 POS 를 안 거치니 데스크가 그날 이벤트 입장 수를 보냄
-     - 매일 20:00 (설문 누적을 보내는 때와 같이 · 설문을 안 하는 기간에도 이것만) 하루 한 번 · 보고 열쇠로 boards/{열쇠}/deskStats/event-{날짜} (astanakiz-event · 손님 정보 없음)
+     - 매일 20:00 하루 한 번 · 보고 열쇠로 boards/{열쇠}/deskStats/event-{날짜} (astanakiz-event · 손님 정보 없음)
      - 이벤트 손님이 없는 날도 0 으로 · 20:00 뒤 숫자가 바뀌면(늦게 온 이벤트 손님 · 기록 삭제) 10초 안에 다시 · 실패하면 10분 뒤 다시 */
   const EVS = { sentDay: "", sig: "", last: null, retry: null };
   const EVS_APP = () => APP && !!(window.desk && window.desk.eventStat);
@@ -4484,7 +4342,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     const L = EVS.last, n = evTickets(TODAY);
     const st = !EVS_APP() ? "체험판: 설치한 앱에서 매일 20:00 보고 앱으로 보내요" : !svKey.has ? "보고 열쇠를 넣으면 매일 20:00 보고 앱으로 보내요" : L ? `마지막 ${L.at.slice(0, 10) === TODAY ? "" : L.at.slice(5, 10) + " "}${L.at.slice(11)} ${L.auto ? "자동" : "직접"} ${L.ok ? `보냄 (${L.count}명)` : `실패: ${L.why}`}${EVS.retry && EVS.retry.day === TODAY ? ` — ${hm(EVS.retry.m)} 다시` : ""}` : "아직 안 보냄 — 20:00 에 보내요";
     return `<div class="btns" style="align-items:center"><span class="label">이벤트 입장 수</span><button class="btn btn-sm" data-act="evsSendNow" ${EVS_APP() && svKey.has ? "" : "disabled"}>지금 보내기</button>
-      <span class="help num ${L && !L.ok ? "evwarn" : ""}">오늘 ${n}명 · 매일 20:00 (설문과 같이 · 설문이 없어도) · ${esc(st)}</span></div>`;
+      <span class="help num ${L && !L.ok ? "evwarn" : ""}">오늘 ${n}명 · 매일 20:00 · ${esc(st)}</span></div>`;
   }
 
   // ── 대관 → 보고 앱 (사장님 11/10) ─────────────────────
@@ -5152,14 +5010,14 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
           "이용일시 · 수량 · 결제상태를 본다 — 금색 <b>2만원 사은권 증정</b>이 보이면 입장할 때 함께 드린다",
           "<b>수량만큼 빈 열쇠 번호</b>를 누른다 (흐린 번호 = 이미 나간 열쇠)",
           "<b>[등록 완료]</b> → 입장권이 나오면 열쇠와 함께 드린다",
-        ], "예약 시간보다 일찍 와도 입장할 수 있어요 (초록 안내) · 설문 번호가 보이면 손님 답(번호)을 먼저 눌러요 · 연속예약은 첫 예약에서 한 번에")}</div></section>
+        ], "예약 시간보다 일찍 와도 입장할 수 있어요 (초록 안내) · 같은 시간에 나눠 한 예약은 어느 카드에서든 한 번에 · 연속예약은 첫 예약에서 한 번에")}</div></section>
         <section class="mansec" id="man3"><div>${manImg("m3-walk.jpg", "현장입장 창")}</div><div><h4>③ 현장 손님 입장</h4>${manSteps([
           "열쇠판에서 <b>빈 열쇠</b>를 누른다 — 맨 위가 <b>초록(판매 가능)</b>인지 본다 · 빨강이면 지금은 판매 불가",
           "<b>입장권 수</b>를 맞춘다 (열쇠가 이어서 붙음) · 입장 타임은 ◀ ▶",
           "<b>[POS로 이동해서 n장 결제하기]</b>(초록 = 판매 가능 · 빨강 = 안 넘어감) → POS에서 그 수만큼 결제 → 끝나면 POS를 최소화하면 이 창으로 돌아온다",
           "<b>전화번호</b> 010 뒤 8자리를 키패드로",
           "맨 아래 오른쪽 <b>[결제 완료 · 열쇠 등록]</b>(POS에 다녀와야 눌림) → 입장권과 열쇠를 드린다",
-        ], "결제 없이 들어오는 이벤트 · 쿠폰 손님은 ③(POS)을 건너뛰고 맨 아래 왼쪽 <b>[이벤트 입장]</b> (전화번호 · 설문만 있으면 · 이름은 관리자가 운영 설정 → 기타에서 · 총 판매수에는 안 셈) · 임직원 등 판매가 아닌 사용은 왼쪽 아래 <b>[서비스 키 (판매 아님)]</b>")}</div></section>
+        ], "결제 없이 들어오는 이벤트 · 쿠폰 손님은 ③(POS)을 건너뛰고 맨 아래 왼쪽 <b>[이벤트 입장]</b> (전화번호만 있으면 · 이름은 관리자가 운영 설정 → 기타에서 · 총 판매수에는 안 셈) · 임직원 등 판매가 아닌 사용은 왼쪽 아래 <b>[서비스 키 (판매 아님)]</b>")}</div></section>
         <section class="mansec" id="man4"><div>${manImg("m4-key.jpg", "열쇠 반납 창")}</div><div><h4>④ 퇴장 · 열쇠 반납</h4>${manSteps([
           "손님이 준 <b>열쇠 번호</b>를 열쇠판에서 누른다",
           "이용 시간을 본다 — <b>빨간 상자</b> = 반납 시간 지남 → <b>[POS로 결제 · 금액]</b>으로 초과요금을 결제",
@@ -5553,8 +5411,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     }
     autoLoad(); // 사무실 PC 도 네이버는 같은 때 읽음 (읽기만)
     if (!OFFICE) { // 사무실 PC 는 그 밖의 자동 일 없음 (현장 POS 가 함)
-    svTick(); // 설문 누적 20:00 보고
-    evsTick(); // 이벤트 입장 수 20:00 보고 (설문과 같이 · 설문이 없어도)
+    evsTick(); // 이벤트 입장 수 20:00 보고
     cwTick(); // 수량 관찰 기록 (5분마다 · 11/13)
     rtTick(); // 재방문 안내 톡톡 매일 자동 보내기 (켰을 때 · 11/16)
     rentTick(); // 대관 기록 → 보고 앱 (바뀌면 바로 · 실패하면 10분 뒤)
@@ -5646,9 +5503,9 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     const done = $("w-done"); if (!done) return;
     if (sheet.svc) { done.disabled = !svcWalkState().ok; return; }
     const st = walkState();
-    const lock = !st.phoneOk || (!!svForWalk() && sheet.sv == null); // 전화번호 · 설문 대상이면 번호(또는 제외) 먼저
+    const lock = !st.phoneOk; // 전화번호 먼저
     done.disabled = lock || st.over || (st.flex && !sheet.flexOk) || !walkPaid(); // 결제 완료 = 판매 가능 + ③ POS에 다녀온 뒤에만
-    if ($("w-event")) $("w-event").disabled = lock; // 이벤트 입장은 전화번호 · 설문만 (판매 가능 · POS 상관없음 · 사장님 10/21)
+    if ($("w-event")) $("w-event").disabled = lock; // 이벤트 입장은 전화번호만 (판매 가능 · POS 상관없음 · 사장님 10/21)
   }
   /* 현장입장 ③ POS에 다녀왔나 (사장님 10/21): [POS로 이동]을 누르고 POS에서 데스크로 돌아와야(posDone) 결제한 수가 적힘
      → 그 수와 지금 입장권 수가 같을 때만 [결제 완료 · 열쇠 등록] (결제 뒤 수를 바꾸면 다시 POS로) */
@@ -5660,10 +5517,8 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     if (!st.phoneOk) return;
     if (ev == null && (st.over || (st.flex && !sheet.flexOk))) return; // 이벤트 입장은 판매 가능과 상관없음
     if (ev == null && !walkPaid()) { toast("③ [POS로 이동]에서 결제하고 돌아와 주세요"); return; }
-    if (svForWalk() && sheet.sv == null) { toast("설문 번호(또는 제외)를 먼저 눌러 주세요"); return; }
     if (sheet.keys.some((k) => holderOf(k))) { toast("그 사이 다른 손님이 쓴 열쇠가 있어요"); closeSheet(); renderAll(); return; }
     const w = walkin(digits(sheet.phone), sheet.keys, now, sheet.slot, ev);
-    if (svForWalk()) { w.sv = sheet.sv; saveState(); } // 설문 답 (번호 · 제외 = 0)
     capWalkSold(); // 현장 1명 = 네이버 1장 — 다음 분에 바로 수량 조절 (11/17)
     closeSheet(); toast(`${ev == null ? "현장입장자" : `${walkTag(w)} 입장 (결제 없음 · 총 판매수에는 안 셈)`} · 열쇠 ${w.keys.join(", ")}번 등록${printForm("enter", keyVals(w))}`); renderAll();
   }
@@ -5682,7 +5537,6 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     openRes(el) { openSheet({ mode: "enter", id: el.dataset.id, keys: [] }); },
     pickKey(btn) {
       const k = Number(btn.dataset.k), b = findB(sheet.id), need = partyNeed(b);
-      if (svFor(b) && sheet.sv == null) { toast("설문 번호를 먼저 눌러 주세요"); return; }
       sheet.over = null;
       if (sheet.keys.includes(k)) sheet.keys = sheet.keys.filter((x) => x !== k);
       else if (sheet.keys.length < need) sheet.keys.push(k);
@@ -5704,8 +5558,6 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       const b = findB(sheet.id);
       const party = partyOpen(b), need = partyNeed(b);
       if (sheet.keys.length !== need || sheet.busy) return; // 같은 시간 묶음은 어느 카드에서든 (11/20)
-      if (svFor(b) && sheet.sv == null) { toast("설문 번호를 먼저 눌러 주세요"); return; }
-      if (svFor(b)) b.sv = sheet.sv; // 설문 답 (번호 · 제외 = 0)
       if (sheet.keys.some((k) => holderOf(k))) { toast("그 사이 다른 손님이 쓴 열쇠가 있어요. 다시 골라 주세요."); sheet.keys = []; renderSheet(); return; }
       // 열쇠는 바로 등록하고 네이버 이용완료는 뒤에서 (naverFlush) — 근무자가 기다리지 않음
       if (APP) b.naverPending = true;
@@ -5823,7 +5675,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       saveState(); renderAll(); renderSheet();
       toast(`${k}번 서비스 키 → ${x.of.label} 손님과 연결 (판매수 · 인원에 안 셈)`);
     },
-    // 현장입장 창 왼쪽 아래 [서비스 키]: 임직원 등 예약 없이 쓸 때 — 판매 · 결제 · 설문 없이 사용자만 적고 열쇠 등록
+    // 현장입장 창 왼쪽 아래 [서비스 키]: 임직원 등 예약 없이 쓸 때 — 판매 · 결제 없이 사용자만 적고 열쇠 등록
     svcWalk() { sheet.svc = !sheet.svc; renderSheet(); const n = $(sheet.svc ? "w-svcname" : "w-phone"); if (n) n.focus(); },
     // 맨 위 '포스 전환': 결제와 상관없이 POS 화면으로 (POS를 최소화하면 데스크로 돌아옴)
     async posGo() {
@@ -5872,7 +5724,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     },
     walkDone() {
       if (sheet.svc) {
-        // 서비스 키 (직원 등): 판매 아님 — 입장권 · 설문 없음 · 총 판매수 · 인원에 안 셈 (저장 파일 s)
+        // 서비스 키 (직원 등): 판매 아님 — 입장권 없음 · 총 판매수 · 인원에 안 셈 (저장 파일 s)
         const st = svcWalkState();
         if (!st.ok) { toast("쓰는 사람 이름이나 전화번호를 적어 주세요"); return; }
         if (sheet.keys.some((k) => holderOf(k))) { toast("그 사이 다른 손님이 쓴 열쇠가 있어요"); closeSheet(); renderAll(); return; }
@@ -5884,7 +5736,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       }
       walkReg();
     },
-    // [이벤트 입장] (사장님 10/21): 결제 없이 — 나머지는 [결제 완료 · 열쇠 등록]과 같음 (열쇠 · 입장권 · 설문 · 인원) · 총 판매수에는 안 셈
+    // [이벤트 입장] (사장님 10/21): 결제 없이 — 나머지는 [결제 완료 · 열쇠 등록]과 같음 (열쇠 · 입장권 · 인원) · 총 판매수에는 안 셈
     walkEvent() { if (!sheet.svc) walkReg(WEV.name); },
     evsSendNow() { evsSend("manual"); },
     // 재방문 안내 (사장님 11/15)
@@ -6035,14 +5887,6 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       const h = holderById(sheet.hid); if (!giftAsk([h])) return; returnKeys(h, [Number(btn.dataset.k)]); renderAll();
       if (h.keys.length) renderSheet(); else closeSheet();
     },
-    // 설문조사 (10/14)
-    svPick(btn) { sheet.sv = Number(btn.dataset.n); renderSheet(); },
-    svAdd() { if (SV.opts.length < 20) SV.opts.push(""); svSaveCfg(); renderSheet(); },
-    // [+] 확인된 1건 더하기 (예약 없이 이벤트로 들어온 손님 등 · 사장님 10/15) — 그날 저장 파일에 번호별 수만 (따로 기록 없음)
-    svPlus(btn) { if (!svOn()) return; const n = Number(btn.dataset.n); svExtra[n] = (svExtra[n] || 0) + 1; saveState(); renderSheet(); toast(`${n}번${SV.opts[n - 1] ? ` ${SV.opts[n - 1]}` : ""} 1건 더함 (오늘 직접 +${svExtra[n]})`); },
-    svMinus(btn) { const n = Number(btn.dataset.n); if (!(svExtra[n] > 0)) return; svExtra[n]--; if (!svExtra[n]) delete svExtra[n]; saveState(); renderSheet(); toast(`${n}번 직접 더한 것 1건 뺌`); },
-    svDel() { if (SV.opts.length > 1) SV.opts.pop(); svSaveCfg(); renderSheet(); },
-    svSendNow() { svSend(true); },
     // 네이버 재고 자동 오픈 (사장님 10/20) — 켜기 · 끄기 · 확인만 · 지금 한 번
     async stToggle() {
       if (!ST_APP()) return;
@@ -6073,15 +5917,13 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       }, (e) => toast(`지난 방문 기록을 못 읽어요: ${e}`));
     },
     hvStop() { if (HV_APP()) window.desk.history.stop().then((r) => { if (r && r.ok) { HV.job = r.job; hvShow(); } toast("지난 방문 기록 읽기를 멈춰요 — 읽던 날까지 남고 다시 누르면 이어서"); }, () => {}); },
-    hvSendNow() { if (!HV_APP()) toast("체험판: 재방문 간격은 설치한 앱에서 보고 앱으로 보내요"); else if (!svKey.has) toast("보고 열쇠를 먼저 넣어 주세요 (설문 보고와 같은 열쇠)"); else hvSend("manual"); },
+    hvSendNow() { if (!HV_APP()) toast("체험판: 재방문 간격은 설치한 앱에서 보고 앱으로 보내요"); else if (!svKey.has) toast("보고 열쇠를 먼저 넣어 주세요 (운영 설정 → 기타 → 보고 앱)"); else hvSend("manual"); },
     // 폰 실시간 현황 켜기 · 끄기 (사장님 10/16) — 켜면 바로 한 번 보냄
     liveToggle() {
       LIVE.on = !LIVE.on; liveSig = ""; liveSentAt = 0; liveWait = 0;
       if (APP && window.desk.config) window.desk.config.set({ liveOn: LIVE.on });
       renderSheet(); toast(LIVE.on ? (svKey.has ? "폰 실시간 현황을 켰어요 — 1분마다 · 바뀌면 바로 보내요" : "폰 실시간 현황을 켰어요 — 보고 열쇠를 넣어 주세요") : "폰 실시간 현황을 껐어요");
     },
-    // 설문조사 켜기 · 끄기 (사장님 10/16) — 끄면 설문 번호 없이 예전처럼 완료 · 입장 (기간 · 대상 · 선택지 · 누적 · 보고 열쇠는 그대로)
-    svToggle() { SV.on = !SV.on; svSaveCfg(); renderSheet(); renderAll(); toast(SV.on ? (svOn() ? "설문조사를 켰어요 — 대상 손님은 번호를 눌러야 입장해요" : "설문조사를 켰어요 — 기간 · 대상 · 선택지를 확인해 주세요") : "설문조사를 껐어요 — 예약자 · 현장입장 창에 설문 없이 바로 입장해요"); },
     // 보고 열쇠 (보고 앱 주소 …/b/{열쇠}/) — 앱은 이 PC 에 암호화 저장, 화면에는 끝 4자리만 · 체험판은 저장 · 보내기 없음
     async svKeySave() {
       const k = (($("sv-key") || {}).value || "").trim();
@@ -6089,13 +5931,13 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       if (APP && window.desk.config) { const r = await window.desk.config.set({ surveyKey: k }).catch((e) => ({ ok: false, why: String(e) })); if (!r || !r.ok) { toast(`열쇠를 저장 못 했어요: ${(r && r.why) || ""}`); return; } }
       svKey = { has: true, tail: k.slice(-4) };
       liveSig = ""; liveWait = 0; // 새 열쇠로 폰 실시간 현황도 바로
-      toast(APP ? "보고 열쇠를 저장했어요 — [지금 보내기]로 확인해 보세요 (폰 실시간 현황도 바로 보내요)" : "체험판: 보고 열쇠는 이 화면에만 (저장 · 보내기 없음)");
+      toast(APP ? "보고 열쇠를 저장했어요 — 폰 실시간 현황을 바로 보내요" : "체험판: 보고 열쇠는 이 화면에만 (저장 · 보내기 없음)");
       renderSheet();
     },
     async svKeyDel() {
       if (APP && window.desk.config) await window.desk.config.set({ surveyKey: "" }).catch(() => {});
-      svKey = { has: false, tail: "" }; SV.retry = null; svSaveCfg();
-      toast("보고 열쇠를 지웠어요 — 보고 파일만 남겨요"); renderSheet();
+      svKey = { has: false, tail: "" };
+      toast("보고 열쇠를 지웠어요 — 보고 앱으로 보내지 않아요"); renderSheet();
     },
     // 방문 이벤트 (10/14 · 10/15 시작일 ~ 종료일)
     evApply() {
@@ -6816,7 +6658,6 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       if (k === "bc" && v) Object.assign(RULES.bc, v);
       if (k === "visitEvent" && v) evLoadCfg(v);
       if (k === "walkEvent" && v) WEV.name = String(v.name || "").slice(0, 10);
-      if (k === "survey" && v) svLoadCfg(v);
       if (k === "liveOn") LIVE.on = v !== false;
       if (k === "announce" && v) { annLoad(v); renderAnnBtn(); }
     }
@@ -6828,7 +6669,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   const OFFICE_OK = new Set(["updApply", "updLater", "updCheck", "time", "refresh", "day", "slot", "openRes", "key", "minimize", "soldList", "soldDay", "soldOpen", "settings", "setTab", "qhelp", "csub", "manual", "manGo", "close", "clock",
     "memoOpen", "memoTab", "memoTo", "memoSend", "memoAck", "memoFin", "memoUnfin", "memoRecall", "memoAdd", "memoDone", "memoUndo", "memoDel",
     "capCell", "addPeak", "delPeak", "evApply", "evOff", "evTpl", "evOpen", "tplGo", "tplRow", "tplSamp", "tplSave", "tplDef", "tplNew", "tplDel", "tplCode",
-    "staffAdd", "staffDel", "svPick", "svAdd", "svDel", "svToggle", "liveToggle", "svKeySave", "svKeyDel", "stToggle", "printMode", "drawerPin", "findPorts", "pickPort", "findPrinters", "pickPrinter", "bcFilter",
+    "staffAdd", "staffDel", "liveToggle", "svKeySave", "svKeyDel", "stToggle", "printMode", "drawerPin", "findPorts", "pickPort", "findPrinters", "pickPrinter", "bcFilter",
     "naverShow", "naverHome", "annTest", "annStop", "syncRole", "syncCodeNew", "syncCodeSave", "syncRelaunch", "syncOpen", "syncDemo", "rentOpen"]);
   /* 새 판 바꾸기 (사장님 11/16 · 11/18 — "업뎃해" 한 판만 · 지웠다가 다시 설치하지 않게): 앱이 10분마다 GitHub 최신 판을 보기만 하다가 새 판이면 고친 내용만 받아 둠 → 위 띠 → 1분 뒤 데스크만 다시 켬
      체험판(앱 아님)은 없음 */
@@ -6948,7 +6789,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
         ${SYNC ? "" : `<div class="btns"><button class="btn" data-act="syncDemo">${SYNCV.demo ? "미리 보기 끝" : "사무실 PC 화면 미리 보기 (체험)"}</button></div>`}
       </div>
       <div class="setcard plain stack"><b>우편함으로 오가는 것 · 안 오가는 것</b>
-        <span class="help"><b>오감</b>: 운영 설정(성수기 기간 · 판매 수량 자동조절 켜고 끄기 · 입금대기 자동 취소 · 재고 자동 오픈 · 입장권 양식 · 프린트물 설정 · BC 양식 · 재방문 이벤트 · 현장 이벤트 · 설문 · 폰 실시간 현황 — 두 PC 중 늦게 바꾼 쪽) · 메모장(근무자 · 메모 · 관리자 전달 · 접수 · 완료) · 키 현황(현장 → 사무실, 열쇠 번호 · 입장 · 반납 시각만 — 이름 · 전화번호는 안 보냄)</span>
+        <span class="help"><b>오감</b>: 운영 설정(성수기 기간 · 판매 수량 자동조절 켜고 끄기 · 입금대기 자동 취소 · 재고 자동 오픈 · 입장권 양식 · 프린트물 설정 · BC 양식 · 재방문 이벤트 · 현장 이벤트 · 폰 실시간 현황 — 두 PC 중 늦게 바꾼 쪽) · 메모장(근무자 · 메모 · 관리자 전달 · 접수 · 완료) · 키 현황(현장 → 사무실, 열쇠 번호 · 입장 · 반납 시각만 — 이름 · 전화번호는 안 보냄)</span>
         <span class="help"><b>안 오감</b>: 네이버 예약 · 고객 카드(사무실 PC 가 네이버에서 직접 읽음 — 처음 한 번 사무실 PC 에서 네이버 로그인) · 주차 · 프린터 · API(아마노 · 톡톡) · 보고 열쇠 · 고객 세부 관리(손님 메모 · BC · 마일리지 SKIP)</span>
         <span class="help"><b>사무실 PC 에서</b>: 키 현황 · 네이버 예약 보기([새로고침] · 날짜 · 시간 칸) · 운영 설정 · 메모장 · 맨 위 [오늘 수량조절]. 네이버에 넣는 일(이용완료 · 판매 수량 · 취소 · 재고 열기) · 입장 · 반납 · 결제 · 출력 · 주차는 현장 POS 에서만.</span>
       </div>`;
@@ -7059,10 +6900,6 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
     if (t.id === "ev-optout") { EV.optout = t.value.trim().slice(0, 60); evSaveCfg(); }
     if (t.id === "rt-auto-at" && /^\d{2}:\d{2}$/.test(t.value) && RT_APP()) { RT.auto = { ...RT.auto, at: t.value < "08:00" ? "08:00" : t.value > "20:30" ? "20:30" : t.value }; window.desk.config.set({ revTalkAuto: RT.auto }); const el = $("rt-auto"); if (el) el.innerHTML = rtAutoRow(); }
     if (t.id === "ev-gift") { EV.gift = t.value.trim(); evSaveCfg(); $("ev-paper").innerHTML = evPrev(); evScroll("ev-paper"); $("ev-dates").textContent = evDatesText(); }
-    if (t.id === "sv-from" || t.id === "sv-to") { SV[t.id === "sv-from" ? "from" : "to"] = t.value; svSaveCfg(); renderSheet(); }
-    if (t.id === "sv-send") { SV.send = t.checked; svSaveCfg(); toast(t.checked ? "설문 누적을 매일 20:00 보고앱에 보내요" : "설문 보고앱 보내기를 껐어요"); }
-    if (t.id === "sv-new" || t.id === "sv-walk" || t.id === "sv-all") { SV[{ "sv-new": "naverNew", "sv-walk": "walkin", "sv-all": "all" }[t.id]] = t.checked; svSaveCfg(); renderSheet(); }
-    if (t.classList.contains("svlabel")) { SV.opts[+t.dataset.i] = t.value; svSaveCfg(); }
     if (t.id === "ev-q") { EV.q = t.value; $("ev-hits").innerHTML = evFindHtml(); }
     if (t.id === "form-auto") { PRINT.forms[PRINT.cur].auto = t.checked; savePrint(); }
     if (t.id === "tpl-apply") { PSET.apply = t.value === "event" ? "event" : "base"; psetSave(); renderSheet(); renderAll(); toast(`지금부터 입장권은 '${PSET.apply === "event" ? "이벤트" : "기본 입장권"}' 양식으로 나가요`); } // 영수증 설정 맨 위 (11/06)
@@ -7176,7 +7013,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       const nn = o.n ?? b.prevDone, d = o.day || EV.from, st = o.st === undefined ? "안내" : o.st;
       evAdd(Object.assign({ at: `${d} 10:00`, day: d, no: o.no || "t-" + name + nn + d, k: evKey(b), name: o.name ?? name, phone: digits(b.phone), prev: nn - 1, n: nn, base: o.base ?? nn - 1 }, st ? { st, due: o.due ?? shiftDay(d, EV.days) } : {}), o.from || EV.from);
       renderAll();
-    }, evSub: (name) => evSub(bookings[TODAY].filter((x) => x.name === name).pop()), EV, SV, svCounts, svPayload, svSend };
+    }, evSub: (name) => evSub(bookings[TODAY].filter((x) => x.name === name).pop()), EV };
 
   // ── 반납안내 커튼 ─────────────────────────────────
   (function curtain() {

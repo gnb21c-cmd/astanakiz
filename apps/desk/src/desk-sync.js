@@ -1,6 +1,6 @@
 /* 두 PC 연결 (사장님 11/06) — 현장 POS(본 PC) ↔ 사무실 PC · 같은 버전끼리 같은 설정 · 같은 화면
    고정 IP 가 없어 두 PC 가 직접 이어지지 않음 → 둘 다 바깥 '우편함'에 자기 문서 하나를 덮어쓰고 반대편 문서를 읽음
-   - 우편함 = 보고 시스템 클라우드 (설문 보고함 · 키즈 실시간과 같은 보고 열쇠): boards/{열쇠}/deskSync/pos · deskSync/office
+   - 우편함 = 보고 시스템 클라우드 (키즈 실시간과 같은 보고 열쇠): boards/{열쇠}/deskSync/pos · deskSync/office
      (GitHub 는 바뀔 때마다 기록이 영구히 쌓이고 · 손님 이름 · 네이버 번호를 저장소에 못 넣고 · POS 에 쓰기 열쇠가 필요해 쓰지 않음)
    - 문서 안 내용은 '연결 코드'(현장 POS 가 만듦 → 사무실 PC 에 넣음)로 잠금: scrypt 로 열쇠를 만들고 AES-256-GCM
      → 보고 열쇠를 아는 사람도 읽거나 가짜 명령을 넣지 못함 (지우거나 덮어쓰면 연결만 끊김)
@@ -17,7 +17,7 @@ const crypto = require("crypto");
 const zlib = require("zlib");
 
 /** 함께 쓰는 설정 (settings.json 키) — 프린터 포트 · 아마노 · 네이버 주소 · 보고 열쇠 · 쿠폰 봉인 열쇠 · 손님 기록은 각 PC 에만 */
-const SHARED = ["peaks", "capAuto", "unpaidCancel", "stockAuto", "printForm", "printSet", "bc2Forms", "bc", "visitEvent", "walkEvent", "survey", "liveOn", "announce"]; // announce = 안내 방송 (11/07 · 목소리는 각 PC annVoice)
+const SHARED = ["peaks", "capAuto", "unpaidCancel", "stockAuto", "printForm", "printSet", "bc2Forms", "bc", "visitEvent", "walkEvent", "liveOn", "announce"]; // announce = 안내 방송 (11/07 · 목소리는 각 PC annVoice)
 const ROLES = ["pos", "office"];
 const other = (role) => (role === "pos" ? "office" : "pos");
 const ALPHA = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"; // 헷갈리는 0 · 1 · I · O 없음 (32자 → 16자리 = 80비트)

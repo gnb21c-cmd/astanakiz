@@ -71,7 +71,7 @@ test("키즈 실시간: 현황 글이 데스크 화면과 같음 (네이버 합 
     for (const k of ["", "naver", "people", "walk", "over", "keys", "rules"]) assert.strictEqual(shape(k ? sample[k] : sample), shape(k ? s[k] : s), `예시 글 ${k || "맨 위"} 칸`);
     assert.strictEqual(shape(sample.keys.holders[0]), shape(s.keys.holders[0]), "예시 글 손님 칸");
 
-    // 운영 설정 → 설문조사: 보고 열쇠 밑 '폰 실시간 현황' (체험판은 보내지 않음)
+    // 운영 설정 → 기타 → 보고 앱: 보고 열쇠 밑 '폰 실시간 현황' (체험판은 보내지 않음)
     await page.dblclick("#now");
     await page.click('[data-t="etc"]');
     assert.match(await page.textContent("#sheet [data-act=liveToggle]"), /폰 실시간 현황 켜짐/);

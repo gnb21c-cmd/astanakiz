@@ -23,7 +23,7 @@ const DEFAULTS = {
   amanoPwEnc: "", // 아마노 비밀번호: Windows 암호화로 이 PC 계정만 풀 수 있게 저장 (저장소·설치파일에 넣지 않음)
   spUrl: "", // 스마트플레이스 '고객' 화면 주소 (재방문 안내 톡톡 보내기 시작 화면 · 11/16). 저장소에 적지 않고 운영 설정 '지금 화면을 …으로'로 이 PC 에만
   talkUrls: { kids: "", cafe: "" }, // 네이버 톡톡 상담 목록 주소 (계정마다). 저장소에 적지 않고 운영 설정 '지금 화면을 …으로'로 기억
-  surveyKeyEnc: "", // 설문 보고함 '보고 열쇠' (보고 앱 주소 …/b/{열쇠}/): Windows 암호화로 이 PC 에만 (저장소·설치파일에 넣지 않음 · 10/15)
+  surveyKeyEnc: "", // '보고 열쇠' (보고 앱 주소 …/b/{열쇠}/ · 이름은 예전 설문 보고 때 그대로): Windows 암호화로 이 PC 에만 (저장소·설치파일에 넣지 않음 · 10/15)
 };
 let settings = { ...DEFAULTS };
 let deskWin = null;
@@ -1044,7 +1044,7 @@ ipcMain.handle("config:set", (_e, patch) => {
   }
   delete patch.amanoPw;
   delete patch.amanoPwEnc;
-  // 설문 보고 열쇠: "" = 지움 · 16~64자 영문 · 숫자 · _ - 만 (화면에는 끝 4자리만 돌려줌)
+  // 보고 열쇠: "" = 지움 · 16~64자 영문 · 숫자 · _ - 만 (화면에는 끝 4자리만 돌려줌)
   if (patch.surveyKey !== undefined) {
     const k = String(patch.surveyKey || "").trim();
     if (!k) settings.surveyKeyEnc = "";
@@ -1158,51 +1158,9 @@ ipcMain.handle("ledger:open", async () => {
   return why ? { ok: false, why } : { ok: true, dir: d };
 });
 
-// 설문조사 누적 보고 (사장님 10/14 · 10/15): 매일 20:00(뒤에 숫자가 바뀌면 다시 · [지금 보내기]) 데스크가 번호별 오늘 · 누적 수를 넘겨줌
-// ① 앱 폴더 report-outbox\survey-날짜.json 에 남김 (손님 정보 없음)
-// ② 보고 열쇠가 있으면 같은 글을 보고 시스템 클라우드 '설문 보고함'에 씀 (gnb21c-cmd/report docs/SURVEY.md '통합데스크가 할 일')
-//    통합데스크(키즈 POS)와 보고 시스템 수집(바리스타 POS)이 다른 PC 라 파일만으로는 못 가져감 → 보고 앱이 보고함을 바로 읽음
-//    PATCH …/boards/{열쇠}/surveyInbox/{설문 시작일} · 로그인 · API 키 없음 · 200 = 보냄 / 403 = 열쇠나 모양이 틀림 / 그 밖 = 실패
+// 보고 시스템 클라우드 (보고 열쇠 = boards/{열쇠}) — 폰 실시간 현황 · 재방문 간격 · 이벤트 입장 수 · 방문 기록 · 두 PC 연결
+// 설문조사 누적 보고(surveyInbox · report-outbox\survey-날짜.json)는 11/20 뺌 (사장님 — 설문을 더 하지 않음 · 다시 할 때 다시 넣음)
 const INBOX_BASE = process.env.ASTANA_INBOX_BASE || "https://firestore.googleapis.com/v1/projects/astana-report/databases/(default)/documents"; // ASTANA_INBOX_BASE 는 시험용
-async function surveyInbox(json, at) {
-  const key = surveyKey();
-  if (!key) return null;
-  let from = "";
-  try { from = String(JSON.parse(json).period.from || ""); } catch (err) { /* 모양 틀림 */ }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(from)) return { ok: false, code: 0, why: "설문 시작일이 없어요" };
-  if (json.length >= 20000) return { ok: false, code: 0, why: "보고 글이 너무 길어요 (선택지 이름을 줄여 주세요)" };
-  const body = JSON.stringify({ fields: { json: { stringValue: json }, at: { stringValue: String(at || "").slice(0, 39) } } });
-  try {
-    const { net } = require("electron");
-    const ac = new AbortController();
-    const t = setTimeout(() => ac.abort(), 15000);
-    const r = await net.fetch(`${INBOX_BASE}/boards/${encodeURIComponent(key)}/surveyInbox/${from}`, { method: "PATCH", headers: { "content-type": "application/json; charset=utf-8" }, body, signal: ac.signal });
-    clearTimeout(t);
-    if (r.status === 200) return { ok: true, code: 200 };
-    return { ok: false, code: r.status, why: r.status === 403 ? "열쇠나 모양이 틀림 (403)" : `응답 ${r.status}` };
-  } catch (err) {
-    return { ok: false, code: 0, why: `인터넷 오류: ${err && err.name === "AbortError" ? "응답 없음" : err && err.message ? err.message : err}` };
-  }
-}
-ipcMain.handle("survey:send", async (_e, job) => {
-  const json = String((job && job.json) || "{}");
-  let file = null, why = "";
-  try {
-    const dir = path.join(app.getPath("userData"), "report-outbox");
-    fs.mkdirSync(dir, { recursive: true });
-    let day = "";
-    try { day = String(JSON.parse(json).day || "").replace(/[^0-9-]/g, ""); } catch (err) { /* 날짜 없음 */ }
-    file = path.join(dir, `survey-${day || "x"}.json`);
-    fs.writeFileSync(file + ".tmp", json, "utf8");
-    fs.renameSync(file + ".tmp", file);
-  } catch (err) {
-    file = null;
-    why = `파일을 못 씀: ${err && err.message ? err.message : err}`;
-  }
-  const inbox = await surveyInbox(json, job && job.at); // 파일을 못 써도 보고함에는 보냄
-  return { ok: !!file, file, why, inbox };
-});
-
 // 폰 실시간 현황 (사장님 10/16): 총괄 관리자가 출근 전에도 보고 앱(입장권 판매 총 수량 → 세부 화면)에서 지금 키즈를 봄
 //   데스크가 1분마다 · 바뀌면 5초 안에 현황 글(astanakiz-live)을 넘겨줌 → 같은 보고 열쇠로 클라우드 boards/{열쇠}/deskLive/now 에 덮어씀 (docs/LIVE.md)
 //   손님 이름 · 전화번호가 들어감(열쇠 미반납 때 관리자가 전화) → 문서 하나(now)만 계속 고쳐 써서 지난 기록은 클라우드에 쌓이지 않음 · 파일로도 안 남김
@@ -1313,7 +1271,7 @@ ipcMain.handle("history:backfill", (_e, job) => {
   return histJobView();
 });
 // 이벤트 입장 수 (사장님 10/21): 현장 [이벤트 입장]은 POS 를 안 거쳐 보고 시스템이 POS 0원 이벤트 상품으로 셀 수 없음
-//   → 데스크가 매일 20:00(설문 보낼 때 같이 · 설문이 없어도) 그날 이벤트 입장 수(astanakiz-event · 손님 정보 없음)를 boards/{열쇠}/deskStats/event-{날짜} 에 덮어씀
+//   → 데스크가 매일 20:00 그날 이벤트 입장 수(astanakiz-event · 손님 정보 없음)를 boards/{열쇠}/deskStats/event-{날짜} 에 덮어씀
 ipcMain.handle("event:send", async (_e, job) => {
   const json = String((job && job.json) || "");
   let day = "";

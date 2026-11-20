@@ -2,7 +2,7 @@
    - 열쇠 창 [서비스 키] (+1타임 오른쪽): 빈 열쇠 중 하나를 골라 판매 아닌 열쇠로 더 줌 → 처음 누른 열쇠 손님(네이버 · 현장)과 연결
    - 원래 손님이 먼저 반납 · 퇴장해도 서비스 키에는 연결 정보가 그대로 · 서비스 키는 따로 반납 (원래 손님 [모두 반납]에 안 섞임)
    - 열쇠판에는 점선 + 연결된 사람 이름(네이버 이름 · 현장 · 직원 이름) · 열쇠 창 수령인 "10번 김채원님에게 추가 서비스 지급된 열쇠" (사장님 10/16)
-   - 현장입장 창 왼쪽 아래 [서비스 키]: 임직원 등 예약 없이 쓸 때 — 쓰는 사람(이름 · 전화)만 적고 등록 · 결제 · 입장권 · 설문 없음
+   - 현장입장 창 왼쪽 아래 [서비스 키]: 임직원 등 예약 없이 쓸 때 — 쓰는 사람(이름 · 전화)만 적고 등록 · 결제 · 입장권 없음
    - 총 판매수 · 네이버/현장 인원(시간표 · 좌석 · 보고 파일 w)에 안 들어감 · 초과요금 없음 · 저장 파일 s 로 따로 */
 const test = require("node:test");
 const assert = require("node:assert");
@@ -120,7 +120,7 @@ test("서비스 키: 열쇠 창에서 빈 열쇠를 골라 연결 · 판매수 �
   }
 });
 
-test("서비스 키: 현장입장 창 왼쪽 아래 — 임직원 등 예약 없이 · 쓰는 사람만 적고 등록 · 판매 · 설문 없음", async () => {
+test("서비스 키: 현장입장 창 왼쪽 아래 — 임직원 등 예약 없이 · 쓰는 사람만 적고 등록 · 판매 없음", async () => {
   const browser = await launch();
   try {
     const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
@@ -128,17 +128,13 @@ test("서비스 키: 현장입장 창 왼쪽 아래 — 임직원 등 예약 없
     page.on("pageerror", (e) => errs.push(e.message));
     await page.goto(DESK);
     const sold0 = await sold(page);
-    // 설문조사를 현장구매자까지 켜 둬도 서비스 키는 설문 없이
-    await page.evaluate(() => Object.assign(window.__deskTest.SV, { on: true, from: "2026-10-01", to: "2026-10-31", walkin: true }));
 
     await page.click('.key[data-k="32"]');
-    assert.ok(await page.$("#sheet .svwalk"), "판매 창은 설문 번호");
     const btn = await page.$eval("#sheet .wleft .svcwalk button", (b) => b.textContent.trim());
     assert.strictEqual(btn, "서비스 키 (판매 아님)", "왼쪽 단계 안내 아래");
     await page.click("#sheet [data-act=svcWalk]");
     assert.match(await page.textContent("#sheet-title"), /현장입장 · 서비스 키\s*판매 아님/);
     assert.strictEqual(await page.$("#sheet [data-act=pay]"), null, "POS 결제 단계 없음");
-    assert.strictEqual(await page.$("#sheet .svwalk"), null, "설문 없음");
     assert.ok(await page.isDisabled("#w-done"), "쓰는 사람을 적기 전엔 잠김");
     assert.strictEqual(await page.evaluate(() => document.activeElement.id), "w-svcname");
     await page.fill("#w-svcname", "홍길동 매니저");

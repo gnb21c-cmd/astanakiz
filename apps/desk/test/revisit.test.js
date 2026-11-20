@@ -99,7 +99,7 @@ test("재방문 간격(앱): 입장 처리 때마다 그날 손님 · 20:00 일�
     h = await hv();
     assert.deepStrictEqual([h.send.length, h.backfill.length], [3, 1], "그 뒤로 그날은 더 안 보내고 · 안 읽음");
     assert.strictEqual((await page.evaluate(() => window.__cfg.revisit)).sentDay, "2026-10-26", "보낸 날 저장 (다시 켜도 그날 또 안 보냄)");
-    // 설정 → 설문조사 탭: 재방문 간격 줄
+    // 설정 → 기타 → 보고 앱: 재방문 간격 줄
     await page.dblclick("#now");
     await page.click('[data-t="etc"]');
     assert.match(await page.textContent("#hv-text"), /기록 4\/1 ~ 10\/26 · 205일 · 마지막 20:\d\d 보냄/);

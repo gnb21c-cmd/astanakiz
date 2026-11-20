@@ -42,8 +42,6 @@ contextBridge.exposeInMainWorld("desk", {
     load: (day) => ipcRenderer.sendSync("state:load", day),
     save: (day, json) => ipcRenderer.send("state:save", day, json),
   },
-  // 설문조사 누적 보고 (매일 20:00 · 10/14) — 파일로 남기고 보고앱 주소가 있으면 POST → { ok, posted, file, why }
-  survey: { send: (job) => ipcRenderer.invoke("survey:send", job) },
   // 폰 실시간 현황 (10/16) — 보고 열쇠로 클라우드 deskLive/now 에 덮어씀 → { ok, code, why }
   live: { send: (job) => ipcRenderer.invoke("live:send", job) },
   // 재방문 간격 (사장님 10/19): 이 PC 방문 기록(해시) · 지난 기록 읽기 · 일수 모음 · 보고 앱으로
