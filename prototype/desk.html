@@ -2247,15 +2247,20 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   const capState = (() => { try { const v = JSON.parse(localStorage.getItem("astanakiz-capstate-" + TODAY)); if (v && Array.isArray(v.loans)) return Object.assign({ bonus: {}, locks: [] }, v); } catch (e) { /* 없음 */ } return { loans: [], bonus: {}, locks: [], seq: 0 }; })();
   const saveCapState = () => { try { localStorage.setItem("astanakiz-capstate-" + TODAY, JSON.stringify(capState)); } catch (e) { /* 저장 못 해도 동작 */ } };
   /** 그 시각 x 의 { keys: 안에 있는 손님 열쇠(반납 전), pend: 아직 안 온 예약, open: 열린 네이버 잔여 } — skip(h) 이면 그 손님 열쇠는 안 셈 (네이버 몫만 셀 때 현장 · 서비스 키 빼기) */
+  /* 수량 조절 셈의 이용시간 (사장님 11/20 — "무제한이어도 중간 중간 나간단 말이지 · 무조건 0으로 만들면 장사하지 말라는 거야")
+     시간제 날 = 원래 시간 · 비수기 평일(무제한)에 [오늘 수량조절]을 켠 날 = 18:00 전 입장은 1시간 50분 머문다고 봄 (10/21 정한 것 · capMinutes · 현장 손님 반납 시각과 같게)
+     예전(11/07 ~ 11/20): 이 셈만 무제한을 '문 닫을 때까지'로 셈 → 앞 타임 자리가 저녁까지 쌓여 상한을 넘었다고 보고 뒤 타임을 예약 수까지(잔여 0) 줄였음 */
+  const capBase = (t) => { const m = baseMinutes(TODAY, t); return m != null ? m : capForce() && t < toMin(RULES.unlimitedFrom) ? RULES.useMinutes : null; };
+  const capKeyTo = (h, k) => { const m = useOf(h, k); return m != null ? h.slot + m : capForce() ? Math.max(h.slot + RULES.useMinutes, now + 30) : Infinity; }; // 안에 있는 손님 열쇠 반납 (켠 평일 무제한 = 1시간 50분 · capWalkOut 과 같음)
   function capKeysParts(x, openLeft, skip) {
     let keys = 0, pend = 0, open = 0;
-    for (const h of holders()) { if (skip && skip(h)) continue; for (const k of h.keys) { const m = useOf(h, k); if (m == null || h.slot + m > x || x < now + 10) keys++; } }
+    for (const h of holders()) { if (skip && skip(h)) continue; for (const k of h.keys) if (capKeyTo(h, k) > x || x < now + 10) keys++; }
     for (const b of bookings[TODAY]) {
       if (b.status !== "확정") continue;
-      const m = isShort(b) ? shortMin(b) : baseMinutes(TODAY, b.slot); // 아직 안 온 예약은 골든벨이어도 원래 시간 안에만 올 수 있다고 (안 온 지난 예약이 계속 자리를 막지 않게) · 숏타임 1시간 20분
+      const m = isShort(b) ? shortMin(b) : capBase(b.slot); // 아직 안 온 예약은 골든벨이어도 원래 시간 안에만 올 수 있다고 (안 온 지난 예약이 계속 자리를 막지 않게) · 숏타임 1시간 20분
       if (b.slot - RULES.earlyMinutes <= x && (m == null || x < b.slot + m)) pend += b.qty;
     }
-    for (const o of openLeft) { const m = baseMinutes(TODAY, o.s); if (o.s - RULES.earlyMinutes <= x && (m == null || x < o.s + m)) open += o.left; }
+    for (const o of openLeft) { const m = capBase(o.s); if (o.s - RULES.earlyMinutes <= x && (m == null || x < o.s + m)) open += o.left; }
     return { keys, pend, open };
   }
   /** 그 시각 t 의 열쇠 (안에 있는 손님 반납 전 · 아직 안 온 예약 · 열린 네이버 잔여) — 수량 조절 상한 셈 */
