@@ -75,6 +75,7 @@ class NaverSync {
     this.onSnap = opts.onSnap || null; // 진단: 네이버 화면 저장 (이용완료 누른 뒤 · 안 됐을 때) // 진행 단계를 데스크에 알림 (현장에서 어디서 막히는지 보려고)
     this.days = new Map(); // 날짜 → Map("상품|시각|확정/이용완료" → { count, cards }) — 칸 숫자가 그대로면 다시 안 엶
     this.cust = new Map(); // "날짜|예약번호" → 손님 확인 { email, past(이용완료 날짜 · 최근 것부터), more, done } (사장님 11/26 — 한 번 읽으면 그날 다시 안 엶)
+    this.custMail = new Map(); // "날짜|예약번호" → 이메일만 읽은 것 { email, done } (hist: false)
     this.custTries = new Map(); // 같은 예약을 못 읽은 수 (세 번까지)
     this.refunds = new Map(); // 예약번호 → 예약 상세에서 읽은 환불 장수 (사장님 11/19 — 새로고침 때 상세를 못 열어도 오락가락하지 않게 · 칸이 또 어긋나면 다시 엶)
   }
@@ -271,12 +272,15 @@ class NaverSync {
      예약마다 ① 그 시간 [확정] 칸 → 그 예약 카드 → '예약 상세정보'의 이메일(앞 2자리 · 도메인으로 같은 손님 견주기)
      ② '완료 n >'를 눌러 '고객정보' 맨 아래 '지난 예약'의 이용완료 날짜 (보이는 줄에 이용완료가 없고 [더보기]가 있으면 눌러 더 · 세 번까지)
      → 데스크가 마지막 이용완료 날짜로 재방문 이벤트 기한 안인지 정함 · 처음 온 손님('신규예약')은 고객정보를 안 엶
-     list = [{ no, time, product }] · 읽은 예약은 그날 다시 안 엶 · 못 읽은 예약은 세 번까지 */
+     list = [{ no, time, product, hist }] · 읽은 예약은 그날 다시 안 엶 · 못 읽은 예약은 세 번까지
+     hist: false = 이메일만 (현장 POS 고객 데이터베이스에 아이디 앞 2자리를 모을 때 · 재방문 이벤트 밖 · 고객정보는 안 엶 · 11/26) */
   async custInfo(day, list) {
     const out = {};
     const want = (list || []).filter((it) => it && it.no && it.time);
     const todo = want.filter((it) => !this.cust.has(`${day}|${it.no}`));
     for (const it of want) if (this.cust.has(`${day}|${it.no}`)) out[it.no] = this.cust.get(`${day}|${it.no}`);
+    for (const it of todo) if (it.hist === false && this.custMail.has(`${day}|${it.no}`)) out[it.no] = this.custMail.get(`${day}|${it.no}`);
+    for (const k of Object.keys(out)) { const i = todo.findIndex((it) => String(it.no) === k); if (i >= 0) todo.splice(i, 1); }
     if (!todo.length) return { ok: true, info: out };
     let g = await this.goView("calendar");
     if (!g.ok) return g;
@@ -290,6 +294,7 @@ class NaverSync {
       let r;
       try { r = await this.custOne(it); } catch (e) { r = { ok: false, why: String((e && e.message) || e) }; }
       if (r.ok && Array.isArray(r.past)) this.cust.set(key, r);
+      else if (r.ok) this.custMail.set(key, r); // 이메일만 읽음 — 나중에 지난 예약이 필요하면 그때 고객정보를 엶
       out[it.no] = r;
       await this.call("window.__naver.closeCustomer()").catch(() => null);
       await sleep(300);
@@ -314,6 +319,7 @@ class NaverSync {
     }
     const email = card.email || "", done = card.doneCount;
     if (done === 0) return { ok: true, email, past: [], more: false, done }; // 신규예약 — 지난 이용완료 없음
+    if (it.hist === false) return { ok: true, email, done }; // 이메일만 (고객정보 · 지난 예약은 안 엶)
     this.step(`${it.time} 손님 확인 — 고객정보 지난 예약 읽는 중`);
     const oc = await this.call("window.__naver.openCustomer()").catch(() => null);
     if (!oc || !oc.ok) return { ok: false, email, why: (oc && oc.why) || "고객정보를 못 엶" };

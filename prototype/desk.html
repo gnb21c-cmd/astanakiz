@@ -1081,6 +1081,8 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
       proxy: !!o.proxy, visitor: o.visitor || "", unpaid: !!o.unpaid,
     };
     if (o.naverProduct) b.naverProduct = o.naverProduct; // 시험: 네이버 상품 이름 (숏타임 등)
+    if (o.email) b.email = o.email; // 시험: 네이버 예약 상세 이메일 (가린 모양 · 11/26)
+    if (o.past) b.past = o.past; // 시험: 네이버 고객정보 지난 예약 이용완료 날짜 (읽은 것)
     if (o.unpaid) b.pay = "입금대기";
     if (b.status === "완료") b.visitNo = b.prevDone + 1;
     (bookings[day] = bookings[day] || []).push(b);
@@ -2528,7 +2530,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
     annGoldenAuto(); // 안내 방송 (사장님 11/07): 배경음악과 함께 골든벨 멘트
     renderAll();
   }
-  function renderAll() { if (!OFFICE) { saveState(); evSync(); hvSync(); notesSync(); bcWatch(); } $("now").textContent = hm(now); $("refresh-at").textContent = refreshText(); $("refresh-at").style.color = (naverErr || (bookings[TODAY] || []).some((b) => b.naverPending && b.naverWhy)) && !naverBusy ? "var(--red)" : ""; renderSlots(); renderRes(); renderKeys(); renderCars(); if (!OFFICE) goldenCheck(); renderMemoBoxes(); renderCapForce(); renderSyncChip(); renderRentBtn(); renderRevBtn(); fitTop(); }
+  function renderAll() { if (!OFFICE) { saveState(); evSync(); hvSync(); cdbSync(); notesSync(); bcWatch(); } $("now").textContent = hm(now); $("refresh-at").textContent = refreshText(); $("refresh-at").style.color = (naverErr || (bookings[TODAY] || []).some((b) => b.naverPending && b.naverWhy)) && !naverBusy ? "var(--red)" : ""; renderSlots(); renderRes(); renderKeys(); renderCars(); if (!OFFICE) goldenCheck(); renderMemoBoxes(); renderCapForce(); renderSyncChip(); renderRentBtn(); renderRevBtn(); fitTop(); }
   /** 맨 위 오른쪽 묶음(두 PC 연결 · 대관 · 근무자 메뉴얼 · 총 판매수 · 시계)이 가운데 커튼 손잡이에 가리면 조금씩 줄임 (사장님 11/10 — 겹치지 않게)
       손잡이는 1024×768 판 밖(창 가운데 · 크기 그대로)이라 창 크기마다 재서 맞춤 · 커튼이 내려와 손잡이가 숨어도 마지막 크기로 */
   var topTabW = 0; // var: 처음 그릴 때(이 줄보다 먼저)도 쓰임
@@ -2553,6 +2555,12 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
   // ── 팝업 ─────────────────────────────────────────
   const sheet = { mode: null };
   function openSheet(s) { for (const k of Object.keys(sheet)) delete sheet[k]; Object.assign(sheet, s); $("overlay").hidden = false; renderSheet(); focusFirst(); }
+  /** 입장 창 '우리 기록' 줄 — 현장 POS 고객 데이터베이스 (사장님 11/26) */
+  function cdbRow(b) {
+    if (OFFICE || !cdbReady || b.walk || b.svc) return "";
+    const o = cdbOf(b);
+    return `<dt>우리 기록</dt><dd class="num cdbrow">${o && o.n ? `방문 ${o.n}번 · 마지막 ${md2(o.last)}${o.ph ? " · 번호 있음" : ""}${o.em ? ` · 아이디 ${esc(o.em.split("@")[0])}…` : ""}` : `<span class="help">처음 (데스크에 모은 기록 없음)</span>`}</dd>`;
+  }
   /** 입장 창 전화번호 줄: 010-[가운데 4자리]-뒷 4자리 + 숫자판 (사장님 11/26) */
   function midHtml(b) {
     const v = String(sheet.mid || ""), ok = midOk(v), kn = ok ? knownFulls(b) : null, full = `010${v}${p4Of(b.phone)}`;
@@ -2642,7 +2650,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
         <h3 id="sheet-title">네이버 예약자 <button class="x" data-act="close" aria-label="닫기">×</button></h3>${bcAskHtml()}
         <div><dl class="facts">
           <dt>예약자</dt><dd style="font-size:18px">${nameHtml(b)}${isShort(b) ? ` ${shortBadge(b)}` : ""} <span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span>${b.black ? `<span class="nblk" title="네이버 예약 카드에 '블랙리스트' 표시 — 처음 한 번 BC 원아웃 · 특이사항을 메모로">네이버 블랙리스트</span>` : ""}${noteChecks(b)}</dd>
-          <dt>${evActive() && evIn(b.day) ? "이벤트" : "이용완료"}</dt><dd class="num visits big">${visitText(b)}</dd>
+          <dt>${evActive() && evIn(b.day) ? "이벤트" : "이용완료"}</dt><dd class="num visits big">${visitText(b)}</dd>${cdbRow(b)}
           <dt>전화번호</dt><dd class="num">${midNeed(b) && canEnter ? midHtml(b) : phoneHtml(b)}</dd>${visitorRow(b)}
           <dt>이용일시</dt><dd class="num">${hm(b.slot)} ${m == null ? "· 무제한" : `~ ${hm(b.slot + m)} (${dur(m)})`}${b.naverSlot != null && b.naverSlot !== b.slot ? ` <span class="moved">네이버 ${hm(b.naverSlot)}</span>` : ""}${b.day === TODAY && b.no ? `
             <span class="mvrow" aria-label="예약시간 변경">→ <button class="btn btn-sm" data-act="mvSlot" data-d="-30" aria-label="앞 시간" ${(sheet.mv ?? b.slot) <= SLOTS[0] ? "disabled" : ""}>◀</button><b class="num">${hm(sheet.mv ?? b.slot)}</b><button class="btn btn-sm" data-act="mvSlot" data-d="30" aria-label="뒤 시간" ${(sheet.mv ?? b.slot) >= SLOTS[SLOTS.length - 1] ? "disabled" : ""}>▶</button><button class="btn btn-sm btn-ink" data-act="mvDo" ${(sheet.mv ?? b.slot) === b.slot ? "disabled" : ""}>변경</button></span>` : ""}</dd>
@@ -3141,8 +3149,18 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
         return { html, after: () => evScroll("ev-paper") };
       }
       if (tab === "cust") {
-        const sub = sheet.csub === "skip" ? "skip" : "bc";
-        const head = `<div class="seg2 psub"><button class="${sub === "bc" ? "on" : ""}" data-act="csub" data-s="bc" aria-pressed="${sub === "bc"}">BC 관리</button><button class="${sub === "skip" ? "on" : ""}" data-act="csub" data-s="skip" aria-pressed="${sub === "skip"}">마일리지 SKIP</button></div>`;
+        const sub = sheet.csub === "skip" ? "skip" : sheet.csub === "db" ? "db" : "bc";
+        const head = `<div class="seg2 psub"><button class="${sub === "bc" ? "on" : ""}" data-act="csub" data-s="bc" aria-pressed="${sub === "bc"}">BC 관리</button><button class="${sub === "skip" ? "on" : ""}" data-act="csub" data-s="skip" aria-pressed="${sub === "skip"}">마일리지 SKIP</button><button class="${sub === "db" ? "on" : ""}" data-act="csub" data-s="db" aria-pressed="${sub === "db"}">고객 데이터베이스</button></div>`;
+        if (sub === "db") {
+          const all = Object.values(CDB.c), q = sheet.dbq || "", hits = cdbSearch(q), top = hits.slice(0, 30);
+          const phT = (r) => (r.ph ? fmtPhone(r.ph) : `***-****-${r.p4}`);
+          const rows = top.map(([, r]) => { const days = [...new Set(r.v.map((v) => v[0]))]; return `<div class="it"><span><b>${esc(r.nm)}</b> · <span class="num">${esc(phT(r))}</span>${r.em ? ` · <span class="num">${esc(r.em)}</span>` : ""}</span><span class="help num">방문 ${days.length}번 · ${days.slice(-3).map(md2).join(" · ")}</span></div>`; }).join("");
+          return { html: head + `
+          <div class="setcard plain stack"><div class="bcfind"><b>고객 데이터베이스</b><span class="help">${OFFICE ? "현장 POS 에만 있어요" : !cdbReady ? "읽는 중…" : `모은 손님 ${all.length}명 · 방문 ${all.reduce((a, r) => a + r.v.length, 0)}번 · 전체 번호 ${all.filter((r) => r.ph).length}명 · 아이디 ${all.filter((r) => r.em).length}명`}</span></div>
+            <input id="db-q" class="cfg" placeholder="이름(홍*동 · 홍동) · 전화 뒷 4자리 · 전체 번호 · 아이디 앞 글자로 찾기" autocomplete="off" value="${esc(q)}">
+            <div class="bclist">${rows || `<span class="help">${q ? "찾는 손님이 없어요" : "아직 모은 손님이 없어요"}</span>`}${hits.length > top.length ? `<span class="help">${hits.length}명 중 최근 30명 — 더 넣어 좁혀 주세요</span>` : ""}</div>
+            <span class="help">입장 처리할 때마다 데스크가 네이버와 따로 모아 백업하듯 보관 (판정은 네이버를 읽을 수 있는 동안 네이버로 · 끝내 못 읽으면 이 기록으로) · 이름은 '홍*동' 모양 · 같은 손님 = 이름 첫 · 끝 글자 + 뒷 4자리 (+ 전체 번호 · 아이디 앞 2자리가 둘 다 있으면 같아야) · 이 PC 앱 폴더 customer-db.json 에만 (클라우드 없음)</span></div>` };
+        }
         if (!custList) custLoad();
         const L = custList || [], p4 = (x) => `010-****-${esc(x.p4 || "????")}`;
         if (sub === "skip") {
@@ -3853,7 +3871,10 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
   const naverLast = (b) => { const ps = pastOf(b); if (!ps) return undefined; return ps.filter((d) => isDay(d) && d < b.day && (!EV.from || d >= EV.from)).sort().pop() || ""; };
   /** 지난 예약을 읽어야 판정할 수 있는 손님 (앱 · 가린 정보 · 처음 온 손님이 아님) */
   const custUnsure = (b) => CUST_APP() && !!b && maskedPhone(b.phone) && b.prevDone !== 0 && pastOf(b) == null;
-  const custWant = (b) => !!b && b.day === TODAY && !!b.no && !b.walk && evActive() && evIn(b.day) && !evEarly(b) && !evOut(b) && custUnsure(b);
+  /** 지난 예약까지 읽어야 하나 (재방문 이벤트 판정) */
+  const custHist = (b) => evActive() && evIn(b.day) && !evEarly(b) && !evOut(b) && custUnsure(b);
+  /** 읽어야 하나: 이벤트 판정 · 또는 아이디(이메일) 앞 2자리를 아직 모음 (사장님 11/26 — 데이터베이스로 같은 손님 견주기 · 이벤트 밖에도) */
+  const custWant = (b) => !!b && b.day === TODAY && !!b.no && !b.walk && CUST_APP() && maskedPhone(b.phone) && (custHist(b) || (!b.email && !b.emailNone));
   const custTried = new Map(); // 예약번호 → 읽어 본 수 (세 번까지)
   let custBusy = false, custFirst = null, custT = null, custFails = 0, custPause = -1;
   async function custScan(first) {
@@ -3862,20 +3883,23 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
     const pri = custFirst && custWant(custFirst) ? [custFirst] : [];
     custFirst = null;
     if (!pri.length && now < custPause) return; // 이어서 못 읽으면 30분 쉼 (네이버 화면이 바뀌었을 때 하루 종일 붙잡지 않게 · 카드를 누른 손님은 그대로)
-    const rest = (bookings[TODAY] || []).filter((b) => (b.status === "확정" || b.custWait) && custWant(b) && !pri.includes(b) && (custTried.get(b.no) || 0) < 3)
+    // 아이디(이메일)만 모으는 손님은 올 즈음(30분 전 ~ 60분 뒤)에만 — 네이버를 하루 종일 붙잡지 않게 (재방문 이벤트 판정은 그대로)
+    const near = (b) => custHist(b) || (b.slot >= now - 30 && b.slot <= now + 60);
+    const rest = (bookings[TODAY] || []).filter((b) => (b.status === "확정" || b.custWait) && custWant(b) && near(b) && !pri.includes(b) && (custTried.get(b.no) || 0) < 3)
       .sort((x, y) => (x.slot < now - 60) - (y.slot < now - 60) || x.slot - y.slot); // 곧 올 손님부터 (한참 지난 시간은 뒤로)
     const list = pri.concat(rest).slice(0, pri.length ? 1 : 2);
     if (!list.length) return;
     custBusy = true;
     for (const b of list) custTried.set(b.no, (custTried.get(b.no) || 0) + 1);
-    const r = await window.desk.naver.custInfo({ day: TODAY, list: list.map((b) => ({ no: b.no, time: hm(b.naverSlot ?? b.slot), product: b.naverProduct || "" })) }).catch((e) => ({ ok: false, why: String(e) }));
+    const r = await window.desk.naver.custInfo({ day: TODAY, list: list.map((b) => ({ no: b.no, time: hm(b.naverSlot ?? b.slot), product: b.naverProduct || "", hist: custHist(b) })) }).catch((e) => ({ ok: false, why: String(e) }));
     custBusy = false;
     const got = list.some((b) => { const x = r && r.ok && r.info ? r.info[b.no] : null; return !!(x && x.ok); });
     custFails = got ? 0 : custFails + 1;
     if (custFails >= 3) { custPause = now + 30; custFails = 0; }
     for (const b of list) {
       const x = r && r.ok && r.info ? r.info[b.no] : null;
-      if (x && x.email) b.email = x.email;
+      if (x && x.email) { b.email = x.email; cdbMore(b); }
+      else if (x && x.ok) b.emailNone = true; // 상세에 이메일이 없음 — 다시 안 읽음
       if (x && x.ok && Array.isArray(x.past)) b.past = x.past.filter(isDay).slice(0, 20);
       if (b.custWait) custPrint(b); // 확인을 기다리던 입장권 (읽었든 못 읽었든 한 번)
     }
@@ -3890,6 +3914,153 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
     if (b.printWaiting) return;
     toast(`${b.name}님 ${ev ? (ev.st === "성공" ? `이벤트 도전 성공 — ${EV.gift || "사은품"} 드리세요` : evLabel(ev)) : "입장"}${printForm("enter", keyVals(b))}`, ev && ev.st === "성공" ? 8000 : 0);
     renderAll();
+  }
+  /* ── 현장 POS 고객 데이터베이스 (사장님 11/26 — "네이버 믿을 수 없어 · 현장 포스에 데이터베이스로 활용 · 저장 관리")
+     = 네이버가 또 무엇을 막을지 모르니, 네이버를 읽을 수 있는 동안은 네이버로 마일리지 · 이벤트 · 사은권을 판정하고 우리 데이터는 데이터대로 백업하듯 보관 (사장님 11/26) ──
+     데스크가 직접 모으는 손님 장부 — 설치한 앱: 현장 POS 앱 폴더 customer-db.json (저장할 때마다 바로 앞 파일을 .bak 로) · 체험판: 이 브라우저 · 사무실 PC · 클라우드로 안 감
+     { v: 1, seq, filled: 처음 채운 날, c: { id: { nm: "홍*동", p4: "1234", ph: 전체 번호 | "", em: "bl@naver.com" | "", v: [[날짜, 예약번호, 장수], …] } } }
+     - 이름은 홍길동이든 홍지동이든 '홍*동' 모양으로만 남김 (가운데 글자는 네이버가 가려 비교 못 함)
+     - 같은 손님 = 이름 첫 · 끝 글자 + 전화 뒷 4자리가 같고, 둘 다 알면 전체 번호 · 아이디(이메일) 앞 2자리 · 도메인도 같음 (다르면 다른 손님 → 새로)
+       후보가 여럿이면 전체 번호 · 아이디가 맞는 쪽 → 그래도 여럿이면 최근에 온 손님
+     - 방문 = 데스크에서 입장 처리한 네이버 예약 하나 (예약번호로 한 번만) · 처음 한 번 그동안의 날짜별 입장 기록(desk-state, 4/1 ~ 어제)에서 채움
+     - 쓰는 곳: 입장 창 '우리 기록' · 운영 설정 → 고객 세부 관리 → 고객 데이터베이스 · 재방문 이벤트 판정은 네이버 지난 예약을 끝내 못 읽었을 때만 대신 (evOf) */
+  const CDB_LS = "astanakiz-cdb", CDB_FROM = "2026-04-01";
+  const CDB_APP = () => APP && !OFFICE && !!(window.desk && window.desk.cdb);
+  let CDB = { v: 1, seq: 0, filled: "", c: {} }, cdbReady = false, cdbT = null;
+  const cdbIdx = new Map(), cdbNos = new Set(); // "이름 첫 · 끝|뒷 4자리" → [id] · 적은 예약번호
+  const nmMask = (n) => { const c = [...String(n || "").normalize("NFC").replace(/\s+/g, "")]; return c.length <= 1 ? c.join("") : c.length === 2 ? c[0] + "*" : c[0] + "*".repeat(c.length - 2) + c[c.length - 1]; };
+  const cdbKey = (name, p4) => `${nmSig(name)}|${p4}`;
+  function cdbIndex() {
+    cdbIdx.clear(); cdbNos.clear();
+    for (const [id, r] of Object.entries(CDB.c)) {
+      const k = cdbKey(r.nm, r.p4);
+      if (!cdbIdx.has(k)) cdbIdx.set(k, []);
+      cdbIdx.get(k).push(id);
+      for (const v of r.v) cdbNos.add(String(v[1]));
+    }
+  }
+  /** 이 손님(이름 · 전화 · 전체 번호 · 이메일)의 장부 id — 없으면 "" */
+  function cdbFind(q) {
+    const p4 = p4Of(fullPhone(q) || q.phone);
+    if (p4.length !== 4) return "";
+    const f = fullPhone(q), e = emSig(q.email);
+    const ok = (cdbIdx.get(cdbKey(q.name, p4)) || []).map((id) => [id, CDB.c[id]]).filter(([, r]) => (!f || !r.ph || r.ph === f) && (!e || !r.em || r.em === e));
+    if (!ok.length) return "";
+    const score = ([, r]) => (f && r.ph === f ? 4 : 0) + (e && r.em === e ? 2 : 0), lastOf = ([, r]) => (r.v.length ? r.v[r.v.length - 1][0] : "");
+    ok.sort((a, b) => score(b) - score(a) || (lastOf(b) > lastOf(a) ? 1 : lastOf(b) < lastOf(a) ? -1 : 0));
+    return ok[0][0];
+  }
+  /** 방문 한 번 적기 { day, no, qty, name, phone, phoneFull, email } (같은 예약번호는 한 번만) → id */
+  function cdbVisit(q) {
+    const no = String(q.no || "");
+    if (!no || cdbNos.has(no) || !isDay(q.day) || !q.name) return "";
+    const p4 = p4Of(fullPhone(q) || q.phone);
+    if (p4.length !== 4) return "";
+    const f = fullPhone(q), e = emSig(q.email);
+    let id = cdbFind(q);
+    if (!id) {
+      id = "c" + ++CDB.seq;
+      CDB.c[id] = { nm: nmMask(q.name), p4, ph: "", em: "", v: [] };
+      const k = cdbKey(q.name, p4);
+      if (!cdbIdx.has(k)) cdbIdx.set(k, []);
+      cdbIdx.get(k).push(id);
+    }
+    const r = CDB.c[id];
+    if (f && !r.ph) r.ph = f;
+    if (e && !r.em) r.em = e;
+    r.v.push([q.day, no, Math.max(1, Math.round(Number(q.qty)) || 1)]);
+    r.v.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+    if (r.v.length > 400) r.v.splice(0, r.v.length - 400);
+    cdbNos.add(no);
+    return id;
+  }
+  /** 이 예약 손님의 우리 기록 { id, days: 그 예약 날 전 방문 날짜(겹침 없이 · 오래된 것부터), n, last, ph, em } — 모르면 null */
+  function cdbOf(b) {
+    if (!cdbReady || !b || b.walk || b.svc) return null;
+    const id = cdbFind(b);
+    if (!id) return null;
+    const r = CDB.c[id], days = [...new Set(r.v.map((v) => v[0]).filter((d) => d < b.day))];
+    return { id, days, n: days.length, last: days[days.length - 1] || "", ph: !!r.ph, em: r.em };
+  }
+  /** 이미 적은 방문(예약번호)에 나중에 알게 된 전체 번호 · 아이디를 더함 (비어 있을 때만 · 다른 값이면 그대로) */
+  function cdbMore(b) {
+    if (!cdbReady || !b || !b.no || !cdbNos.has(String(b.no))) return;
+    const id = Object.keys(CDB.c).find((k) => CDB.c[k].v.some((v) => v[1] === String(b.no)));
+    if (!id) return;
+    const r = CDB.c[id], f = fullPhone(b), e = emSig(b.email);
+    let any = false;
+    if (f && !r.ph && p4Of(f) === r.p4) { r.ph = f; any = true; }
+    if (e && !r.em) { r.em = e; any = true; }
+    if (any) cdbSave();
+  }
+  /** 우리 기록의 마지막 방문 (이벤트 기간 · 그 예약 날 전) — 기록은 있는데 없으면 "" · 손님을 모르면 undefined */
+  const cdbLast = (b) => { const o = cdbOf(b); return o ? o.days.filter((d) => !EV.from || d >= EV.from).pop() || "" : undefined; };
+  const cdbSave = () => {
+    clearTimeout(cdbT);
+    cdbT = setTimeout(() => { const t = JSON.stringify(CDB); if (CDB_APP()) window.desk.cdb.save(t).catch(() => {}); else if (!APP) try { localStorage.setItem(CDB_LS, t); } catch (e) { /* 저장 못 해도 동작 */ } }, 800);
+  };
+  /** 화면을 그릴 때마다: 오늘 입장 처리한 네이버 예약을 장부에 (적은 예약번호는 건너뜀 · 같은 손님 예약은 대표의 전체 번호 · 이메일로) */
+  function cdbSync() {
+    if (!cdbReady || OFFICE) return;
+    let any = false;
+    // 오늘 '기록 삭제'(판매수 · 통계에서 뺌)한 예약은 장부에서도 뺌 · 되살리면 다시 적힘
+    for (const no of testOut) if (cdbNos.has(String(no))) { cdbDrop(no); any = true; }
+    for (const b of bookings[TODAY] || []) {
+      if (b.status !== "완료" || b.enteredAt == null || !b.no || testOut.has(b.no) || cdbNos.has(String(b.no))) continue;
+      const h = (b.chainHead && (bookings[TODAY] || []).find((x) => x.id === b.chainHead)) || b;
+      if (cdbVisit({ day: TODAY, no: b.no, qty: b.qty, name: b.name, phone: b.phone, phoneFull: b.phoneFull || h.phoneFull, email: b.email || h.email })) any = true;
+    }
+    if (any) cdbSave();
+  }
+  /** 예약번호 하나의 방문을 뺌 (남은 방문이 없으면 손님째) */
+  function cdbDrop(no) {
+    no = String(no);
+    for (const [id, r] of Object.entries(CDB.c)) {
+      if (!r.v.some((v) => v[1] === no)) continue;
+      r.v = r.v.filter((v) => v[1] !== no);
+      if (!r.v.length) delete CDB.c[id];
+    }
+    cdbIndex();
+  }
+  /** 처음 한 번: 그동안의 날짜별 입장 기록(4/1 ~ 어제 · 그날 '기록 삭제'한 예약 빼고)에서 채움 (설치한 앱) — 15일씩 나눠 읽어 화면이 안 멈춤 · 다 채우면 done */
+  function cdbFill(done) {
+    if (CDB.filled || !APP || !window.desk.state) { CDB.filled = CDB.filled || TODAY; cdbSave(); return done(); }
+    let d = CDB_FROM;
+    const step = () => {
+      for (let i = 0; i < 15 && d < TODAY; i++, d = shiftDay(d, 1)) {
+        let f = null;
+        try { const t = window.desk.state.load(d); f = t ? JSON.parse(t) : null; } catch (e) { f = null; }
+        if (!f || !Array.isArray(f.b)) continue;
+        const x = new Set(f.x || []);
+        for (const b of f.b) if (b && b.status === "완료" && b.enteredAt != null && !x.has(b.no)) cdbVisit({ day: d, no: b.no, qty: b.qty, name: b.name, phone: b.phone, phoneFull: b.phoneFull, email: b.email });
+      }
+      if (d < TODAY) return void setTimeout(step, 0);
+      CDB.filled = TODAY;
+      cdbSave();
+      done();
+    };
+    step();
+  }
+  function cdbLoad() {
+    if (OFFICE) return;
+    const done = (t) => {
+      try { const d = t ? JSON.parse(t) : null; if (d && d.v === 1 && d.c && typeof d.c === "object") CDB = Object.assign({ v: 1, seq: 0, filled: "", c: {} }, d); } catch (e) { /* 깨졌으면 새로 (앱 본체는 .bak 에서 읽음) */ }
+      cdbIndex(); cdbFill(() => { cdbReady = true; renderAll(); });
+    };
+    if (CDB_APP()) window.desk.cdb.load().then((r) => done(r && r.ok ? r.text : null), () => done(null));
+    else if (!APP) { let t = null; try { t = localStorage.getItem(CDB_LS); } catch (e) { /* 없음 */ } done(t); }
+  }
+  /** 찾기 (이름 · 뒷번호 · 전체 번호 조각 · 아이디) → 최근에 온 손님부터 */
+  function cdbSearch(q) {
+    q = String(q || "").trim();
+    const d = /^[\d\s-]+$/.test(q) ? digits(q) : "", L = [];
+    const fl = (n) => { const c = [...String(n).normalize("NFC").replace(/[\s*]/g, "")]; return c.length > 1 ? c[0] + c[c.length - 1] : c.join(""); }; // '도희' · '도*희' · '도지희' → 도희
+    for (const [id, r] of Object.entries(CDB.c)) {
+      const hit = !q ? true : d ? (d.length <= 4 ? r.p4.endsWith(d) : r.ph.includes(d)) : r.nm.includes(q) || r.nm === nmMask(q) || fl(r.nm) === fl(q) || (r.em && r.em.startsWith(q.toLowerCase()));
+      if (hit) L.push([id, r]);
+    }
+    const lastOf = (r) => (r.v.length ? r.v[r.v.length - 1][0] : "");
+    return L.sort((a, b) => (lastOf(b[1]) > lastOf(a[1]) ? 1 : lastOf(b[1]) < lastOf(a[1]) ? -1 : 0));
   }
   /** 입장 때 전화번호 가운데 4자리를 받아야 하나 (가려진 네이버 손님 · 전체 번호를 아직 모름) */
   const midNeed = (b) => !!b && !b.walk && !b.svc && maskedPhone(b.phone) && p4Of(b.phone).length === 4 && !fullPhone(b);
@@ -4271,14 +4442,17 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
     const i = vs.findIndex((v) => String(v.no) === String(h.no || h.id));
     const before = (i >= 0 ? vs.slice(0, i) : vs).filter((v) => v.day && v.day <= b.day);
     // 네이버 고객정보 '지난 예약'의 마지막 이용완료 (사장님 11/26 — 가린 정보로 장부와 못 이어도 · 같은 네이버 아이디) — 장부보다 늦으면 그 날 기준
-    const nv = naverLast(b);
+    // 네이버 정보가 먼저 (사장님 11/26 — 읽을 수 있는 동안은 네이버로 마일리지 · 이벤트 · 사은권) · 현장 POS 고객 데이터베이스는 네이버 지난 예약을 끝내 못 읽었을 때만 대신
+    //   (네이버가 '신규예약'(완료 0)이라 한 손님 · 아직 읽는 중(세 번까지)인 손님은 우리 기록을 안 씀)
+    const nv = naverLast(b), naverTrying = custUnsure(b) && (custTried.get(b.no) || 0) < 3;
+    const dv = nv === undefined && b.prevDone !== 0 && !naverTrying ? cdbLast(b) : undefined, ext = nv !== undefined ? nv : dv || "";
     if (!before.length) {
-      if (nv) return evRule({ day: nv, due: "" }, b.day);
+      if (ext) return evRule({ day: ext, due: "" }, b.day);
       const r0 = evRule(null, b.day);
-      return nv === undefined && custUnsure(b) ? Object.assign(r0, { unsure: true }) : r0; // 아직 못 읽음 — 도전 시작인지 성공인지 모름
+      return nv === undefined && dv === undefined && custUnsure(b) ? Object.assign(r0, { unsure: true }) : r0; // 아직 못 읽음 (못 읽었으면 우리 기록에도 없음) — 도전 시작인지 성공인지 모름
     }
     const day = before.reduce((a, v) => (v.day > a ? v.day : a), "");
-    if (nv && nv > day) return evRule({ day: nv, due: "" }, b.day);
+    if (ext && ext > day) return evRule({ day: ext, due: "" }, b.day);
     const that = before.filter((v) => v.day === day), rc = that.filter((v) => v.st); // 그날 영수증 기록(다음 기한)
     return evRule(rc.length ? rc[rc.length - 1] : { day, due: "" }, b.day);
   }
@@ -6243,7 +6417,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
     // 운영 설정 V2.0: [?] 설명 펼치기 · 프린트물 (입장권 양식 / 재방문 이벤트)
     qhelp(btn) { const t = btn.nextElementSibling; if (!t || !t.classList.contains("qtext")) return; t.hidden = !t.hidden; btn.setAttribute("aria-expanded", String(!t.hidden)); },
     // ── 고객 세부 관리 (사장님 10/26) ──
-    csub(btn) { sheet.csub = btn.dataset.s === "skip" ? "skip" : "bc"; renderSheet(); },
+    csub(btn) { sheet.csub = btn.dataset.s === "skip" ? "skip" : btn.dataset.s === "db" ? "db" : "bc"; renderSheet(); },
     /** BC 손님 목록 거르기 ①②③ — 누르면 켬 · 다시 누르면 끔 (여러 개 · 아무것도 안 고르면 모두) */
     bcFilter(btn) { const k = Number(btn.dataset.n), f = (sheet.bcf || []).filter((v) => v !== k); if (f.length === (sheet.bcf || []).length) f.push(k); sheet.bcf = f.sort(); renderSheet(); },
     /** BC 아웃별 대응 스위치 (켜짐 · 꺼짐) */
@@ -7073,6 +7247,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
     if (t.id === "rent-paid") sheet.rp = t.value;
     if (t.id === "wev-name") { WEV.name = t.value.trim().slice(0, 10); wevSave(); $("wev-preview").textContent = `[${wevLabel()}]`;  }
     if (t.id === "bc-q") { sheet.bcq = t.value; renderSheet(); } // BC 손님 찾기 (사장님 10/26)
+    if (t.id === "db-q") { sheet.dbq = t.value; renderSheet(); const i = $("db-q"); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } } // 고객 데이터베이스 찾기 (11/26)
     if (t.id === "memo-admin") { MEMO.admin = t.value.trim().slice(0, 12) || "관리자"; memoSaveSoon(); }
     if (t.id === "memo-q") { sheet.q = t.value; $("memo-body").innerHTML = memoBodyHtml(); }
     if (t.classList.contains("staffname")) { const s = MEMO.staff[Number(t.dataset.i)]; if (s) { s.name = t.value.trim().slice(0, 12); memoSaveSoon(); } }
@@ -7201,7 +7376,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
       const nn = o.n ?? b.prevDone, d = o.day || EV.from, st = o.st === undefined ? "안내" : o.st;
       evAdd(Object.assign({ at: `${d} 10:00`, day: d, no: o.no || "t-" + name + nn + d, k: evKey(b), name: o.name ?? name, phone: digits(b.phone), prev: nn - 1, n: nn, base: o.base ?? nn - 1 }, st ? { st, due: o.due ?? shiftDay(d, EV.days) } : {}), o.from || EV.from);
       renderAll();
-    }, evLine: (r, from) => { evAdd(r, from || EV.from); renderAll(); }, sigKey, // 장부 한 줄 그대로 (예전 모양 줄 시험) · 손님 견주는 열쇠 (11/26)
+    }, evLine: (r, from) => { evAdd(r, from || EV.from); renderAll(); }, sigKey, cdb: () => JSON.parse(JSON.stringify(CDB)), cdbOf: (id) => cdbOf((bookings[TODAY] || []).find((b) => b.id === id)), cdbVisit: (q) => { const id = cdbVisit(q); cdbSave(); renderAll(); return id; }, cdbFind: (q) => cdbFind(q), cdbSearch: (q) => cdbSearch(q).map(([id]) => id), nmMask: (n) => nmMask(n), // 장부 한 줄 그대로 (예전 모양 줄 시험) · 손님 견주는 열쇠 (11/26)
     evSub: (name) => evSub(bookings[TODAY].filter((x) => x.name === name).pop()), EV };
 
   // ── 반납안내 커튼 ─────────────────────────────────
@@ -7229,6 +7404,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
   })();
   fit();
   renderAll();
+  cdbLoad(); // 현장 POS 고객 데이터베이스 (11/26) — 화면을 다 준비한 뒤 (읽으면 다시 그림)
   renderTalk();
   parkFlush(); // 꺼지기 전에 남은 할인 등록 이어서
 })();

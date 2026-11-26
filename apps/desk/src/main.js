@@ -1382,6 +1382,48 @@ ipcMain.handle("notes:patch", (_e, job) => {
   }
 });
 
+// ── 현장 POS 고객 데이터베이스 (사장님 11/26 — "네이버 믿을 수 없어 · 현장 포스에 데이터베이스로 활용 · 저장 관리" = 네이버를 읽을 수 있는 동안은 네이버로, 우리 데이터는 따로 보관) ──
+//   데스크가 입장 처리한 네이버 손님(이름 '홍*동' · 전화 뒷 4자리 · 받은 전체 번호 · 아이디 앞 2자리 · 방문 날짜)을 모은 장부 → 이 PC 앱 폴더 customer-db.json 에만
+//   (모양 · 같은 손님 판단은 데스크 화면이 함 · 여기는 글 그대로 저장) · 저장할 때마다 바로 앞 파일을 customer-db.bak.json 으로 · 클라우드로 안 보냄 · 현장 POS 만
+//   백업 (사장님 11/26 — 네이버를 읽을 수 있는 동안은 네이버로 판정하고, 우리 데이터는 데이터대로 백업하듯 보관): 날마다 첫 저장 때 customer-db-backup/날짜.json 한 벌 · 30일치
+const CDB_FILE = "customer-db.json", CDB_BAK = "customer-db.bak.json", CDB_MAX = 30 * 1024 * 1024, CDB_KEEP = 30;
+/** 오늘 백업이 없으면 한 벌 · 오래된 것부터 지워 30일치만 */
+function cdbBackup(dir, t) {
+  const bd = path.join(dir, "customer-db-backup"), f = path.join(bd, `${localToday()}.json`);
+  if (fs.existsSync(f)) return;
+  fs.mkdirSync(bd, { recursive: true });
+  fs.writeFileSync(f, t, "utf8");
+  const old = fs.readdirSync(bd).filter((x) => /^\d{4}-\d{2}-\d{2}\.json$/.test(x)).sort();
+  for (const x of old.slice(0, Math.max(0, old.length - CDB_KEEP))) try { fs.unlinkSync(path.join(bd, x)); } catch (e) { /* 그대로 */ }
+}
+const cdbOk = (t) => { try { const d = JSON.parse(t); return !!d && d.v === 1 && !!d.c && typeof d.c === "object"; } catch (e) { return false; } };
+ipcMain.handle("cdb:load", () => {
+  if (RUN_ROLE === "office") return { ok: false, why: "현장 POS 에만 있어요" };
+  for (const f of [CDB_FILE, CDB_BAK]) {
+    let t = null;
+    try { t = fs.readFileSync(path.join(histDir(), f), "utf8"); } catch (e) { continue; }
+    if (cdbOk(t)) return { ok: true, text: t, from: f };
+    if (f === CDB_FILE) try { fs.copyFileSync(path.join(histDir(), f), path.join(histDir(), `customer-db.broken-${Date.now()}.json`)); } catch (e) { /* 그대로 */ }
+  }
+  return { ok: true, text: null };
+});
+ipcMain.handle("cdb:save", (_e, text) => {
+  if (RUN_ROLE === "office") return { ok: false, why: "현장 POS 에만 있어요" };
+  const t = String(text || "");
+  if (t.length > CDB_MAX || !cdbOk(t)) return { ok: false, why: "모양이 틀림" };
+  try {
+    const dir = histDir(), f = path.join(dir, CDB_FILE);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(f + ".tmp", t, "utf8");
+    try { if (cdbOk(fs.readFileSync(f, "utf8"))) fs.copyFileSync(f, path.join(dir, CDB_BAK)); } catch (e) { /* 처음 */ }
+    fs.renameSync(f + ".tmp", f);
+    try { cdbBackup(dir, t); } catch (e) { /* 백업 못 해도 저장은 됨 */ }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, why: String(e.message || e) };
+  }
+});
+
 // ── 근무자 메모장 (V2.0 · 사장님 10/21): 평일 ↔ 주말 전달 · 근무자마다 메모 → 이 PC 앱 폴더 staff-memo.json 에만 (staff-memo.js) ──
 const staffMemo = require("./staff-memo");
 ipcMain.handle("memo:get", () => {

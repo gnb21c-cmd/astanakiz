@@ -49,3 +49,30 @@ test("손님 확인: 가린 이름 · 전화 그대로 읽음 · 예약 상세 �
     await browser.close();
   }
 });
+
+test("손님 확인 hist: false = 이메일만 (현장 POS 고객 데이터베이스 · 고객정보는 안 엶) → 나중에 지난 예약이 필요하면 그때 엶", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    await page.goto(NAVER + "?mask=1");
+    await page.evaluate(() => localStorage.clear());
+    await page.goto(NAVER + "?mask=1");
+    const steps = [];
+    const naver = new NaverSync((code) => page.evaluate(code), { urls: { list: NAVER + "?mask=1&view=list", calendar: NAVER + "?mask=1&view=calendar" }, today: () => "2026-10-05", onStep: (s) => steps.push(s) });
+    assert.ok((await naver.loadDay("2026-10-05")).ok);
+    const P = "평일 무제한 / 휴일 1시간 50분 입장권";
+    const r = await naver.custInfo("2026-10-05", [{ no: "1379100102", time: "17:00", product: P, hist: false }]);
+    assert.ok(r.ok, r.why);
+    assert.deepStrictEqual(r.info["1379100102"], { ok: true, email: "pa***@gmail.com", done: 3 });
+    assert.ok(!steps.some((s) => /고객정보/.test(s)), "고객정보는 안 엶");
+    // 같은 날 다시 (이메일만) → 안 엶
+    const n0 = steps.length;
+    assert.strictEqual((await naver.custInfo("2026-10-05", [{ no: "1379100102", time: "17:00", product: P, hist: false }])).info["1379100102"].email, "pa***@gmail.com");
+    assert.strictEqual(steps.slice(n0).filter((s) => /손님 확인/.test(s)).length, 0);
+    // 이벤트 판정에 지난 예약이 필요해지면 그때 고객정보까지
+    const r2 = await naver.custInfo("2026-10-05", [{ no: "1379100102", time: "17:00", product: P }]);
+    assert.deepStrictEqual(r2.info["1379100102"].past, ["2026-09-25", "2026-08-01", "2026-07-11"]);
+  } finally {
+    await browser.close();
+  }
+});

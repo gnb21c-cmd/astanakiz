@@ -91,6 +91,11 @@ contextBridge.exposeInMainWorld("desk", {
     list: () => ipcRenderer.invoke("notes:list"), // BC · 마일리지 SKIP 손님 목록 (사장님 10/26)
     patch: (job) => ipcRenderer.invoke("notes:patch", job), // 목록에서 { id, bc?, sk? }
   },
+  // 현장 POS 고객 데이터베이스 (사장님 11/26): 데스크가 모은 손님 장부 글 그대로 — 이 PC 앱 폴더 customer-db.json 에만
+  cdb: {
+    load: () => ipcRenderer.invoke("cdb:load"),
+    save: (text) => ipcRenderer.invoke("cdb:save", text),
+  },
   // 근무자 메모장 (V2.0): 평일 ↔ 주말 전달 · 근무자마다 메모 — 이 PC 에만
   memo: {
     get: () => ipcRenderer.invoke("memo:get"),
