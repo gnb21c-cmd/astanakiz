@@ -240,8 +240,8 @@ test("입장권 양식 네이버 · 현장 따로 (사장님 10/28): 예전 한 
     await p2.click('[data-t="prints"]');
     assert.deepStrictEqual(await p2.$$eval("#tpl-apply option", (e) => e.map((x) => x.textContent)), ["기본 입장권", "이벤트"], "현재 기본 적용 템플릿");
     assert.ok(await p2.isChecked("#tpl-bc") && await p2.isChecked("#form-auto"), "BC 고객 별도 영수증 · 입장권 자동 출력");
-    assert.deepStrictEqual(await p2.$$eval("#tpl-group option", (e) => e.map((x) => x.textContent)), ["기본 입장권", "이벤트", "BC"]);
-    assert.deepStrictEqual(await p2.$$eval("#sheet .tplrow .tn", (e) => e.map((x) => x.textContent)), ["네이버 예약용", "현장입장자용"]);
+    assert.deepStrictEqual(await p2.$$eval("#sheet .tplgh", (e) => e.map((x) => x.textContent)), ["기본 입장권", "이벤트", "BC"], "묶음은 모두 한 목록에 (11/26)");
+    assert.deepStrictEqual(await p2.$$eval('#sheet .tplrow[data-g="base"] .tn', (e) => e.map((x) => x.textContent)), ["네이버 예약용", "현장입장자용"]);
     const nText = await p2.inputValue("#tpl-text");
     assert.ok(!/\[현장\]/.test(nText) && /\{누계\}/.test(nText), "네이버 양식엔 [현장] 줄 없음");
     assert.strictEqual(await p2.getAttribute("#tpl-text", "wrap"), "soft", "편집 칸은 종이처럼 42칸에서 줄을 바꿈 (사장님 11/07)");
@@ -296,7 +296,7 @@ test("입장권 양식 네이버 · 현장 따로 (사장님 10/28): 예전 한 
     assert.strictEqual(await p2.evaluate(() => window.__deskTest.PRINT_().forms.enter.text), nText);
     // 이름은 고칠 수 있음 (이 PC 에 저장)
     await p2.fill("#tpl-name", "현장 손님용"); await p2.press("#tpl-name", "Enter");
-    assert.deepStrictEqual(await p2.$$eval("#sheet .tplrow .tn", (e) => e.map((x) => x.textContent)), ["네이버 예약용", "현장 손님용"]);
+    assert.deepStrictEqual(await p2.$$eval('#sheet .tplrow[data-g="base"] .tn', (e) => e.map((x) => x.textContent)), ["네이버 예약용", "현장 손님용"]);
     assert.strictEqual(JSON.parse(await p2.evaluate(() => localStorage.getItem("astanakiz-printset"))).names.walk, "현장 손님용");
     // 네이버 · 현장 입장권은 비울 수 없음
     await p2.fill("#tpl-text", "  ");

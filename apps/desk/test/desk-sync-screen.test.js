@@ -147,7 +147,6 @@ test("반대편 PC 에서 바꾼 설정이 화면에 바로: 프린트물 설정
     await A.click("#sheet h3");
     await A.waitForFunction(() => document.getElementById("tpl-apply") && document.getElementById("tpl-apply").value === "event");
     assert.strictEqual(await A.isChecked("#tpl-bc"), false);
-    await A.selectOption("#tpl-group", "event");
     assert.ok((await A.$$eval("#sheet .tplrow", (e) => e.map((x) => x.textContent))).some((t) => t.includes("(추)추석양식")));
     await A.click('[data-t="sync"]');
     assert.match(await A.textContent("#setbody"), /체험판 — 설치한 앱에서 이어져요/);

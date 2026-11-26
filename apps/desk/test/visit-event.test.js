@@ -36,8 +36,8 @@ const tip = async (page, slot, name) => { await page.click(`.slot[data-s="${slot
 const openEvent = async (page) => { await page.dblclick("#now"); await page.click('[data-t="event"]'); }; // 운영 설정 → 재방문 이벤트 (11/05 왼쪽 메뉴 따로)
 /** 영수증 설정 (운영 설정 → 프린트물 설정 · 11/05): 종류 고르기 · 실제출력물 고쳐 [저장] */
 /** 영수증 설정 (11/06): 묶음(기본 입장권 · 이벤트 · BC) 고르고 양식 줄 누르기 */
-const pickForm = async (page, kind) => { const g = kind === "naver" || kind === "walk" ? "base" : kind.startsWith("bc") ? "bc" : "event"; if ((await page.inputValue("#tpl-group")) !== g) await page.selectOption("#tpl-group", g); await page.click(`#sheet .tplrow[data-k="${kind}"]`); };
-const rowNames = (page) => page.$$eval("#sheet .tplrow .tn", (e) => e.map((x) => x.textContent));
+const pickForm = (page, kind) => page.click(`#sheet .tplrow[data-k="${kind}"]`); // 모든 묶음이 한 목록 (11/26 — 예전엔 묶음 고르기)
+const rowNames = (page, g = "event") => page.$$eval(`#sheet .tplrow[data-g="${g}"] .tn`, (e) => e.map((x) => x.textContent));
 const openForm = async (page, kind) => { await page.dblclick("#now"); await page.click('[data-t="prints"]'); await pickForm(page, kind); };
 const tplPaper = async (page) => (await page.textContent("#tpl-paper")).replace(/\s+/g, " ");
 const find = async (page, q) => { await page.fill("#ev-q", q); return (await page.textContent("#ev-hits")).replace(/\s+/g, " "); };
@@ -384,7 +384,7 @@ test("공통 양식: 이벤트 기간 입장권의 나머지(안내 문구)도 �
     assert.match(await page.textContent("#ev-def"), /아직 예시 문구: 1번 안내 · 2번 성공/);
     // 양식은 영수증 설정(프린트물 설정) — 이벤트 묶음: (재)공통양식 · 도전 · 성공 · 제공상품 · (한)한가위 · 현장결제 (11/06)
     await page.click("[data-act=tplGo][data-k=ev1]");
-    assert.strictEqual(await page.inputValue("#tpl-group"), "event");
+    assert.strictEqual(await page.getAttribute("#sheet .tplrow.on", "data-g"), "event");
     assert.deepStrictEqual(await rowNames(page), ["(재)공통양식", "(재)도전양식", "(재)성공양식", "(재)제공상품", "(한)한가위양식", "(재)현장결제양식"]);
     assert.strictEqual(await page.getAttribute("#sheet .tplrow.on", "data-k"), "ev1", "[문구 고치기] → 도전양식");
     assert.match(await page.textContent("#sheet .tplrow.on"), /\{도전양식\}/, "조각 양식 = 코드");
@@ -568,6 +568,10 @@ test("양식 자리 (10/16): 공통 양식의 [이벤트] 줄 = 1번 · 2번 자
     await pickForm(page, "ev3");
     assert.strictEqual(await page.inputValue("#tpl-text"), "^*[ {사은품} 무료 증정 ]\n^이 영수증을 보여 주세요");
     await page.fill("#tpl-text", "[자르기]\n#* 수제돈까스 쿠폰\n^이 쿠폰을 카페에 보여 주세요");
+    // 제공상품 미리보기: 처음엔 '쿠폰만' (11/26) → '입장권에 넣어' = 성공 예시 안 그 자리
+    assert.match(await page.textContent("#tpl-paper"), /✂ 여기서 자름.*수제돈까스 쿠폰/, "쿠폰만 (11/26)");
+    assert.doesNotMatch(await page.textContent("#tpl-paper"), /재방문 이벤트 성공!/);
+    await page.click('#sheet [data-act=tplView][data-v="full"]');
     assert.match(await page.textContent("#tpl-paper"), /재방문 이벤트 성공!.*✂ 여기서 자름/, "제공상품 미리보기 = 성공 예시");
     assert.ok(await page.$("#tpl-paper .pl.cutl + .seal img"), "잘린 뒤 제공상품(쿠폰)은 보안 무늬 그림 (10/16)");
     await page.click("#tpl-save");

@@ -227,8 +227,8 @@ test("BC 양식 (사장님 11/06): 프린트물 설정 → BC 묶음 '1아웃용
     assert.strictEqual(JSON.parse(await page.evaluate(() => localStorage.getItem("astanakiz-bc2forms"))).v, 2, "새 모양으로 저장");
     // 프린트물 설정 → 묶음 BC: 1아웃용 · 2아웃용 (코드는 입장권 양식과 같음)
     await page.dblclick("#now"); await page.click('[data-t="prints"]');
-    await page.selectOption("#tpl-group", "bc");
-    assert.deepStrictEqual(await page.$$eval("#sheet .tplrow .tn", (e) => e.map((x) => x.textContent)), ["1아웃용", "2아웃용"]);
+    await page.click('#sheet .tplrow[data-k="bc1"]'); // 모든 묶음이 한 목록 (11/26 — 예전엔 묶음 고르기)
+    assert.deepStrictEqual(await page.$$eval('#sheet .tplrow[data-g="bc"] .tn', (e) => e.map((x) => x.textContent)), ["1아웃용", "2아웃용"]);
     assert.match(await page.textContent("#sheet .tpldesc"), /BC 원아웃 손님 입장권 대신.*비어 있으면 보통 입장권/);
     assert.match(await page.textContent("#sheet .tplcodes"), /\{열쇠\}/, "입장권 양식과 같은 코드");
     await page.fill("#tpl-text", "^원아웃 안내\n{열쇠}번");
@@ -269,13 +269,13 @@ test("BC 양식 (사장님 11/06): 프린트물 설정 → BC 묶음 '1아웃용
     await page.dblclick("#now"); await page.click('[data-t="prints"]');
     await page.uncheck("#tpl-bc");
     assert.strictEqual(JSON.parse(await page.evaluate(() => localStorage.getItem("astanakiz-printset"))).bcOn, false);
-    await page.selectOption("#tpl-group", "bc");
+    await page.click('#sheet .tplrow[data-k="bc1"]');
     assert.match(await page.textContent("#sheet .evwarn"), /'BC 고객 별도 영수증 출력'이 꺼져 있어 지금은 보통 입장권/);
     await page.click("#sheet .x");
     assert.doesNotMatch((await formOf(b))[1], /투아웃 안내/, "끄면 보통 입장권");
     await page.dblclick("#now"); await page.click('[data-t="prints"]'); await page.check("#tpl-bc");
     // 2아웃용을 비우면 보통 입장권
-    await page.selectOption("#tpl-group", "bc"); await page.click('#sheet .tplrow[data-k="bc2"]');
+    await page.click('#sheet .tplrow[data-k="bc2"]');
     await page.fill("#tpl-text", ""); await page.click("#tpl-save");
     assert.strictEqual(JSON.parse(await page.evaluate(() => localStorage.getItem("astanakiz-bc2forms"))).f2, "");
     await page.click("#sheet .x");
