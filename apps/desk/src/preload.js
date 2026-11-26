@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld("desk", {
     load: (day, only) => ipcRenderer.invoke("naver:load", day, only), // only = "14:00" 이면 그 시간 칸만
     complete: (b) => ipcRenderer.invoke("naver:complete", b),
     cells: (day) => ipcRenderer.invoke("naver:cells", day), // 수량 관찰 기록 (11/13): 칸 숫자만
+    custInfo: (job) => ipcRenderer.invoke("naver:custInfo", job), // 손님 확인: 이메일 · 지난 예약 이용완료 날짜 (11/26)
     setCap: (c) => ipcRenderer.invoke("naver:setCap", c),
     cancel: (b) => ipcRenderer.invoke("naver:cancel", b), // 입금대기 예약 취소 // 판매 수량 바꾸기 { day, product, time, n }
     cancelPaid: (b) => ipcRenderer.invoke("naver:cancelPaid", b), // BC 쓰리아웃 자동 전액 취소 (전액환불을 고른 뒤 [예약 취소] · 사장님 10/26)

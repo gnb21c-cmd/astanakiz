@@ -74,6 +74,8 @@ class NaverSync {
     this.onStep = opts.onStep || (() => {});
     this.onSnap = opts.onSnap || null; // 진단: 네이버 화면 저장 (이용완료 누른 뒤 · 안 됐을 때) // 진행 단계를 데스크에 알림 (현장에서 어디서 막히는지 보려고)
     this.days = new Map(); // 날짜 → Map("상품|시각|확정/이용완료" → { count, cards }) — 칸 숫자가 그대로면 다시 안 엶
+    this.cust = new Map(); // "날짜|예약번호" → 손님 확인 { email, past(이용완료 날짜 · 최근 것부터), more, done } (사장님 11/26 — 한 번 읽으면 그날 다시 안 엶)
+    this.custTries = new Map(); // 같은 예약을 못 읽은 수 (세 번까지)
     this.refunds = new Map(); // 예약번호 → 예약 상세에서 읽은 환불 장수 (사장님 11/19 — 새로고침 때 상세를 못 열어도 오락가락하지 않게 · 칸이 또 어긋나면 다시 엶)
   }
   call(expr) {
@@ -264,6 +266,72 @@ class NaverSync {
       if (!o.ok) break;
       for (let i = 0; i < 24 && !(await this.read()).cards.length; i++) await sleep(250);
     }
+  }
+  /* 손님 확인 (사장님 11/26 — 네이버가 이름 가운데 · 전화번호 앞 · 가운데를 * 로 가려 예전 장부와 같은 손님인지 못 이음):
+     예약마다 ① 그 시간 [확정] 칸 → 그 예약 카드 → '예약 상세정보'의 이메일(앞 2자리 · 도메인으로 같은 손님 견주기)
+     ② '완료 n >'를 눌러 '고객정보' 맨 아래 '지난 예약'의 이용완료 날짜 (보이는 줄에 이용완료가 없고 [더보기]가 있으면 눌러 더 · 세 번까지)
+     → 데스크가 마지막 이용완료 날짜로 재방문 이벤트 기한 안인지 정함 · 처음 온 손님('신규예약')은 고객정보를 안 엶
+     list = [{ no, time, product }] · 읽은 예약은 그날 다시 안 엶 · 못 읽은 예약은 세 번까지 */
+  async custInfo(day, list) {
+    const out = {};
+    const want = (list || []).filter((it) => it && it.no && it.time);
+    const todo = want.filter((it) => !this.cust.has(`${day}|${it.no}`));
+    for (const it of want) if (this.cust.has(`${day}|${it.no}`)) out[it.no] = this.cust.get(`${day}|${it.no}`);
+    if (!todo.length) return { ok: true, info: out };
+    let g = await this.goView("calendar");
+    if (!g.ok) return g;
+    await this.tidy();
+    g = await this.goDate(day);
+    if (!g.ok) return g;
+    for (const it of todo) {
+      const key = `${day}|${it.no}`, n = (this.custTries.get(key) || 0) + 1;
+      if (n > 3) { out[it.no] = { ok: false, why: "세 번 못 읽음" }; continue; }
+      this.custTries.set(key, n);
+      let r;
+      try { r = await this.custOne(it); } catch (e) { r = { ok: false, why: String((e && e.message) || e) }; }
+      if (r.ok && Array.isArray(r.past)) this.cust.set(key, r);
+      out[it.no] = r;
+      await this.call("window.__naver.closeCustomer()").catch(() => null);
+      await sleep(300);
+    }
+    await this.act("window.__naver.closePanel()").catch(() => null);
+    return { ok: true, info: out };
+  }
+  async custOne(it) {
+    this.step(`${it.time} 손님 확인 — 예약 상세 여는 중`);
+    const o = await this.openSlot(it.product, it.time, "확정");
+    if (!o.ok) return o;
+    for (let i = 0; i < 24 && !(await this.read()).cards.length; i++) await sleep(250);
+    const isMine = (c) => c && c.detail && String(c.no) === String(it.no);
+    let st = await this.read();
+    let card = st.cards.length === 1 && isMine(st.cards[0]) ? st.cards[0] : null; // 그 칸에 예약이 하나면 상세가 바로 뜸
+    if (!card) {
+      for (let i = 0; i < 30; i++) { if ((await this.read()).cards.some((c) => String(c.no) === String(it.no))) break; if (!(await this.moreCards())) break; }
+      const r = await this.call(`window.__naver.openCard(${JSON.stringify(it.no)})`).catch(() => null);
+      if (!r || !r.ok) return { ok: false, why: (r && r.why) || "예약 카드를 못 누름" };
+      for (let i = 0; i < 16 && !card; i++) { await sleep(250); const c = (await this.read()).cards; if (c.length === 1 && isMine(c[0])) card = c[0]; }
+      if (!card) return { ok: false, why: "예약 상세가 안 열림" };
+    }
+    const email = card.email || "", done = card.doneCount;
+    if (done === 0) return { ok: true, email, past: [], more: false, done }; // 신규예약 — 지난 이용완료 없음
+    this.step(`${it.time} 손님 확인 — 고객정보 지난 예약 읽는 중`);
+    const oc = await this.call("window.__naver.openCustomer()").catch(() => null);
+    if (!oc || !oc.ok) return { ok: false, email, why: (oc && oc.why) || "고객정보를 못 엶" };
+    let h = null;
+    for (let i = 0; i < 24; i++) { await sleep(250); h = await this.call("window.__naver.history()").catch(() => null); if (h && h.found && !h.loading && (h.rows.length || h.empty || i >= 8)) break; }
+    if (!h || !h.found) return { ok: false, email, why: "고객정보의 지난 예약을 못 찾음" };
+    // 보이는 줄에 이용완료가 없고(최근이 취소뿐) [더보기]가 있으면 눌러 더 (세 번까지)
+    for (let k = 0; k < 3 && !h.rows.some((x) => x.st === "완료") && h.more; k++) {
+      this.step(`${it.time} 손님 확인 — 지난 예약 더보기`);
+      await this.call("window.__naver.moreHistory()").catch(() => null);
+      let h2 = null;
+      for (let i = 0; i < 16; i++) { await sleep(250); h2 = await this.call("window.__naver.history()").catch(() => null); if (h2 && h2.found && h2.rows.length > h.rows.length) break; }
+      if (!h2 || !h2.found || h2.rows.length <= h.rows.length) break;
+      h = h2;
+    }
+    const past = [...new Set(h.rows.filter((x) => x.st === "완료").map((x) => x.day))].sort().reverse();
+    this.step(`${it.time} 손님 확인 — 지난 이용완료 ${past.length ? past[0] : "없음"}`);
+    return { ok: true, email, past, rows: h.rows.length, more: !!h.more, done };
   }
   /** opts.only = "14:00" 이면 그 시간 칸만 다시 열어 읽음 (기억한 카드도 무시) — 근무자가 시간 칸을 누를 때 */
   async loadDay(day, opts = {}) {

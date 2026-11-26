@@ -436,6 +436,8 @@ ipcMain.handle("naver:load", nwrap((day, only) => naver.loadDay(day, { only }), 
 const posOnly = (h) => (e, ...a) => (RUN_ROLE === "office" ? { ok: false, why: "사무실 PC 는 네이버를 읽기만 해요 (현장 POS 에서)" } : h(e, ...a));
 ipcMain.handle("naver:complete", posOnly(nwrap((b) => naver.complete(b))));
 ipcMain.handle("naver:cells", posOnly(nwrap((day) => naver.readCells(day), 60000))); // 수량 관찰 기록 (11/13): 칸 숫자만 · 카드는 안 엶
+// 손님 확인 (사장님 11/26 — 네이버가 이름 · 전화를 가림): 예약 상세의 이메일 · 고객정보 '지난 예약' 이용완료 날짜 { day, list: [{ no, time, product }] } — 현장 POS 만
+ipcMain.handle("naver:custInfo", posOnly(nwrap((job) => naver.custInfo(String((job && job.day) || ""), Array.isArray(job && job.list) ? job.list.slice(0, 6) : []), 180000)));
 /* 수량 관찰 기록 (사장님 11/13 — 평일에 자동조절을 끄고 직접 수량을 조절하는 날을 배우려고)
    데스크가 5분마다 네이버 칸 숫자(회차당 수량 · 확정 · 완료 · 잔여)와 그때 열쇠 현황을 보냄 → 바탕화면 '아스타나키즈-수량관찰/수량관찰-날짜.csv' 에 한 줄씩
    손님 이름 · 전화번호 없음 (숫자만) · 사장님이 그날 밤 파일을 보내 주면 조절 방식을 배움 */
@@ -1206,7 +1208,15 @@ const histKeys = (keys) => (Array.isArray(keys) ? keys : []).map((k) => String(k
 /** { 손님 키: [완료 n, 그날 건수] } → { 해시: [완료 n, 건수, 읽은 날] } */
 const histCounts = (counts, rd) => Object.fromEntries(Object.entries(counts && typeof counts === "object" ? counts : {}).filter(([k, v]) => String(k || "").trim() && Array.isArray(v) && v[0] != null && v[0] !== "" && Number(v[0]) >= 0).map(([k, v]) => [visitHistory.hashKey(histSalt(), String(k).trim()), [Number(v[0]), Math.max(1, Number(v[1]) || 1), rd]]));
 /** 네이버 카드 → 손님 키 (데스크 장부와 같게: 전화번호 숫자, 없으면 '이름:…') */
-const visitKey = (v) => { const d = String(v.phone || "").replace(/\D/g, ""); return d || (v.name ? "이름:" + v.name : ""); };
+// 손님 키: 전체 번호 · 네이버가 가린 손님(사장님 11/26 "***-****-1252")은 데스크 장부와 같은 모양 "m:" + 이름 첫 · 끝 글자 + 뒷 4자리 (두 글자 이름은 첫 글자만)
+const visitKey = (v) => {
+  const raw = String(v.phone || ""), d = raw.replace(/\D/g, "");
+  if (d.length >= 4 && (raw.includes("*") || d.length < 10)) {
+    const c = [...String(v.name || "").normalize("NFC").replace(/\s+/g, "")], l = c[c.length - 1];
+    return `m:${!c.length ? "" : c.length <= 2 || l === "*" ? c[0] : c[0] + l}${d.slice(-4)}`;
+  }
+  return d || (v.name ? "이름:" + v.name : "");
+};
 const isDayKey = (d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d || ""));
 const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 ipcMain.handle("history:add", (_e, job) => {

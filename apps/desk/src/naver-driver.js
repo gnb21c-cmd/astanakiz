@@ -22,7 +22,7 @@
    - 이용완료는 두 단계 (현장 화면 10/6): 카드의 [이용완료] → 오른쪽이 '이용완료' 화면("이용완료 시 사용자에게 이용완료 알림이 발송됩니다.")으로 바뀜 → 맨 아래 초록 [이용완료]: window.confirm 이면 자동 확인, 화면 안 창이면 "하시겠습니까" 글자 옆 [확인] */
 
 function installNaverDriver() {
-  if (window.__naver && window.__naver.v === 13) return true;
+  if (window.__naver && window.__naver.v === 14) return true;
 
   const norm = (s) => String(s || "").replace(/\s+/g, "");
   const vis = (el) => !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== "hidden");
@@ -231,6 +231,7 @@ function installNaverDriver() {
       black: leafs(c).some((e) => norm(e.textContent) === "블랙리스트"),
       detail: leafs(c).some((e) => norm(e.textContent) === "예약상세정보"), // 예약 상세정보 (목록 카드가 아님)
       note: leafs(c).some((e) => norm(e.textContent) === "예약상세정보") ? noteOf(c) : null, // 특이사항 (상세에만 · 목록 카드면 null = 모름)
+      email: field(c, "이메일").replace(/\s+/g, ""), // 예약 상세의 이메일 "bl********@naver.com" (사장님 11/26 — 가린 이름 · 전화와 같이 견줌 · 목록 카드면 "")
     };
   };
 
@@ -301,11 +302,45 @@ function installNaverDriver() {
     return p ? refundState(p) : null;
   };
 
+  /* 고객정보 '지난 예약' (사장님 11/26 — 네이버가 이름 · 전화를 가려 같은 손님인지 장부로 못 이을 때):
+     예약 상세의 '완료 n >'(처음 온 손님 '신규예약 >')를 누르면 오른쪽이 '고객정보'(결제금액 · 재방문주기 · 리뷰내역 · 지난 예약)로 바뀜
+     → 맨 아래 '지난 예약' 줄 "● 완료  2026. 2. 15.(일) 오후 6:30" (최근 것부터 몇 줄) · 오른쪽 위 [더보기 >] (최근이 취소뿐이면 눌러 더)
+     글자로 찾음: '지난 예약' 머리 뒤의 '상태 + 날짜 · 시각' 줄들 (클래스 이름은 네이버가 바꿀 수 있어 안 봄) */
+  const histHead = () => leafs(document).find((e) => norm(e.textContent) === "지난예약");
+  const custRoot = () => {
+    const h = histHead();
+    if (!h) return null;
+    for (let p = h.parentElement; p && p !== document.body; p = p.parentElement) {
+      const x = norm(p.textContent);
+      if (x.includes("고객정보") || x.includes("재방문주기") || x.includes("결제금액")) return p;
+    }
+    return h.parentElement;
+  };
+  const HIST_RE = /(이용완료|완료|예약취소|취소|노쇼|확정|신청)\s*(\d{4})\s*\.\s*(\d{1,2})\s*\.\s*(\d{1,2})\s*\.?\s*(?:\([^)]*\))?\s*(오전|오후)?\s*(\d{1,2})\s*:\s*(\d{2})/g;
+  const histInfo = () => {
+    const root = custRoot();
+    if (!root) return { found: false, rows: [], more: false };
+    const all = root.innerText || root.textContent || "";
+    const at = all.search(/지난\s*예약/);
+    const t = at >= 0 ? all.slice(at) : all;
+    const rows = [];
+    for (const m of t.matchAll(HIST_RE)) {
+      const st = /완료/.test(m[1]) ? "완료" : /취소/.test(m[1]) ? "취소" : m[1] === "노쇼" ? "노쇼" : "확정";
+      let h = +m[6];
+      if (m[5] === "오후" && h < 12) h += 12;
+      if (m[5] === "오전" && h === 12) h = 0;
+      rows.push({ st, day: `${m[2]}-${String(+m[3]).padStart(2, "0")}-${String(+m[4]).padStart(2, "0")}`, time: `${String(h).padStart(2, "0")}:${m[7]}` });
+    }
+    const more = clickables(root).some((e) => /^더보기/.test(textOf(e)));
+    const empty = /지난예약.*(없습니다|없어요)/.test(norm(t).slice(0, 80));
+    return { found: true, rows, more, empty, loading: $$('[class*="Loading__load_area"], .spinner', root).some(vis) };
+  };
+
   window.confirm = () => true;
   window.alert = () => {};
 
   window.__naver = {
-    v: 13,
+    v: 14,
     /** 목록 카드의 손님 칸(예약번호 링크)을 눌러 그 예약의 '예약 상세정보'를 엶 — [이용완료] · [예약취소] 단추는 누르지 않음 (부분취소 환불정보를 읽으려고 · 11/11) */
     openCard(no) {
       const card = $$('[class*="List__contents-box"]').filter(vis).find((c) => field(c, "예약번호") === String(no));
@@ -314,6 +349,44 @@ function installNaverDriver() {
       if (!t || t.closest("button") || /이용완료|예약취소/.test(textOf(t))) return { ok: false, why: "누를 곳 없음" };
       t.click();
       return { ok: true };
+    },
+    /** 예약 상세의 '완료 n >' · '신규예약 >' 링크를 눌러 '고객정보'를 엶 (사장님 11/26) — [이용완료] · [예약취소] 단추는 안 누름 */
+    openCustomer() {
+      if (histHead()) return { ok: true, already: true };
+      const d = detailPanel();
+      if (!d) return { ok: false, why: "예약 상세가 안 열림" };
+      const own = (e) => [...e.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join("").trim().replace(/\s+/g, " ");
+      const t = [...d.querySelectorAll("*")].filter(vis).find((e) => !e.closest("button") && /^(완료|취소|노쇼)\s*\d+|^신규예약/.test(own(e) || (!e.children.length ? txt(e) : "")));
+      if (!t) return { ok: false, why: "'완료 n' 글자가 없음" };
+      const a = t.closest("a, [role=button], [role=link]") || t;
+      if (/이용완료|예약취소/.test(textOf(a))) return { ok: false, why: "누를 곳 없음" };
+      press(a);
+      return { ok: true };
+    },
+    /** 고객정보 '지난 예약' 줄들 { found, rows: [{ st: 완료 · 취소 · 노쇼 · 확정, day, time }], more(더보기 있음), empty } */
+    history() {
+      return histInfo();
+    },
+    /** 지난 예약 [더보기] */
+    moreHistory() {
+      const root = custRoot();
+      const b = root && clickables(root).find((e) => /^더보기/.test(textOf(e)));
+      if (!b) return { ok: false, why: "더보기 없음" };
+      press(b);
+      return { ok: true };
+    },
+    /** 고객정보 · 예약 상세를 닫음 (← · ×) — 다음 예약 칸을 누를 수 있게 */
+    closeCustomer() {
+      const root = custRoot() || detailPanel();
+      if (!root) return { ok: true, had: false };
+      const isClose = (e) => /닫기|close/i.test(`${e.getAttribute("aria-label") || ""} ${e.getAttribute("title") || ""} ${e.className && e.className.baseVal != null ? e.className.baseVal : e.className || ""}`) || /^[×✕x]$/i.test(textOf(e)) || textOf(e) === "닫기";
+      let p = root;
+      for (let i = 0; i < 4 && p && p !== document.body; i++, p = p.parentElement) {
+        const b = clickables(p).find(isClose);
+        if (b) { press(b); return { ok: true, had: true }; }
+      }
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      return { ok: true, had: true };
     },
     read() {
       const page = cls(document, "Calendar__inner-contents") ? "calendar" : $$('a[class*="contents-user"]').length || cls(document, "BookingListView__root") ? "list" : "";

@@ -44,7 +44,8 @@ async function enter(page, [name]) {
   await page.click("#enter-done");
 }
 const ticket = (page, [name]) => page.evaluate((n) => { const T = window.__deskTest, h = T.holders().find((x) => x.name === n); return T.receiptLines(T.form(), T.keyVals(h)).map((l) => l.t.trim()).filter(Boolean); }, name);
-const ledger = (page, [, phone]) => page.evaluate((k) => { const p = window.__deskTest.evLog("2026-10-26").people[k]; return p ? { base: p.base, last: p.last, n: p.visits.map((v) => v.n), st: p.visits.map((v) => v.st || "") } : null; }, phone.replace(/\D/g, ""));
+// 장부 손님 열쇠 = 이름 첫 · 끝 + 뒷 4자리 (11/26)
+const ledger = (page, [name, phone]) => page.evaluate(([n, ph]) => { const T = window.__deskTest, p = T.evLog("2026-10-26").people[T.sigKey(n, ph)]; return p ? { base: p.base, last: p.last, n: p.visits.map((v) => v.n), st: p.visits.map((v) => v.st || "") } : null; }, [name, phone]);
 const NO_COUNT = /완료 \d|번째|마일리지|사은권|이벤트 \d/; // 이벤트 기간 카드에는 횟수가 안 보임
 
 test("사장님 시나리오: 홍길동 이벤트 전 5 + 기간 6번(네이버 11) → 3월 '완료 5 → 6번' · 김철수 3 → '완료 3 → 4번' · 같은 날 두 건도 정확히 · 기간 중 카드는 시작 / 쿠폰만", async () => {
