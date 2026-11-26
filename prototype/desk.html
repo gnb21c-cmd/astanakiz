@@ -695,6 +695,8 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
 .midpad { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
 .midpad .btn { min-width: 38px; min-height: 34px; padding: 0 6px; font-size: 16px; font-weight: 700; }
 .midhelp { margin-top: 3px; }
+/* 전화번호 마지막 4자리 (사장님 11/26 — 이름 가운데가 * 라 뒷번호로 찾음) */
+b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--fg); }
 .midhelp.bad { color: var(--red); font-weight: 700; }
 .midhelp.good { color: var(--ok); font-weight: 700; }
 .bigkeys { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -1809,7 +1811,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
         <div class="head"><span class="name">${nameHtml(b)}${isShort(b) ? ` ${shortBadge(b)}` : ""}${b.proxy ? ` <span class="badge proxy">대리예약</span>` : ""}${noteOf(b) && noteOf(b).m ? ` <span class="badge memo" title="${esc(noteOf(b).m)}">메모</span>` : ""}</span>${b.unpaid && b.status === "확정" ? `<span class="badge unpaid">입금대기</span>` : `<span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span>`}</div>
         ${partyTag}${chainTag}<div class="visits num">${visitText(b)}</div>${bc3Html(b)}
         <dl class="kv">
-          <dt>전화번호</dt><dd class="phone num">${esc(phoneText(b))}</dd>${visitorRow(b)}
+          <dt>전화번호</dt><dd class="phone num">${phoneHtml(b)}</dd>${visitorRow(b)}
           <dt>이용일시</dt><dd class="num">${when}${isShort(b) && bookMinutes(b) != null ? ` <b class="shortend">~ ${hm(b.slot + bookMinutes(b))} 퇴장</b>` : ""}${b.naverSlot != null && b.naverSlot !== b.slot ? ` <span class="moved">네이버 ${hm(b.naverSlot)}</span>` : ""}</dd>
           <dt>수량</dt><dd>${b.product} ${qtyNum(b.qty)}${qtyNote(b)}</dd>
           <dt>결제상태</dt><dd><span class="badge paid">${b.pay}</span></dd>
@@ -2641,7 +2643,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
         <div><dl class="facts">
           <dt>예약자</dt><dd style="font-size:18px">${nameHtml(b)}${isShort(b) ? ` ${shortBadge(b)}` : ""} <span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span>${b.black ? `<span class="nblk" title="네이버 예약 카드에 '블랙리스트' 표시 — 처음 한 번 BC 원아웃 · 특이사항을 메모로">네이버 블랙리스트</span>` : ""}${noteChecks(b)}</dd>
           <dt>${evActive() && evIn(b.day) ? "이벤트" : "이용완료"}</dt><dd class="num visits big">${visitText(b)}</dd>
-          <dt>전화번호</dt><dd class="num">${midNeed(b) && canEnter ? midHtml(b) : esc(phoneText(b))}</dd>${visitorRow(b)}
+          <dt>전화번호</dt><dd class="num">${midNeed(b) && canEnter ? midHtml(b) : phoneHtml(b)}</dd>${visitorRow(b)}
           <dt>이용일시</dt><dd class="num">${hm(b.slot)} ${m == null ? "· 무제한" : `~ ${hm(b.slot + m)} (${dur(m)})`}${b.naverSlot != null && b.naverSlot !== b.slot ? ` <span class="moved">네이버 ${hm(b.naverSlot)}</span>` : ""}${b.day === TODAY && b.no ? `
             <span class="mvrow" aria-label="예약시간 변경">→ <button class="btn btn-sm" data-act="mvSlot" data-d="-30" aria-label="앞 시간" ${(sheet.mv ?? b.slot) <= SLOTS[0] ? "disabled" : ""}>◀</button><b class="num">${hm(sheet.mv ?? b.slot)}</b><button class="btn btn-sm" data-act="mvSlot" data-d="30" aria-label="뒤 시간" ${(sheet.mv ?? b.slot) >= SLOTS[SLOTS.length - 1] ? "disabled" : ""}>▶</button><button class="btn btn-sm btn-ink" data-act="mvDo" ${(sheet.mv ?? b.slot) === b.slot ? "disabled" : ""}>변경</button></span>` : ""}</dd>
           <dt>수량</dt><dd>${b.product} ${qtyNum(b.qty)}${qtyNote(b)}</dd>
@@ -2833,7 +2835,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
         <div class="${e ? "extgrid" : ""}"><div>${giftDueHtml(h)}
         <dl class="facts">
           ${h.svc ? svcFacts(h) : `<dt>${h.walk ? "고객명" : "예약자"}</dt><dd class="whorow"><span>${h.walk ? esc(h.name) : nameHtml(h)}${isShort(h) ? ` ${shortBadge(h)}` : ""}${h.walk ? ` · ${h.posNo}` : noteChecks(h)}</span><button class="btn btn-sm reprint" data-act="reprint" title="감열지가 다 돼 중간에 끊겼을 때 — 이 손님 입장권을 다시 출력">입장권 다시 출력</button></dd>`}
-          <dt>전화번호</dt><dd class="num">${h.phone ? esc(phoneText(h)) : "—"}</dd>
+          <dt>전화번호</dt><dd class="num">${h.phone ? phoneHtml(h) : "—"}</dd>
           <dt>입장</dt><dd class="num">${hm(h.enteredAt)}${h.walk ? "" : ` (예약 ${hm(h.slot)})`}</dd>
           <dt>이용</dt><dd class="num">${m == null ? "무제한" : `${used < 0 ? `예약 ${hm(h.slot)}부터 셈` : `${Math.floor(used / 60)}시간 ${used % 60}분째`} · ${h.keyUse && new Set(h.keys.map((k) => useOf(h, k))).size > 1 ? h.keys.map((k) => { const mk = useOf(h, k); return `${k}번 ${mk == null ? "무제한" : hm(h.slot + mk)}`; }).join(" · ") + " 반납" : `${hm(h.slot + m)} 반납`}`}${(() => {
             const cur = holderEnd(h);
@@ -3820,6 +3822,8 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
   const fullPhone = (b) => { if (!b) return ""; const f = digits(b.phoneFull || ""); if (f.length >= 10) return f; const d = digits(b.phone || ""); return !maskedPhone(b.phone) && d.length >= 10 ? d : ""; };
   /** 화면에 보일 전화번호: 전체를 알면 전체 · 가려졌으면 네이버 글 그대로 */
   const phoneText = (b) => { const f = fullPhone(b); return f ? fmtPhone(f) : maskedPhone(b && b.phone) ? String(b.phone) : b && b.phone ? fmtPhone(b.phone) : ""; };
+  /** 전화번호 칸: 자릿수 그대로("***-****-5759" · 전체를 알면 "010-1234-5759") · 마지막 4자리만 조금 크게 (사장님 11/26 — 입장 전 손님을 뒷번호로 빨리 찾게) */
+  const phoneHtml = (b) => { const t = phoneText(b), m = /^(.*?)(\d{4})$/.exec(t); return m ? `${esc(m[1])}<b class="p4">${m[2]}</b>` : esc(t); };
   /** 손님 견주는 열쇠 "m:은인1252" (이름 첫 · 끝 글자 + 뒷 4자리) · 전화가 없으면 '이름:…' */
   const sigKey = (name, phone) => { const q = p4Of(phone); return q.length === 4 ? `m:${nmSig(name)}${q}` : name ? "이름:" + String(name).normalize("NFC").replace(/\s+/g, "") : ""; };
   const evKey = (b) => sigKey(b.name, b.phone);
@@ -4692,7 +4696,7 @@ body.keydrag, body.keydrag * { cursor: grabbing !important; }
       const left = dayDiff(TODAY, due) + 1; // 오늘 포함 남은 날 (14일 → 21일 = 8일 · 사장님 11/17)
       if (!REV_LEFT.includes(left)) continue;
       if (evOut({ name: p.name, phone: p.phone })) continue; // BC 투아웃 이상은 이벤트 대상 아님
-      out[left].push({ k, name: p.name || "손님", phone: p.phone || "", visits: new Set(vs.map((v) => v.day)).size, ok: vs.filter((v) => v.st === "성공").length, last, due, today: p.visits.some((v) => v.day === TODAY) });
+      out[left].push({ k: digits(p.phone || "").length >= 10 ? digits(p.phone) : k, name: p.name || "손님", phone: p.phone || "", visits: new Set(vs.map((v) => v.day)).size, ok: vs.filter((v) => v.st === "성공").length, last, due, today: p.visits.some((v) => v.day === TODAY) });
     }
     for (const l of REV_LEFT) out[l].sort((a, b) => Number(a.today) - Number(b.today) || a.name.localeCompare(b.name, "ko"));
     revMemo = { sig, v: out };
