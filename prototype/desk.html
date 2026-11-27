@@ -1402,7 +1402,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
           x.naverPending = false; x.naverWhy = "";
           // 방문 횟수를 몰랐으면 이용완료 때 카드에서 읽은 '완료 n'으로 채움
           if (x.prevDone == null && r.doneCount != null) { x.prevDone = r.doneCount; x.visitNo = r.doneCount + 1; x.visitEnd = x.visitNo + (bookings[x.day] || []).filter((y) => y.chainHead === x.id).length; if (r.cancelCount != null) x.cancels = r.cancelCount; }
-          toast(`${x.name}님 네이버 이용완료 됨${x.visitNo ? ` · ${x.visitNo}번째 예약완료` : ""}${x.printWaiting && !x.custWait ? printForm("enter", keyVals(x)) : ""}`);
+          toast(`${x.name}님 네이버 이용완료 ${r.already ? "되어 있음" : "됨"}${x.visitNo ? ` · ${x.visitNo}번째 예약완료` : ""}${x.printWaiting && !x.custWait ? printForm("enter", keyVals(x)) : ""}`);
         } else {
           x.naverWhy = (r && r.why) || "응답 없음";
           toast(`${x.name}님 네이버 이용완료 실패: ${x.naverWhy} — 2분 뒤 다시 해요${x.printWaiting && !x.custWait ? ` · 입장권은 방문 횟수 없이 출력${printForm("enter", keyVals(x))}` : ""}`);

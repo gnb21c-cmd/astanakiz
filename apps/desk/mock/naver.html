@@ -99,6 +99,13 @@
   let db;
   try { db = JSON.parse(localStorage.getItem(KEY)) || seed(); } catch (e) { db = seed(); }
   const save = () => localStorage.setItem(KEY, JSON.stringify(db));
+  // 늦게 반영된 이용완료 (mockSlowDone): 때가 지났으면 이제 완료로
+  if (Array.isArray(db.slow) && db.slow.length) {
+    const due = db.slow.filter((s) => s.at <= Date.now());
+    for (const s of due) { const y = (db[s.day] || []).find((b) => b.no === s.no); if (y && y.status !== "완료") { y.status = "완료"; y.done += 1; } }
+    db.slow = db.slow.filter((s) => s.at > Date.now());
+    if (due.length) save();
+  }
   const go = (o) => { const q = new URLSearchParams(Object.assign(Object.fromEntries(P), o)); location.href = location.pathname + "?" + q; };
   const view = P.get("view") || "calendar";
   const day = P.get("day") || "2026-10-05";
@@ -309,7 +316,12 @@
             <dl><dt>예약자</dt><dd>${x.name}</dd><dt>예약번호</dt><dd>${x.no}</dd><dt>상품</dt><dd>${PRODUCTS[x.product]}</dd><dt>수량</dt><dd>4인 입장권 ${x.qty}</dd></dl>
             <p class="notice">이용완료 시 사용자에게 이용완료 알림이 발송됩니다.</p>
             <button type="button" class="green" id="final-complete">이용완료</button></div>`;
-          aside.querySelector("#final-complete").onclick = () => { x.status = "완료"; x.done += 1; save(); setTimeout(() => go({}), 200); };
+          // localStorage "mockSlowDone" = 초 (11/27 — 실제 네이버가 이용완료를 늦게 반영: 누른 뒤 n초 동안은 확정 칸에 그대로)
+          const slow = Number(localStorage.getItem("mockSlowDone") || 0);
+          aside.querySelector("#final-complete").onclick = () => {
+            if (slow > 0) { db.slow = (db.slow || []).concat([{ day, no: x.no, at: Date.now() + slow * 1000 }]); save(); setTimeout(() => go({}), 200); return; }
+            x.status = "완료"; x.done += 1; save(); setTimeout(() => go({}), 200);
+          };
         }, 300);
       }
     });
