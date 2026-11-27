@@ -9,6 +9,7 @@
 2. 시험: `cd apps/desk && npm test` 모두 통과
 3. **직원용 메뉴얼 PDF 만들기** (사용자 지시)
    - 그 시점의 실제 화면으로 캡처해 만든다 (화면이 바뀌면 메뉴얼도 다시)
+   - 2.41 부터: 글은 `docs/manual/manual.html` 을 고치고 `cd apps/desk && node tools/pdf-shots.js 2.41` (바뀐 사진만 `ONLY=01,02` · PDF 만 `PDF_ONLY=1`) → `docs/manual/img/*.png` · `staff-manual.pdf`
    - 담을 내용: 아침 준비(앱 켜기 · 아마노 자동 로그인 확인) · 네이버 예약자 입장 · 현장입장(POS 결제 전환) · 열쇠 반납과 초과요금 · 주차등록 · 방문 회차와 사은권 · 프린터 · 문제가 생겼을 때
    - 직원들에게 배포
 4. 설치본 만들기: `cd apps/desk && npm run dist:win`
