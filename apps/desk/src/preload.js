@@ -95,6 +95,7 @@ contextBridge.exposeInMainWorld("desk", {
   cdb: {
     load: () => ipcRenderer.invoke("cdb:load"),
     save: (text) => ipcRenderer.invoke("cdb:save", text),
+    onSynced: (cb) => ipcRenderer.on("cdb:synced", (_e, v) => cb(v)), // 사무실 PC: 현장 POS 에서 고객 데이터베이스를 받음 (11/27)
   },
   // 근무자 메모장 (V2.0): 평일 ↔ 주말 전달 · 근무자마다 메모 — 이 PC 에만
   memo: {

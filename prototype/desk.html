@@ -2557,7 +2557,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
   function openSheet(s) { for (const k of Object.keys(sheet)) delete sheet[k]; Object.assign(sheet, s); $("overlay").hidden = false; renderSheet(); focusFirst(); }
   /** 입장 창 '우리 기록' 줄 — 현장 POS 고객 데이터베이스 (사장님 11/26) */
   function cdbRow(b) {
-    if (OFFICE || !cdbReady || b.walk || b.svc) return "";
+    if (!cdbReady || b.walk || b.svc) return "";
     const o = cdbOf(b);
     return `<dt>우리 기록</dt><dd class="num cdbrow">${o && o.n ? `방문 ${o.n}번 · 마지막 ${md2(o.last)}${o.ph ? " · 번호 있음" : ""}${o.em ? ` · 아이디 ${esc(o.em.split("@")[0])}…` : ""}` : `<span class="help">처음 (데스크에 모은 기록 없음)</span>`}</dd>`;
   }
@@ -3156,10 +3156,10 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
           const phT = (r) => (r.ph ? fmtPhone(r.ph) : `***-****-${r.p4}`);
           const rows = top.map(([, r]) => { const days = [...new Set(r.v.map((v) => v[0]))]; return `<div class="it"><span><b>${esc(r.nm)}</b> · <span class="num">${esc(phT(r))}</span>${r.em ? ` · <span class="num">${esc(r.em)}</span>` : ""}</span><span class="help num">방문 ${days.length}번 · ${days.slice(-3).map(md2).join(" · ")}</span></div>`; }).join("");
           return { html: head + `
-          <div class="setcard plain stack"><div class="bcfind"><b>고객 데이터베이스</b><span class="help">${OFFICE ? "현장 POS 에만 있어요" : !cdbReady ? "읽는 중…" : `모은 손님 ${all.length}명 · 방문 ${all.reduce((a, r) => a + r.v.length, 0)}번 · 전체 번호 ${all.filter((r) => r.ph).length}명 · 아이디 ${all.filter((r) => r.em).length}명`}</span></div>
+          <div class="setcard plain stack"><div class="bcfind"><b>고객 데이터베이스</b><span class="help">${OFFICE && !cdbReady ? "현장 POS 에서 아직 못 받았어요 — 두 PC 연결 · 현장 POS 가 켜져 있으면 몇 분 안에" : !cdbReady ? "읽는 중…" : `${OFFICE ? `현장 POS 에서 받음${cdbOff && cdbOff.at ? ` (${esc(cdbOff.at.slice(-8, -3) || cdbOff.at)})` : ""}${cdbOff && cdbOff.cut ? " · 길어서 오래전에 온 손님은 빠짐" : ""} · 보기만 · ` : ""}모은 손님 ${all.length}명 · 방문 ${all.reduce((a, r) => a + r.v.length, 0)}번 · 전체 번호 ${all.filter((r) => r.ph).length}명 · 아이디 ${all.filter((r) => r.em).length}명`}</span></div>
             <input id="db-q" class="cfg" placeholder="이름(홍*동 · 홍동) · 전화 뒷 4자리 · 전체 번호 · 아이디 앞 글자로 찾기" autocomplete="off" value="${esc(q)}">
             <div class="bclist">${rows || `<span class="help">${q ? "찾는 손님이 없어요" : "아직 모은 손님이 없어요"}</span>`}${hits.length > top.length ? `<span class="help">${hits.length}명 중 최근 30명 — 더 넣어 좁혀 주세요</span>` : ""}</div>
-            <span class="help">입장 처리할 때마다 데스크가 네이버와 따로 모아 백업하듯 보관 (판정은 네이버를 읽을 수 있는 동안 네이버로 · 끝내 못 읽으면 이 기록으로) · 이름은 '홍*동' 모양 · 같은 손님 = 이름 첫 · 끝 글자 + 뒷 4자리 (+ 전체 번호 · 아이디 앞 2자리가 둘 다 있으면 같아야) · 이 PC 앱 폴더 customer-db.json 에만 (클라우드 없음)</span></div>` };
+            <span class="help">입장 처리할 때마다 데스크가 네이버와 따로 모아 백업하듯 보관 (판정은 네이버를 읽을 수 있는 동안 네이버로 · 끝내 못 읽으면 이 기록으로) · 이름은 '홍*동' 모양 · 같은 손님 = 이름 첫 · 끝 글자 + 뒷 4자리 (+ 전체 번호 · 아이디 앞 2자리가 둘 다 있으면 같아야) · ${OFFICE ? "현장 POS 가 모은 것을 두 PC 연결(연결 코드로 잠김)로 받아 봄 — 손님에게 연락할 때" : "현장 POS 앱 폴더 customer-db.json (사무실 PC 에는 두 PC 연결로 · 연결 코드로 잠김 · 그 밖의 클라우드 없음)"}</span></div>` };
         }
         if (!custList) custLoad();
         const L = custList || [], p4 = (x) => `010-****-${esc(x.p4 || "????")}`;
@@ -3917,7 +3917,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
   }
   /* ── 현장 POS 고객 데이터베이스 (사장님 11/26 — "네이버 믿을 수 없어 · 현장 포스에 데이터베이스로 활용 · 저장 관리")
      = 네이버가 또 무엇을 막을지 모르니, 네이버를 읽을 수 있는 동안은 네이버로 마일리지 · 이벤트 · 사은권을 판정하고 우리 데이터는 데이터대로 백업하듯 보관 (사장님 11/26) ──
-     데스크가 직접 모으는 손님 장부 — 설치한 앱: 현장 POS 앱 폴더 customer-db.json (저장할 때마다 바로 앞 파일을 .bak 로) · 체험판: 이 브라우저 · 사무실 PC · 클라우드로 안 감
+     데스크가 직접 모으는 손님 장부 — 설치한 앱: 현장 POS 앱 폴더 customer-db.json (저장할 때마다 바로 앞 파일을 .bak 로) · 체험판: 이 브라우저 · 클라우드로 안 감 · 사무실 PC 는 두 PC 연결(연결 코드로 잠김)로 받아 보기만 (11/27)
      { v: 1, seq, filled: 처음 채운 날, c: { id: { nm: "홍*동", p4: "1234", ph: 전체 번호 | "", em: "bl@naver.com" | "", v: [[날짜, 예약번호, 장수], …] } } }
      - 이름은 홍길동이든 홍지동이든 '홍*동' 모양으로만 남김 (가운데 글자는 네이버가 가려 비교 못 함)
      - 같은 손님 = 이름 첫 · 끝 글자 + 전화 뒷 4자리가 같고, 둘 다 알면 전체 번호 · 아이디(이메일) 앞 2자리 · 도메인도 같음 (다르면 다른 손님 → 새로)
@@ -3927,6 +3927,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
   const CDB_LS = "astanakiz-cdb", CDB_FROM = "2026-04-01";
   const CDB_APP = () => APP && !OFFICE && !!(window.desk && window.desk.cdb);
   let CDB = { v: 1, seq: 0, filled: "", c: {} }, cdbReady = false, cdbT = null;
+  let cdbOff = null; // 사무실 PC: 현장 POS 에서 받은 때 { at, cut } (11/27 — 고객 불만 · 열쇠 반납이 늦을 때 사무실에서도 연락 · 보기만)
   const cdbIdx = new Map(), cdbNos = new Set(); // "이름 첫 · 끝|뒷 4자리" → [id] · 적은 예약번호
   const nmMask = (n) => { const c = [...String(n || "").normalize("NFC").replace(/\s+/g, "")]; return c.length <= 1 ? c.join("") : c.length === 2 ? c[0] + "*" : c[0] + "*".repeat(c.length - 2) + c[c.length - 1]; };
   const cdbKey = (name, p4) => `${nmSig(name)}|${p4}`;
@@ -4042,7 +4043,18 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
     step();
   }
   function cdbLoad() {
-    if (OFFICE) return;
+    if (OFFICE) {
+      // 사무실 PC: 현장 POS 가 두 PC 연결 우편함(연결 코드로 잠김)으로 보낸 것 — 보기만 (장부에 안 씀 · 저장 안 함)
+      if (APP && window.desk.cdb) window.desk.cdb.load().then((r) => {
+        let d = null;
+        try { d = r && r.ok && r.text ? JSON.parse(r.text) : null; } catch (e) { d = null; }
+        CDB = d && d.v === 1 && d.c ? Object.assign({ v: 1, seq: 0, filled: "office", c: {} }, d) : { v: 1, seq: 0, filled: "office", c: {} };
+        cdbOff = d ? { at: String(r.at || ""), cut: !!r.cut } : null;
+        cdbIndex(); cdbReady = !!d; renderAll();
+        if (sheet.mode === "settings" && sheet.csub === "db") renderSheet();
+      }, () => {});
+      return;
+    }
     const done = (t) => {
       try { const d = t ? JSON.parse(t) : null; if (d && d.v === 1 && d.c && typeof d.c === "object") CDB = Object.assign({ v: 1, seq: 0, filled: "", c: {} }, d); } catch (e) { /* 깨졌으면 새로 (앱 본체는 .bak 에서 읽음) */ }
       cdbIndex(); cdbFill(() => { cdbReady = true; renderAll(); });
@@ -4445,7 +4457,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
     // 네이버 정보가 먼저 (사장님 11/26 — 읽을 수 있는 동안은 네이버로 마일리지 · 이벤트 · 사은권) · 현장 POS 고객 데이터베이스는 네이버 지난 예약을 끝내 못 읽었을 때만 대신
     //   (네이버가 '신규예약'(완료 0)이라 한 손님 · 아직 읽는 중(세 번까지)인 손님은 우리 기록을 안 씀)
     const nv = naverLast(b), naverTrying = custUnsure(b) && (custTried.get(b.no) || 0) < 3;
-    const dv = nv === undefined && b.prevDone !== 0 && !naverTrying ? cdbLast(b) : undefined, ext = nv !== undefined ? nv : dv || "";
+    const dv = !OFFICE && nv === undefined && b.prevDone !== 0 && !naverTrying ? cdbLast(b) : undefined, ext = nv !== undefined ? nv : dv || ""; // 사무실 PC 는 현장 장부대로 (고객 데이터베이스는 연락용으로 보기만)
     if (!before.length) {
       if (ext) return evRule({ day: ext, due: "" }, b.day);
       const r0 = evRule(null, b.day);
@@ -6027,7 +6039,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
       if (holderOf(k)) { toast(`${k}번은 그 사이 다른 손님이 썼어요`); renderSheet(); return; }
       const end = holderEnd(h);
       // 연결 정보는 지금 손님 정보를 복사해 둠 → 원래 손님이 먼저 반납 · 퇴장해도 남음 (반납 시각은 지금 그 손님과 같게 시작 · 그 뒤로는 따로)
-      const x = { id: "s" + seq++, svc: true, walk: true, name: h.walk ? "현장구매자" : h.name, phone: h.phone || "", keys: [k], qty: 0, enteredAt: now, slot: h.slot, keyUse: { [k]: end == null ? null : end - h.slot }, outAt: null,
+      const x = { id: "s" + seq++, svc: true, walk: true, name: h.walk ? "현장구매자" : h.name, phone: fullPhone(h) || h.phone || "", keys: [k], qty: 0, enteredAt: now, slot: h.slot, keyUse: { [k]: end == null ? null : end - h.slot }, outAt: null,
         of: { id: h.id, k: h.walk ? "w" : "n", no: h.no || null, posNo: h.posNo || null, name: h.walk ? "현장구매자" : h.name, keys: h.keys.slice(), label: `${h.walk ? walkTag(h) : h.name} ${h.keys.join(", ")}번`, slot: h.slot, enteredAt: h.enteredAt } };
       svcKeys.push(x);
       sheet.svcPick = false;
@@ -6936,14 +6948,14 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
   // ── 두 PC 연결 (사장님 11/06): 현장 POS ↔ 사무실 PC · 같은 버전끼리 (앱 본체 desk-sync.js · docs/SYNC.md) ──
   //   우편함으로 주고받는 것 (사장님 11/06 다시): 운영 설정 일체 · 관리자 메시지(메모장) · 자동 수량조절 켜고 끄기(설정) · 키 현황
   //   네이버 예약 · 고객 카드는 우편함으로 안 보냄 → 사무실 PC 가 네이버에서 직접 읽기만 (이용완료 · 수량 · 취소 · 재고는 현장 POS 만) · 주차는 사무실에 없음
-  //   키 현황 = 입장한 예약의 열쇠 · 입장 · 반납 시각 (예약번호로 사무실 네이버 카드에 붙임) · 현장 · 서비스 키 — 이름 · 전화번호는 빼고 보냄
-  const KEY_FIELDS = ["id", "no", "slot", "naverSlot", "qty", "qtyBooked", "qtyCut", "qtyAsk", "qtySrc", "qtyPicked", "product", "naverProduct", "status", "keys", "enteredAt", "outAt", "overPaid", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut", "visitEnd", "naverPending", "naverWhy", "plusT"];
+  //   키 현황 = 입장한 예약의 열쇠 · 입장 · 반납 시각 (예약번호로 사무실 네이버 카드에 붙임) · 현장 · 서비스 키 — 이름 · 전화번호도 (사장님 11/27 — 열쇠 반납이 늦거나 고객 불만 때 사무실에서도 손님에게 연락 · 가운데 4자리를 받은 전체 번호 · 우편함은 연결 코드로 잠김) · 손님 메모는 안 보냄
+  const KEY_FIELDS = ["id", "no", "name", "phone", "phoneFull", "slot", "naverSlot", "qty", "qtyBooked", "qtyCut", "qtyAsk", "qtySrc", "qtyPicked", "product", "naverProduct", "status", "keys", "enteredAt", "outAt", "overPaid", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut", "visitEnd", "naverPending", "naverWhy", "plusT"];
   /** 현장 POS: 키 현황 (사무실로 보낼 것) — 오늘만 */
   function syncSnap() {
     const pick = (x, fs) => Object.fromEntries(fs.filter((k) => x[k] !== undefined).map((k) => [k, x[k]]));
     const b = (bookings[TODAY] || []).filter((x) => x.enteredAt != null).map((x) => pick(x, KEY_FIELDS));
-    const w = walkins.map((x) => Object.assign({}, x, { phone: "" }));
-    const s = svcKeys.map((x) => Object.assign({}, x, { phone: "", name: x.of ? "" : x.name, of: x.of ? pick(x.of, ["id", "k", "no", "posNo", "keys", "slot", "enteredAt"]) : null }));
+    const w = walkins.map((x) => Object.assign({}, x));
+    const s = svcKeys.map((x) => Object.assign({}, x, { of: x.of ? pick(x.of, ["id", "k", "no", "posNo", "keys", "slot", "enteredAt"]) : null }));
     return { v: 2, day: TODAY, at: hm(now), b, w, s, x: [...testOut], ig: [...extIgnored], mv: [...moved], g: golden, r: rentals.map((r) => ({ id: r.id, name: r.name, paidOn: r.paidOn })) };
   }
   /** 사무실 PC: 키 현황을 사무실 네이버 카드에 붙임 (예약번호로) · 네이버에 아직 없는 입장은 '예약 손님' 카드로 · 현장 · 서비스 키는 그대로 */
@@ -6975,7 +6987,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
         const o = x.of.k === "w" ? walkins.find((y) => y.id === x.of.id) : x.of.no ? byNo.get(String(x.of.no)) || idOf.get(x.of.id) : idOf.get(x.of.id);
         const nm = x.of.k === "w" ? "현장구매자" : (o && o.name) || "예약 손님";
         Object.assign(x.of, { id: o ? o.id : x.of.id, name: nm, label: `${x.of.k === "w" ? (o ? walkTag(o) : "현장") : nm} ${(x.of.keys || []).join(", ")}번` });
-        x.name = nm; if (o && o.phone) x.phone = o.phone;
+        x.name = nm; if (!x.phone && o && o.phone) x.phone = o.phone; // 현장 번호가 먼저 (전체 번호 · 11/27)
       }
       return x;
     }));
@@ -7405,6 +7417,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
   fit();
   renderAll();
   cdbLoad(); // 현장 POS 고객 데이터베이스 (11/26) — 화면을 다 준비한 뒤 (읽으면 다시 그림)
+  if (APP && OFFICE && window.desk.cdb && window.desk.cdb.onSynced) window.desk.cdb.onSynced(() => cdbLoad()); // 사무실 PC: 현장에서 새로 받음 (11/27)
   renderTalk();
   parkFlush(); // 꺼지기 전에 남은 할인 등록 이어서
 })();

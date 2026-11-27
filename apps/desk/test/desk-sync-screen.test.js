@@ -31,7 +31,7 @@ async function enter(page, id, slot) {
 const snapOf = (page) => page.evaluate(() => JSON.stringify(window.__deskTest.sync.snap()));
 const applyTo = (page, snap, at) => page.evaluate(([s, t]) => { window.__deskTest.sync.apply(JSON.parse(s), window.__deskTest.today() + " " + t); window.__deskTest.setNow(830); }, [snap, at]);
 
-test("사무실 PC 키 현황: 현장 열쇠판 그대로 · 이름 · 전화 · 손님 메모는 안 감 · 사무실 네이버에 없는 입장은 '예약 손님' → 네이버에 나오면 그 카드로", async () => {
+test("사무실 PC 키 현황: 현장 열쇠판 그대로 · 이름 · 전화(가운데 4자리를 받은 전체 번호)도 감 — 사무실에서도 손님에게 연락 (11/27) · 손님 메모는 안 감 · 사무실 네이버에 없는 입장도 이름 그대로 → 네이버에 나오면 그 카드로", async () => {
   const browser = await launch();
   try {
     const ctx = await browser.newContext();
@@ -48,8 +48,17 @@ test("사무실 PC 키 현황: 현장 열쇠판 그대로 · 이름 · 전화 ·
     await A.click(`.key[data-k='${k}']`);
     await A.fill("#note-m", "손님메모비밀글"); await A.dispatchEvent("#note-m", "change");
     await A.click("#sheet [data-act=close] >> nth=0");
+    // 가린 네이버 손님 (11/26 ~): 입장 때 받은 가운데 4자리 → 전체 번호
+    const mid = await A.evaluate(() => { const T = window.__deskTest; return T.addBooking(T.today(), "14:00", "은*인", "***-****-1252", 1, { prevDone: 0 }); });
+    await A.click('.slot[data-s="840"]');
+    await A.click(`.res[data-id="${mid}"]`);
+    await A.click(".kpick button:not([disabled]):not(.on) >> nth=0");
+    for (const n of "5678") await A.click(`[data-act=midKey][data-n="${n}"]`);
+    await A.click("#enter-done");
+    const midKey = await A.evaluate((i) => window.__deskTest.bk(i).keys[0], mid);
     const snap = await snapOf(A);
-    for (const s of ["손님메모비밀글", "사무실확인", "01077770000", "찟재명", "01020039595"]) assert.ok(!snap.includes(s), `키 현황에 '${s}' 없음 (이름 · 전화 · 메모는 안 보냄)`);
+    assert.ok(!snap.includes("손님메모비밀글"), "손님 메모는 안 보냄 (이 PC 에만)");
+    for (const s of ["사무실확인", "01077770000", "01056781252"]) assert.ok(snap.includes(s), `키 현황에 '${s}' (이름 · 전화 — 열쇠 반납이 늦거나 고객 불만 때 사무실에서도 연락 · 사장님 11/27)`);
     assert.deepStrictEqual(Object.keys(JSON.parse(snap)).sort(), ["at", "b", "day", "g", "ig", "mv", "r", "s", "v", "w", "x"].sort(), "네이버 칸 · 고객 카드 · 수량 기록은 안 보냄 (r = 대관 단체 이름 · 입금일 · 11/10)");
 
     // 사무실 PC (체험판 미리 보기) — 네이버 예약은 이 PC 가 읽은 것 (체험 예시 = 현장과 같은 예약, '사무실확인'은 아직 없음)
@@ -59,11 +68,15 @@ test("사무실 PC 키 현황: 현장 열쇠판 그대로 · 이름 · 전화 ·
     await applyTo(B, snap, "13:50:00");
     const boardA = await keyBoard(A), boardB = await keyBoard(B);
     for (const kk of ent.keys) {
-      assert.match(boardB.find((x) => x.startsWith(kk + ":")), /예약 손님/, `${kk}번: 사무실 네이버에 아직 없는 입장은 '예약 손님'`);
+      assert.match(boardB.find((x) => x.startsWith(kk + ":")), /사무실확인/, `${kk}번: 사무실 네이버에 아직 없는 입장도 현장 이름 그대로`);
       assert.match(boardA.find((x) => x.startsWith(kk + ":")), /사무실확인/);
     }
+    // 사무실 열쇠 창: 가린 손님도 전체 번호 (바로 전화)
+    await B.click(`.key[data-k='${midKey}']`);
+    assert.match((await B.textContent("#sheet")).replace(/\s+/g, " "), /010-5678-1252/, "사무실 열쇠 창에 전체 번호");
+    await B.click("#sheet [data-act=close] >> nth=0");
     const strip = (b) => b.filter((x) => !ent.keys.some((kk) => x.startsWith(kk + ":")));
-    assert.deepStrictEqual(strip(boardB), strip(boardA), "다른 열쇠는 이름까지 같음 (이름은 사무실 네이버 카드에서)");
+    assert.deepStrictEqual(strip(boardB), strip(boardA), "다른 열쇠는 이름까지 같음");
     assert.strictEqual(await B.getAttribute("#syncchip", "aria-label"), "사무실 미리 보기 누르면 끝"); // 11/10: 두 줄 · 오른쪽 묶음
     // 사무실 네이버를 다시 읽어 그 예약이 나옴 → 그 카드에 붙음 ('예약 손님' 카드는 없어짐)
     await B.evaluate((no) => { const T = window.__deskTest; const i = T.addBooking(T.today(), "14:00", "사무실확인", "01077770000", 2, {}); T.bk(i).no = no; }, ent.no);

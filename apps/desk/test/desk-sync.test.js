@@ -272,3 +272,63 @@ test("재방문 장부: 버전이 다르면 싣지 않음 (사무실이 못 풂)
   assert.strictEqual(p.led, undefined);
   assert.deepStrictEqual(got, []);
 });
+
+test("고객 데이터베이스 (사장님 11/27 — 사무실에서도 손님에게 연락): 현장 → 사무실 — 장부와 같게 사무실이 열려 있고 지문이 다를 때만 · 받으면 다시 안 실음 · 바뀌면 다시 · 너무 길면 오래전에 온 손님부터 덜어냄 · 우편함엔 잠겨서", async () => {
+  const clock = mkClock(Date.parse("2026-11-27T10:00:00+09:00")), mb = mailbox();
+  const pos = pc("pos", mb, clock), off = pc("office", mb, clock);
+  const cust = (nm, p4, ph, day) => ({ nm, p4, ph, em: "", v: [[day, "n" + p4, 1]] });
+  let C = { h: "c1", c: { c1: cust("은*인", "1252", "01056781252", "2026-11-26") } };
+  pos.sync.local.cdb = () => C;
+  const got = []; let have = "";
+  off.sync.local.cdbHave = () => have;
+  off.sync.local.applyCdb = (x) => { got.push(x); have = x.h; };
+  const posDoc = () => { const env = JSON.parse(mb.docs.pos.json); return S.unseal(S.deriveKey("ABCD-EFGH-JKLM-NPQR", BOARD), env.box, `pos|${env.build}`); };
+  await run(clock, [pos, off], 20);
+  assert.deepStrictEqual(got.map((x) => [x.h, Object.keys(x.c), x.cut]), [["c1", ["c1"], false]], "사무실이 받음");
+  assert.strictEqual(got[0].c.c1.ph, "01056781252");
+  assert.ok(!mb.docs.pos.json.includes("01056781252") && !mb.docs.pos.json.includes("은*인"), "우편함 글에는 번호 · 이름이 그대로 안 보임 (연결 코드로 잠김)");
+  await run(clock, [pos, off], 90);
+  assert.strictEqual(got.length, 1, "받은 뒤엔 다시 안 실음");
+  assert.deepStrictEqual([posDoc().ch, posDoc().cdb], ["c1", undefined], "현장 문서에 지문만");
+  // 현장에서 손님이 늘어남 → 1분 안에 다시
+  C = { h: "c2", c: Object.assign({}, C.c, { c2: cust("김*수", "2468", "01024681252", "2026-11-27") }) };
+  await run(clock, [pos, off], 70);
+  assert.deepStrictEqual(got.map((x) => x.h), ["c1", "c2"]);
+  // 사무실이 꺼져 있으면 안 실음 → 켜면 받음
+  await run(clock, [pos], 200);
+  C = { h: "c3", c: Object.assign({}, C.c, { c3: cust("도*희", "4321", "", "2026-11-27") }) };
+  await run(clock, [pos], 120);
+  assert.strictEqual(posDoc().cdb, undefined, "사무실이 꺼져 있으면 실지 않음");
+  await run(clock, [pos, off], 90);
+  assert.deepStrictEqual(got.map((x) => x.h), ["c1", "c2", "c3"]);
+  // 너무 김 (압축이 안 되는 손님 기록 약 93만 자) → 오래전에 온 손님부터 덜어냄
+  const big = {};
+  for (let i = 0; i < 300; i++) big["b" + i] = { nm: require("crypto").randomBytes(2300).toString("base64"), p4: "0000", ph: "", em: "", v: [[`2026-0${1 + (i % 9)}-01`, "x" + i, 1]] };
+  C = { h: "c4", c: Object.assign({}, big, C.c) };
+  await run(clock, [pos, off], 90);
+  const last = got[got.length - 1];
+  assert.strictEqual(last.h, "c4");
+  assert.ok(last.cut, "덜어냄");
+  assert.ok(["c1", "c2", "c3"].every((id) => last.c[id]), "최근에 온 손님은 남음");
+  assert.ok(Object.keys(last.c).length < 303);
+  assert.ok(mb.docs.pos.json.length < S.MAX_DOC, "문서 길이 한도 안");
+  assert.match(pos.sync.status().cdb, /오래전에 온 손님은 빼고/);
+  assert.deepStrictEqual(Object.keys(S.trimCdb({ a: cust("a", "1", "", "2026-01-01"), b: cust("b", "2", "", "2026-03-01"), c: cust("c", "3", "", "2026-02-01"), d: cust("d", "4", "", "2026-04-01") })).sort(), ["b", "d"]);
+  assert.strictEqual(S.trimCdb({ a: cust("a", "1", "", "2026-01-01") }), null);
+});
+
+test("고객 데이터베이스: 버전이 다르면 싣지 않음 · 사무실은 현장으로 안 보냄", async () => {
+  const clock = mkClock(Date.parse("2026-11-27T10:00:00+09:00")), mb = mailbox();
+  const pos = pc("pos", mb, clock), off = pc("office", mb, clock, { build: "2.19" });
+  pos.sync.local.cdb = () => ({ h: "c1", c: { c1: { nm: "은*인", p4: "1252", ph: "01056781252", em: "", v: [] } } });
+  const got = [];
+  off.sync.local.cdbHave = () => "";
+  off.sync.local.applyCdb = (x) => got.push(x);
+  off.sync.local.cdb = () => ({ h: "x", c: { z: {} } }); // 사무실에 있어도 안 실음
+  await run(clock, [pos, off], 30);
+  const env = JSON.parse(mb.docs.pos.json);
+  assert.strictEqual(S.unseal(S.deriveKey("ABCD-EFGH-JKLM-NPQR", BOARD), env.box, `pos|${env.build}`).cdb, undefined);
+  const envO = JSON.parse(mb.docs.office.json);
+  assert.strictEqual(S.unseal(S.deriveKey("ABCD-EFGH-JKLM-NPQR", BOARD), envO.box, `office|${envO.build}`).cdb, undefined);
+  assert.deepStrictEqual(got, []);
+});

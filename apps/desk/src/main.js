@@ -1386,6 +1386,8 @@ ipcMain.handle("notes:patch", (_e, job) => {
 //   데스크가 입장 처리한 네이버 손님(이름 '홍*동' · 전화 뒷 4자리 · 받은 전체 번호 · 아이디 앞 2자리 · 방문 날짜)을 모은 장부 → 이 PC 앱 폴더 customer-db.json 에만
 //   (모양 · 같은 손님 판단은 데스크 화면이 함 · 여기는 글 그대로 저장) · 저장할 때마다 바로 앞 파일을 customer-db.bak.json 으로 · 클라우드로 안 보냄 · 현장 POS 만
 //   백업 (사장님 11/26 — 네이버를 읽을 수 있는 동안은 네이버로 판정하고, 우리 데이터는 데이터대로 백업하듯 보관): 날마다 첫 저장 때 customer-db-backup/날짜.json 한 벌 · 30일치
+//   사무실 PC (사장님 11/27 — 고객 불만 · 열쇠 반납이 늦을 때 사무실에서도 손님에게 연락): 두 PC 연결 우편함(연결 코드로 잠김)으로 현장 → 사무실 · 사무실은 office-cdb.json 에 두고 보기만
+//     보낼 때는 손님마다 최근 방문 30번까지 (cdbShare) · 재방문 장부와 같게 사무실이 열려 있고 지문이 다를 때만
 const CDB_FILE = "customer-db.json", CDB_BAK = "customer-db.bak.json", CDB_MAX = 30 * 1024 * 1024, CDB_KEEP = 30;
 /** 오늘 백업이 없으면 한 벌 · 오래된 것부터 지워 30일치만 */
 function cdbBackup(dir, t) {
@@ -1397,8 +1399,34 @@ function cdbBackup(dir, t) {
   for (const x of old.slice(0, Math.max(0, old.length - CDB_KEEP))) try { fs.unlinkSync(path.join(bd, x)); } catch (e) { /* 그대로 */ }
 }
 const cdbOk = (t) => { try { const d = JSON.parse(t); return !!d && d.v === 1 && !!d.c && typeof d.c === "object"; } catch (e) { return false; } };
+let cdbShare = null; // 현장: 사무실로 보낼 것 { h, c }
+let officeCdb = null; // 사무실: 현장에서 받은 것 { h, c, cut, at }
+const OFFICE_CDB = () => path.join(histDir(), "office-cdb.json");
+/** 현장: 저장한 글 → 사무실로 보낼 것 (손님마다 최근 방문 30번까지) · 지문 */
+function cdbShareFrom(t) {
+  try {
+    const d = JSON.parse(t), c = {};
+    for (const [id, r] of Object.entries(d.c || {})) if (r && typeof r === "object") c[id] = { nm: String(r.nm || ""), p4: String(r.p4 || ""), ph: String(r.ph || ""), em: String(r.em || ""), v: (Array.isArray(r.v) ? r.v : []).slice(-30) };
+    cdbShare = { h: require("crypto").createHash("sha1").update(t).digest("hex").slice(0, 16), c };
+  } catch (e) { /* 다음 저장 때 */ }
+}
+function cdbShareLoad() {
+  if (RUN_ROLE !== "pos") return;
+  try { const t = fs.readFileSync(path.join(histDir(), CDB_FILE), "utf8"); if (cdbOk(t)) cdbShareFrom(t); } catch (e) { /* 아직 없음 */ }
+}
+function officeCdbLoad() {
+  try { const o = JSON.parse(fs.readFileSync(OFFICE_CDB(), "utf8")); if (o && o.h && o.c && typeof o.c === "object") officeCdb = o; } catch (e) { /* 아직 없음 */ }
+}
+function officeCdbApply(C) {
+  const c = {};
+  for (const [id, r] of Object.entries(C.c || {})) if (r && typeof r === "object" && /^\d{4}$/.test(String(r.p4 || ""))) c[id] = { nm: String(r.nm || "").slice(0, 20), p4: String(r.p4), ph: /^\d{10,11}$/.test(String(r.ph || "")) ? String(r.ph) : "", em: String(r.em || "").slice(0, 80), v: (Array.isArray(r.v) ? r.v : []).filter((v) => Array.isArray(v) && isDayStr(v[0])).slice(-30).map((v) => [String(v[0]), String(v[1] || ""), Number(v[2]) || 1]) };
+  officeCdb = { h: String(C.h), c, cut: !!C.cut, at: String(C.at || "") };
+  try { fs.writeFileSync(OFFICE_CDB(), JSON.stringify(officeCdb)); } catch (e) { /* 다음에 다시 받음 */ }
+  toDesk("cdb:synced", { h: officeCdb.h, at: officeCdb.at, cut: officeCdb.cut });
+}
 ipcMain.handle("cdb:load", () => {
-  if (RUN_ROLE === "office") return { ok: false, why: "현장 POS 에만 있어요" };
+  // 사무실 PC: 현장에서 받은 것 (보기만 · 11/27) — 아직 한 번도 못 받았으면 text: null
+  if (RUN_ROLE === "office") return { ok: true, office: true, text: officeCdb ? JSON.stringify({ v: 1, seq: 0, filled: "office", c: officeCdb.c }) : null, at: officeCdb ? officeCdb.at : "", cut: !!(officeCdb && officeCdb.cut) };
   for (const f of [CDB_FILE, CDB_BAK]) {
     let t = null;
     try { t = fs.readFileSync(path.join(histDir(), f), "utf8"); } catch (e) { continue; }
@@ -1418,6 +1446,7 @@ ipcMain.handle("cdb:save", (_e, text) => {
     try { if (cdbOk(fs.readFileSync(f, "utf8"))) fs.copyFileSync(f, path.join(dir, CDB_BAK)); } catch (e) { /* 처음 */ }
     fs.renameSync(f + ".tmp", f);
     try { cdbBackup(dir, t); } catch (e) { /* 백업 못 해도 저장은 됨 */ }
+    cdbShareFrom(t); // 사무실로 (두 PC 연결 · 11/27)
     return { ok: true };
   } catch (e) {
     return { ok: false, why: String(e.message || e) };
@@ -1647,6 +1676,9 @@ function syncStart() {
     ledger: () => ledgerShare, // 현장: 재방문 장부 (11/19)
     ledgerHave: () => (officeLedger ? officeLedger.h : ""), // 사무실: 가진 장부 지문
     applyLedger: (L) => officeLedgerApply(L),
+    cdb: () => cdbShare, // 현장: 고객 데이터베이스 (11/27)
+    cdbHave: () => (officeCdb ? officeCdb.h : ""), // 사무실: 가진 고객 데이터베이스 지문
+    applyCdb: (C) => officeCdbApply(C),
   };
   const on = {
     snap: (snap, at) => toDesk("sync:snap", { snap, at }),
@@ -1656,7 +1688,8 @@ function syncStart() {
   };
   syncEngine = new deskSync.DeskSync({ role: RUN_ROLE, build: BUILD, board: surveyKey, code: syncCode }, io, local, on);
   setInterval(() => { syncEngine.tick().catch(() => {}); }, 1000);
-  if (RUN_ROLE === "office") officeLedgerLoad(); // 지난번에 받은 장부 (켜자마자 카드에)
+  if (RUN_ROLE === "office") { officeLedgerLoad(); officeCdbLoad(); } // 지난번에 받은 장부 · 고객 데이터베이스 (켜자마자)
+  if (RUN_ROLE === "pos") cdbShareLoad(); // 고객 데이터베이스 → 사무실 (11/27)
   if (RUN_ROLE === "pos") { ledgerShareNow(); setInterval(ledgerShareNow, 3 * 60 * 1000); } // 재방문 장부 → 사무실 (3분마다 · 적은 뒤 15초)
 }
 ipcMain.on("sync:role", (e) => { e.returnValue = RUN_ROLE; });
