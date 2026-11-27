@@ -1291,8 +1291,14 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
     for (const n of r.bookings) {
       const done = n.status === "완료";
       const b = old.get(n.no) || { id: "b" + seq++, keys: [], enteredAt: null, outAt: null, visitNo: null };
+      // 네이버 '개인정보 조회'(사장님 11/27)로 이름 · 전화번호가 보이면 기억 → 다시 가려져도 전체 번호 · 이름 그대로 (입장 창 가운데 4자리를 안 물음 · 열쇠 반납 · 사무실 연락)
+      //   네이버가 보여 준 번호가 근무자가 넣은 가운데 4자리와 다르면 네이버 것으로
+      const ph = digits(n.phone || ""), nm = String(n.name || "");
+      if (!maskedPhone(n.phone) && ph.length >= 10 && ph.length <= 11) b.phoneFull = ph;
+      if (nm && !/\*/.test(nm)) b.nameOpen = nm;
+      const name = /\*/.test(nm) && b.nameOpen && nmSig(b.nameOpen) === nmSig(nm) ? b.nameOpen : nm;
       Object.assign(b, {
-        day, no: n.no, naverSlot: toMin(n.time), slot: day === TODAY && moved.has(n.no) ? moved.get(n.no) : toMin(n.time), name: n.name, phone: n.phone, qty: n.qty,
+        day, no: n.no, naverSlot: toMin(n.time), slot: day === TODAY && moved.has(n.no) ? moved.get(n.no) : toMin(n.time), name, phone: n.phone, qty: n.qty,
         qtyBooked: n.qtyBooked || null, qtyCut: n.qtyCut || 0, qtyAsk: n.qtyAsk || null, qtyAskRaw: n.qtyAsk || null, qtyPicked: false, qtySrc: n.qtySrc || "", // 부분취소 (11/11): 남은 장수 · 처음 수량 · 누구 것인지 모름
         product: (n.qtyText || "").replace(/\s*\d+\s*$/, "") || "입장권", naverProduct: n.product, pay: n.pay || "",
         cancels: n.cancelCount,
@@ -1384,7 +1390,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
      - 앱: 저장 폴더(%APPDATA%\astanakiz-desk\desk-state\날짜.json — 앱 폴더 이름은 영문 · 키즈 포스 11/16 확인)에 바로 씀 (갑자기 꺼져도 남게) + 브라우저 저장소에도 한 벌
      - 켜자마자 빈 화면으로 저장본을 덮어쓰지 않게: 저장본을 먼저 읽어 들인 뒤부터 저장 */
   const STATE_KEY = "astanakiz-desk-" + TODAY;
-  const SAVE_FIELDS = ["id", "day", "no", "slot", "name", "phone", "qty", "qtyBooked", "qtyCut", "qtySrc", "qtyPicked", "product", "naverProduct", "pay", "cancels", "prevDone", "visitNo", "visitEnd", "proxy", "visitor", "status", "keys", "enteredAt", "outAt", "overPaid", "naverPending", "naverWhy", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut", "naverSlot", "phoneFull", "email", "past", "giftDue", "giftGiven", "plusT"];
+  const SAVE_FIELDS = ["id", "day", "no", "slot", "name", "phone", "qty", "qtyBooked", "qtyCut", "qtySrc", "qtyPicked", "product", "naverProduct", "pay", "cancels", "prevDone", "visitNo", "visitEnd", "proxy", "visitor", "status", "keys", "enteredAt", "outAt", "overPaid", "naverPending", "naverWhy", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut", "naverSlot", "phoneFull", "nameOpen", "email", "past", "giftDue", "giftGiven", "plusT"];
   let stateReady = !APP; // 저장본을 읽기 전에는 저장하지 않음
   let qtyPicks = {}; // 부분취소 (사장님 11/11): 누구 것인지 모를 때 근무자가 고른 실제 장수 { 예약번호: 장수 } — 오늘 저장 파일(pq)
   let rentals = []; // 대관 (사장님 11/10): 오늘 적은 단체 이름 · 입금일 [{ id, name, paidOn, at }] — 오늘 저장 파일(r) · 보고 앱 '키즈대관'
@@ -3928,16 +3934,16 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
   const CDB_APP = () => APP && !OFFICE && !!(window.desk && window.desk.cdb);
   let CDB = { v: 1, seq: 0, filled: "", c: {} }, cdbReady = false, cdbT = null;
   let cdbOff = null; // 사무실 PC: 현장 POS 에서 받은 때 { at, cut } (11/27 — 고객 불만 · 열쇠 반납이 늦을 때 사무실에서도 연락 · 보기만)
-  const cdbIdx = new Map(), cdbNos = new Set(); // "이름 첫 · 끝|뒷 4자리" → [id] · 적은 예약번호
+  const cdbIdx = new Map(), cdbNos = new Set(), cdbNoId = new Map(); // "이름 첫 · 끝|뒷 4자리" → [id] · 적은 예약번호 · 예약번호 → id
   const nmMask = (n) => { const c = [...String(n || "").normalize("NFC").replace(/\s+/g, "")]; return c.length <= 1 ? c.join("") : c.length === 2 ? c[0] + "*" : c[0] + "*".repeat(c.length - 2) + c[c.length - 1]; };
   const cdbKey = (name, p4) => `${nmSig(name)}|${p4}`;
   function cdbIndex() {
-    cdbIdx.clear(); cdbNos.clear();
+    cdbIdx.clear(); cdbNos.clear(); cdbNoId.clear();
     for (const [id, r] of Object.entries(CDB.c)) {
       const k = cdbKey(r.nm, r.p4);
       if (!cdbIdx.has(k)) cdbIdx.set(k, []);
       cdbIdx.get(k).push(id);
-      for (const v of r.v) cdbNos.add(String(v[1]));
+      for (const v of r.v) { cdbNos.add(String(v[1])); cdbNoId.set(String(v[1]), id); }
     }
   }
   /** 이 손님(이름 · 전화 · 전체 번호 · 이메일)의 장부 id — 없으면 "" */
@@ -3972,7 +3978,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
     r.v.push([q.day, no, Math.max(1, Math.round(Number(q.qty)) || 1)]);
     r.v.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
     if (r.v.length > 400) r.v.splice(0, r.v.length - 400);
-    cdbNos.add(no);
+    cdbNos.add(no); cdbNoId.set(no, id);
     return id;
   }
   /** 이 예약 손님의 우리 기록 { id, days: 그 예약 날 전 방문 날짜(겹침 없이 · 오래된 것부터), n, last, ph, em } — 모르면 null */
@@ -3986,7 +3992,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
   /** 이미 적은 방문(예약번호)에 나중에 알게 된 전체 번호 · 아이디를 더함 (비어 있을 때만 · 다른 값이면 그대로) */
   function cdbMore(b) {
     if (!cdbReady || !b || !b.no || !cdbNos.has(String(b.no))) return;
-    const id = Object.keys(CDB.c).find((k) => CDB.c[k].v.some((v) => v[1] === String(b.no)));
+    const id = cdbNoId.get(String(b.no));
     if (!id) return;
     const r = CDB.c[id], f = fullPhone(b), e = emSig(b.email);
     let any = false;
@@ -4006,6 +4012,15 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
     let any = false;
     // 오늘 '기록 삭제'(판매수 · 통계에서 뺌)한 예약은 장부에서도 뺌 · 되살리면 다시 적힘
     for (const no of testOut) if (cdbNos.has(String(no))) { cdbDrop(no); any = true; }
+    // 네이버 '개인정보 조회'(11/27)로 보인 번호가 적은 번호와 다르면 (근무자가 가운데 4자리를 잘못 넣음) 네이버 번호로 다시 적음 — 맞는 손님 기록으로 옮겨짐
+    for (const b of bookings[TODAY] || []) {
+      if (b.status !== "완료" || b.enteredAt == null || !b.no || testOut.has(b.no) || maskedPhone(b.phone)) continue;
+      const real = digits(b.phone), id = cdbNoId.get(String(b.no)), r = id && CDB.c[id];
+      if (real.length < 10 || real.length > 11 || !r || r.ph === real || p4Of(real) !== r.p4) continue;
+      cdbDrop(b.no);
+      cdbVisit({ day: TODAY, no: b.no, qty: b.qty, name: b.name, phone: b.phone, phoneFull: real, email: b.email });
+      any = true;
+    }
     for (const b of bookings[TODAY] || []) {
       if (b.status !== "완료" || b.enteredAt == null || !b.no || testOut.has(b.no) || cdbNos.has(String(b.no))) continue;
       const h = (b.chainHead && (bookings[TODAY] || []).find((x) => x.id === b.chainHead)) || b;
@@ -7388,7 +7403,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
       const nn = o.n ?? b.prevDone, d = o.day || EV.from, st = o.st === undefined ? "안내" : o.st;
       evAdd(Object.assign({ at: `${d} 10:00`, day: d, no: o.no || "t-" + name + nn + d, k: evKey(b), name: o.name ?? name, phone: digits(b.phone), prev: nn - 1, n: nn, base: o.base ?? nn - 1 }, st ? { st, due: o.due ?? shiftDay(d, EV.days) } : {}), o.from || EV.from);
       renderAll();
-    }, evLine: (r, from) => { evAdd(r, from || EV.from); renderAll(); }, sigKey, cdb: () => JSON.parse(JSON.stringify(CDB)), cdbOf: (id) => cdbOf((bookings[TODAY] || []).find((b) => b.id === id)), cdbVisit: (q) => { const id = cdbVisit(q); cdbSave(); renderAll(); return id; }, cdbFind: (q) => cdbFind(q), cdbSearch: (q) => cdbSearch(q).map(([id]) => id), nmMask: (n) => nmMask(n), // 장부 한 줄 그대로 (예전 모양 줄 시험) · 손님 견주는 열쇠 (11/26)
+    }, evLine: (r, from) => { evAdd(r, from || EV.from); renderAll(); }, sigKey, naverApply: (day, r) => { applyNaver(day, r); renderAll(); }, cdb: () => JSON.parse(JSON.stringify(CDB)), cdbOf: (id) => cdbOf((bookings[TODAY] || []).find((b) => b.id === id)), cdbVisit: (q) => { const id = cdbVisit(q); cdbSave(); renderAll(); return id; }, cdbFind: (q) => cdbFind(q), cdbSearch: (q) => cdbSearch(q).map(([id]) => id), nmMask: (n) => nmMask(n), // 장부 한 줄 그대로 (예전 모양 줄 시험) · 손님 견주는 열쇠 (11/26)
     evSub: (name) => evSub(bookings[TODAY].filter((x) => x.name === name).pop()), EV };
 
   // ── 반납안내 커튼 ─────────────────────────────────
