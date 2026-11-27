@@ -431,7 +431,7 @@ const nwrap = (fn, limit = 120000) => async (_e, ...args) => {
     return { ok: false, why: String(e.message || e) };
   }
 };
-ipcMain.handle("naver:load", nwrap((day, only) => naver.loadDay(day, { only }), 300000)); // 처음엔 칸을 다 열어 오래 걸릴 수 있음
+ipcMain.handle("naver:load", nwrap((day, only, o) => naver.loadDay(day, { only, probe: !!(o && o.probe) }), 300000)); // 처음엔 칸을 다 열어 오래 걸릴 수 있음 · probe = 근무자 새로고침 (가린 채 읽어 둔 손님 다시 확인 · 11/27)
 // 두 PC 연결 (11/06): 사무실 PC 는 네이버를 읽기만 — 이용완료 · 판매 수량 · 취소는 현장 POS 만
 const posOnly = (h) => (e, ...a) => (RUN_ROLE === "office" ? { ok: false, why: "사무실 PC 는 네이버를 읽기만 해요 (현장 POS 에서)" } : h(e, ...a));
 ipcMain.handle("naver:complete", posOnly(nwrap((b) => naver.complete(b))));

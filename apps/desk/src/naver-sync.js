@@ -61,6 +61,13 @@ function naverUrls(anyUrl) {
   return { list: `${m[1]}/booking-list-view`, calendar: `${m[1]}/booking-calendar-view`, items: `${m[1]}/biz-items`, schedule: `${m[1]}/biz-items/{id}/schedules` };
 }
 
+/** 네이버 개인정보 (11/27): 가린 카드 · 보이는 카드 수로 "보임" | "가림" | null(카드 없음) */
+const maskedCard = (x) => /\*/.test(String((x && x.phone) || ""));
+function maskOf(cards) {
+  let m = 0, o = 0;
+  for (const x of cards || []) { if (maskedCard(x)) m++; else if (String((x && x.phone) || "").replace(/\D/g, "").length >= 10) o++; }
+  return m || o ? (m > o ? "가림" : "보임") : null;
+}
 class NaverSync {
   constructor(exec, opts = {}) {
     this.exec = exec;
@@ -74,6 +81,7 @@ class NaverSync {
     this.onStep = opts.onStep || (() => {});
     this.onSnap = opts.onSnap || null; // 진단: 네이버 화면 저장 (이용완료 누른 뒤 · 안 됐을 때) // 진행 단계를 데스크에 알림 (현장에서 어디서 막히는지 보려고)
     this.days = new Map(); // 날짜 → Map("상품|시각|확정/이용완료" → { count, cards }) — 칸 숫자가 그대로면 다시 안 엶
+    this.maskProbeAt = new Map(); // 날짜 → 가린 채 기억한 칸을 다시 열어 본 때 (네이버 개인정보 조회 · 11/27)
     this.cust = new Map(); // "날짜|예약번호" → 손님 확인 { email, past(이용완료 날짜 · 최근 것부터), more, done } (사장님 11/26 — 한 번 읽으면 그날 다시 안 엶)
     this.custMail = new Map(); // "날짜|예약번호" → 이메일만 읽은 것 { email, done } (hist: false)
     this.custTries = new Map(); // 같은 예약을 못 읽은 수 (세 번까지)
@@ -339,7 +347,9 @@ class NaverSync {
     this.step(`${it.time} 손님 확인 — 지난 이용완료 ${past.length ? past[0] : "없음"}`);
     return { ok: true, email, past, rows: h.rows.length, more: !!h.more, done };
   }
-  /** opts.only = "14:00" 이면 그 시간 칸만 다시 열어 읽음 (기억한 카드도 무시) — 근무자가 시간 칸을 누를 때 */
+  /** opts.only = "14:00" 이면 그 시간 칸만 다시 열어 읽음 (기억한 카드도 무시) — 근무자가 시간 칸을 누를 때
+      결과 mask = 네이버 개인정보 "보임" | "가림" | null(이번에 연 카드가 없어 모름) · 11/27
+      opts.probe = 근무자가 [새로고침] — 가린 채 기억한 칸이 있으면 바로 하나 열어 봄 (자동은 5분에 한 번) */
   async loadDay(day, opts = {}) {
     let g = await this.goView("calendar");
     if (!g.ok) return g;
@@ -354,6 +364,7 @@ class NaverSync {
     const live = new Set();
     const warn = [];
     let opened = false;
+    const fresh = []; // 이번에 새로 연 카드 (네이버 개인정보 보임 · 가림 판단 · 11/27)
     this.step(`예약현황 ${day.slice(5)} · 입장권 칸 ${slots.length}개`);
     for (const s of slots) {
       for (const [kind, n] of [["확정", s.conf], ["이용완료", s.done]]) {
@@ -370,6 +381,7 @@ class NaverSync {
           warn.push(`${s.time} ${kind}`);
           continue; // 못 읽은 칸은 기억하지 않음 (다음에 다시)
         }
+        fresh.push(...r.cards);
         // 칸 숫자가 카드 합보다 적으면 여러 장 산 카드의 상세를 열어 환불정보를 읽음 (최대 4장 · 칸 숫자만으로는 안 줄임 · 못 읽으면 줄이지 않고 다음에 다시)
         for (const x of r.cards) if (x.refund == null && this.refunds.has(x.no)) x.refund = this.refunds.get(x.no); // 전에 읽은 환불 장수
         let asks = [...partialFix(r.cards, n, kind).entries()].filter(([, f]) => f.ask).map(([no]) => no);
@@ -388,6 +400,29 @@ class NaverSync {
       }
     }
     for (const key of [...cache.keys()]) if (!live.has(key)) cache.delete(key); // 비워진 칸 (취소 등)
+    // 네이버 [개인정보 조회] (사장님 11/27 — 인증하면 이름 · 번호가 보이는데 새로고침해도 이미 읽어 둔 손님은 * 그대로였음 · 칸 숫자가 그대로면 기억한 카드를 다시 안 열어서)
+    //   지금 보임 · 가림 = 이번에 새로 연 카드 · 새로 연 카드가 없으면 기억한 칸 하나만 열어 봄 (근무자 [새로고침]은 바로 · 자동 불러오기는 30분에 한 번)
+    //   보이면 가린 채 읽어 둔 칸만 다시 읽음 (환불 장수 · 블랙리스트 특이사항은 이어받음) · 아직 가려져 있으면 더 안 엶
+    //   근무자가 시간 칸을 누르면(only) 그 칸만 다시 읽고 끝 (사장님 11/27 — "그 시간대만 다시 확인하면 되잖어")
+    let mask = maskOf(fresh);
+    if (!mask && !opts.only && cache.size && (opts.probe || Date.now() - (this.maskProbeAt.get(day) || 0) >= 30 * 60000)) {
+      this.maskProbeAt.set(day, Date.now());
+      const c = [...cache.values()].sort((a, b) => a.cards.length - b.cards.length)[0];
+      this.step(`${c.time} 네이버 개인정보가 보이는지 확인`);
+      const r = await this.readSlotCards(c.product, c.time, c.status === "확정" ? "확정" : "이용완료", c.count);
+      if (r.ok && r.cards.length) { opened = true; mask = maskOf(r.cards); }
+    }
+    if (mask === "보임" && !opts.only) {
+      const again = [...cache.values()].filter((c) => c.cards.some(maskedCard));
+      if (again.length) this.step(`네이버 개인정보가 보여요 — 가린 채 읽어 둔 칸 ${again.length}개를 다시 읽음`);
+      for (const c of again) {
+        const r = await this.readSlotCards(c.product, c.time, c.status === "확정" ? "확정" : "이용완료", c.count);
+        if (!r.ok || !r.cards.length) continue;
+        opened = true;
+        for (const x of r.cards) { const p = c.cards.find((y) => y.no === x.no); if (p) { if (x.refund == null && p.refund != null) x.refund = p.refund; if (x.note == null && p.note != null) x.note = p.note; } }
+        c.cards = r.cards;
+      }
+    }
     if (opened) await this.act("window.__naver.closePanel()");
     const seen = new Set();
     const bookings = [];
@@ -402,7 +437,7 @@ class NaverSync {
           black: !!x.black, bnote: x.black && x.note != null ? x.note : null }); // 네이버 블랙리스트 · 그 예약 상세의 특이사항 (모르면 null · 11/16)
       }
     }
-    return { ok: true, day, warn: warn.length ? `카드를 못 읽은 칸: ${warn.join(", ")}` : "", slots: slots.map((s) => ({ time: s.time, product: s.product, cap: s.avail + s.conf + s.done + s.apply, conf: s.conf + s.apply, done: s.done })), bookings };
+    return { ok: true, day, mask, warn: warn.length ? `카드를 못 읽은 칸: ${warn.join(", ")}` : "", slots: slots.map((s) => ({ time: s.time, product: s.product, cap: s.avail + s.conf + s.done + s.apply, conf: s.conf + s.apply, done: s.done })), bookings };
   }
   /** 칸 숫자만 (카드는 안 엶 · 가벼움) — 수량 관찰 기록 (사장님 11/13: 사장님이 직접 수량을 조절하는 날을 5분마다 남겨 배움) */
   async readCells(day) {

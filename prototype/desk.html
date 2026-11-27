@@ -1255,7 +1255,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
     if (!APP) return;
     if (naverBusy) { naverNext = { day, loud, only }; if (loud) toast(`지금 불러오기가 끝나면 ${dateLabel(day)}${only ? ` ${only}` : ""}를 이어서 불러와요`); return; }
     naverBusy = true; naverStep = ""; renderAll();
-    const r = await window.desk.naver.load(day, only).catch((e) => ({ ok: false, why: String(e) }));
+    const r = await window.desk.naver.load(day, only, { probe: !!loud && !only }).catch((e) => ({ ok: false, why: String(e) })); // 근무자 [새로고침] = 가린 채 읽어 둔 손님이 이제 보이는지 바로 확인 (11/27)
     naverBusy = false;
     // 기다리던 날짜 · 시간이 있으면 이어서 (지금 보는 날짜일 때만)
     const next = naverNext; naverNext = null;
@@ -1304,11 +1304,13 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
     naverSlots[day] = sl;
     if (!only) naverRaw[day] = r.slots.map((x) => Object.assign({}, x));
     // 네이버 개인정보 보임 · 가림 (11/27): 오늘 불러온 예약 전화번호로 — 보이다가 다시 가려지면 한 번 알림
-    if (day === TODAY && r.bookings.length) {
+    //   앱은 이번에 새로 연 카드로 정한 r.mask (기억한 카드는 예전 모양일 수 있어서) · 없으면 불러온 예약 전화번호로
+    if (day === TODAY && (r.mask || r.bookings.length)) {
       const masked = r.bookings.filter((n) => maskedPhone(n.phone)).length, open = r.bookings.filter((n) => !maskedPhone(n.phone) && digits(n.phone || "").length >= 10).length;
-      if (masked || open) {
+      const st = r.mask === "보임" || r.mask === "가림" ? r.mask : r.mask === null ? "" : masked || open ? (masked > open ? "가림" : "보임") : "";
+      if (st) {
         const was = naverMask && naverMask.st;
-        naverMask = { st: masked > open ? "가림" : "보임", at: hm(now) };
+        naverMask = { st, at: hm(now) };
         if (was === "보임" && naverMask.st === "가림") setTimeout(() => toast("네이버 개인정보가 다시 가려졌어요 — 맨 위 '개인정보 가림·인증'을 눌러 네이버 창에서 [개인정보 조회] 인증 (그동안 데스크는 가린 방식으로 그대로)", 9000), 0);
       }
     }

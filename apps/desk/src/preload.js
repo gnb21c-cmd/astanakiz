@@ -15,7 +15,7 @@ contextBridge.exposeInMainWorld("desk", {
     learn: (key) => ipcRenderer.invoke("amano:learn", key),
   },
   naver: {
-    load: (day, only) => ipcRenderer.invoke("naver:load", day, only), // only = "14:00" 이면 그 시간 칸만
+    load: (day, only, o) => ipcRenderer.invoke("naver:load", day, only, o), // only = "14:00" 이면 그 시간 칸만 · o.probe = 근무자 새로고침 (가린 채 읽어 둔 손님 다시 확인 · 11/27)
     complete: (b) => ipcRenderer.invoke("naver:complete", b),
     cells: (day) => ipcRenderer.invoke("naver:cells", day), // 수량 관찰 기록 (11/13): 칸 숫자만
     custInfo: (job) => ipcRenderer.invoke("naver:custInfo", job), // 손님 확인: 이메일 · 지난 예약 이용완료 날짜 (11/26)

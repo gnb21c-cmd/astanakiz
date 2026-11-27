@@ -74,6 +74,14 @@ test("네이버 개인정보 조회: 가림 → 보임 → 다시 가림 — 오
     await page.waitForTimeout(900);
     const C = Object.values(await page.evaluate(() => window.__deskTest.cdb().c)).filter((r) => ["1252", "3333", "4321"].includes(r.p4)).map((r) => [r.nm, r.p4, r.ph]).sort();
     assert.deepStrictEqual(C, [["도*희", "4321", "01022224321"], ["박*준", "3333", "01044443333"], ["은*인", "1252", "01056781252"]], "고객 데이터베이스는 이름 '홍*동' 모양 · 잘못 넣은 가운데 4자리(1111)는 네이버가 보여 준 번호로 바로잡음");
+    // 앱의 네이버 읽기가 알려 주는 mask (11/27 — 이번에 새로 연 카드 기준): 모름(null)이면 칩 그대로 · '보임' · '가림'은 기억한 카드 모양과 상관없이 그대로
+    const loadM = (list, mask) => page.evaluate(([L, p, m]) => { const T = window.__deskTest; T.naverApply(T.today(), { mask: m, slots: [{ time: "16:30", product: p, cap: 20, conf: L.length, done: 0 }], bookings: L }); }, [list, P, mask]);
+    await loadM([bk("u1", "은지인", "010-5678-1252", "완료", 3)], "보임");
+    assert.strictEqual(await chip(), "개인정보보임|synchip ok");
+    await loadM([bk("u1", "은*인", "***-****-1252", "완료", 3)], null);
+    assert.strictEqual(await chip(), "개인정보보임|synchip ok", "모름(새로 연 카드 없음)이면 그대로");
+    await loadM([bk("u1", "은지인", "010-5678-1252", "완료", 3)], "가림");
+    assert.strictEqual(await chip(), "개인정보가림·인증|synchip warn", "기억한 카드는 보여도 새로 연 카드가 가렸으면 '가림'");
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();
