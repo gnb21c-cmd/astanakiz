@@ -673,6 +673,13 @@ test("근무자 메뉴얼: 맨 위 버튼 → 차례 8개 · 그림이 뜸 · �
     const top = await page.evaluate(() => document.getElementById("man4").getBoundingClientRect().top - document.getElementById("manual-body").getBoundingClientRect().top);
     assert.ok(Math.abs(top) < 10, `④ 가 맨 위로 ${top}`);
     assert.match(await page.textContent("#man4"), /\[n번 반납 · 퇴장\]/);
+    // 11/27 최신화: 가린 손님 가운데 4자리 · 뒷 4자리 · 개인정보 인증 · 이용완료 되어 있음 · 손님 연락
+    assert.match(await page.textContent("#man2"), /전화번호 가운데 4자리.*\[등록 완료\]/);
+    assert.match(await page.textContent("#man2"), /전화번호 마지막 4자리/);
+    assert.match(await page.textContent("#man1"), /개인정보.*보임.*가림·인증/);
+    assert.match(await page.textContent("#man8"), /\[개인정보 조회\].*로그아웃 하지 않기.*\[새로고침\]/);
+    assert.match(await page.textContent("#man8"), /이용완료 되어 있음/);
+    assert.match(await page.textContent("#man8"), /손님에게 연락할 때.*사무실 PC 에서도/);
     assert.deepStrictEqual(errs, []);
   } finally {
     await browser.close();

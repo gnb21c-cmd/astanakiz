@@ -144,6 +144,11 @@ class NaverSync {
       this.step("네이버에 열려 있던 '예약 취소' 화면 닫음 (누르지 않음)");
       await this.act("window.__naver.closeRefund()");
     }
+    // 손님 확인(가린 손님)이 연 '고객정보' 창이 남아 있으면 닫음 (11/27 — 남은 창이 이용완료 · 불러오기를 가리지 않게)
+    if (s && s.cust) {
+      this.step("네이버에 열려 있던 '고객정보' 창 닫음");
+      await this.call("window.__naver.closeCustomer()").catch(() => null);
+    }
   }
   step(msg) {
     try {
@@ -349,7 +354,7 @@ class NaverSync {
   }
   /** opts.only = "14:00" 이면 그 시간 칸만 다시 열어 읽음 (기억한 카드도 무시) — 근무자가 시간 칸을 누를 때
       결과 mask = 네이버 개인정보 "보임" | "가림" | null(이번에 연 카드가 없어 모름) · 11/27
-      opts.probe = 근무자가 [새로고침] — 가린 채 기억한 칸이 있으면 바로 하나 열어 봄 (자동은 5분에 한 번) */
+      opts.probe = 근무자가 [새로고침] — 가린 채 기억한 칸이 있으면 바로 하나 열어 봄 (자동은 30분에 한 번) */
   async loadDay(day, opts = {}) {
     let g = await this.goView("calendar");
     if (!g.ok) return g;

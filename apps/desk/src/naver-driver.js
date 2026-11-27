@@ -403,6 +403,7 @@ function installNaverDriver() {
         cards: cards().map(readCard),
         cap: (() => { const p = capPanel(); return p ? capInfo(p) : null; })(), // 예약가능 설정 창
         refund: refundInfo(), // 결제한 예약의 '예약 취소' 화면 { full, agreed, sure } (전액환불 · 동의된 환불기준이 켜졌는지)
+        cust: !!histHead(), // 손님 확인이 연 '고객정보' 창 (지난 예약)이 열려 있음 — 정리 때 닫음 (11/27)
         listTotal: total ? +total : null, // 예약 목록 위의 "124건"
         loading: $$('[class*="Loading__load_area"], .spinner').some(vis),
       };

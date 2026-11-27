@@ -56,8 +56,11 @@ const shot = (loc, name) => loc.screenshot({ path: path.join(OUT, name), type: "
     return [at("[data-act=posGo]", -6, -4), at(".curtain-tab", -10, 0), at("#memo-boxes", -6, -6), at(".leftcol .panel", -6, 4), at(".midcol .panel", -6, 4), at("#keys", -8, -8), at(".keyfoot", -8, -6), at(".park", -8, -4), at(".top .rgrp", -10, -4)];
   });
   console.log("MANUAL_MARKS", JSON.stringify(marks));
-  // 2. 예약 손님 입장
-  await page.click("#res article.res >> nth=0");
+  // 2. 예약 손님 입장 — 네이버가 가린 손님 (11/27 · 전화번호 가운데 4자리 칸이 보이게 · 지어낸 손님)
+  await page.evaluate(() => { const T = window.__deskTest; window.__m2 = T.addBooking(T.today(), "14:00", "은*인", "***-****-1252", 1, { prevDone: 2 }); });
+  await page.click('.slot[data-s="840"]');
+  await page.click(`.res[data-id="${await page.evaluate(() => window.__m2)}"]`);
+  await page.click(".kpick button:not([disabled]) >> nth=0");
   await page.waitForTimeout(250);
   await shot(page.locator("#sheet"), "m2-enter.jpg");
   await page.keyboard.press("Escape");

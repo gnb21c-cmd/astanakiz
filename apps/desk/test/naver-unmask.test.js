@@ -87,3 +87,28 @@ test("네이버 개인정보 조회: 가림 → 보임 → 다시 가림 — 오
     await browser.close();
   }
 });
+
+test("시간 칸만 다시 불러와도 그 칸 네이버 숫자(수량 자동조절이 쓰는 칸)가 바뀜 — 개인정보 칩 판단과 섞이지 않음 (11/27 최종 점검: 2.38 에서 칩 판단이 if/else 사이에 끼어 시간 칸 숫자가 안 바뀌었음)", async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const errs = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    await page.goto(DESK);
+    const r = await page.evaluate((p) => {
+      const T = window.__deskTest, d = T.today();
+      const b = (no, name, phone) => ({ no, time: "16:30", name, phone, qty: 1, status: "확정", doneCount: 1, product: p, qtyText: "4인 입장권 1", pay: "결제완료" });
+      T.naverApply(d, { slots: [{ time: "16:00", product: p, cap: 20, conf: 0, done: 0 }, { time: "16:30", product: p, cap: 20, conf: 1, done: 0 }], bookings: [b("k1", "은*인", "***-****-1252")] });
+      const before = T.naverRaw(d).map((x) => [x.time, x.cap, x.conf]);
+      // 근무자가 16:30 칸을 누름 → 그 칸만 (판매 수량 12 · 확정 2)
+      T.naverApply(d, { slots: [{ time: "16:30", product: p, cap: 12, conf: 2, done: 0 }], bookings: [b("k1", "은*인", "***-****-1252"), b("k2", "박*준", "***-****-3333")] }, "16:30");
+      return { before, after: T.naverRaw(d).map((x) => [x.time, x.cap, x.conf]), mask: T.naverMask() && T.naverMask().st };
+    }, P);
+    assert.deepStrictEqual(r.before, [["16:00", 20, 0], ["16:30", 20, 1]]);
+    assert.deepStrictEqual(r.after, [["16:00", 20, 0], ["16:30", 12, 2]], "16:30 만 새 숫자 · 16:00 그대로");
+    assert.strictEqual(r.mask, "가림", "칩 판단도 그대로");
+    assert.deepStrictEqual(errs, []);
+  } finally {
+    await browser.close();
+  }
+});
