@@ -47,12 +47,12 @@ test("맨 위: 두 PC 연결 표시 · [대관]은 오른쪽 묶음 — 커튼 �
       await page.click("#sheet [data-act=rentSave]");
       await page.click("#sheet [data-act=close]");
     }
+    await page.click("[data-act=day][data-d='-1']"); // 다른 날 판매수 (현장 POS 에서 — 사무실 PC 는 오늘만 · 11/27)
     await page.evaluate(() => window.__deskTest.sync.demo(true));
     // 네이버 개인정보 '가림·인증' 칩까지 (11/27 — 가장 붐빔)
     await page.evaluate(() => { const T = window.__deskTest, P = "평일 무제한 / 휴일 1시간 50분 입장권"; T.naverApply(T.today(), { slots: [{ time: "16:30", product: P, cap: 20, conf: 1, done: 0 }], bookings: [{ no: "mk1", time: "16:30", name: "은*인", phone: "***-****-1252", qty: 1, status: "확정", doneCount: 1, product: P, qtyText: "4인 입장권 1", pay: "결제완료" }] }); });
     assert.strictEqual(await page.$eval("#maskchip", (e) => e.hidden), false);
-    assert.deepStrictEqual(await page.evaluate(() => [...document.querySelectorAll("#maskchip span")].filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent)), [], "개인정보 칩 글자가 안 잘림 (체험판 '사무실 미리 보기'는 줄여 보일 수 있음 — 실제 사무실 PC 는 '사무실 PC · 키 현황 hh:mm')");
-    await page.click("[data-act=day][data-d='-1']");
+    assert.deepStrictEqual(await page.evaluate(() => [...document.querySelectorAll("#maskchip span")].filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent)), [], "개인정보 칩 글자가 안 잘림 (체험판 '사무실 미리 보기'는 줄여 보일 수 있음 — 실제 사무실 PC 는 '사무실 PC · 현장 hh:mm')");
     assert.match(await page.textContent("#sold"), /^11\/9 총 판매수/);
     assert.deepStrictEqual(await topHits(page), [], "가장 붐벼도 안 겹침");
     assert.match(await topCls(page), /tight1/, "근무자 메뉴얼을 두 줄로 줄임");
@@ -66,8 +66,8 @@ test("맨 위: 두 PC 연결 표시 · [대관]은 오른쪽 묶음 — 커튼 �
     // 오늘로 돌아오고 미리 보기 끝 → 다시 넓은 모양
     await page.setViewportSize({ width: 1024, height: 768 });
     await page.clock.runFor(200);
-    await page.click("[data-act=day][data-d='1']");
     await page.evaluate(() => window.__deskTest.sync.demo(false));
+    await page.click("[data-act=day][data-d='1']");
     assert.strictEqual(await topCls(page), "top");
     assert.deepStrictEqual(errs, []);
   } finally {

@@ -431,9 +431,9 @@ const nwrap = (fn, limit = 120000) => async (_e, ...args) => {
     return { ok: false, why: String(e.message || e) };
   }
 };
-ipcMain.handle("naver:load", nwrap((day, only, o) => naver.loadDay(day, { only, probe: !!(o && o.probe) }), 300000)); // 처음엔 칸을 다 열어 오래 걸릴 수 있음 · probe = 근무자 새로고침 (가린 채 읽어 둔 손님 다시 확인 · 11/27)
-// 두 PC 연결 (11/06): 사무실 PC 는 네이버를 읽기만 — 이용완료 · 판매 수량 · 취소는 현장 POS 만
-const posOnly = (h) => (e, ...a) => (RUN_ROLE === "office" ? { ok: false, why: "사무실 PC 는 네이버를 읽기만 해요 (현장 POS 에서)" } : h(e, ...a));
+// 두 PC 연결 (11/06 · 11/27): 사무실 PC 는 네이버를 열지도 읽지도 않음 — 현장 POS 화면을 받아 그대로 보여 줌 (사장님 11/27 "키즈POS 내용을 복사해오듯")
+const posOnly = (h) => (e, ...a) => (RUN_ROLE === "office" ? { ok: false, why: "사무실 PC 는 네이버를 쓰지 않아요 — 현장 POS 화면을 받아 보여요" } : h(e, ...a));
+ipcMain.handle("naver:load", posOnly(nwrap((day, only, o) => naver.loadDay(day, { only, probe: !!(o && o.probe) }), 300000))); // 처음엔 칸을 다 열어 오래 걸릴 수 있음 · probe = 근무자 새로고침 (가린 채 읽어 둔 손님 다시 확인 · 11/27)
 ipcMain.handle("naver:complete", posOnly(nwrap((b) => naver.complete(b))));
 ipcMain.handle("naver:cells", posOnly(nwrap((day) => naver.readCells(day), 60000))); // 수량 관찰 기록 (11/13): 칸 숫자만 · 카드는 안 엶
 // 손님 확인 (사장님 11/26 — 네이버가 이름 · 전화를 가림): 예약 상세의 이메일 · 고객정보 '지난 예약' 이용완료 날짜 { day, list: [{ no, time, product }] } — 현장 POS 만
@@ -819,6 +819,7 @@ ipcMain.handle("naver:setCap", posOnly(nwrap((c) => naver.setCap(c))));
 ipcMain.handle("naver:cancel", posOnly(nwrap((b) => naver.cancel(Object.assign({}, b, { paidOk: false }))))); // 입금대기 예약 자동 취소 { day, time, product, no, qty } // 판매 수량 자동 조절 { day, product, time, n }
 ipcMain.handle("naver:cancelPaid", posOnly(nwrap((b) => naver.cancelPaid(b)))); // BC 쓰리아웃 자동 전액 취소 (전액환불을 고른 뒤 [예약 취소] · 사장님 10/26)
 ipcMain.handle("naver:show", () => {
+  if (RUN_ROLE === "office") return { ok: false, why: "사무실 PC 는 네이버 창이 없어요 — 현장 POS 화면을 받아 보여요" };
   if (naverWin) {
     naverWin.show();
     naverWin.focus();
@@ -2058,10 +2059,10 @@ app.whenReady().then(() => {
   if (!gotLock) return;
   setInterval(memWatch, 5 * 60 * 1000);
   loadSettings();
-  RUN_ROLE = syncRole(); // 두 PC 연결 역할 (11/06) — 사무실 PC 는 아마노 · 톡톡 · POS · 현금통을 안 켜고 네이버는 읽기만
+  RUN_ROLE = syncRole(); // 두 PC 연결 역할 (11/06) — 사무실 PC 는 아마노 · 네이버 · 톡톡 · POS · 현금통을 안 켬 (현장 POS 화면을 받아 보여 줌 · 11/27)
   const pos = RUN_ROLE !== "office";
   if (pos) openAmano(); // 맨 뒤 아마노
-  openNaver(); // 맨 뒤 네이버 예약관리 (사무실 PC 는 읽기만 — 처음 한 번 사무실에서 네이버 로그인)
+  if (pos) openNaver(); // 맨 뒤 네이버 예약관리 (사무실 PC 는 네이버를 열지 않음 — 사장님 11/27 "사무실 PC 에서 네이버를 확인하는 행위는 없애자")
   createDesk(); // 맨 앞 데스크 (POS 는 원래대로 따로 켜져 있음)
   if (pos) startPosAgent(); // POS로 넘어가는 도우미를 미리 켜 둠
   if (pos) setTimeout(startPrnAgent, 3000); // 현금통 · 프린터 도우미도 (환전 오픈을 바로)

@@ -8,7 +8,7 @@
    주고받는 것
    - 설정(SHARED 키): 키마다 마지막으로 바꾼 때(t)가 늦은 쪽이 이김
    - 근무자 메모장: 메모 · 전달마다 마지막으로 바꾼 때(u) · 지운 것(gone) · 근무자 목록(su)
-   - 현장 POS → 사무실: 지금 화면(snap — 사무실 PC 가 열려 있을 때만) · 명령 결과(acks)
+   - 현장 POS → 사무실: 지금 화면(snap — 사무실 PC 가 열려 있을 때만 · 11/27 부터 오늘 예약 전부 · 시간 칸 숫자 · 개인정보까지 — 사무실은 네이버를 읽지 않음) · 명령 결과(acks)
    - 현장 POS → 사무실: 재방문 장부(led · 사장님 11/19 — 사무실 카드에도 '이벤트 도전 시작 · 성공') — 사무실이 열려 있고 사무실이 가진 장부 지문(lh)이 다를 때만 · 1분에 한 번까지
      (우편함 규칙상 문서는 pos · office 둘뿐 → 따로 문서를 두지 않고 현장 문서에 같이 · 문서가 너무 길면 지난 이벤트 장부부터 덜어냄)
    - 현장 POS → 사무실: 고객 데이터베이스(cdb · 사장님 11/27 — 고객 불만 · 열쇠 반납이 늦을 때 사무실에서도 손님에게 연락) — 장부와 같게 사무실이 열려 있고 지문(ch)이 다를 때만
@@ -19,7 +19,7 @@ const crypto = require("crypto");
 const zlib = require("zlib");
 
 /** 함께 쓰는 설정 (settings.json 키) — 프린터 포트 · 아마노 · 네이버 주소 · 보고 열쇠 · 쿠폰 봉인 열쇠 · 손님 기록은 각 PC 에만 */
-const SHARED = ["peaks", "capAuto", "unpaidCancel", "stockAuto", "printForm", "printSet", "bc2Forms", "bc", "visitEvent", "walkEvent", "liveOn", "announce"]; // announce = 안내 방송 (11/07 · 목소리는 각 PC annVoice)
+const SHARED = ["peaks", "capAuto", "unpaidCancel", "stockAuto", "printForm", "printSet", "bc2Forms", "bc", "visitEvent", "walkEvent", "liveOn", "announce", "capWatch", "revTalkAuto"]; // announce = 안내 방송 (11/07 · 목소리는 각 PC annVoice) · capWatch 수량 관찰 기록 · revTalkAuto 톡톡 자동 보내기 켜고 끄기 (11/27 — 사무실에서 바꿔도 현장에 바로)
 const ROLES = ["pos", "office"];
 const other = (role) => (role === "pos" ? "office" : "pos");
 const ALPHA = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"; // 헷갈리는 0 · 1 · I · O 없음 (32자 → 16자리 = 80비트)
