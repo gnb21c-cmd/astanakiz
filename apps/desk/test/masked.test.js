@@ -42,6 +42,8 @@ test("가린 손님 (체험판): 예전 장부(전체 이름 · 번호)와 이�
     assert.doesNotMatch(await cardText(page, "은*인"), /같은 시간 예약/, "뒷번호만 같은 다른 손님(김*수)과 같은 시간이어도 묶음 아님");
     // 입장 창: 가운데 4자리 → 예전 기록과 같은지 (번호는 안 보임) → [등록 완료]
     await page.click('.res:has-text("은*인")');
+    // 입장 창은 열린 뒤 30ms 에 커서를 놓음 (focusFirst) — 놓일 때까지 기다림 (11/27: 바로 보면 가끔 아직 안 놓임)
+    await page.waitForFunction(() => document.activeElement && document.activeElement.id === "e-mid", null, { timeout: 2000 }).catch(() => {});
     assert.strictEqual(await page.evaluate(() => document.activeElement.id), "e-mid", "가운데 4자리 칸에 커서");
     await page.click(".kpick button:not([disabled]) >> nth=0");
     assert.ok(await page.isDisabled("#enter-done"), "가운데 4자리 전엔 등록 안 됨");
