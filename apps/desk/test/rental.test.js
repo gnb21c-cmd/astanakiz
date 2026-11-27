@@ -33,7 +33,7 @@ test("맨 위: 두 PC 연결 표시 · [대관]은 오른쪽 묶음 — 커튼 �
     await page.addInitScript(() => { window.__today = "2026-11-10"; });
     await page.goto(DESK);
     const order = await page.evaluate(() => [...document.querySelectorAll(".top .rgrp > *")].map((e) => e.id || e.dataset.act));
-    assert.deepStrictEqual(order, ["syncchip", "rent-btn", "manual", "sold", "now"], "오른쪽 묶음: 두 PC 연결 · 대관 · 근무자 메뉴얼 · 총 판매수 · 시계");
+    assert.deepStrictEqual(order, ["maskchip", "syncchip", "rent-btn", "manual", "sold", "now"], "오른쪽 묶음: 네이버 개인정보(11/27) · 두 PC 연결 · 대관 · 근무자 메뉴얼 · 총 판매수 · 시계");
     assert.deepStrictEqual([await topHits(page), await topCls(page)], [[], "top"], "평소: 줄이지 않음");
     // 사무실 미리 보기 (두 PC 연결 표시가 보임) + 대관 2건 + 다른 날 판매수 (가장 붐빔)
     await page.evaluate(() => window.__deskTest.sync.demo(true));
@@ -48,6 +48,10 @@ test("맨 위: 두 PC 연결 표시 · [대관]은 오른쪽 묶음 — 커튼 �
       await page.click("#sheet [data-act=close]");
     }
     await page.evaluate(() => window.__deskTest.sync.demo(true));
+    // 네이버 개인정보 '가림·인증' 칩까지 (11/27 — 가장 붐빔)
+    await page.evaluate(() => { const T = window.__deskTest, P = "평일 무제한 / 휴일 1시간 50분 입장권"; T.naverApply(T.today(), { slots: [{ time: "16:30", product: P, cap: 20, conf: 1, done: 0 }], bookings: [{ no: "mk1", time: "16:30", name: "은*인", phone: "***-****-1252", qty: 1, status: "확정", doneCount: 1, product: P, qtyText: "4인 입장권 1", pay: "결제완료" }] }); });
+    assert.strictEqual(await page.$eval("#maskchip", (e) => e.hidden), false);
+    assert.deepStrictEqual(await page.evaluate(() => [...document.querySelectorAll("#maskchip span")].filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent)), [], "개인정보 칩 글자가 안 잘림 (체험판 '사무실 미리 보기'는 줄여 보일 수 있음 — 실제 사무실 PC 는 '사무실 PC · 키 현황 hh:mm')");
     await page.click("[data-act=day][data-d='-1']");
     assert.match(await page.textContent("#sold"), /^11\/9 총 판매수/);
     assert.deepStrictEqual(await topHits(page), [], "가장 붐벼도 안 겹침");

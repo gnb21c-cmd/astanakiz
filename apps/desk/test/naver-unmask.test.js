@@ -18,7 +18,7 @@ const P = "평일 무제한 / 휴일 1시간 50분 입장권";
 const bk = (no, name, phone, st = "확정", done = 1) => ({ no, time: "16:30", name, phone, qty: 1, status: st, doneCount: done, product: P, qtyText: "4인 입장권 1", pay: "결제완료" });
 const load = (page, list) => page.evaluate(([L, p]) => { const T = window.__deskTest; T.naverApply(T.today(), { slots: [{ time: "16:30", product: p, cap: 20, conf: L.length, done: 0 }], bookings: L }); }, [list, P]);
 
-test("네이버 개인정보 조회: 가림 → 보임 → 다시 가림 — 오류 없음 · 보이면 가운데 4자리 안 물음 · 보인 이름 · 번호를 기억 · 장부 · 고객 데이터베이스 이어짐", async () => {
+test("네이버 개인정보 조회: 가림 → 보임 → 다시 가림 — 오류 없음 · 맨 위 '개인정보 보임 · 가림·인증' 칩 (누르면 네이버 창 · 다시 가려지면 알림) · 보이면 가운데 4자리 안 물음 · 보인 이름 · 번호를 기억 · 장부 · 고객 데이터베이스 이어짐", async () => {
   const browser = await launch();
   try {
     const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
@@ -28,8 +28,14 @@ test("네이버 개인정보 조회: 가림 → 보임 → 다시 가림 — 오
     await page.addInitScript(() => { if (!sessionStorage.getItem("once")) { sessionStorage.setItem("once", "1"); localStorage.clear(); localStorage.setItem("astanakiz-visitevent", JSON.stringify({ ver: 2, on: true, from: "2026-09-10", to: "2026-10-31", days: 20, gift: "수제돈까스" })); } });
     await page.goto(DESK);
     const text = async (name) => { await page.click('.slot[data-s="990"]'); return (await page.textContent(`.res:has-text("${name}")`)).replace(/\s+/g, " "); };
+    // 맨 위 '개인정보' 칩 (11/27): 오늘 네이버를 불러오기 전엔 없음
+    const chip = async () => ((await page.$eval("#maskchip", (e) => (e.hidden ? "" : e.textContent + "|" + e.className))) || "").trim();
+    assert.strictEqual(await chip(), "", "불러오기 전엔 칩 없음");
     // ① 가린 채 (11/26 ~)
     await load(page, [bk("u1", "은*인", "***-****-1252"), bk("u2", "박*준", "***-****-3333"), bk("u3", "도*희", "***-****-4321")]);
+    assert.strictEqual(await chip(), "개인정보가림·인증|synchip warn");
+    await page.click("#maskchip");
+    assert.match(await page.textContent("#toast"), /\[개인정보 조회\] → 휴대폰 · 네이버 인증서로 인증.*로그아웃은 하지 마세요/);
     assert.match(await text("은*인"), /\*\*\*-\*\*\*\*-1252/);
     await page.click('.res:has-text("은*인")');
     assert.ok(await page.$("#e-mid"), "가리면 가운데 4자리를 물음");
@@ -44,6 +50,7 @@ test("네이버 개인정보 조회: 가림 → 보임 → 다시 가림 — 오
     // ② 개인정보 조회 → 다음 불러오기에서 이름 · 번호가 보임 (네이버도 이용완료)
     await load(page, [bk("u1", "은지인", "010-5678-1252", "완료", 3), bk("u2", "박서준", "010-4444-3333"), bk("u3", "도지희", "010-2222-4321", "완료", 2)]);
     assert.match(await text("박서준"), /010-4444-3333/);
+    assert.strictEqual(await chip(), "개인정보보임|synchip ok");
     await page.click('.res:has-text("박서준")');
     assert.strictEqual(await page.$("#e-mid"), null, "보이면 가운데 4자리를 안 물음");
     await page.click(".kpick button:not([disabled]) >> nth=0");
@@ -51,6 +58,8 @@ test("네이버 개인정보 조회: 가림 → 보임 → 다시 가림 — 오
     await page.click("#enter-done");
     // ③ 다시 가려짐 (조회 시간이 끝남) → 기억한 이름 · 전체 번호 그대로
     await load(page, [bk("u1", "은*인", "***-****-1252", "완료", 3), bk("u2", "박*준", "***-****-3333", "완료", 2), bk("u3", "도*희", "***-****-4321", "완료", 2)]);
+    assert.strictEqual(await chip(), "개인정보가림·인증|synchip warn");
+    assert.match(await page.textContent("#toast"), /네이버 개인정보가 다시 가려졌어요/, "보이다가 다시 가려지면 한 번 알림");
     const t2 = await text("박서준");
     assert.match(t2, /박서준.*010-4444-3333/, "다시 가려져도 기억한 이름 · 번호 " + t2);
     assert.match(await text("은지인"), /010-5678-1252/);
