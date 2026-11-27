@@ -59,19 +59,26 @@ test("가린 채 읽어 둔 손님: 시간 칸을 누르면 그 칸만 · 자동
     const r4 = await naver.loadDay(DAY);
     assert.strictEqual(r4.mask, null);
     assert.ok(!steps.slice(n0).some((s) => /보이는지 확인|다시 읽음/.test(s)), "30분 안엔 안 엶");
-    // ⑤ 로그아웃 (다시 가림) → 근무자 [새로고침] → 바로 한 칸 열어 봄 → '가림' (읽어 둔 이름 · 번호는 그대로 둠 · 데스크도 기억)
+    // ⑤ 로그아웃 (다시 가림) → 가린 카드가 없으면 [새로고침]도 칸을 안 엶 (평소 네이버 작업을 늦추지 않게) → 모름
     await page.evaluate(() => localStorage.removeItem("naver-unmask"));
     n0 = steps.length;
     const r5 = await naver.loadDay(DAY, { probe: true });
-    assert.strictEqual(r5.mask, "가림");
-    assert.ok(steps.slice(n0).some((s) => /보이는지 확인/.test(s)));
-    assert.ok(!steps.slice(n0).some((s) => /다시 읽음/.test(s)), "가려져 있으면 더 안 엶");
-    // ⑥ 30분이 지나 자동 불러오기 → 한 칸만 열어 봄 (가림이면 더 안 엶)
+    assert.strictEqual(r5.mask, null);
+    assert.ok(!steps.slice(n0).some((s) => /보이는지 확인/.test(s)), "가린 카드가 없으면 안 엶");
+    // 근무자가 시간 칸을 누름 → 그 칸을 새로 열어 '가림' (읽어 둔 다른 손님 이름 · 번호는 그대로 둠 · 데스크도 기억)
+    const r5b = await naver.loadDay(DAY, { only: "17:00" });
+    assert.strictEqual(r5b.mask, "가림");
+    assert.strictEqual(nm(r5b, "1379100103"), "한별", "다른 시간은 그대로");
+    // ⑥ 가린 칸이 다시 생김 → 30분이 지나 자동 불러오기 → 한 칸만 열어 봄 (가림이면 더 안 엶) · 30분 안이면 안 엶
+    n0 = steps.length;
+    assert.strictEqual((await naver.loadDay(DAY)).mask, null, "30분 안 (②에서 연 때부터)");
+    assert.ok(!steps.slice(n0).some((s) => /보이는지 확인/.test(s)));
     naver.maskProbeAt.set(DAY, Date.now() - 31 * 60000);
     n0 = steps.length;
     const r6 = await naver.loadDay(DAY);
     assert.strictEqual(r6.mask, "가림");
     assert.strictEqual(steps.slice(n0).filter((s) => /보이는지 확인/.test(s)).length, 1, "한 칸만");
+    assert.ok(!steps.slice(n0).some((s) => /다시 읽음/.test(s)), "가려져 있으면 더 안 엶");
   } finally {
     await browser.close();
   }

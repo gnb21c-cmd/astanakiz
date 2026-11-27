@@ -401,13 +401,15 @@ class NaverSync {
     }
     for (const key of [...cache.keys()]) if (!live.has(key)) cache.delete(key); // 비워진 칸 (취소 등)
     // 네이버 [개인정보 조회] (사장님 11/27 — 인증하면 이름 · 번호가 보이는데 새로고침해도 이미 읽어 둔 손님은 * 그대로였음 · 칸 숫자가 그대로면 기억한 카드를 다시 안 열어서)
-    //   지금 보임 · 가림 = 이번에 새로 연 카드 · 새로 연 카드가 없으면 기억한 칸 하나만 열어 봄 (근무자 [새로고침]은 바로 · 자동 불러오기는 30분에 한 번)
-    //   보이면 가린 채 읽어 둔 칸만 다시 읽음 (환불 장수 · 블랙리스트 특이사항은 이어받음) · 아직 가려져 있으면 더 안 엶
-    //   근무자가 시간 칸을 누르면(only) 그 칸만 다시 읽고 끝 (사장님 11/27 — "그 시간대만 다시 확인하면 되잖어")
+    //   지금 보임 · 가림 = 이번에 새로 연 카드 (모르면 null) · 가린 채 읽어 둔 칸이 있을 때만 그중 한 칸을 열어 봄 (근무자 [새로고침]은 바로 · 자동 불러오기는 30분에 한 번)
+    //   보이면 가린 채 읽어 둔 칸만 다시 읽음 (환불 장수 · 블랙리스트 특이사항은 이어받음) · 아직 가려져 있으면 더 안 엶 · 가린 카드가 없으면 안 엶 (평소 네이버 작업을 늦추지 않게)
+    //   근무자가 시간 칸을 누르면(only) 그 칸만 다시 읽고 끝 (사장님 11/27 — "가려져 있을 고객카드만 30분 단위로 다시 읽거나 … 그 시간대만 다시 확인하면 되잖어")
+    //   다시 가려진 것은 칸 숫자가 바뀌어 카드를 새로 열 때 · 시간 칸을 누를 때 알게 됨
     let mask = maskOf(fresh);
-    if (!mask && !opts.only && cache.size && (opts.probe || Date.now() - (this.maskProbeAt.get(day) || 0) >= 30 * 60000)) {
+    const maskedSlots = [...cache.values()].filter((c) => c.cards.some(maskedCard));
+    if (!mask && !opts.only && maskedSlots.length && (opts.probe || Date.now() - (this.maskProbeAt.get(day) || 0) >= 30 * 60000)) {
       this.maskProbeAt.set(day, Date.now());
-      const c = [...cache.values()].sort((a, b) => a.cards.length - b.cards.length)[0];
+      const c = maskedSlots.slice().sort((a, b) => a.cards.length - b.cards.length)[0];
       this.step(`${c.time} 네이버 개인정보가 보이는지 확인`);
       const r = await this.readSlotCards(c.product, c.time, c.status === "확정" ? "확정" : "이용완료", c.count);
       if (r.ok && r.cards.length) { opened = true; mask = maskOf(r.cards); }
