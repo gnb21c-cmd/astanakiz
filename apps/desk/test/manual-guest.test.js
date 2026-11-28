@@ -232,3 +232,27 @@ test("예약 없는 손님: 사무실 PC 는 현장 POS 화면 그대로 ('예�
     await browser.close();
   }
 });
+
+test("예약 없는 손님: 사무실 PC 에서 등록 · 지운 것(두 PC 설정 manualGuests)을 받으면 현장 POS 명단에 바로 · 입장한 카드는 지워도 남음", async () => {
+  const browser = await launch();
+  try {
+    const page = await open(browser);
+    const today = await page.evaluate(() => window.__deskTest.today());
+    const g = (id, name, slot) => ({ id, day: today, slot, name, phone: "01033334444", qty: 3, note: "사무실 등록", at: today + " 13:40" });
+    await page.evaluate((v) => window.__deskTest.sync.settings(["manualGuests"], { manualGuests: v }), { v: 1, list: [g("o1", "사무실등록", 900), g("o2", "먼저입장", 840)] });
+    assert.deepStrictEqual(await page.evaluate(() => window.__deskTest.man.cards().map((x) => [x.name, x.slot, x.qty, x.status]).sort()), [["먼저입장", 840, 3, "확정"], ["사무실등록", 900, 3, "확정"]]);
+    await page.click('.slot[data-s="840"]');
+    await page.click('.res:has-text("먼저입장")');
+    await pickKeys(page);
+    await page.click("#enter-done");
+    // 사무실에서 둘 다 지움 → 입장 전 카드만 빠짐
+    await page.evaluate(() => window.__deskTest.sync.settings(["manualGuests"], { manualGuests: { v: 1, list: [] } }));
+    assert.deepStrictEqual(await page.evaluate(() => window.__deskTest.man.cards().map((x) => [x.name, x.status])), [["먼저입장", "완료"]]);
+    // 모양이 틀린 등록은 버림
+    await page.evaluate(() => window.__deskTest.sync.settings(["manualGuests"], { manualGuests: { v: 1, list: [{ id: "b1", day: "2026-10-05", slot: 845, name: "x", phone: "010", qty: 0 }] } }));
+    assert.deepStrictEqual(await page.evaluate(() => window.__deskTest.man.list()), []);
+    assert.deepStrictEqual(page.errs, []);
+  } finally {
+    await browser.close();
+  }
+});
