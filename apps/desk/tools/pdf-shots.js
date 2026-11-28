@@ -3,7 +3,7 @@
             ONLY=01,02 node tools/pdf-shots.js 2.41             (그 번호 사진만 다시 · PDF 는 늘 다시)
             PDF_ONLY=1 node tools/pdf-shots.js                   (사진은 그대로 · PDF 만)
    - 화면이 바뀌면 바뀐 사진만 다시 찍고 PDF 를 다시 만든다 (astanakiz CLAUDE.md) · 체험판 예시 손님만 나옴 (실제 손님 정보 없음)
-   - 13(반납안내 커튼 그림)만 예전 사진 그대로 — 나머지는 모두 여기서 찍음 */
+   - 13(반납안내 커튼 그림)만 예전 사진 그대로 — 나머지는 모두 여기서 찍음 (27 = 예약 없는 손님 등록 창 · 2.43) */
 const path = require("path");
 const fs = require("fs");
 let chromium;
@@ -112,6 +112,20 @@ const setTab = async (page, t) => { await page.click(`[data-t=${t}]`); await pag
       await page.click(".mbox >> nth=0");
       await shot(page, "21-memo.png");
       await page.click("[data-act=close]");
+      // 3장 · 예약 없는 손님 (2.43 — 네이버 예약은 취소 · 수수료) 등록 창: 하나 등록해 두고 다음 손님을 적는 중 (지어낸 손님)
+      if (want("27-man.png")) {
+        const reg = async (o, save) => {
+          await page.click("[data-act=manOpen]");
+          await page.selectOption("#man-slot", String(o.slot));
+          await page.fill("#man-name", o.name); await page.fill("#man-phone", o.phone);
+          await page.selectOption("#man-qty", String(o.qty)); await page.fill("#man-note", o.note);
+          if (save) await page.click("[data-act=manSave]");
+        };
+        await reg({ slot: 960, name: "윤하람", phone: "01080801212", qty: 1, note: "2장 중 1장 수수료 취소" }, true);
+        await reg({ slot: 900, name: "구본희", phone: "01024681357", qty: 2, note: "4장 중 2장 수수료 취소" }, false);
+        await shot(page, "27-man.png");
+        await page.click("[data-act=close]");
+      }
       if (want("08-park.png")) {
         await page.fill("#car-q", "5514");
         await page.press("#car-q", "Enter");

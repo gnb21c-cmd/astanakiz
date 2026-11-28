@@ -522,6 +522,16 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 .mvrow.off b { color: var(--muted); }
 .mvwhy { margin-top: 2px; font-weight: 400; }
 .badge.proxy { background: var(--surface-2); color: var(--fg); border: 1px solid var(--line); font-size: 11px; vertical-align: 2px; }
+/* 예약 없는 손님 (사장님 11/28 — 네이버 예약은 취소됐지만 입장시키는 손님) */
+.badge.manb { background: transparent; color: var(--fg); border: 1.5px dashed var(--accent); font-size: 11px; vertical-align: 2px; }
+.rhead { display: flex; align-items: baseline; gap: 6px; }
+.badge.manpay { white-space: normal; text-align: left; line-height: 1.35; }
+.manadd { font-size: 11px; padding: 1px 7px; min-height: 0; }
+.mangrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+.mangrid .field { margin: 0; }
+.manlist { display: grid; gap: 4px; max-height: 210px; overflow: auto; }
+.manrow { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
+.manrow .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .badge.short { background: var(--short-bg); color: #FFFFFF; } /* 숏타임 상품 (1시간 20분 · 사장님 11/05) — 1시간 50분 손님과 한눈에 구분 */
 .res .name .badge.short { font-weight: 700; }
 .shortend { color: var(--short); font-weight: 700; }
@@ -734,6 +744,8 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
 .svcwalk { display: grid; gap: 4px; padding: 8px 10px; border: 1.5px dashed var(--line); border-radius: 10px; }
 .svcwalk .btn { min-height: 38px; font-weight: 700; }
 .svcwalk .help { font-size: 12px; line-height: 1.4; }
+.svcwalk .two { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.svcwalk .two .btn { font-size: 13px; padding: 4px 6px; }
 .badge.svcb { background: var(--surface-2); color: var(--fg); border: 1.5px dashed var(--muted); font-size: 12px; vertical-align: middle; }
 .key.svc { border-style: dashed; border-color: var(--ink); }
 .key.svc span { font-weight: 700; }
@@ -852,7 +864,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
     <div class="midcol">
       <button class="btn refresh" data-act="refresh">새로고침 <small id="refresh-at"></small></button>
       <section class="panel" aria-labelledby="h-res">
-        <h2 id="h-res"><span id="res-title">예약자</span> <small id="res-sub"></small></h2>
+        <h2 id="h-res"><span id="res-title">예약자</span> <span class="rhead"><small id="res-sub"></small><button class="btn btn-sm manadd" data-act="manOpen" title="네이버 예약은 모두 취소됐지만(일부 환불 · 일부 수수료) 입장시키는 손님 — 이름 · 전화 · 장수 · 날짜 · 시간을 등록하면 그 명단에 카드가 생겨요">+ 예약 없음</button></span></h2>
         <div class="scroll" id="res"></div>
       </section>
     </div>
@@ -1348,9 +1360,10 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
       list.push(b);
     }
     // 네이버에서 사라진 예약(취소)은 열쇠를 받지 않았을 때만 뺌
-    for (const b of old.values()) if (!list.includes(b) && (b.keys.length || (only && (b.naverSlot ?? b.slot) !== toMin(only)))) list.push(b); // 한 시간만 불러왔으면 다른 시간 예약은 그대로
+    for (const b of old.values()) if (!list.includes(b) && (b.manual || b.keys.length || (only && (b.naverSlot ?? b.slot) !== toMin(only)))) list.push(b); // 한 시간만 불러왔으면 다른 시간 예약은 그대로 · 예약 없는 손님 카드는 늘 남김 (11/28)
     bookings[day] = list;
     qtySettle(day);
+    manInject(day);
   }
   /* 부분취소 (사장님 11/11 — 5장 예약 → 4장 부분취소 → 1장 입장인데 카드는 5장): 네이버 예약 카드 '수량'은 처음 결제한 수 그대로라
      앱 본체(naver-sync.js partialFix)가 시간 칸 숫자(남은 장수)와 카드 합을 견줘 남은 장수(qty) · 처음 수량(qtyBooked) · 취소 장수(qtyCut)를 줌
@@ -1423,10 +1436,11 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
      - 앱: 저장 폴더(%APPDATA%\astanakiz-desk\desk-state\날짜.json — 앱 폴더 이름은 영문 · 키즈 포스 11/16 확인)에 바로 씀 (갑자기 꺼져도 남게) + 브라우저 저장소에도 한 벌
      - 켜자마자 빈 화면으로 저장본을 덮어쓰지 않게: 저장본을 먼저 읽어 들인 뒤부터 저장 */
   const STATE_KEY = "astanakiz-desk-" + TODAY;
-  const SAVE_FIELDS = ["id", "day", "no", "slot", "name", "phone", "qty", "qtyBooked", "qtyCut", "qtySrc", "qtyPicked", "product", "naverProduct", "pay", "cancels", "prevDone", "visitNo", "visitEnd", "proxy", "visitor", "status", "keys", "enteredAt", "outAt", "overPaid", "naverPending", "naverWhy", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut", "naverSlot", "phoneFull", "nameOpen", "email", "past", "giftDue", "giftGiven", "plusT"];
+  const SAVE_FIELDS = ["id", "day", "no", "slot", "name", "phone", "qty", "qtyBooked", "qtyCut", "qtySrc", "qtyPicked", "product", "naverProduct", "pay", "cancels", "prevDone", "visitNo", "visitEnd", "proxy", "visitor", "status", "keys", "enteredAt", "outAt", "overPaid", "naverPending", "naverWhy", "useMin", "keyUse", "chainHead", "keysTaken", "bulkOut", "naverSlot", "phoneFull", "nameOpen", "email", "past", "giftDue", "giftGiven", "plusT", "manual"];
   let stateReady = !APP; // 저장본을 읽기 전에는 저장하지 않음
   let qtyPicks = {}; // 부분취소 (사장님 11/11): 누구 것인지 모를 때 근무자가 고른 실제 장수 { 예약번호: 장수 } — 오늘 저장 파일(pq)
   let rentals = []; // 대관 (사장님 11/10): 오늘 적은 단체 이름 · 입금일 [{ id, name, paidOn, at }] — 오늘 저장 파일(r) · 보고 앱 '키즈대관'
+  let MAN = []; // 예약 없는 손님 등록 (사장님 11/28 — 아래 '예약 없는 손님') [{ id, day, slot, name, phone, qty, note, at, past }]
   let pendingSaved = []; // 예전 형식(예약번호만 있는) 저장본 — 네이버에서 그 예약을 불러오면 합침
   /* 열쇠 기록: 그 손님이 받은 열쇠 번호는 반납해도 남김(keysTaken) — 다음날 아침 없는 열쇠를 마지막에 누가 썼는지 찾아 연락 (사장님 10/8)
      일괄 반납으로 돌려받은 열쇠는 bulkOut (하나씩 확인하지 않은 열쇠) */
@@ -1482,7 +1496,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
      방문 횟수(마일리지)는 네이버와 같이 예약 건수로 셈 — 연속예약도 예약마다 1회 */
   const CHAIN_STEP = RULES.useMinutes + 10; // 120분
   const nameKey = (s) => String(s || "").normalize("NFC").replace(/\s+/g, ""); // 이름 견주기: 띄어쓰기 · 한글 저장 방식(휴대폰마다 NFC/NFD) 차이 무시 (11/20)
-  const samePerson = (b) => (bookings[b.day] || []).filter((x) => nameKey(x.name) === nameKey(b.name) && digits(x.phone) === digits(b.phone) && x.phone).sort((x, y) => x.slot - y.slot);
+  const samePerson = (b) => (bookings[b.day] || []).filter((x) => nameKey(x.name) === nameKey(b.name) && digits(x.phone) === digits(b.phone) && x.phone && !x.manual === !b.manual).sort((x, y) => x.slot - y.slot); // 예약 없는 손님은 네이버 예약과 안 묶음 (11/28)
   /** 이 예약 전 네이버 '완료' 수 — 같은 사람이 오늘 이미 따로 입장(이용완료)했는데 네이버를 다시 불러오기 전이면 '완료 n'이 옛 숫자 → 그만큼 올림 (10/15) */
   const doneSoFar = (b) => { let m = b.prevDone; if (m == null) return m; for (const x of samePerson(b)) if (x !== b && x.status === "완료") { const e = x.visitEnd || x.visitNo; if (e != null && e > m) m = e; } return m; };
   const liftDone = (x) => { if (x.status === "완료") return; const m = doneSoFar(x); if (m != null && m > x.prevDone) x.prevDone = m; };
@@ -1490,7 +1504,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
      첫 카드(예약번호 순) = 대표, 열쇠는 합친 장수만큼 대표에게 */
   /* 같은 시간 묶음 (사장님 11/20 — "동일인/동일 전화번호로 확인된 1/N … N/N 이면 어느 카드든 눌러 수량만큼 열쇠를"): 같은 시간 + 같은 전화번호면 이름이 달라도 묶음
      예전: 이름 · 전화가 둘 다 같아야 묶고 · 예약번호가 빠른 첫 카드에서만 합계 열쇠 → 이름이 조금 달라 안 묶이면 카드마다 1개 · 현장은 서비스 키로 처리했음 */
-  const partyOf = (b) => (b && digits(b.phone) ? (bookings[b.day] || []).filter((x) => x.slot === b.slot && sameCust(x, b)).sort((x, y) => String(x.no || x.id).localeCompare(String(y.no || y.id))) : [b]);
+  const partyOf = (b) => (b && digits(b.phone) ? (bookings[b.day] || []).filter((x) => x.slot === b.slot && !x.manual === !b.manual && sameCust(x, b)).sort((x, y) => String(x.no || x.id).localeCompare(String(y.no || y.id))) : [b]);
   const slotQty = (b) => partyOf(b).reduce((a, x) => a + x.qty, 0);
   /** 입장할 때 같이 처리할 같은 시간 예약 (아직 입장 전인 것) · 대표 = 그중 첫 번째 */
   const partyOpen = (b) => partyOf(b).filter((x) => x.status === "확정");
@@ -1704,7 +1718,8 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
   }
   function slotStats(day) {
     ensureDay(day);
-    const list = bookings[day];
+    manInject(day);
+    const list = bookings[day].filter((b) => !b.manual); // 예약 없는 손님(11/28)은 네이버 숫자에 안 셈
     return daySlots(day).map((s) => {
       const bs = list.filter((b) => (b.naverSlot ?? b.slot) === s); // 데스크에서 옮긴 카드도 네이버처럼 원래 시간 칸 (사장님 10/31)
       const ns = (naverSlots[day] || {})[s];
@@ -1742,6 +1757,15 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
      끝난 뒤(또 지난 이벤트가 있으면) 마일리지 = 네이버 완료 − 이벤트 기간 이용완료
      → 원래 모양 그대로 '완료 (마일리지) → n번 완료 예정' + 작게 '(네이버 완료 11 − 이벤트 6)' (사장님 10/19: 네이버 11 · 12번째가 아니라 완료 5 · 6번째) */
   function visitText(b) {
+    // 예약 없는 손님 (11/28): 네이버 순번 · 마일리지 없음 — 이벤트 기간이면 장부(우리 기록)로 도전 시작 · 성공
+    if (b.manual) {
+      if (!(evActive() && evIn(b.day))) return `<span class="help">예약 없는 손님 — 마일리지 없음</span>`;
+      if (evOut(b)) return `<span class="help bcmile">이벤트 제외 (BC)</span>`;
+      const ev = evOf(b);
+      if (!ev) return `<span class="help">${OFFICE && evLog().missing ? "재방문 기록 받는 중 (현장 POS 에서)" : "예약 없는 손님"}</span>`;
+      const tip = esc(evLabel(ev));
+      return ev.st === "성공" ? `<span class="evcoupon" title="${tip}">이벤트 도전 성공</span>` : `<span class="evstart" title="${tip}">${ev.same ? "오늘 이미 방문" : "이벤트 도전 시작"}</span>`;
+    }
     if (b.status === "완료" ? !b.visitNo : b.prevDone == null) return `<span class="help">이용완료 횟수 확인 중</span>`;
     const c = b.cancels ? ` · 취소 ${b.cancels}` : "", done = b.status === "완료";
     if (!done) liftDone(b); // 같은 사람이 오늘 이미 따로 입장했으면 '완료 n'을 그만큼 (네이버를 다시 불러오면 같아짐)
@@ -1857,13 +1881,13 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
       if (b.giftDue) act += b.giftGiven ? `<span class="help num">${RULES.giftName} ${b.giftGiven} 전달</span>` : `<span class="npend">${b.giftDue}번째 ${RULES.giftName} 전달 전 — 손님께 연락해 전달 (열쇠 창 [사은권 전달함])</span>`;
       if (b.naverPending) act += `<span class="npend">${b.naverBusy ? "네이버 이용완료 처리 중…" : `네이버 이용완료 대기${b.naverWhy ? ` — ${esc(b.naverWhy)}` : ""} (자동으로 다시)`}</span>`;
       return `<article class="res ${b.status === "완료" ? "done" : ""}${bcHit(b, 2) ? " bc2" : bcHit(b, 1) ? " bc1" : ""}" data-act="openRes" data-id="${b.id}" tabindex="0" role="button" aria-label="${esc(b.name)} 예약 열기">
-        <div class="head"><span class="name">${nameHtml(b)}${isShort(b) ? ` ${shortBadge(b)}` : ""}${b.proxy ? ` <span class="badge proxy">대리예약</span>` : ""}${noteOf(b) && noteOf(b).m ? ` <span class="badge memo" title="${esc(noteOf(b).m)}">메모</span>` : ""}</span>${b.unpaid && b.status === "확정" ? `<span class="badge unpaid">입금대기</span>` : `<span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span>`}</div>
+        <div class="head"><span class="name">${nameHtml(b)}${isShort(b) ? ` ${shortBadge(b)}` : ""}${b.proxy ? ` <span class="badge proxy">대리예약</span>` : ""}${b.manual ? ` <span class="badge manb" title="네이버 예약은 취소 — 근무자가 등록한 손님 · 총 판매수에 안 셈">예약 없음</span>` : ""}${noteOf(b) && noteOf(b).m ? ` <span class="badge memo" title="${esc(noteOf(b).m)}">메모</span>` : ""}</span>${b.unpaid && b.status === "확정" ? `<span class="badge unpaid">입금대기</span>` : `<span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span>`}</div>
         ${partyTag}${chainTag}<div class="visits num">${visitText(b)}</div>${bc3Html(b)}
         <dl class="kv">
           <dt>전화번호</dt><dd class="phone num">${phoneHtml(b)}</dd>${visitorRow(b)}
           <dt>이용일시</dt><dd class="num">${when}${isShort(b) && bookMinutes(b) != null ? ` <b class="shortend">~ ${hm(b.slot + bookMinutes(b))} 퇴장</b>` : ""}${b.naverSlot != null && b.naverSlot !== b.slot ? ` <span class="moved">네이버 ${hm(b.naverSlot)}</span>` : ""}</dd>
           <dt>수량</dt><dd>${b.product} ${qtyNum(b.qty)}${qtyNote(b)}</dd>
-          <dt>결제상태</dt><dd><span class="badge paid">${b.pay}</span></dd>
+          <dt>결제상태</dt><dd><span class="badge paid${b.manual ? " manpay" : ""}">${esc(b.pay)}</span></dd>
         </dl>
         <div class="act">${act}</div>
       </article>`;
@@ -2014,7 +2038,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
   function entryRows(day) {
     const f = dayFile(day), seen = new Set();
     const nb = f.b.concat(bookings[day] || []).filter((b) => b.status === "완료" && b.no && !seen.has(b.no) && seen.add(b.no));
-    return nb.map((b) => ({ k: "n", id: b.no, day, name: b.name, phone: b.phone, src: b, keys: b.keysTaken || b.keys || [], at: b.enteredAt != null ? b.enteredAt : b.slot, qty: b.qty, out: f.x.has(b.no) }))
+    return nb.map((b) => ({ k: "n", id: b.no, day, name: b.manual ? `예약 없음 · ${b.name}` : b.name, man: !!b.manual, phone: b.phone, src: b, keys: b.keysTaken || b.keys || [], at: b.enteredAt != null ? b.enteredAt : b.slot, qty: b.qty, out: f.x.has(b.no) }))
       .concat(f.w.map((w) => ({ k: "w", id: w.id, day, name: w.extra ? `추가 1타임 · ${w.of}` : isEv(w) ? `${walkTag(w)} 입장` : "현장구매자", ev: isEv(w), phone: w.phone, src: w, keys: w.keysTaken || w.keys || [], at: w.enteredAt != null ? w.enteredAt : w.slot, qty: walkQty(w), out: false })))
       .concat((f.s || []).map((x) => ({ k: "s", id: x.id, day, name: svcLabel(x), phone: x.phone, src: x, keys: x.keysTaken || x.keys || [], at: x.enteredAt != null ? x.enteredAt : x.slot, qty: 0, out: false, svc: true })))
       .sort((a, b) => b.at - a.at || a.name.localeCompare(b.name, "ko"));
@@ -2578,7 +2602,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
     annGoldenAuto(); // 안내 방송 (사장님 11/07): 배경음악과 함께 골든벨 멘트
     renderAll();
   }
-  function renderAll() { if (!OFFICE) { saveState(); evSync(); hvSync(); cdbSync(); notesSync(); bcWatch(); } renderMaskChip(); $("now").textContent = hm(now); $("refresh-at").textContent = refreshText(); $("refresh-at").style.color = (naverErr || (bookings[TODAY] || []).some((b) => b.naverPending && b.naverWhy)) && !naverBusy ? "var(--red)" : ""; renderSlots(); renderRes(); renderKeys(); renderCars(); if (!OFFICE) goldenCheck(); renderMemoBoxes(); renderCapForce(); renderSyncChip(); renderRentBtn(); renderRevBtn(); fitTop(); }
+  function renderAll() { manInject(TODAY); if (!OFFICE) { saveState(); evSync(); manPastSync(); hvSync(); cdbSync(); notesSync(); bcWatch(); } renderMaskChip(); $("now").textContent = hm(now); $("refresh-at").textContent = refreshText(); $("refresh-at").style.color = (naverErr || (bookings[TODAY] || []).some((b) => b.naverPending && b.naverWhy)) && !naverBusy ? "var(--red)" : ""; renderSlots(); renderRes(); renderKeys(); renderCars(); if (!OFFICE) goldenCheck(); renderMemoBoxes(); renderCapForce(); renderSyncChip(); renderRentBtn(); renderRevBtn(); fitTop(); }
   /** 맨 위 오른쪽 묶음(두 PC 연결 · 대관 · 근무자 메뉴얼 · 총 판매수 · 시계)이 가운데 커튼 손잡이에 가리면 조금씩 줄임 (사장님 11/10 — 겹치지 않게)
       손잡이는 1024×768 판 밖(창 가운데 · 크기 그대로)이라 창 크기마다 재서 맞춤 · 커튼이 내려와 손잡이가 숨어도 마지막 크기로 */
   var topTabW = 0; // var: 처음 그릴 때(이 줄보다 먼저)도 쓰임
@@ -2692,27 +2716,29 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
       const qNote = qAsk ? `<div class="banner qhint"><b>예약 수량 그대로 열쇠를 주세요</b> (지금 ${need}개) — ${hm(qAsk.slot)} 네이버 칸 숫자가 예약 카드 합보다 ${qAsk.qtyAsk.cut}장 적은데, 대개 방금 들어온 예약이 칸 숫자에 늦게 들어가서예요. 손님이 일부를 취소(환불)했다고 할 때만 ${qAsk === b ? "이 손님" : `${esc(qAsk.name)}님(같은 시간 예약)`} 실제 장수를 고르세요
           <span class="qpick">${qOpts(qAsk).map((k) => `<button class="btn btn-sm num" data-act="qtyPick" data-id="${qAsk.id}" data-n="${k}">${k}장</button>`).join("")}</span></div>`
         : b.qtyCut ? `<div class="banner"><b>부분취소</b> — 처음 ${b.qtyBooked}장 중 ${b.qtyCut}장 취소 · <b>남은 ${b.qty}장</b>만 입장 (${b.qtyPicked ? "근무자가 고름" : b.qtySrc === "detail" ? "네이버 예약 상세의 환불정보로 맞춤" : "네이버 시간 칸 숫자로 맞춤"})</div>` : "";
-      const note = qNote + oddNote + chainNote + (b.status !== "확정" ? "" : b.day !== TODAY ? `<div class="banner warn">이용일(${b.day.slice(5).replace("-", "/")})에 입장 처리할 수 있어요</div>`
+      const manNote = b.manual ? `<div class="banner"><b>예약 없는 손님</b> — 네이버 예약은 취소(${esc(b.pay.replace(/^예약 없음 · ?/, "") || "수수료")}) · 열쇠 · 입장권은 평소처럼, 네이버 이용완료는 없음 · 총 판매수에 안 셈 · 재방문 이벤트 장부에는 오늘 방문으로</div>` : "";
+      const note = manNote + qNote + oddNote + chainNote + (b.status !== "확정" ? "" : b.day !== TODAY ? `<div class="banner warn">이용일(${b.day.slice(5).replace("-", "/")})에 입장 처리할 수 있어요</div>`
         : early ? `<div class="banner">예약 ${hm(b.slot)}보다 일찍 입장 — 근무자 판단으로 가능해요 (손님 안내 기준은 ${hm(b.slot - RULES.earlyMinutes)}). ${m == null ? "" : `이용시간은 예약 시간부터라 일찍 온 만큼 더 놀 수 있어요 (반납 ${hm(b.slot + m)})`}</div>` : "");
       el.innerHTML = `
-        <h3 id="sheet-title">네이버 예약자 <button class="x" data-act="close" aria-label="닫기">×</button></h3>${bcAskHtml()}
+        <h3 id="sheet-title">${b.manual ? "예약 없는 손님" : "네이버 예약자"} <button class="x" data-act="close" aria-label="닫기">×</button></h3>${bcAskHtml()}
         <div><dl class="facts">
           <dt>예약자</dt><dd style="font-size:18px">${nameHtml(b)}${isShort(b) ? ` ${shortBadge(b)}` : ""} <span class="badge ${b.status === "완료" ? "done" : "conf"}">${b.status === "완료" ? "이용완료" : "미입장"}</span>${b.black ? `<span class="nblk" title="네이버 예약 카드에 '블랙리스트' 표시 — 처음 한 번 BC 원아웃 · 특이사항을 메모로">네이버 블랙리스트</span>` : ""}${noteChecks(b)}</dd>
           <dt>${evActive() && evIn(b.day) ? "이벤트" : "이용완료"}</dt><dd class="num visits big">${visitText(b)}</dd>${cdbRow(b)}
           <dt${midNeed(b) && canEnter ? ' class="midlbl"' : ""}>전화번호</dt><dd class="num">${midNeed(b) && canEnter ? midHtml(b) : phoneHtml(b)}</dd>${visitorRow(b)}
-          <dt>이용일시</dt><dd class="num">${hm(b.slot)} ${m == null ? "· 무제한" : `~ ${hm(b.slot + m)} (${dur(m)})`}${b.naverSlot != null && b.naverSlot !== b.slot ? ` <span class="moved">네이버 ${hm(b.naverSlot)}</span>` : ""}${b.day === TODAY && b.no ? `
+          <dt>이용일시</dt><dd class="num">${hm(b.slot)} ${m == null ? "· 무제한" : `~ ${hm(b.slot + m)} (${dur(m)})`}${b.naverSlot != null && b.naverSlot !== b.slot ? ` <span class="moved">네이버 ${hm(b.naverSlot)}</span>` : ""}${b.day === TODAY && b.no && !b.manual ? `
             <span class="mvrow" aria-label="예약시간 변경">→ <button class="btn btn-sm" data-act="mvSlot" data-d="-30" aria-label="앞 시간" ${(sheet.mv ?? b.slot) <= SLOTS[0] ? "disabled" : ""}>◀</button><b class="num">${hm(sheet.mv ?? b.slot)}</b><button class="btn btn-sm" data-act="mvSlot" data-d="30" aria-label="뒤 시간" ${(sheet.mv ?? b.slot) >= SLOTS[SLOTS.length - 1] ? "disabled" : ""}>▶</button><button class="btn btn-sm btn-ink" data-act="mvDo" ${(sheet.mv ?? b.slot) === b.slot ? "disabled" : ""}>변경</button></span>` : ""}</dd>
           <dt>수량</dt><dd>${b.product} ${qtyNum(b.qty)}${qtyNote(b)}</dd>
-          <dt>결제상태</dt><dd>${b.pay}</dd>${noteRow(b)}
+          <dt>결제상태</dt><dd>${esc(b.pay)}</dd>${noteRow(b)}
           ${b.status === "완료" ? `<dt>열쇠</dt><dd>${b.keys.length ? `<div class="bigkeys">${b.keys.map((k) => `<span class="bigkey num">${k}</span>`).join("")}</div>` : b.outAt != null ? `<span class="num">${b.enteredAt != null ? hm(b.enteredAt) + " 입장 · " : ""}${hm(b.outAt)} 퇴장 (반납함)</span>` : "-"}</dd>` : ""}
         </dl></div>
         ${bc3Html(b)}${note}${pickHtml}
         <div class="sheet-foot">${b.status === "확정"
           ? `${sheet.naverErr ? `<div class="banner warn" style="flex-basis:100%">네이버 이용완료 실패: ${esc(sheet.naverErr)}</div><button class="btn" data-act="doEnter" data-skip-naver="1">네이버 없이 열쇠만 등록</button>` : ""}
-             <button class="btn" data-act="close">닫기</button><button class="btn btn-ink" id="enter-done" data-act="doEnter" ${canEnter && sheet.keys.length === need && !sheet.busy && !qLock && (!midNeed(b) || midOk(sheet.mid)) ? "" : "disabled"}>${sheet.busy ? "네이버 이용완료 중…" : sheet.naverErr ? "다시 시도" : "등록 완료"}</button>`
+             ${b.manual ? `<button class="btn" data-act="manDel" data-id="${esc(b.no)}">등록 지우기</button>` : ""}<button class="btn" data-act="close">닫기</button><button class="btn btn-ink" id="enter-done" data-act="doEnter" ${canEnter && sheet.keys.length === need && !sheet.busy && !qLock && (!midNeed(b) || midOk(sheet.mid)) ? "" : "disabled"}>${sheet.busy ? "네이버 이용완료 중…" : sheet.naverErr ? "다시 시도" : "등록 완료"}</button>`
           : `<button class="btn btn-ink" data-act="close" data-autofocus>닫기</button>`}</div>`;
       return;
     }
+    if (sheet.mode === "man") { el.innerHTML = manSheetHtml(); return; }
     if (sheet.mode === "walk") {
       /* 현장입장 (사장님 10/7): 손님 응대 순서대로 위에서 아래로 — 왼쪽 1/3 = 할 일 안내, 오른쪽 2/3 = 버튼 · 입력
          ① 판매 가능? (초록 = 가능 · 빨강 = 불가) → ② 입장권 수 · 입장 타임(◀ ▶) → ③ POS로 이동해 그만큼 결제 (사장님 10/21: 수를 먼저 정하고 POS)
@@ -2730,12 +2756,49 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
       // 왼쪽 아래 [서비스 키] (사장님 10/16): 임직원 등 예약 없이 쓸 때 — 누르면 판매 단계 없이 사용자만 적는 창으로
       const svcBox = `<div class="svcwalk"><button class="btn ${sheet.svc ? "btn-ink" : ""}" data-act="svcWalk" aria-pressed="${!!sheet.svc}">${sheet.svc ? "← 판매로 돌아가기" : "서비스 키 (판매 아님)"}</button>
         <span class="help">${sheet.svc ? "판매 · 결제 · 입장권 없이 열쇠만 등록" : "임직원 등 예약 없이 쓸 때 — 쓰는 사람만 적고 열쇠 등록 · 총 판매수 · 인원에 안 셈"}</span></div>`;
+      // 예약 없는 손님 (사장님 11/28): 손님이 이미 와 있으면 여기서 바로 등록 · 입장 (미리 등록은 예약자 명단 위 [+ 예약 없음])
+      const manBox = `<div class="svcwalk"><button class="btn ${sheet.man ? "btn-ink" : ""}" data-act="manWalk" aria-pressed="${!!sheet.man}">${sheet.man ? "← 판매로 돌아가기" : "예약 없는 손님"}</button>
+        <span class="help">${sheet.man ? "네이버 예약은 취소 — 이름 · 전화번호로 입장 · 이벤트 입장권 · 장부" : "네이버 예약은 취소(수수료)됐지만 입장시키는 손님 — 총 판매수에 안 셈"}</span></div>`;
+      // 판매 단계 없이 쓰는 두 길을 한 상자에 (왼쪽이 넘치지 않게 · 11/28)
+      const sideBox = `<div class="svcwalk"><div class="two"><button class="btn" data-act="svcWalk" aria-pressed="false">서비스 키</button><button class="btn" data-act="manWalk" aria-pressed="false">예약 없는 손님</button></div>
+        <span class="help"><b>서비스 키</b> = 임직원 등 열쇠만 · <b>예약 없는 손님</b> = 네이버 예약은 취소(수수료)됐지만 입장 — 둘 다 총 판매수에 안 셈</span></div>`;
       const slotRow = `<div class="wrow"><span class="wn"></span> <span class="wl">입장 타임</span>
               <button class="btn btn-sm" data-act="wslot" data-d="-30" aria-label="앞 타임" ${ws <= SLOTS[0] ? "disabled" : ""}>◀</button>
               <b class="num wtime">${hm(ws)} 입장</b>
               <button class="btn btn-sm" data-act="wslot" data-d="30" aria-label="뒤 타임" ${ws >= SLOTS[SLOTS.length - 1] ? "disabled" : ""}>▶</button>
               <span class="help num">${m == null ? "무제한" : `~ ${hm(ws + m)} 퇴장`} · 접수 ${hm(now)}${ws !== walkSlot(now) ? " · 바꾼 타임" : ""}</span></div>`;
       const keypad = `<div class="keypad" aria-label="전화번호 키패드">${["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((n) => `<button data-act="kp" data-k="${n}">${n}</button>`).join("")}<button class="fn" data-act="kp" data-k="clr">지우기</button><button data-act="kp" data-k="0">0</button><button class="fn" data-act="kp" data-k="del" aria-label="한 자리 지우기">←</button></div>`;
+      if (sheet.man) {
+        const ms = manWalkState();
+        const mdone = [sheet.keys.length > 0, ms.ok, false], mcur = mdone.indexOf(false);
+        const mstep = (i, t) => `<li class="${mdone[i] ? "done" : i === mcur ? "now" : ""}"><b>${"①②③"[i]}</b> ${t}</li>`;
+        const mtag = (i) => `<span class="wn ${mdone[i] ? "done" : i === mcur ? "now" : ""}">${i + 1}</span>`;
+        el.innerHTML = `
+        <h3 id="sheet-title"><span>현장입장 · 예약 없는 손님 <span class="badge manb">판매 아님</span></span><button class="x" data-act="close" aria-label="닫기">×</button></h3>
+        <div class="walkgrid">
+          <div class="wleft"><ol class="wguide">
+            ${mstep(0, `<b>열쇠 수</b> = 입장할 장수 (네이버에서 취소된 예약 중 입장시키는 만큼) · 입장 타임은 ◀ ▶`)}
+            ${mstep(1, `손님 <b>이름</b> · <b>전화번호</b>(11자리) — 재방문 이벤트 · 연락에 써요`)}
+            ${mstep(2, `<b>[입장 등록]</b> → 열쇠 · 이벤트 입장권 · 장부 방문 (20일 기한). 네이버 이용완료 없음 · 총 판매수에 안 셈`)}
+          </ol>${manBox}</div>
+          <div class="wmain">
+            <div class="wrow">${mtag(0)} <span class="wl">열쇠 수</span>
+              <div class="stepper"><button data-act="qty" data-d="-1" aria-label="열쇠 수 줄이기">−</button><output class="num">${st.need}</output><button data-act="qty" data-d="1" aria-label="열쇠 수 늘리기">+</button></div>
+              <span class="wl">열쇠</span><div class="bigkeys">${sheet.keys.map((k) => `<span class="bigkey num">${k}</span>`).join("")}</div></div>
+            ${slotRow}
+            <div class="field svcname"><label for="w-manname">${mtag(1)} 이름 <span class="help">사유(선택)는 아래 칸</span></label>
+              <div class="btns" style="flex-wrap:nowrap"><input id="w-manname" maxlength="20" autocomplete="off" value="${esc(sheet.manName || "")}" placeholder="이름" data-autofocus>
+              <input id="w-mannote" maxlength="40" autocomplete="off" value="${esc(sheet.manNote || "")}" placeholder="사유 (예: 4장 중 2장 수수료 취소)"></div></div>
+            <div class="wphone">
+              <div class="field"><label for="w-phone">전화번호 <span class="help">010 뒤 8자리 (꼭)</span></label>
+                <input id="w-phone" inputmode="numeric" autocomplete="off" value="${esc(walkFmt(sheet.phone))}" placeholder="010-0000-0000"></div>
+              ${keypad}
+            </div>
+            <button class="btn btn-ink wdone" id="w-done" data-act="walkDone" ${ms.ok ? "" : "disabled"}>${mtag(2)} 입장 등록 (예약 없음)</button>
+          </div>
+        </div>`;
+        return;
+      }
       if (sheet.svc) {
         const vs = svcWalkState();
         const sdone = [sheet.keys.length > 0, vs.ok, false], scur = sdone.indexOf(false);
@@ -2776,7 +2839,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
             ${step(2, `<b>[POS로 이동]</b>(<span class="g">초록</span> = 이동 · <span class="r">빨강</span> = 판매 불가라 안 넘어감)을 눌러 POS에서 그 수만큼 결제 → 끝나면 POS를 최소화하면 이 창으로 돌아와요 (결제 없는 이벤트 손님은 건너뛰고 ⑤의 왼쪽 [이벤트 입장])`)}
             ${step(3, `열쇠를 드리기 전에 <b>전화번호</b>를 받아요 (열쇠 미반납 때 연락). 010 뒤 8자리를 키패드로`)}
             ${step(4, `<b>[결제 완료 · 열쇠 등록]</b>(③ POS에 다녀와야 눌려요) → 입장권이 나오면 열쇠와 함께 드려요 · 결제 없이 들어오는 이벤트 손님은 왼쪽 <b>[${esc(wevLabel())}]</b>`)}
-          </ol>${svcBox}</div>
+          </ol>${sideBox}</div>
           <div class="wmain">
             <div class="banner ${okSell ? "" : "bad"}">${tag(0)} ${st.over ? `<b>지금은 판매 불가</b> — 열쇠 <b class="num">${st.all}</b>개까지만 내줄 수 있어요 (${capToday() ? `안에 있을 손님이 상한 ${capCeil()}명 — 예약 손님 · 네이버 남은 자리` : "예약 손님이 오실 자리"})`
               : st.flex ? `기본 ${RULES.baseKeys}개를 넘어 <b>유동 열쇠</b> — 안에 빈 좌석이 있는지 보고 판매 <button class="btn btn-sm ${sheet.flexOk ? "btn-ink" : ""}" data-act="flexOk" aria-pressed="${!!sheet.flexOk}">${sheet.flexOk ? "빈 좌석 확인함" : "빈 좌석 확인했어요"}</button>`
@@ -2803,7 +2866,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
       const day = sheet.day || viewDay, key = Number(sheet.key) || 0, edit = day === TODAY && !key;
       const days = key ? Array.from({ length: KEEP_DAYS }, (_, i) => shiftDay(TODAY, -i)) : [day];
       const rows = days.flatMap((d) => entryRows(d).filter((r) => !key || r.keys.includes(key)));
-      const total = rows.filter((r) => !r.out && !r.ev).reduce((a, r) => a + r.qty, 0), evTotal = rows.filter((r) => !r.out && r.ev).reduce((a, r) => a + r.qty, 0);
+      const total = rows.filter((r) => !r.out && !r.ev && !r.man).reduce((a, r) => a + r.qty, 0), evTotal = rows.filter((r) => !r.out && r.ev).reduce((a, r) => a + r.qty, 0), manTotal = rows.filter((r) => !r.out && r.man).reduce((a, r) => a + r.qty, 0);
       const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8))}`;
       // 전체 목록(열쇠로 찾기 아님): 열쇠마다 지금 쓰는 · 마지막에 쓴 사람은 노랑, 그 앞에 쓴 사람은 회색 (사장님 10/21 — 1번을 세 명이 쓰면 셋 다 '1번'이라 헷갈림) · 목록은 최근 입장이 위
       const lastOf = {};
@@ -2816,7 +2879,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
           ${key ? "" : `<button class="btn btn-sm" data-act="soldDay" data-d="-1" aria-label="전날" ${day <= first ? "disabled" : ""}>◀</button><b class="num">${esc(dateLabel(day))}</b><button class="btn btn-sm" data-act="soldDay" data-d="1" aria-label="다음날" ${day >= TODAY ? "disabled" : ""}>▶</button>`}
           <select id="sold-key" aria-label="열쇠 번호로 찾기"><option value="">열쇠 번호로 찾기 (전체)</option>${Array.from({ length: RULES.keys }, (_, i) => `<option value="${i + 1}" ${key === i + 1 ? "selected" : ""}>${i + 1}번 열쇠</option>`).join("")}</select>
         </div>
-        <div class="help">${key ? "최근에 가져간 사람이 위 · 줄을 누르면 고객 카드(전화번호)" : `열쇠를 가져간 순서(최근 입장이 위) · 합계 <b class="num">${total}</b>장${evTotal ? ` (이벤트 입장 ${evTotal}명은 판매 아님 · 따로)` : ""} · 줄을 누르면 고객 카드(전화번호) · <b>기록 삭제</b> = 시험으로 잡힌 손님을 판매수 · 통계에서 뺌 (네이버 예약 기록은 그대로)`}</div>
+        <div class="help">${key ? "최근에 가져간 사람이 위 · 줄을 누르면 고객 카드(전화번호)" : `열쇠를 가져간 순서(최근 입장이 위) · 합계 <b class="num">${total}</b>장${evTotal ? ` (이벤트 입장 ${evTotal}명은 판매 아님 · 따로)` : ""}${manTotal ? ` (예약 없음 ${manTotal}장은 판매 아님 · 따로)` : ""} · 줄을 누르면 고객 카드(전화번호) · <b>기록 삭제</b> = 시험으로 잡힌 손님을 판매수 · 통계에서 뺌 (네이버 예약 기록은 그대로)`}</div>
         <div class="soldlist ${key ? "bykey" : ""}">${rows.length ? rows.map((r) => `<div class="srow ${r.out ? "out" : ""}" data-act="soldOpen" data-day="${r.day}" data-k="${r.k}" data-id="${esc(r.id)}" role="button" tabindex="0"><span class="sn">${esc(r.name)}</span><span class="sk num">${keysCell(r)}</span><span class="st num">${key ? md(r.day) + " " : ""}${hm(r.at)} 입장</span><span class="num">${r.svc ? "서비스" : r.ev ? `${r.qty}명 · 이벤트` : `${r.qty}장`}</span>${edit ? (r.out ? `<button class="btn btn-sm" data-act="soldBack" data-k="${r.k}" data-id="${esc(r.id)}">되살리기</button>` : `<button class="btn btn-sm btn-red" data-act="soldDel" data-k="${r.k}" data-id="${esc(r.id)}">기록 삭제</button>`) : key ? "" : "<span></span>"}</div>`).join("") : `<span class="help">${key ? "최근 2주 동안 이 열쇠를 가져간 기록이 없어요" : "아직 없어요"}</span>`}</div>
         ${edit || key ? "" : `<div class="help">지난날 기록은 보기만 해요 · 입장 기록은 이 PC에 남아 있어 2주 전까지 볼 수 있어요</div>`}
         <div class="sheet-foot"><button class="btn btn-ink" data-act="close" data-autofocus>닫기</button></div>`;
@@ -4176,7 +4239,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
   const bcWhat = (k) => [[1, "카드 테두리 빨강"], [2, "마일리지 · 이벤트 미적용"], [3, "예약 불가"]].filter(([i]) => i <= k && RULES.bc["o" + i]).map(([, t]) => t).join(" · ") || "대응 꺼짐 (운영 설정 → 고객 세부 관리)";
   /** 쓰리아웃 손님 예약 (입장 전): 네이버를 불러올 때 앱이 알아서 전액 취소 (사장님 10/26) · 두 번 실패하면 [다시 취소] */
   const bc3Html = (b) => {
-    if (!b || !bcHit(b, 3) || b.status !== "확정") return "";
+    if (!b || b.manual || !bcHit(b, 3) || b.status !== "확정") return ""; // 예약 없는 손님(11/28)은 네이버에서 취소할 예약이 없음
     const t = bcTried.get(b.no) || { n: 0, why: "" };
     const st = b.bcBusy ? "네이버에서 전액 취소하는 중…" : !APP ? "설치한 앱은 네이버를 불러올 때 자동으로 전액 취소" : t.n >= BC_TRIES ? `자동 전액 취소 실패${t.why ? `: ${esc(t.why)}` : ""} — <button class="btn btn-sm" data-act="bcCancel" data-id="${b.id}">다시 취소</button> 또는 네이버에서 직접` : t.n ? `자동 전액 취소 다시 하는 중 (${t.n}번 실패${t.why ? `: ${esc(t.why)}` : ""})` : "네이버를 불러올 때 자동으로 전액 취소";
     return `<div class="bc3">③ 쓰리아웃 · 예약 불가 — ${st}</div>`;
@@ -4191,7 +4254,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
   let bcBusy = false;
   async function bcSweep() { // 가린 정보로 짐작한 쓰리아웃(_guess)은 자동 취소 안 함 (11/26)
     if (!APP || OFFICE || !RULES.bc.o3 || bcBusy || !window.desk.naver.cancelPaid) return;
-    const due = Object.values(bookings).flat().filter((b) => b.status === "확정" && b.no && !b.keys.length && b.enteredAt == null && bcHit(b, 3) && !(noteOf(b) || {})._guess && (() => { const t = bcTried.get(b.no); return !t || (t.n < BC_TRIES && t.scan < bcScan); })());
+    const due = Object.values(bookings).flat().filter((b) => b.status === "확정" && b.no && !b.manual && !b.keys.length && b.enteredAt == null && bcHit(b, 3) && !(noteOf(b) || {})._guess && (() => { const t = bcTried.get(b.no); return !t || (t.n < BC_TRIES && t.scan < bcScan); })());
     if (!due.length) return;
     bcBusy = true;
     try {
@@ -4223,7 +4286,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
   function bcWatch() {
     if (!RULES.bc.o3) return;
     for (const b of (bookings[TODAY] || []).concat(viewDay !== TODAY ? bookings[viewDay] || [] : [])) {
-      if (b.status !== "확정" || bcSeen.has(b.id) || !bcHit(b, 3)) continue;
+      if (b.manual || b.status !== "확정" || bcSeen.has(b.id) || !bcHit(b, 3)) continue;
       bcSeen.add(b.id);
       toast(`③ 쓰리아웃 고객 예약 — ${b.name} ${b.day === TODAY ? "" : `${+b.day.slice(5, 7)}/${+b.day.slice(8)} `}${hm(b.slot)} ${b.qty}장 · ${APP ? "네이버에서 자동 전액 취소해요" : "설치한 앱은 자동 전액 취소"}`, 8000);
     }
@@ -4394,12 +4457,12 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
     const k = sigKey(r.name, r.phone || (/^\d+$/.test(r.k) ? r.k : "")) || r.k;
     const ph = digits(r.phone || "").length >= 10 ? digits(r.phone) : "", masked = /\*/.test(String(r.name || ""));
     let p = L.people.get(k);
-    if (!p) L.people.set(k, (p = { name: r.name, phone: ph || r.phone || "", base: r.base, last: r.n, visits: [] }));
-    p.last = Math.max(p.last, r.n);
+    if (!p) L.people.set(k, (p = { name: r.name, phone: ph || r.phone || "", base: r.man ? null : r.base, last: r.man ? 0 : r.n, visits: [] }));
+    if (!r.man) p.last = Math.max(p.last, r.n); // 예약 없는 손님 줄(man · 11/28)은 네이버 순번이 아님 — 마일리지 셈에 안 넣음
     if (r.name && (!masked || !p.name || /\*/.test(p.name))) p.name = r.name; // 가린 이름보다 전체 이름
     if (ph) p.phone = ph;
-    if (r.base != null && (p.base == null || r.base < p.base)) p.base = r.base;
-    p.visits.push({ at: r.at, day: r.day || String(r.at || "").slice(0, 10), n: r.n, no: r.no, st: r.st || "", due: r.due || "", base: r.base, ph, em: r.em || "" });
+    if (!r.man && r.base != null && (p.base == null || r.base < p.base)) p.base = r.base;
+    p.visits.push({ at: r.at, day: r.day || String(r.at || "").slice(0, 10), n: r.n, no: r.no, st: r.st || "", due: r.due || "", base: r.man ? undefined : r.base, ph, em: r.em || "", man: r.man ? 1 : 0 });
   }
   /** 이 예약 손님의 장부 기록 (그 장부) — 같은 열쇠(이름 첫 · 끝 + 뒷 4자리) 중 전체 번호 · 이메일이 어긋나는 줄은 다른 손님이라 뺌 (11/26) · 없으면 null */
   function personOf(L, b) {
@@ -4451,7 +4514,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
     return s;
   }
   /** 장부 한 사람의 이벤트 기간 이용완료 수 (네이버 순번 N까지) = 순번 차이 · 기록 건수 중 큰 것 (네이버 '완료 n'이 옛 숫자라 순번이 겹친 기록도 셈) */
-  const evCnt = (p, N = Infinity) => Math.max(0, Math.min(p.last, N) - p.base, p.visits.filter((v) => v.n <= N).length);
+  const evCnt = (p, N = Infinity) => { const nv = p.visits.filter((v) => !v.man && v.n <= N).length; return p.base == null ? nv : Math.max(0, Math.min(p.last, N) - p.base, nv); }; // 예약 없는 손님 방문(man)은 네이버 이용완료가 아니라 안 셈 (11/28)
   /** 이벤트 기간에 이용완료한 예약인가 (장부에 있음) */
   const evWas = (b) => evFroms().some((f) => evLog(f).nos.has(b.no || b.id));
   /** 장부에 한 줄 덧붙임 — 설치한 앱: 앱 폴더 + 바탕화면 '아스타나키즈-이벤트' 두 곳 (사장님 10/14) · 체험판: 브라우저 */
@@ -4489,7 +4552,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
   /** 그 손님의 지금 이벤트 기준(base): 장부 → 없으면 지금 보이는 '완료 n'(이번 방문 전까지 · 같은 날 함께 완료하는 예약 중 가장 작은 수). 모르면 null */
   function evBase(b) {
     const k = evKey(b); if (!k) return null;
-    const p = personOf(evLog(), b); if (p) return p.base;
+    const p = personOf(evLog(), b); if (p && p.base != null) return p.base; // 예약 없는 손님 줄만 있으면 base 없음 → 이 예약의 '완료 n' (11/28)
     const same = (bookings[b.day] || []).filter((x) => x.prevDone != null && evKey(x) === k && !evEarly(x)).map((x) => x.prevDone); // 같은 날 함께 완료하는 예약(나눠 한 예약 · 연속예약) · 켜기 전 입장은 빼고
     return same.length ? Math.min(...same) : b.prevDone ?? null;
   }
@@ -4504,7 +4567,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
     // 사무실 PC 도 현장 POS 에서 받은 장부로 같게 판정 (사장님 11/19 — "재방문 정보도 보여야지" · 예전 11/06 ~ 11/19 는 사무실에서 안 함 → '이용완료 횟수 확인 중'만 보였음)
     if (OFFICE && evLog().missing) return null; // 아직 못 받았으면 판정하지 않음 ('재방문 기록 받는 중')
     if (!evFrozen(b) || evOut(b)) return null; // BC 투아웃 이상은 이벤트 대상 아님 (사장님 11/05)
-    const n = b.status === "완료" ? b.visitNo : b.prevDone == null ? null : b.prevDone + 1;
+    const n = b.manual ? 1 : b.status === "완료" ? b.visitNo : b.prevDone == null ? null : b.prevDone + 1; // 예약 없는 손님(11/28)은 네이버 순번 없이 장부로만
     if (!n) return null;
     // 함께 이용완료한 예약은 대표 예약의 기록으로 봄 · 이미 적힌 예약이면 그 줄보다 앞에 적힌 기록만
     const h = (b.chainHead && (bookings[b.day] || []).find((x) => x.id === b.chainHead)) || b;
@@ -4514,7 +4577,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
     // 네이버 고객정보 '지난 예약'의 마지막 이용완료 (사장님 11/26 — 가린 정보로 장부와 못 이어도 · 같은 네이버 아이디) — 장부보다 늦으면 그 날 기준
     // 네이버 정보가 먼저 (사장님 11/26 — 읽을 수 있는 동안은 네이버로 마일리지 · 이벤트 · 사은권) · 현장 POS 고객 데이터베이스는 네이버 지난 예약을 끝내 못 읽었을 때만 대신
     //   (네이버가 '신규예약'(완료 0)이라 한 손님 · 아직 읽는 중(세 번까지)인 손님은 우리 기록을 안 씀)
-    const nv = naverLast(b), naverTrying = custUnsure(b) && (custTried.get(b.no) || 0) < 3;
+    const nv = b.manual ? "" : naverLast(b), naverTrying = !b.manual && custUnsure(b) && (custTried.get(b.no) || 0) < 3;
     const dv = !OFFICE && nv === undefined && b.prevDone !== 0 && !naverTrying ? cdbLast(b) : undefined, ext = nv !== undefined ? nv : dv || ""; // 사무실 PC 는 현장 장부대로 (고객 데이터베이스는 연락용으로 보기만)
     if (!before.length) {
       if (ext) return evRule({ day: ext, due: "" }, b.day);
@@ -4529,17 +4592,146 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
   /** 카드(마우스) · 알림 표시: 이벤트 도전 성공 · 수제돈까스 / 이벤트 도전 시작 · 11/21까지 / 오늘 이미 방문 · 11/21까지 (카드 이름과 같게 · 사장님 10/27) */
   const evLabel = (ev) => (ev.st === "성공" ? `이벤트 도전 성공 · ${EV.gift}` : `${ev.same ? "오늘 이미 방문" : "이벤트 도전 시작"}${ev.due ? ` · ${md2(ev.due)}까지` : " · 마지막 날"}`);
   const md2 = (d) => { const [, m, x] = String(d).split("-").map(Number); return `${m}/${x}`; };
+  /* ── 예약 없는 손님 (사장님 11/28) ──
+     네이버에서 예약했다가 모두 취소(일부 환불 · 일부 100% 수수료 — 수수료 몫은 매장이 받음)됐지만 그 장수만큼 입장시키기로 한 손님
+     - 예약자 명단 위 [+ 예약 없음](미리 · 사무실 PC 에서도) 또는 현장입장 창 [예약 없는 손님](손님이 와 있으면 그 자리에서 등록 · 입장)
+     - 이름 · 전화번호 · 장수 · 날짜 · 시간 → 그 날짜 · 시간 명단에 '예약 없음' 카드 → 오시면 카드를 눌러 평소처럼 입장 (열쇠 · 입장권)
+     - 네이버 실적이 없어 네이버 이용완료 · 시간표 숫자 · 총 판매수 · 폰 실시간 판매 장수에 안 셈 (열쇠판 · 반납 · 초과요금 · 자리 계산은 같음) · 입장권 목록에는 '예약 없음 · 이름'으로 따로
+     - 재방문 이벤트 기간이면 장부에 입장한 날 방문 한 줄(man: 1 · 네이버 순번 없음 · 마일리지 셈에 안 넣음) → 그날부터 기한(20일) · 기한 안에 다시 오면(네이버 예약이든 예약 없음이든) 성공 쿠폰
+     - 현장 POS 고객 데이터베이스에도 그날 방문으로
+     - 지난 날짜 = 그날 이미 왔던 손님을 나중에 적음 → 카드 · 열쇠 · 입장권 없이 장부 · 고객 데이터베이스만
+     - 저장: 설정 manualGuests { v: 1, list } (두 PC 가 같이 — 연결 코드로 잠긴 두 PC 연결로만 · 클라우드 보고로는 안 감) · 체험판은 이 브라우저 · 40일 지난 등록은 버림 */
+  const MAN_LS = "astanakiz-manual";
+  function manNo(g) { return "m" + g.id; }
+  function manCard(g) {
+    return { slot: g.slot, naverSlot: g.slot, name: g.name, phone: fmtPhone(g.phone), phoneFull: g.phone, qty: g.qty, product: "입장권", pay: `예약 없음${g.note ? " · " + g.note : ""}` };
+  }
+  function manBooking(g) {
+    const no = manNo(g);
+    return Object.assign({ id: no, no, manual: true, day: g.day, status: "확정", keys: [], enteredAt: null, outAt: null, prevDone: null, visitNo: null, cancels: 0 }, manCard(g));
+  }
+  const manPhoneOk = (p) => /^01\d{8,9}$/.test(p || "");
+  function manLoad(v) {
+    const lo = shiftDay(TODAY, -40);
+    MAN = (v && v.v === 1 && Array.isArray(v.list) ? v.list : [])
+      .filter((g) => g && g.id && isDay(g.day) && g.day >= lo && SLOTS.includes(g.slot) && g.name && manPhoneOk(g.phone) && g.qty >= 1 && g.qty <= 10)
+      .map((g) => Object.assign({ id: String(g.id).slice(0, 24), day: g.day, slot: g.slot, name: String(g.name).slice(0, 20), phone: g.phone, qty: g.qty, note: String(g.note || "").slice(0, 40), at: String(g.at || "") }, g.past ? { past: true } : {}));
+  }
+  function manStore() {
+    const v = { v: 1, list: MAN };
+    if (APP && window.desk.config) window.desk.config.set({ manualGuests: v });
+    else try { localStorage.setItem(MAN_LS, JSON.stringify(v)); } catch (e) { /* 저장 못 해도 동작 */ }
+  }
+  if (APP && window.desk.config) window.desk.config.get().then((c) => { manLoad(c && c.manualGuests); manChanged(); }).catch(() => {});
+  else try { manLoad(JSON.parse(localStorage.getItem(MAN_LS) || "null")); } catch (e) { MAN = []; }
+  /** 그날 명단에 등록 카드를 맞춤: 없으면 넣고 · 입장 전 카드는 등록대로 고치고 · 지운 등록의 입장 전 카드는 뺌 (사무실 PC 는 넣기만 — 현장 화면이 기준) */
+  function manInject(day) {
+    const list = bookings[day];
+    if (!list) return;
+    const want = new Map(MAN.filter((g) => g.day === day && !g.past).map((g) => [manNo(g), g]));
+    for (let i = list.length - 1; i >= 0; i--) {
+      const b = list[i];
+      if (!b.manual || b.status !== "확정" || OFFICE) continue;
+      const g = want.get(b.no);
+      if (!g) { if (!(sheet.mode === "enter" && sheet.id === b.id)) list.splice(i, 1); continue; }
+      const c = manCard(g);
+      if (Object.keys(c).some((k) => b[k] !== c[k])) Object.assign(b, c);
+    }
+    for (const [no, g] of want) if (!list.some((b) => b.no === no)) list.push(manBooking(g));
+  }
+  /** 등록 하나 더함 → { ok, g } | { ok: false, why } */
+  function manAdd(q) {
+    const name = String(q.name || "").normalize("NFC").replace(/\s+/g, " ").trim().slice(0, 20), phone = digits(q.phone || ""), qty = Math.round(Number(q.qty));
+    const day = String(q.day || ""), slot = Number(q.slot), note = String(q.note || "").replace(/\s+/g, " ").trim().slice(0, 40);
+    const lo = shiftDay(TODAY, -30), hi = shiftDay(TODAY, 60);
+    if (!name) return { ok: false, why: "이름을 넣어 주세요" };
+    if (/\*/.test(name)) return { ok: false, why: "이름은 * 없이 모두 넣어 주세요" };
+    if (!manPhoneOk(phone)) return { ok: false, why: "전화번호를 010 부터 모두 넣어 주세요" };
+    if (!(qty >= 1 && qty <= 10)) return { ok: false, why: "장수는 1 ~ 10장이에요" };
+    if (!isDay(day) || day < lo || day > hi) return { ok: false, why: `날짜는 ${md2(lo)} ~ ${md2(hi)} 안에서 골라 주세요` };
+    if (!SLOTS.includes(slot)) return { ok: false, why: "입장 시간을 골라 주세요" };
+    if (MAN.some((g) => g.day === day && g.slot === slot && g.phone === phone)) return { ok: false, why: "같은 날 · 시간에 같은 번호로 이미 등록했어요" };
+    const g = Object.assign({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), day, slot, name, phone, qty, note, at: `${TODAY} ${hm(now)}` }, day < TODAY ? { past: true } : {});
+    MAN.push(g);
+    manStore();
+    manChanged();
+    return { ok: true, g };
+  }
+  function manChanged() {
+    for (const d of Object.keys(bookings)) manInject(d);
+    renderAll();
+    if (sheet.mode === "man") renderSheet();
+  }
+  /** 예약 없는 손님 입장 뒤: 장부 · 고객 데이터베이스 · 저장(renderAll) → 알림 + 입장권 */
+  function manEntered(b) {
+    renderAll();
+    const ev = evOf(b), ok = !!ev && ev.st === "성공";
+    toast(`${b.name}님 입장 (예약 없음 · 판매 아님) · 열쇠 ${b.keys.join(", ")}번${ev ? ` · ${ok ? `이벤트 도전 성공 — ${EV.gift || "사은품"} 드리세요` : evLabel(ev)}` : ""}${printForm("enter", keyVals(b))}`, ok ? 8000 : 0);
+  }
+  /** 지난 날짜 등록 = 그날 왔던 손님: 고객 데이터베이스 · (그날이 지금 이벤트 기간이면) 장부에 그날 방문 한 줄 — 현장 POS 만 · 한 번만 */
+  function manPastSync() {
+    if (OFFICE) return;
+    let any = false;
+    for (const g of MAN) {
+      if (!g.past) continue;
+      const no = manNo(g);
+      if (cdbReady && !cdbNos.has(no) && cdbVisit({ day: g.day, no, qty: g.qty, name: g.name, phone: g.phone, phoneFull: g.phone })) any = true;
+      if (!evActive() || !evIn(g.day)) continue;
+      const L = evLog();
+      if (L.nos.has(no)) continue;
+      const b = Object.assign(manBooking(g), { status: "완료", enteredAt: g.slot });
+      const k = evKey(b);
+      if (!k) continue;
+      const ev = evOf(b);
+      evAdd(Object.assign({ at: `${g.day} ${hm(g.slot)}`, day: g.day, no, k, name: g.name, phone: g.phone, n: 0, man: 1, qty: g.qty, late: TODAY }, ev ? { st: ev.st, due: ev.due } : {}));
+    }
+    if (any) cdbSave();
+  }
+  /** 등록 창 (예약자 명단 위 [+ 예약 없음]) */
+  function manSheetHtml() {
+    const lo = shiftDay(TODAY, -30), hi = shiftDay(TODAY, 60), f = sheet.mf || {};
+    const day0 = f["man-day"] || sheet.day, day = isDay(day0) && day0 >= lo && day0 <= hi ? day0 : TODAY;
+    const slot0 = Number(f["man-slot"] ?? sheet.slot), slot = SLOTS.includes(slot0) ? slot0 : SLOTS[0], qty = Number(f["man-qty"] || 1);
+    const L = evActive() ? evLog() : null;
+    const rows = MAN.slice().sort((a, b) => (a.day < b.day ? 1 : a.day > b.day ? -1 : b.slot - a.slot)).map((g) => {
+      const no = manNo(g), b = (bookings[g.day] || []).find((x) => x.no === no), inLog = !!(L && L.nos.has(no));
+      const st = g.past ? (inLog ? "지난 방문 · 장부에 적음" : "지난 방문 기록") : b && b.status === "완료" ? `입장함${b.enteredAt != null ? " " + hm(b.enteredAt) : ""}` : g.day < TODAY ? "안 오심" : "입장 전";
+      const del = !(b && b.status === "완료") && !inLog;
+      return `<div class="manrow"><span class="num">${g.day === TODAY ? "오늘" : md2(g.day)} ${hm(g.slot)}</span><span class="grow"><b>${esc(g.name)}</b> <span class="num">${esc(fmtPhone(g.phone))}</span> · ${g.qty}장${g.note ? ` · ${esc(g.note)}` : ""}</span><span class="help">${st}</span>${del ? `<button class="btn btn-sm" data-act="manDel" data-id="${esc(no)}">지우기</button>` : ""}</div>`;
+    }).join("");
+    const v = (id) => esc(f[id] || "");
+    return `<h3 id="sheet-title">예약 없는 손님 등록 <button class="x" data-act="close" aria-label="닫기">×</button></h3>
+      <div class="banner">네이버 예약은 모두 취소됐지만(일부 환불 · 일부 수수료) 그 장수만큼 입장시키기로 한 손님 — 등록하면 그 날짜 · 시간 명단에 <b>예약 없음</b> 카드가 생겨요. 오시면 카드를 눌러 평소처럼 입장(열쇠 · 입장권). 네이버 실적이 없어 총 판매수에는 안 세고, 재방문 이벤트 장부에는 입장한 날 방문으로 적혀 그날부터 기한(${EV.days || EV_DAYS}일)이 시작돼요.<br><b>지난 날짜</b>는 그날 이미 왔던 손님을 적는 것 — 카드 · 열쇠 · 입장권 없이 장부 · 고객 기록만 남아요.${OFFICE ? "<br>사무실 PC 에서 등록하면 현장 POS 명단에도 바로 생겨요 (입장은 현장 POS 에서)." : ""}</div>
+      <div class="mangrid">
+        <div class="field"><label for="man-day">날짜</label><input id="man-day" type="date" min="${lo}" max="${hi}" value="${day}"></div>
+        <div class="field"><label for="man-slot">입장 시간</label><select id="man-slot">${SLOTS.map((s) => `<option value="${s}"${s === slot ? " selected" : ""}>${hm(s)}</option>`).join("")}</select></div>
+        <div class="field"><label for="man-name">이름</label><input id="man-name" maxlength="20" autocomplete="off" value="${v("man-name")}" placeholder="홍길동" data-autofocus></div>
+        <div class="field"><label for="man-phone">전화번호</label><input id="man-phone" inputmode="numeric" autocomplete="off" maxlength="13" value="${v("man-phone")}" placeholder="010-0000-0000"></div>
+        <div class="field"><label for="man-qty">장수 <span class="help">입장시킬 만큼</span></label><select id="man-qty">${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => `<option value="${n}"${n === qty ? " selected" : ""}>${n}장</option>`).join("")}</select></div>
+        <div class="field"><label for="man-note">사유 <span class="help">선택</span></label><input id="man-note" maxlength="40" autocomplete="off" value="${v("man-note")}" placeholder="예: 4장 중 2장 환불 · 2장 수수료 취소"></div>
+      </div>
+      <div class="sheet-foot"><button class="btn" data-act="close">닫기</button><button class="btn btn-ink" data-act="manSave">등록</button></div>
+      <h4 style="margin:14px 0 6px">등록한 손님 <span class="help">${MAN.length}명 · 지난 40일 · 입장한 손님은 못 지움</span></h4>
+      <div class="manlist">${rows || `<span class="help">아직 없어요</span>`}</div>`;
+  }
   /** 오늘 이용완료한 네이버 예약을 장부에 (화면을 그릴 때마다 · 이미 적은 예약번호는 건너뜀) */
   function evSync() {
     if (!evActive()) return;
     const L = evLog();
     const list = (bookings[TODAY] || []).slice().sort((x, y) => (x.chainHead ? 1 : 0) - (y.chainHead ? 1 : 0)); // 대표 예약 먼저 (영수증 기록은 대표에)
     for (const b of list) {
+      if (b.manual) { // 예약 없는 손님 (11/28): 그날 방문 한 줄 (man: 1 · 네이버 순번 없음 · 마일리지 셈에 안 넣음)
+        if (b.status !== "완료" || !evFrozen(b) || L.nos.has(b.no)) continue;
+        const k = evKey(b); if (!k) continue;
+        const ev = evOf(b);
+        evAdd(Object.assign({ at: `${TODAY} ${hm(b.enteredAt ?? now)}`, day: TODAY, no: b.no, k, name: b.name, phone: fullPhone(b) || digits(b.phone || ""), n: 0, man: 1, qty: b.qty }, ev ? { st: ev.st, due: ev.due } : {}));
+        continue;
+      }
       if (b.status !== "완료" || !b.visitNo || !evFrozen(b) || testOut.has(b.no)) continue;
       const no = b.no || b.id; if (L.nos.has(no)) continue;
       const hd = (b.chainHead && list.find((x) => x.id === b.chainHead)) || b; if (hd.custWait) continue; // 네이버 지난 예약 확인 뒤에 (11/26)
       const k = evKey(b); if (!k) continue;
-      const p = personOf(L, b), base = p ? p.base : evBase(b);
+      const p = personOf(L, b), base = p && p.base != null ? p.base : evBase(b); // 예약 없는 손님 줄(11/28)만 있으면 이 예약의 완료 수
       if (base == null) continue;
       // 전화 = 전체를 알면 전체(입장 때 받은 가운데 4자리 · 재방문 안내 · 다음 방문 견주기) · 이메일 앞 2자리 · 도메인 (11/26)
       const line = Object.assign({ at: `${TODAY} ${hm(b.enteredAt ?? now)}`, day: TODAY, no, k, name: b.name, phone: fullPhone(b) || digits(b.phone || ""), prev: b.prevDone ?? null, n: b.visitNo, base }, emSig(b.email) ? { em: emSig(b.email) } : {});
@@ -4670,7 +4862,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
     const prod = new Map(), add = (p, n) => prod.set(p || "네이버 입장권", (prod.get(p || "네이버 입장권") || 0) + n);
     const raw = naverRaw[TODAY];
     if (raw && raw.length) for (const x of raw) { if (x.done) add(x.product, x.done); }
-    else for (const b of bookings[TODAY]) if (b.status === "완료") add(b.naverProduct || b.product, b.qty);
+    else for (const b of bookings[TODAY]) if (b.status === "완료" && !b.manual) add(b.naverProduct || b.product, b.qty); // 예약 없는 손님(11/28)은 판매 아님
     for (const b of bookings[TODAY]) if (b.status === "완료" && testOut.has(b.no)) { const p = b.naverProduct || b.product || "네이버 입장권"; if (prod.has(p)) prod.set(p, Math.max(0, prod.get(p) - b.qty)); }
     const walkQ = (f) => walkins.filter(f).reduce((a, w) => a + walkQty(w), 0);
     const all = bookings[TODAY].concat(walkins);
@@ -4681,7 +4873,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
       for (const k of h.keys) { const m = useOf(h, k); map[k] = { c: keyColor(h, k), end: m == null ? null : hm(h.slot + m), h: i }; }
       const o = overInfo(h);
       return { kind: h.svc ? "s" : h.walk ? "w" : "n", name: h.svc || !h.walk ? h.name : isEv(h) ? `${walkTag(h)} 입장` : "현장구매자", phone: fullPhone(h) || digits(h.phone || ""), visitor: h.visitor || "", keys: h.keys.slice(),
-        in: h.enteredAt != null ? hm(h.enteredAt) : "", slot: hm(h.slot), no: h.no || "", pos: h.posNo || "", qty: h.svc ? 0 : h.qty || h.keys.length, product: h.svc ? "서비스 키" : isEv(h) ? walkTag(h) : h.product || "",
+        in: h.enteredAt != null ? hm(h.enteredAt) : "", slot: hm(h.slot), no: h.no || "", pos: h.posNo || "", qty: h.svc ? 0 : h.qty || h.keys.length, product: h.svc ? "서비스 키" : isEv(h) ? walkTag(h) : h.manual ? "예약 없음" : h.product || "",
         over: h.overPaid ? 0 : o.due, paid: h.overPaid ? h.overPaid.amount : 0, of: h.svc ? svcGiven(h) : "", staff: !!h.staff };
     });
     const pj = projection();
@@ -5416,7 +5608,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
       ["2", "<b>반납안내 커튼</b> — 손잡이를 내리면 손님께 반납 안내를 크게 (아래를 누르면 걷힘)"],
       ["3", "<b>메모 상자</b> — 근무자마다 하나 + 관리자 · 숫자 = 아직 완료 안 한 것 (칠해져 있으면 새 전달)"],
       ["4", "<b>시간표</b> — 시간마다 완료 · 확정 · 잔여 · 시간 줄을 누르면 그 시간 예약자 (네이버에서 다시 불러옴)"],
-      ["5", "<b>새로고침 · 예약자</b> — 고른 시간의 네이버 예약 카드 · 파랑 <b>미입장</b> 카드를 눌러 입장"],
+      ["5", "<b>새로고침 · 예약자</b> — 고른 시간의 네이버 예약 카드 · 파랑 <b>미입장</b> 카드를 눌러 입장 · 위 <b>[+ 예약 없음]</b> = 네이버 예약은 취소(수수료)됐지만 입장시키는 손님 등록 → 그 시간에 '예약 없음' 카드"],
       ["6", "<b>열쇠판</b> — 숫자 = 열쇠 번호 · 바탕색 = 이용 시간 · <b>번호가 노랑</b> = 곧 퇴장 (10분 전 · 1시간 50분 손님은 1시간 40분부터) · 테두리 = 네이버(흰색) / 현장(파랑) / 서비스(흰 점선)"],
       ["7", "<b>키즈상담 · 카페상담</b> (붉은 숫자 = 새 상담) · <b>열쇠 일괄 반납처리</b> (마감)"],
       ["8", "<b>주차등록</b> — 차량번호로 찾아 할인 (뒤에 열린 아마노와 같이 움직임)"],
@@ -5443,7 +5635,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
           "<b>[POS로 이동해서 n장 결제하기]</b>(초록 = 판매 가능 · 빨강 = 안 넘어감) → POS에서 그 수만큼 결제 → 끝나면 POS를 최소화하면 이 창으로 돌아온다",
           "<b>전화번호</b> 010 뒤 8자리를 키패드로",
           "맨 아래 오른쪽 <b>[결제 완료 · 열쇠 등록]</b>(POS에 다녀와야 눌림) → 입장권과 열쇠를 드린다",
-        ], "결제 없이 들어오는 이벤트 · 쿠폰 손님은 ③(POS)을 건너뛰고 맨 아래 왼쪽 <b>[이벤트 입장]</b> (전화번호만 있으면 · 이름은 관리자가 운영 설정 → 기타에서 · 총 판매수에는 안 셈) · 임직원 등 판매가 아닌 사용은 왼쪽 아래 <b>[서비스 키 (판매 아님)]</b>")}</div></section>
+        ], "결제 없이 들어오는 이벤트 · 쿠폰 손님은 ③(POS)을 건너뛰고 맨 아래 왼쪽 <b>[이벤트 입장]</b> (전화번호만 있으면 · 이름은 관리자가 운영 설정 → 기타에서 · 총 판매수에는 안 셈) · 임직원 등 판매가 아닌 사용은 왼쪽 아래 <b>[서비스 키]</b> · 네이버 예약은 취소(수수료)됐지만 입장시키기로 한 손님은 왼쪽 아래 <b>[예약 없는 손님]</b> → 이름 · 전화번호 · 열쇠 수 → 열쇠 · 이벤트 입장권 · 재방문 장부 (총 판매수에는 안 셈)")}</div></section>
         <section class="mansec" id="man4"><div>${manImg("m4-key.jpg", "열쇠 반납 창")}</div><div><h4>④ 퇴장 · 열쇠 반납</h4>${manSteps([
           "손님이 준 <b>열쇠 번호</b>를 열쇠판에서 누른다",
           "이용 시간을 본다 — <b>빨간 상자</b> = 반납 시간 지남 → <b>[POS로 결제 · 금액]</b>으로 초과요금을 결제",
@@ -5630,7 +5822,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
   /** 화면을 그릴 때마다: 오늘 네이버 이용완료 손님(장부와 같은 키 · '기록 삭제'한 시험 예약 빼고)이 늘었으면 방문 기록에 더함 */
   function hvSync() {
     if (!HV_APP() || !stateReady) return;
-    const done = (bookings[TODAY] || []).filter((b) => b.status === "완료" && !testOut.has(b.no));
+    const done = (bookings[TODAY] || []).filter((b) => b.status === "완료" && !testOut.has(b.no) && !b.manual); // 예약 없는 손님(11/28)은 네이버 이용완료가 아님
     const hk = (b) => fullPhone(b) || evKey(b); // 방문 기록 = 전체 번호를 알면 그것(가려지기 전 기록과 이어짐 · 11/26)
     const keys = [...new Set(done.map(hk).filter(Boolean))].sort();
     // 손님마다 [네이버 '완료 n'(오늘 것까지), 오늘 건수] — 신규 · 기존 나누기 (사장님 10/31 · 모르면 뺌)
@@ -5929,8 +6121,14 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
     const phone = d.length === 11 ? d : "";
     return { name, phone, ok: sheet.keys.length > 0 && (!!name || !!phone) && (d.length <= 3 || d.length === 11) };
   }
+  /** 현장입장 예약 없는 손님 (11/28): 이름 · 전화번호 11자리 · 열쇠 */
+  function manWalkState() {
+    const name = String(sheet.manName || "").trim().slice(0, 20), d = digits(sheet.phone);
+    return { name, phone: d, note: String(sheet.manNote || "").trim().slice(0, 40), ok: sheet.keys.length > 0 && !!name && /^01\d{9}$/.test(d) };
+  }
   function updateWalkButtons() {
     const done = $("w-done"); if (!done) return;
+    if (sheet.man) { done.disabled = !manWalkState().ok; return; }
     if (sheet.svc) { done.disabled = !svcWalkState().ok; return; }
     const st = walkState();
     const lock = !st.phoneOk; // 전화번호 먼저
@@ -5991,8 +6189,14 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
     midKey(btn) { const n = btn.dataset.n, v = String(sheet.mid || ""); midSet(n === "del" ? v.slice(0, -1) : v.length >= 4 ? v : v + n); },
     async doEnter(btn) {
       const b = findB(sheet.id);
+      if (!b) { closeSheet(); renderAll(); return; } // 그 사이 지운 등록 (예약 없는 손님)
       const party = partyOpen(b), need = partyNeed(b);
       if (sheet.keys.length !== need || sheet.busy) return; // 같은 시간 묶음은 어느 카드에서든 (11/20)
+      if (b.manual) { // 예약 없는 손님 (11/28): 네이버 이용완료 없이 열쇠 · 입장권 · 장부만
+        if (sheet.keys.some((k) => holderOf(k))) { toast("그 사이 다른 손님이 쓴 열쇠가 있어요. 다시 골라 주세요."); sheet.keys = []; renderSheet(); return; }
+        Object.assign(b, { status: "완료", keys: sheet.keys.slice(), enteredAt: now });
+        closeSheet(); manEntered(b); return;
+      }
       // 전화번호 가운데 4자리 (사장님 11/26): 같은 손님 예약(같은 시간 · 연속예약)에 모두 → 전체 번호로 열쇠 현황 · 장부 · 재방문 확인
       if (midNeed(b)) {
         if (!midOk(sheet.mid)) { toast("전화번호 가운데 4자리를 넣어 주세요"); return; }
@@ -6120,7 +6324,28 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
       toast(`${k}번 서비스 키 → ${x.of.label} 손님과 연결 (판매수 · 인원에 안 셈)`);
     },
     // 현장입장 창 왼쪽 아래 [서비스 키]: 임직원 등 예약 없이 쓸 때 — 판매 · 결제 없이 사용자만 적고 열쇠 등록
-    svcWalk() { sheet.svc = !sheet.svc; renderSheet(); const n = $(sheet.svc ? "w-svcname" : "w-phone"); if (n) n.focus(); },
+    manWalk() { sheet.man = !sheet.man; sheet.svc = false; renderSheet(); const n = $(sheet.man ? "w-manname" : "w-phone"); if (n) n.focus(); },
+    // 예약 없는 손님 등록 창 (11/28)
+    manOpen() { openSheet({ mode: "man", day: viewDay, slot: selSlot }); },
+    manSave() {
+      const v = (id) => ($(id) ? $(id).value : "");
+      const r = manAdd({ day: v("man-day"), slot: Number(v("man-slot")), name: v("man-name"), phone: v("man-phone"), qty: Number(v("man-qty")), note: v("man-note") });
+      if (!r.ok) { toast(r.why); return; }
+      const g = r.g;
+      toast(g.past ? `${g.name}님 ${md2(g.day)} 방문을 기록했어요 (재방문 이벤트 장부 · 기한 ${md2(g.day)}부터)` : `${g.name}님 등록 — ${g.day === TODAY ? "오늘" : md2(g.day)} ${hm(g.slot)} 명단에 '예약 없음' 카드 · 오시면 카드를 눌러 입장`, 6000);
+      if (!g.past) { viewDay = g.day; selSlot = g.slot; selAuto = false; }
+      closeSheet(); renderAll();
+    },
+    manDel(btn) {
+      const no = btn.dataset.id, g = MAN.find((x) => manNo(x) === no), b = Object.values(bookings).flat().find((x) => x.no === no);
+      if (!g) { toast("이미 지운 등록이에요"); closeSheet(); return; }
+      if (b && b.status !== "확정") { toast("이미 입장한 손님은 지울 수 없어요"); return; }
+      if (!confirm(`${g.name}님 예약 없는 손님 등록을 지울까요? (${g.day === TODAY ? "오늘" : md2(g.day)} ${hm(g.slot)} · ${g.qty}장)`)) return;
+      if (sheet.mode === "enter") closeSheet(); // 먼저 닫아야 명단에서 그 카드가 빠짐 (열린 입장 창의 카드는 안 뺌)
+      MAN = MAN.filter((x) => x !== g); manStore(); manChanged();
+      toast(`${g.name}님 등록을 지웠어요`);
+    },
+    svcWalk() { sheet.svc = !sheet.svc; sheet.man = false; renderSheet(); const n = $(sheet.svc ? "w-svcname" : "w-phone"); if (n) n.focus(); },
     // 맨 위 '포스 전환': 결제와 상관없이 POS 화면으로 (POS를 최소화하면 데스크로 돌아옴)
     async posGo() {
       if (window.desk && window.desk.pos) {
@@ -6167,6 +6392,17 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
       renderSheet(); const p = $("w-phone"); if (p) p.focus();
     },
     walkDone() {
+      if (sheet.man) { // 예약 없는 손님 (11/28): 오늘 · 그 타임으로 등록하고 바로 입장
+        const st = manWalkState();
+        if (!st.ok) { toast("이름과 전화번호(010 · 11자리)를 넣어 주세요"); return; }
+        if (sheet.keys.some((k) => holderOf(k))) { toast("그 사이 다른 손님이 쓴 열쇠가 있어요"); closeSheet(); renderAll(); return; }
+        const r = manAdd({ name: st.name, phone: st.phone, qty: sheet.keys.length, day: TODAY, slot: Math.max(SLOTS[0], Math.min(SLOTS[SLOTS.length - 1], sheet.slot ?? walkSlot(now))), note: st.note });
+        if (!r.ok) { toast(r.why); return; }
+        const b = (bookings[TODAY] || []).find((x) => x.no === manNo(r.g));
+        if (!b) { toast("등록했지만 카드를 못 찾았어요 — 명단에서 입장해 주세요"); closeSheet(); return; }
+        Object.assign(b, { status: "완료", keys: sheet.keys.slice(), enteredAt: now });
+        closeSheet(); manEntered(b); return;
+      }
       if (sheet.svc) {
         // 서비스 키 (직원 등): 판매 아님 — 입장권 없음 · 총 판매수 · 인원에 안 셈 (저장 파일 s)
         const st = svcWalkState();
@@ -7095,13 +7331,14 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
       if (k === "announce" && v) { annLoad(v); renderAnnBtn(); }
       if (k === "capWatch") CW.on = !(v && v.on === false); // 수량 관찰 기록 켜고 끄기 (사무실에서도 · 11/27)
       if (k === "revTalkAuto" && v) rtAutoSet(v, true); // 재방문 안내 톡톡 매일 자동 보내기 (사무실에서도 · 11/27)
+      if (k === "manualGuests") { manLoad(v); manChanged(true); } // 예약 없는 손님 등록 (두 PC 가 같이 · 11/28)
     }
     renderAll();
     if (sheet.mode === "settings") syncSheetSoon();
     toast(`${OFFICE ? "현장 POS" : "사무실 PC"}에서 바꾼 설정을 받았어요`);
   }
   /** 사무실 PC 에서 누른 버튼: 되는 것만 (네이버는 읽기만 · 근무자 일 · 네이버에 넣는 일 · 출력 · 주차는 현장 POS) */
-  const OFFICE_OK = new Set(["maskOpen", "cwToggle", "rtAutoToggle", "updApply", "updLater", "updCheck", "time", "refresh", "day", "slot", "openRes", "key", "minimize", "soldList", "soldDay", "soldOpen", "settings", "setTab", "qhelp", "csub", "manual", "manGo", "close", "clock",
+  const OFFICE_OK = new Set(["maskOpen", "cwToggle", "rtAutoToggle", "manOpen", "manSave", "manDel", "updApply", "updLater", "updCheck", "time", "refresh", "day", "slot", "openRes", "key", "minimize", "soldList", "soldDay", "soldOpen", "settings", "setTab", "qhelp", "csub", "manual", "manGo", "close", "clock",
     "memoOpen", "memoTab", "memoTo", "memoSend", "memoAck", "memoFin", "memoUnfin", "memoRecall", "memoAdd", "memoDone", "memoUndo", "memoDel",
     "capCell", "addPeak", "delPeak", "evApply", "evOff", "evTpl", "evOpen", "tplGo", "tplRow", "tplSamp", "tplView", "tplSave", "tplDef", "tplNew", "tplDel", "tplCode",
     "staffAdd", "staffDel", "liveToggle", "svKeySave", "svKeyDel", "stToggle", "printMode", "drawerPin", "findPorts", "pickPort", "findPrinters", "pickPrinter", "bcFilter",
@@ -7363,6 +7600,9 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
     if (t.id === "com-baud") { PRINT.baud = Number(t.value); savePrint(); }
     if (t.id === "w-phone") { sheet.phone = walkPhone(t.value); t.value = walkFmt(sheet.phone); updateWalkButtons(); }
     if (t.id === "w-svcname") { sheet.svcName = t.value; updateWalkButtons(); } // 서비스 키 쓰는 사람
+    if (t.id === "w-manname") { sheet.manName = t.value; updateWalkButtons(); } // 예약 없는 손님 이름 (11/28)
+    if (t.id === "w-mannote") sheet.manNote = t.value;
+    if (sheet.mode === "man" && /^man-/.test(t.id || "")) (sheet.mf || (sheet.mf = {}))[t.id] = t.value; // 예약 없는 손님 등록 창 — 다시 그려도 쓰던 값 그대로
     if (t.id === "e-mid") midSet(t.value); // 네이버 손님 전화번호 가운데 4자리 (11/26)
     const m = /^p(f|t)-(\d+)$/.exec(t.id);
     if (m && t.value) { RULES.peaks[+m[2]][m[1] === "f" ? "from" : "to"] = t.value; savePeaks(); renderAll(); }
@@ -7450,7 +7690,8 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
       evAdd(Object.assign({ at: `${d} 10:00`, day: d, no: o.no || "t-" + name + nn + d, k: evKey(b), name: o.name ?? name, phone: digits(b.phone), prev: nn - 1, n: nn, base: o.base ?? nn - 1 }, st ? { st, due: o.due ?? shiftDay(d, EV.days) } : {}), o.from || EV.from);
       renderAll();
     }, evLine: (r, from) => { evAdd(r, from || EV.from); renderAll(); }, sigKey, naverApply: (day, r, only) => { applyNaver(day, r, only); renderAll(); }, naverMask: () => naverMask, naverRaw: (day) => JSON.parse(JSON.stringify(naverRaw[day] || [])), cdb: () => JSON.parse(JSON.stringify(CDB)), cdbOf: (id) => cdbOf((bookings[TODAY] || []).find((b) => b.id === id)), cdbVisit: (q) => { const id = cdbVisit(q); cdbSave(); renderAll(); return id; }, cdbFind: (q) => cdbFind(q), cdbSearch: (q) => cdbSearch(q).map(([id]) => id), nmMask: (n) => nmMask(n), // 장부 한 줄 그대로 (예전 모양 줄 시험) · 손님 견주는 열쇠 (11/26)
-    evSub: (name) => evSub(bookings[TODAY].filter((x) => x.name === name).pop()), EV };
+    evSub: (name) => evSub(bookings[TODAY].filter((x) => x.name === name).pop()), EV,
+    man: { list: () => JSON.parse(JSON.stringify(MAN)), add: (q) => manAdd(q), rows: (d) => entryRows(d || TODAY).map((r) => ({ name: r.name, qty: r.qty, man: !!r.man })), cards: (d) => (bookings[d || TODAY] || []).filter((b) => b.manual).map((b) => ({ id: b.id, no: b.no, name: b.name, slot: b.slot, qty: b.qty, status: b.status, keys: b.keys.slice(), day: b.day })) } }; // 예약 없는 손님 (11/28)
 
   // ── 반납안내 커튼 ─────────────────────────────────
   (function curtain() {

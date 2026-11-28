@@ -130,8 +130,9 @@ test("서비스 키: 현장입장 창 왼쪽 아래 — 임직원 등 예약 없
     const sold0 = await sold(page);
 
     await page.click('.key[data-k="32"]');
-    const btn = await page.$eval("#sheet .wleft .svcwalk button", (b) => b.textContent.trim());
-    assert.strictEqual(btn, "서비스 키 (판매 아님)", "왼쪽 단계 안내 아래");
+    const btn = await page.$$eval("#sheet .wleft .svcwalk button", (bs) => bs.map((b) => b.textContent.trim()));
+    assert.deepStrictEqual(btn, ["서비스 키", "예약 없는 손님"], "왼쪽 단계 안내 아래 (2.43 — 예약 없는 손님과 한 상자)");
+    assert.match(await page.textContent("#sheet .wleft .svcwalk .help"), /서비스 키 = 임직원 등 열쇠만 .* 둘 다 총 판매수에 안 셈/);
     await page.click("#sheet [data-act=svcWalk]");
     assert.match(await page.textContent("#sheet-title"), /현장입장 · 서비스 키\s*판매 아님/);
     assert.strictEqual(await page.$("#sheet [data-act=pay]"), null, "POS 결제 단계 없음");

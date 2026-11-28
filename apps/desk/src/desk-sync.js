@@ -19,7 +19,7 @@ const crypto = require("crypto");
 const zlib = require("zlib");
 
 /** 함께 쓰는 설정 (settings.json 키) — 프린터 포트 · 아마노 · 네이버 주소 · 보고 열쇠 · 쿠폰 봉인 열쇠 · 손님 기록은 각 PC 에만 */
-const SHARED = ["peaks", "capAuto", "unpaidCancel", "stockAuto", "printForm", "printSet", "bc2Forms", "bc", "visitEvent", "walkEvent", "liveOn", "announce", "capWatch", "revTalkAuto"]; // announce = 안내 방송 (11/07 · 목소리는 각 PC annVoice) · capWatch 수량 관찰 기록 · revTalkAuto 톡톡 자동 보내기 켜고 끄기 (11/27 — 사무실에서 바꿔도 현장에 바로)
+const SHARED = ["peaks", "capAuto", "unpaidCancel", "stockAuto", "printForm", "printSet", "bc2Forms", "bc", "visitEvent", "walkEvent", "liveOn", "announce", "capWatch", "revTalkAuto", "manualGuests"]; // manualGuests = 예약 없는 손님 등록 (11/28 — 두 PC 가 같이 · 연결 코드로 잠긴 두 PC 연결로만) · announce = 안내 방송 (11/07 · 목소리는 각 PC annVoice) · capWatch 수량 관찰 기록 · revTalkAuto 톡톡 자동 보내기 켜고 끄기 (11/27 — 사무실에서 바꿔도 현장에 바로)
 const ROLES = ["pos", "office"];
 const other = (role) => (role === "pos" ? "office" : "pos");
 const ALPHA = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"; // 헷갈리는 0 · 1 · I · O 없음 (32자 → 16자리 = 80비트)

@@ -61,6 +61,7 @@ test("연결 코드: 16자리 · 헷갈리는 글자 없음 · 틀린 코드 · 
 test("설정: 처음 연결하면 사무실 PC 가 현장 설정을 받음 → 사무실에서 바꾸면 현장으로 → 현장에서 바꾸면 사무실로 · 각 PC 설정(프린터 포트)은 안 감", async () => {
   // 사무실에서 바꿔도 현장에 바로 (사장님 11/27): 수량 관찰 기록 · 톡톡 자동 보내기 켜고 끄기도 함께 쓰는 설정
   assert.ok(["capWatch", "revTalkAuto"].every((k) => S.SHARED.includes(k)), "수량 관찰 기록 · 톡톡 자동 보내기");
+  assert.ok(S.SHARED.includes("manualGuests"), "예약 없는 손님 등록 (2.43 — 사무실에서 등록해도 현장 POS 명단에)");
   const clock = mkClock(Date.UTC(2026, 10, 6, 1, 0, 0)), mb = mailbox();
   const pos = pc("pos", mb, clock, { settings: { peaks: [{ from: "2026-12-20", to: "2027-02-28" }], capAuto: { on: true, target: 40 }, comPort: "COM3" }, meta: { peaks: 1, capAuto: 1 } });
   const off = pc("office", mb, clock, { settings: { capAuto: { on: false, target: 42 } } }); // 사무실 PC 를 처음 깔았을 때 (기본값 · 바꾼 때 0)
