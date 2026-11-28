@@ -122,7 +122,7 @@ test("예약 없는 손님: 지난 날짜 = 카드 없이 장부 · 고객 데�
     assert.deepStrictEqual(await page.evaluate(() => window.__deskTest.man.cards("2026-09-28").concat(window.__deskTest.man.cards())), [], "지난 날짜는 카드 없음");
     let p = (await page.evaluate(() => window.__deskTest.evLog().people))["m:한윤1234"];
     assert.ok(p);
-    assert.deepStrictEqual(p.visits.map((v) => [v.day, v.st, v.due, v.man]), [["2026-09-28", "안내", "2026-10-18", 1]]);
+    assert.deepStrictEqual(p.visits.map((v) => [v.day, v.st, v.due, v.man]), [["2026-09-28", "", "", 1]], "방문만 (그날 영수증은 안 나갔으니 안내 · 성공 없음)");
     const db = await page.evaluate(() => window.__deskTest.cdb());
     assert.ok(Object.values(db.c).some((x) => x.p4 === "1234" && x.nm === "한*윤" && x.v.some((v) => v[0] === "2026-09-28")), "고객 데이터베이스 (9/28)");
     // 목록: 장부에 적음 · 못 지움
@@ -139,7 +139,7 @@ test("예약 없는 손님: 지난 날짜 = 카드 없이 장부 · 고객 데�
     await page.fill("#e-mid", "9753");
     await page.click("#enter-done");
     p = (await page.evaluate(() => window.__deskTest.evLog().people))["m:한윤1234"];
-    assert.deepStrictEqual(p.visits.map((v) => [v.day, v.st, v.man]), [["2026-09-28", "안내", 1], ["2026-10-05", "성공", 0]]);
+    assert.deepStrictEqual(p.visits.map((v) => [v.day, v.st, v.man]), [["2026-09-28", "", 1], ["2026-10-05", "성공", 0]]);
     assert.strictEqual(p.base, 5, "네이버 기준은 네이버 예약 줄에서");
     assert.strictEqual(await page.evaluate(() => window.__deskTest.evSub("한*윤")), 1, "마일리지에서 뺄 수 = 네이버 이용완료 1건 (예약 없는 방문은 안 셈)");
     assert.deepStrictEqual(page.errs, []);
