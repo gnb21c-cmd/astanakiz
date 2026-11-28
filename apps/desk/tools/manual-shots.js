@@ -1,5 +1,5 @@
 /* 근무자 메뉴얼 그림 (V2.0) — 체험판 화면을 찍어 prototype/manual/*.jpg 로 남김
-   쓰는 법: apps/desk 에서  node tools/manual-shots.js
+   쓰는 법: apps/desk 에서  node tools/manual-shots.js 2.42   (버전 = 그림 왼쪽 위 'ver.n')
    - 데스크 화면이 바뀌면 다시 찍기 · 그림 1번의 번호 자리(MARKS)는 찍을 때 나온 값으로 desk.html MANUAL_MARKS 를 맞춤
    - 체험판 예시 손님만 나옴 (실제 손님 정보 없음) */
 const path = require("path");
@@ -24,10 +24,10 @@ const shot = (loc, name) => loc.screenshot({ path: path.join(OUT, name), type: "
   await page.goto(URL);
   await page.waitForTimeout(500);
   // 앱처럼: 체험판 시간 버튼 숨김 · 버전 표시
-  await page.evaluate(() => {
+  await page.evaluate((v) => {
     document.querySelectorAll("[data-act=time]").forEach((x) => (x.hidden = true));
-    const t = document.querySelector(".top .tag"); if (t) t.textContent = "ver.2.23";
-  });
+    const t = document.querySelector(".top .tag"); if (t && v) t.textContent = "ver." + v;
+  }, process.argv[2] || "");
   // 메모 상자: 예시 근무자 3명 + 관리자 전달 · 메모 (상자 숫자가 보이게)
   await page.dblclick("#now");
   await page.click("[data-t=staff]");

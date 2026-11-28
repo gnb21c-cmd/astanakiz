@@ -30,6 +30,7 @@
   --red: #D23A3A;
   --nm-k3: #A87400; /* 3자녀가정 이름 (사장님 10/20 — 밝은 화면은 짙은 노랑, 어두운 화면은 노랑) */
   --yellow: #FFD23F; --yellow-fg: #C81E1E; /* 예약 수량 2장 이상 스티커: 노랑 네모 · 빨강 글씨 (사장님 10/16) */
+  --key-soon: #E8B000; --key-soon-sh: 0 0 1px #4A3600, 0 0 1px #4A3600; /* 곧 퇴장 열쇠 번호 (사장님 11/28 — 퇴장 10분 전 노랑) */
   --ochre: #E8CB8E; /* 이벤트 쿠폰 지급 네모 (옅은 황토색 · 밝은 · 어두운 화면 같음) */
   --ok: #1D7F52;
   --warn-bg: #FBE3E3;
@@ -46,6 +47,7 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    --key-soon: #FFD400; --key-soon-sh: none;
     /* V2.0 시안 B '선명한 다크' (사장님 10/21) — 더 검은 바탕 · 흰 글씨 · 원색 */
     --sky-bg: #0C2440; --sky-line: #2D6CB0; --done-bg: #1A1F28;
     --bg: #06080C; --surface: #10141B; --surface-2: #161B24; --fg: #FFFFFF; --muted: #B3BDCC; --faint: #545F70; --line: #252D3A;
@@ -57,6 +59,7 @@
   }
 }
 :root[data-theme="dark"] {
+  --key-soon: #FFD400; --key-soon-sh: none;
   --sky-bg: #0C2440; --sky-line: #2D6CB0; --done-bg: #1A1F28;
   --bg: #06080C; --surface: #10141B; --surface-2: #161B24; --fg: #FFFFFF; --muted: #B3BDCC; --faint: #545F70; --line: #252D3A;
   --ink: #FFFFFF; --on-ink: #06080C; --accent: #5B97FF; --accent-bg: #0F2347; --naver: #18E07A; --naver-bg: #0B3B24; --on-naver: #03170C;
@@ -597,6 +600,8 @@ textarea.notein:focus { outline: none; border-color: var(--accent); }
 .key.in { background: var(--surface); border: 2.5px solid var(--ink); color: var(--ink); }
 .key.pink { background: var(--pink); border: 2.5px solid var(--ink); color: var(--pink-fg); }
 .key.red { background: var(--red); border: 2.5px solid var(--ink); color: #fff; }
+.key.soon b { color: var(--key-soon); text-shadow: var(--key-soon-sh); } /* 곧 퇴장 (사장님 11/28): 이용 끝 10분 전부터 열쇠 번호만 노랑 — 바탕은 그대로 */
+.legend .l-soon { font-weight: 700; color: var(--key-soon); text-shadow: var(--key-soon-sh); margin-right: 3px; }
 /* V2.0 (사장님 10/21): 테두리 = 누구 열쇠 — 네이버 예약 흰색(밝은 화면은 잉크) · 현장 파랑 · 서비스 흰 점선 / 바탕 = 이용 시간 */
 .key.walk { border-color: var(--walk); }
 /* 열쇠 1초 꾹 → 끌어서 맞바꿈 · 옮기기 (사장님 10/29 · 10/30 2초 → 1초) */
@@ -928,6 +933,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
     useMinutes: 110,        // 1시간 50분
     shortMinutes: 80,       // 숏타임 상품(10시 매진 때 사장님이 여는 '10시 매진 시 숏타임 80분') 이용시간 — 상품 이름에 'N분'이 있으면 그 값 (사장님 11/05)
     pinkUntil: 120,         // 1시간 50분 ~ 2시간 분홍, 2시간 넘으면 빨강
+    soonBefore: 10,         // 곧 퇴장: 이용 시간이 끝나기 10분 전(1시간 50분 손님 = 1시간 40분)부터 열쇠 번호만 노랑 (사장님 11/28)
     giftEvery: 10,          // 10회 방문마다 사은권 (명함식 카드로 따로 줌)
     giftName: "2만원 사은권",
     overUnitMin: 10,        // 초과요금: 반납 시각이 지나고 10분마다
@@ -1646,6 +1652,14 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
   const freeKeys = () => { const out = []; for (let k = 1; k <= RULES.keys; k++) if (!holderOf(k)) out.push(k); return out; };
   /* 열쇠 색: 예약한 입장시간(현장은 입장 시각)부터
      ~ 1시간 50분 검정 · 1시간 50분 ~ 2시간 분홍 · 2시간 넘으면 빨강. 무제한 손님은 계속 검정 */
+  /** 곧 퇴장 (사장님 11/28 — "곧 퇴장이 되는 사람도 표시 · 1시간 40분이 되면 열쇠번호 색깔만 노란색"): 이용 시간이 끝나기 10분 전부터 끝날 때까지
+      (1시간 50분 손님 1:40 ~ · 숏타임 80분 1:10 ~ · 연속예약 · 반납 시각을 바꾼 열쇠는 그 끝 10분 전) — 바탕 색(keyColor)은 그대로 · 무제한은 없음 */
+  function keySoon(h, k) {
+    const m = useOf(h, k);
+    if (m == null) return false;
+    const used = now - h.slot;
+    return used >= m - RULES.soonBefore && used < m;
+  }
   function keyColor(h, k) {
     const m = useOf(h, k);
     if (m == null) return "in";
@@ -1865,11 +1879,11 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
       if (k > RULES.keys) break; // 남는 칸(46~50)은 비워 둠
       const h = holderOf(k);
       if (!h) { html += `<button class="key free" data-act="key" data-k="${k}" aria-label="${k}번 빈 열쇠"><b class="num">${k}</b><span>&nbsp;</span></button>`; continue; }
-      html += `<button class="key ${keyColor(h, k)}${h.svc ? " svc" : h.walk ? " walk" : ""}" data-act="key" data-k="${k}" aria-label="${k}번 ${h.svc ? "서비스 키 " : ""}${esc(h.name)}"><b class="num">${k}</b><span>${esc(h.svc ? svcBoard(h) : h.walk ? walkShort(h) : h.name)}</span></button>`;
+      html += `<button class="key ${keyColor(h, k)}${keySoon(h, k) ? " soon" : ""}${h.svc ? " svc" : h.walk ? " walk" : ""}" data-act="key" data-k="${k}" aria-label="${k}번 ${h.svc ? "서비스 키 " : ""}${esc(h.name)}"><b class="num">${k}</b><span>${esc(h.svc ? svcBoard(h) : h.walk ? walkShort(h) : h.name)}</span></button>`;
     }
     // 설명은 45번 오른쪽 빈 칸에 (사장님이 정한 순서 10/8)
     if (RULES.keys > 40 && RULES.keys <= 45) html += `<div class="legend" style="grid-column: ${RULES.keys - 39} / -1">
-      <span class="row"><span><i></i>빈 열쇠 · 누르면 현장입장</span></span>
+      <span class="row"><span><i></i>빈 열쇠 · 누르면 현장입장</span><span><b class="l-soon">7</b>곧 퇴장</span></span>
       <span class="row"><span><i class="l-in"></i>~ 1시간 50분</span><span><i class="l-pink"></i>~ 2시간</span><span><i class="l-red"></i>2시간 넘음</span></span>
       <span class="row"><span>테두리</span><span><i class="l-nv"></i>네이버</span><span><i class="l-walk"></i>현장</span><span><i class="l-svc"></i>서비스</span></span></div>`;
     $("keys").innerHTML = html;
@@ -5403,7 +5417,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
       ["3", "<b>메모 상자</b> — 근무자마다 하나 + 관리자 · 숫자 = 아직 완료 안 한 것 (칠해져 있으면 새 전달)"],
       ["4", "<b>시간표</b> — 시간마다 완료 · 확정 · 잔여 · 시간 줄을 누르면 그 시간 예약자 (네이버에서 다시 불러옴)"],
       ["5", "<b>새로고침 · 예약자</b> — 고른 시간의 네이버 예약 카드 · 파랑 <b>미입장</b> 카드를 눌러 입장"],
-      ["6", "<b>열쇠판</b> — 숫자 = 열쇠 번호 · 바탕색 = 이용 시간 · 테두리 = 네이버(흰색) / 현장(파랑) / 서비스(흰 점선)"],
+      ["6", "<b>열쇠판</b> — 숫자 = 열쇠 번호 · 바탕색 = 이용 시간 · <b>번호가 노랑</b> = 곧 퇴장 (10분 전 · 1시간 50분 손님은 1시간 40분부터) · 테두리 = 네이버(흰색) / 현장(파랑) / 서비스(흰 점선)"],
       ["7", "<b>키즈상담 · 카페상담</b> (붉은 숫자 = 새 상담) · <b>열쇠 일괄 반납처리</b> (마감)"],
       ["8", "<b>주차등록</b> — 차량번호로 찾아 할인 (뒤에 열린 아마노와 같이 움직임)"],
       ["9", "<b>개인정보</b> (초록 <b>보임</b> = 네이버 손님 이름 · 전화번호가 보임 · 호박색 <b>가림·인증</b> = 가려짐 → 눌러서 인증, ⑧ 이럴 땐) · <b>대관</b> (대관이 있는 날 단체 이름 · 입금일 → 보고 앱) · <b>근무자 메뉴얼 · 총 판매수</b> (누르면 입장권 목록) · 지금 시각 · 맨 왼쪽 <b>통합 데스크</b> 글자를 누르면 데스크만 작업표시줄로"],
@@ -5434,7 +5448,7 @@ b.p4 { font-size: 1.3em; font-weight: 800; letter-spacing: 0.5px; color: var(--f
           "손님이 준 <b>열쇠 번호</b>를 열쇠판에서 누른다",
           "이용 시간을 본다 — <b>빨간 상자</b> = 반납 시간 지남 → <b>[POS로 결제 · 금액]</b>으로 초과요금을 결제",
           "<b>[n번 반납 · 퇴장]</b> — 열쇠가 여러 개면 <b>[n번만]</b> 또는 <b>[모두 반납]</b>",
-        ], "초과요금: 2시간이 되면 5,000원, 그 뒤 10분마다 5,000원씩 (열쇠마다) · 반납 시각만 바꾸기 = ◀ ▶ 후 [변경] · 한 타임 더 = [+1타임] (입장권을 더 산 것으로) · 감열지가 다 돼 입장권이 끊겼으면 종이를 갈고 열쇠 창 오른쪽 위 <b>[입장권 다시 출력]</b>")}</div></section>
+        ], "열쇠 <b>번호가 노랑</b> = 곧 퇴장할 손님 (이용 시간이 끝나기 10분 전 — 1시간 50분 손님은 1시간 40분부터 · 숏타임은 1시간 10분부터) → 1시간 50분이 되면 분홍 · 초과요금: 2시간이 되면 5,000원, 그 뒤 10분마다 5,000원씩 (열쇠마다) · 반납 시각만 바꾸기 = ◀ ▶ 후 [변경] · 한 타임 더 = [+1타임] (입장권을 더 산 것으로) · 감열지가 다 돼 입장권이 끊겼으면 종이를 갈고 열쇠 창 오른쪽 위 <b>[입장권 다시 출력]</b>")}</div></section>
         <section class="mansec" id="man5"><div>${manImg("m5-bulk.jpg", "열쇠 일괄 반납 창")}</div><div><h4>⑤ 마감 · 일괄 반납</h4>${manSteps([
           "영업 마감 때 <b>열쇠를 모두 받았는지</b> 먼저 확인한다",
           "<b>[열쇠 일괄 반납처리]</b>를 누르고 손님 · 열쇠 목록을 본다",
